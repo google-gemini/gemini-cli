@@ -17,9 +17,8 @@ describe('CommandHandler', () => {
     expect(memShow.commandToExecute?.name).toBe('memory show');
     expect(memShow.args).toBe('');
 
-    const memAdd = parse('/memory add hello world');
-    expect(memAdd.commandToExecute?.name).toBe('memory add');
-    expect(memAdd.args).toBe('hello world');
+    const memList = parse('/memory list');
+    expect(memList.commandToExecute?.name).toBe('memory list');
 
     const extList = parse('/extensions list');
     expect(extList.commandToExecute?.name).toBe('extensions list');

@@ -206,7 +206,6 @@ class ThemeManager {
         try {
           const theme = createCustomTheme(themeWithDefaults);
           this.extensionThemes.set(namespacedName, theme);
-          debugLogger.log(`Registered theme: ${namespacedName}`);
         } catch (error) {
           debugLogger.warn(
             `Failed to load custom theme "${namespacedName}":`,
@@ -237,7 +236,6 @@ class ThemeManager {
     for (const theme of customThemes) {
       const namespacedName = `${theme.name} (${extensionName})`;
       this.extensionThemes.delete(namespacedName);
-      debugLogger.log(`Unregistered theme: ${namespacedName}`);
     }
   }
 

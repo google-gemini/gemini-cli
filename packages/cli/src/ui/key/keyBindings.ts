@@ -681,34 +681,51 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.STOP_RECORDING]: 'Stop recording the session.',
 };
 
-const keybindingsSchema = z.array(
-  z
-    .object({
-      command: z.string().transform((val, ctx) => {
-        const negate = val.startsWith('-');
-        const commandId = negate ? val.slice(1) : val;
+const keybindingsSchema = z
+  .array(
+    z
+      .object({
+        command: z.string().transform((val, ctx) => {
+          const negate = val.startsWith('-');
+          const commandId = negate ? val.slice(1) : val;
 
-        const result = z.nativeEnum(Command).safeParse(commandId);
-        if (!result.success) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: `Invalid command: "${val}".`,
-          });
-          return z.NEVER;
-        }
+          const result = z.nativeEnum(Command).safeParse(commandId);
+          if (!result.success) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `Invalid command: "${val}".`,
+            });
+            return z.NEVER;
+          }
 
-        return {
-          command: result.data,
-          negate,
-        };
+          return {
+            command: result.data,
+            negate,
+          };
+        }),
+        key: z.string().optional(),
+        keys: z.array(z.string()).min(1).optional(),
+      })
+      .refine(
+        (data) =>
+          data.key !== undefined ||
+          (data.keys !== undefined && data.keys.length > 0),
+        {
+          message: 'Must specify either "key" or a non-empty "keys" array.',
+        },
+      )
+      .transform((data) => {
+        const keys = [
+          ...(data.key !== undefined ? [data.key] : []),
+          ...(data.keys ?? []),
+        ].reverse();
+        return keys.map((key) => ({
+          commandEntry: data.command,
+          key,
+        }));
       }),
-      key: z.string(),
-    })
-    .transform((val) => ({
-      commandEntry: val.command,
-      key: val.key,
-    })),
-);
+  )
+  .transform((entries) => entries.flat());
 
 /**
  * Loads custom keybindings from the user's keybindings.json file.

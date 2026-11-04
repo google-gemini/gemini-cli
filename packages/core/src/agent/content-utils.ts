@@ -6,6 +6,7 @@
 
 import type { Part } from '@google/genai';
 import type { ContentPart } from './types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Converts Gemini API Part objects to framework-agnostic ContentPart objects.
@@ -92,10 +93,16 @@ export function contentPartsToGeminiParts(content: ContentPart[]): Part[] {
         // References are converted to text for the model
         result.push({ text: part.text });
         break;
-      default:
+      default: {
+        const _exhaustiveCheck: never = part;
+        void _exhaustiveCheck;
+        debugLogger.warn(
+          `Unhandled ContentPart type: ${JSON.stringify(part)} fallback to serialization`,
+        );
         // Serialize unknown ContentPart variants instead of dropping them
         result.push({ text: JSON.stringify(part) });
         break;
+      }
     }
   }
   return result;

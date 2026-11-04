@@ -67,6 +67,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     setActiveModel: vi.fn(),
     setModel: vi.fn(),
     activateFallbackMode: vi.fn(),
+    rotateSessionId: vi.fn(),
     getModelAvailabilityService: vi.fn(() =>
       createAvailabilityServiceMock({
         selectedModel: FALLBACK_MODEL,
@@ -77,6 +78,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getModel: vi.fn(() => MOCK_PRO_MODEL),
     getUserTier: vi.fn(() => undefined),
     isInteractive: vi.fn(() => false),
+    getHasAccessToPreviewModel: vi.fn(() => false),
     ...overrides,
   }) as unknown as Config;
 
@@ -190,6 +192,7 @@ describe('handleFallback', () => {
         expect(policyConfig.getFallbackModelHandler).not.toHaveBeenCalled();
         expect(policyConfig.activateFallbackMode).toHaveBeenCalledWith(
           DEFAULT_GEMINI_FLASH_MODEL,
+          undefined,
         );
       } finally {
         chainSpy.mockRestore();
@@ -206,6 +209,9 @@ describe('handleFallback', () => {
         selectedModel: MOCK_PRO_MODEL,
         skipped: [],
       });
+      // Mock activeModel to be unavailable so the utility bypass heuristic is skipped
+      vi.mocked(availability.snapshot).mockReturnValue({ available: false });
+
       policyHandler.mockResolvedValue('retry_once');
 
       await handleFallback(
@@ -234,6 +240,7 @@ describe('handleFallback', () => {
       vi.mocked(policyConfig.getModel).mockReturnValue(
         PREVIEW_GEMINI_MODEL_AUTO,
       );
+      vi.mocked(policyConfig.getHasAccessToPreviewModel).mockReturnValue(true);
 
       const result = await handleFallback(
         policyConfig,
@@ -349,6 +356,8 @@ describe('handleFallback', () => {
       vi.mocked(policyConfig.getModel).mockReturnValue(
         DEFAULT_GEMINI_MODEL_AUTO,
       );
+      // Mock activeModel to be unavailable so the utility bypass heuristic is skipped
+      vi.mocked(availability.snapshot).mockReturnValue({ available: false });
 
       const result = await handleFallback(
         policyConfig,
@@ -381,6 +390,7 @@ describe('handleFallback', () => {
       expect(result).toBe(true);
       expect(policyConfig.activateFallbackMode).toHaveBeenCalledWith(
         FALLBACK_MODEL,
+        undefined,
       );
       // TODO: add logging expect statement
     });
@@ -399,17 +409,83 @@ describe('handleFallback', () => {
       // TODO: add logging expect statement
     });
 
-    it('does NOT call activateFallbackMode when handler returns "retry_once"', async () => {
+    it('does NOT call activateFallbackMode or markTerminal when handler returns "retry_once"', async () => {
       policyHandler.mockResolvedValue('retry_once');
+      vi.mocked(policyConfig.getHasAccessToPreviewModel).mockReturnValue(true);
+      vi.mocked(policyConfig.getModel).mockReturnValue(
+        'gemini-3.1-pro-preview-customtools',
+      );
+      vi.mocked(policyConfig.getActiveModel).mockReturnValue(
+        'gemini-3.1-pro-preview-customtools',
+      );
+      policyConfig.getGemini31LaunchedSync = vi.fn(() => true);
+      policyConfig.getUseCustomToolModelSync = vi.fn(() => true);
+      vi.mocked(availability.selectFirstAvailable).mockReturnValue({
+        selectedModel: PREVIEW_GEMINI_FLASH_MODEL,
+        skipped: [],
+      });
+
+      const capacityError = new TerminalQuotaError(
+        'No capacity available',
+        { code: 429, message: 'No capacity available', details: [] },
+        5,
+        'MODEL_CAPACITY_EXHAUSTED',
+      );
 
       const result = await handleFallback(
         policyConfig,
-        MOCK_PRO_MODEL,
-        AUTH_OAUTH,
+        'gemini-3.1-pro-preview-customtools',
+        AuthType.USE_GEMINI,
+        capacityError,
       );
 
       expect(result).toBe(true);
       expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
+      expect(availability.markTerminal).not.toHaveBeenCalled();
+      expect(availability.markRetryOncePerTurn).toHaveBeenCalledWith(
+        'gemini-3.1-pro-preview-customtools',
+        undefined,
+      );
+      expect(availability.consumeStickyAttempt).toHaveBeenCalledWith(
+        'gemini-3.1-pro-preview-customtools',
+      );
+    });
+
+    it('marks capacity TerminalQuotaError with reason "capacity" when handler returns "retry_always" on manual model', async () => {
+      policyHandler.mockResolvedValue('retry_always');
+      vi.mocked(policyConfig.getHasAccessToPreviewModel).mockReturnValue(true);
+      vi.mocked(policyConfig.getModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+      vi.mocked(policyConfig.getActiveModel).mockReturnValue(
+        PREVIEW_GEMINI_MODEL,
+      );
+      vi.mocked(availability.selectFirstAvailable).mockReturnValue({
+        selectedModel: PREVIEW_GEMINI_FLASH_MODEL,
+        skipped: [],
+      });
+
+      const capacityError = new TerminalQuotaError(
+        'No capacity available',
+        { code: 429, message: 'No capacity available', details: [] },
+        5,
+        'MODEL_CAPACITY_EXHAUSTED',
+      );
+
+      const result = await handleFallback(
+        policyConfig,
+        PREVIEW_GEMINI_MODEL,
+        AUTH_OAUTH,
+        capacityError,
+      );
+
+      expect(result).toBe(true);
+      expect(availability.markTerminal).toHaveBeenCalledWith(
+        PREVIEW_GEMINI_MODEL,
+        'capacity',
+      );
+      expect(policyConfig.activateFallbackMode).toHaveBeenCalledWith(
+        PREVIEW_GEMINI_FLASH_MODEL,
+        undefined,
+      );
     });
   });
 });

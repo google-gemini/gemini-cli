@@ -27,8 +27,7 @@ export function safeJsonStringify(
         }
         seen.add(value);
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return value;
+      return value as unknown;
     },
     space,
   );
@@ -61,8 +60,7 @@ export function safeJsonStringifyBooleanValuesOnly(obj: any): string {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if ((value as Config) !== null && !configSeen) {
       configSeen = true;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return value;
+      return value as unknown;
     }
     if (typeof value === 'boolean') {
       return value;

@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { SubagentHistoryMessage } from './SubagentHistoryMessage.js';
 import type { HistoryItemSubagent } from '../../types.js';
+import { SubagentState } from '@google/gemini-cli-core';
 
 describe('SubagentHistoryMessage', () => {
   const mockItem: HistoryItemSubagent = {
@@ -18,19 +19,19 @@ describe('SubagentHistoryMessage', () => {
         id: '1',
         type: 'thought',
         content: 'Thinking about the problem',
-        status: 'completed',
+        status: SubagentState.COMPLETED,
       },
       {
         id: '2',
         type: 'tool_call',
         content: 'Calling search_web',
-        status: 'running',
+        status: SubagentState.RUNNING,
       },
       {
         id: '3',
         type: 'tool_call',
         content: 'Calling read_file fail',
-        status: 'error',
+        status: SubagentState.ERROR,
       },
     ],
   };

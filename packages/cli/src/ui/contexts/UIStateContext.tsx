@@ -40,6 +40,7 @@ export interface ProQuotaDialogRequest {
   message: string;
   isTerminalQuotaError: boolean;
   isModelNotFoundError?: boolean;
+  isCapacityExceeded?: boolean;
   authType?: AuthType;
   resolve: (intent: FallbackIntent) => void;
 }
@@ -153,6 +154,7 @@ export interface UIState {
   cleanUiDetailsVisible: boolean;
   elapsedTime: number;
   currentLoadingPhrase: string | undefined;
+  statusPhrase?: string | undefined;
   currentTip: string | undefined;
   currentWittyPhrase: string | undefined;
   historyRemountKey: number;

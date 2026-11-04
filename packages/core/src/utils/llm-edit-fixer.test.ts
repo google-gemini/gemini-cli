@@ -156,6 +156,69 @@ describe('FixLLMEditWithInstruction', () => {
     );
   });
 
+  it('should preserve $ replacement patterns literally across all prompt inputs', async () => {
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
+    const dollarInstruction = "Handle $'\\n' and $$100 and $& and $`";
+    const dollarOld = "const a = $'\\n'; // $& $$ $`";
+    const dollarNew = "const b = $$200; // $' $& $`";
+    const dollarError = "Failed matching $& near $' and $$ and $`";
+    const dollarContent = "export const file = $'\\n'; // $$ $& $`";
+
+    await promptIdContext.run('test-dollar-patterns', async () => {
+      await FixLLMEditWithInstruction(
+        dollarInstruction,
+        dollarOld,
+        dollarNew,
+        dollarError,
+        dollarContent,
+        mockBaseLlmClient,
+        abortSignal,
+      );
+    });
+
+    const generateJsonCall = mockGenerateJson.mock.calls[0][0];
+    const userPromptContent = generateJsonCall.contents[0].parts[0].text;
+
+    expect(userPromptContent).toContain(
+      `<instruction>\n${dollarInstruction}\n</instruction>`,
+    );
+    expect(userPromptContent).toContain(`<search>\n${dollarOld}\n</search>`);
+    expect(userPromptContent).toContain(`<replace>\n${dollarNew}\n</replace>`);
+    expect(userPromptContent).toContain(`<error>\n${dollarError}\n</error>`);
+    expect(userPromptContent).toContain(
+      `<file_content>\n${dollarContent}\n</file_content>`,
+    );
+  });
+
+  it('should not perform double-interpolation when inputs contain placeholder tokens', async () => {
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
+    const trickyInstruction =
+      'Update {{current_content}} and {current_content} and {{error}}';
+    const realFileContent = 'const real = true;';
+
+    await promptIdContext.run('test-placeholder-injection', async () => {
+      await FixLLMEditWithInstruction(
+        trickyInstruction,
+        old_string,
+        new_string,
+        error,
+        realFileContent,
+        mockBaseLlmClient,
+        abortSignal,
+      );
+    });
+
+    const generateJsonCall = mockGenerateJson.mock.calls[0][0];
+    const userPromptContent = generateJsonCall.contents[0].parts[0].text;
+
+    expect(userPromptContent).toContain(
+      `<instruction>\n${trickyInstruction}\n</instruction>`,
+    );
+    expect(userPromptContent).toContain(
+      `<file_content>\n${realFileContent}\n</file_content>`,
+    );
+  });
+
   it('should return a cached result on subsequent identical calls', async () => {
     mockGenerateJson.mockResolvedValue(mockApiResponse);
     const testPromptId = 'test-prompt-id-caching';

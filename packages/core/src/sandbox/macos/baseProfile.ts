@@ -160,6 +160,54 @@ export const BASE_SEATBELT_PROFILE = `(version 1)
   (subpath "/dev")
 )
 
+; Block Docker & container daemon UNIX domain sockets (read & write)
+(deny file-read* file-write*
+  (literal "/var/run/docker.sock")
+  (literal "/var/run/docker.sock.raw")
+  (literal "/private/var/run/docker.sock")
+  (literal "/private/var/run/docker.sock.raw")
+  (subpath "/var/run/docker")
+  (subpath "/private/var/run/docker")
+  (subpath "/Users/Shared/.docker")
+  (regex #"^/Users/[^/]+/\\.docker/run/")
+  (regex #"^/Users/[^/]+/\\.docker/desktop/")
+  (regex #"^/Users/[^/]+/\\.colima/")
+  (regex #"^/Users/[^/]+/\\.orbstack/run/")
+  (regex #"^/Users/[^/]+/\\.rd/")
+)
+
+; Block container CLI and daemon binaries from execution
+(deny process-exec
+  (literal "/usr/local/bin/docker")
+  (literal "/usr/local/bin/dockerd")
+  (literal "/usr/local/bin/docker-compose")
+  (literal "/usr/bin/docker")
+  (literal "/opt/homebrew/bin/docker")
+  (literal "/opt/homebrew/bin/dockerd")
+  (literal "/opt/homebrew/bin/docker-compose")
+  (literal "/opt/homebrew/bin/podman")
+  (literal "/usr/local/bin/podman")
+  (literal "/opt/homebrew/bin/colima")
+  (literal "/usr/local/bin/colima")
+  (literal "/opt/homebrew/bin/orb")
+  (literal "/Applications/Docker.app/Contents/Resources/bin/docker")
+  (subpath "/Applications/Docker.app/Contents/MacOS/")
+  (subpath "/Applications/OrbStack.app/Contents/MacOS/")
+  (subpath "/Applications/Rancher Desktop.app/Contents/MacOS/")
+)
+
+; Block com.docker.* and container manager Mach lookup / XPC services
+(deny mach-lookup
+  (xpc-service-name-prefix "com.docker.")
+  (global-name-prefix "com.docker.")
+  (global-name-prefix "dev.kdrag0n.OrbStack")
+)
+
+; Block Docker POSIX Shared Memory
+(deny ipc-posix-shm*
+  (ipc-posix-name-prefix "docker")
+  (ipc-posix-name-prefix "com.docker.")
+)
 `;
 
 /**

@@ -415,6 +415,7 @@ export const SkillExtractionAgent = (
   },
   memoryInboxAccess: true,
   autoMemoryExtractionWriteAccess: true,
+  includeExtensionContext: false,
   toolConfig: {
     tools: [
       ACTIVATE_SKILL_TOOL_NAME,

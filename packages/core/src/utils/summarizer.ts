@@ -9,6 +9,7 @@ import type { Content } from '@google/genai';
 import type { GeminiClient } from '../core/client.js';
 import { getResponseText, partToString } from './partUtils.js';
 import { debugLogger } from './debugLogger.js';
+import { safeTemplateReplace } from './textUtils.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import type { Config } from '../config/config.js';
 import { LlmRole } from '../telemetry/llmRole.js';
@@ -41,7 +42,7 @@ export const defaultSummarizer: Summarizer = (
   _abortSignal: AbortSignal,
 ) => Promise.resolve(JSON.stringify(result.llmContent));
 
-const SUMMARIZE_TOOL_OUTPUT_PROMPT = `Summarize the following tool output to be a maximum of {maxOutputTokens} tokens. The summary should be concise and capture the main points of the tool output.
+const SUMMARIZE_TOOL_OUTPUT_PROMPT = `Summarize the following tool output to be a maximum of {{maxOutputTokens}} tokens. The summary should be concise and capture the main points of the tool output.
 
 The summarization should be done based on the content that is provided. Here are the basic rules to follow:
 1. If the text is a directory listing or any output that is structural, use the history of the conversation to understand the context. Using this context try to understand what information we need from the tool output and return that as a response.
@@ -50,7 +51,7 @@ The summarization should be done based on the content that is provided. Here are
 
 
 Text to summarize:
-"{textToSummarize}"
+"{{textToSummarize}}"
 
 Return the summary string which should first contain an overall summarization of text followed by the full stack trace of errors and warnings in the tool output.
 `;
@@ -84,10 +85,10 @@ export async function summarizeToolOutput(
   if (!textToSummarize || textToSummarize.length < maxOutputTokens) {
     return textToSummarize;
   }
-  const prompt = SUMMARIZE_TOOL_OUTPUT_PROMPT.replace(
-    '{maxOutputTokens}',
-    String(maxOutputTokens),
-  ).replace('{textToSummarize}', textToSummarize);
+  const prompt = safeTemplateReplace(SUMMARIZE_TOOL_OUTPUT_PROMPT, {
+    maxOutputTokens: String(maxOutputTokens),
+    textToSummarize,
+  });
 
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
   try {

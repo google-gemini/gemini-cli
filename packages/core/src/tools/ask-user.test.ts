@@ -451,6 +451,45 @@ describe('AskUserTool', () => {
         expect(details.questions[0].type).toBe(QuestionType.CHOICE);
       }
     });
+
+    it('should normalize escaped newlines while preserving code spans and escaped backslashes', async () => {
+      const questions: Question[] = [
+        {
+          question: 'First line\\nSecond line with `\\n` and "\\n" and \\\\n',
+          header: 'Newlines',
+          type: QuestionType.CHOICE,
+          options: [
+            {
+              label: 'Keep `\\n`',
+              description: 'Line 1\\r\\nLine 2 with `str.split("\\n")`',
+            },
+            {
+              label: 'Option B',
+              description: 'Path C:\\\\new_folder',
+            },
+          ],
+        },
+      ];
+
+      const invocation = tool.build({ questions });
+      const details = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      expect(details).not.toBe(false);
+      if (details && details.type === 'ask_user') {
+        expect(details.questions[0].question).toBe(
+          'First line\nSecond line with `\\n` and "\\n" and \\\\n',
+        );
+        expect(details.questions[0].options?.[0].label).toBe('Keep `\\n`');
+        expect(details.questions[0].options?.[0].description).toBe(
+          'Line 1\nLine 2 with `str.split("\\n")`',
+        );
+        expect(details.questions[0].options?.[1].description).toBe(
+          'Path C:\\\\new_folder',
+        );
+      }
+    });
   });
 
   describe('execute', () => {
@@ -492,9 +531,10 @@ describe('AskUserTool', () => {
       const result = await invocation.execute({
         abortSignal: new AbortController().signal,
       });
-      expect(result.returnDisplay).toContain('User answered:');
-      expect(result.returnDisplay).toContain(
-        '  Approach → Quick fix (Recommended)',
+      expect(result.returnDisplay).toBe(
+        '**User answered:**\n' +
+          '  Approach: How should we proceed with this task?\n' +
+          '    → Quick fix (Recommended)',
       );
       expect(JSON.parse(result.llmContent as string)).toEqual({
         answers: { '0': 'Quick fix (Recommended)' },
@@ -506,6 +546,182 @@ describe('AskUserTool', () => {
           empty_submission: false,
           answer_count: 1,
         },
+      });
+    });
+
+    it('should retain the question text in returnDisplay after answering (#29021)', async () => {
+      // Regression test: once the dialog closes, the tool description is hidden
+      // in the UI, so the result display is the only place the question survives.
+      const questionText =
+        'The subagent failed because the build step timed out. Would you like to retry it?';
+      const invocation = tool.build({
+        questions: [
+          {
+            question: questionText,
+            header: 'Retry Subagent',
+            type: QuestionType.YESNO,
+          },
+        ],
+      });
+      const details = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      if (details && 'onConfirm' in details) {
+        await details.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
+          answers: { '0': 'Yes' },
+        });
+      }
+
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toContain(questionText);
+      expect(result.returnDisplay).toContain('Yes');
+    });
+
+    describe('returnDisplay formatting', () => {
+      const answerAndExecute = async (
+        questions: Question[],
+        answers: { [questionIndex: string]: string },
+      ) => {
+        const invocation = tool.build({ questions });
+        const details = await invocation.shouldConfirmExecute(
+          new AbortController().signal,
+        );
+        if (details && 'onConfirm' in details) {
+          await details.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
+            answers,
+          });
+        }
+        return invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
+      };
+
+      it('should pair each question with its answer, in order', async () => {
+        const result = await answerAndExecute(
+          [
+            {
+              question: 'Which database would you like to use?',
+              header: 'Database',
+              type: QuestionType.CHOICE,
+              options: [
+                { label: 'PostgreSQL', description: 'Relational' },
+                { label: 'SQLite', description: 'Embedded' },
+              ],
+            },
+            {
+              question: 'What is the name of your new project?',
+              header: 'Project Name',
+              type: QuestionType.TEXT,
+            },
+          ],
+          { '0': 'PostgreSQL', '1': 'my-app' },
+        );
+
+        expect(result.returnDisplay).toBe(
+          '**User answered:**\n' +
+            '  Database: Which database would you like to use?\n' +
+            '    → PostgreSQL\n' +
+            '  Project Name: What is the name of your new project?\n' +
+            '    → my-app',
+        );
+      });
+
+      it('should align continuation lines of multi-line answers under the answer', async () => {
+        const result = await answerAndExecute(
+          [
+            {
+              question: 'Any additional feedback?',
+              header: 'Feedback',
+              type: QuestionType.TEXT,
+            },
+          ],
+          { '0': 'First line\nSecond line' },
+        );
+
+        expect(result.returnDisplay).toBe(
+          '**User answered:**\n' +
+            '  Feedback: Any additional feedback?\n' +
+            '    → First line\n' +
+            '      Second line',
+        );
+      });
+
+      it('should indent continuation lines of multi-line questions', async () => {
+        const result = await answerAndExecute(
+          [
+            {
+              question: 'The build failed.\nRetry it?',
+              header: 'Retry',
+              type: QuestionType.YESNO,
+            },
+          ],
+          { '0': 'Yes' },
+        );
+
+        expect(result.returnDisplay).toBe(
+          '**User answered:**\n' +
+            '  Retry: The build failed.\n' +
+            '  Retry it?\n' +
+            '    → Yes',
+        );
+      });
+
+      it('should fall back to a positional label when an answer has no matching question', async () => {
+        const result = await answerAndExecute(
+          [
+            {
+              question: 'Proceed?',
+              header: 'Confirm',
+              type: QuestionType.YESNO,
+            },
+          ],
+          { '0': 'Yes', '5': 'Orphaned answer' },
+        );
+
+        expect(result.returnDisplay).toBe(
+          '**User answered:**\n' +
+            '  Confirm: Proceed?\n' +
+            '    → Yes\n' +
+            '  Q5\n' +
+            '    → Orphaned answer',
+        );
+      });
+
+      it('should fall back to a positional label when the header is whitespace-only', async () => {
+        const result = await answerAndExecute(
+          [
+            {
+              question: 'Proceed?',
+              header: '   ',
+              type: QuestionType.YESNO,
+            },
+          ],
+          { '0': 'Yes' },
+        );
+
+        expect(result.returnDisplay).toBe(
+          '**User answered:**\n  Q0: Proceed?\n    → Yes',
+        );
+      });
+
+      it('should not crash when an answer value is not a string at runtime', async () => {
+        const result = await answerAndExecute(
+          [
+            {
+              question: 'Proceed?',
+              header: 'Confirm',
+              type: QuestionType.YESNO,
+            },
+          ],
+          { '0': undefined as unknown as string },
+        );
+
+        expect(result.returnDisplay).toBe(
+          '**User answered:**\n  Confirm: Proceed?\n    → ',
+        );
       });
     });
 

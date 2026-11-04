@@ -13,6 +13,7 @@ import {
   exitAlternateScreen,
   enableLineWrapping,
   disableLineWrapping,
+  shouldDisableLineWrapping,
 } from '@google/gemini-cli-core';
 import process from 'node:process';
 import {
@@ -26,16 +27,12 @@ import { Command } from '../key/keyBindings.js';
 interface UseSuspendProps {
   handleWarning: (message: string) => void;
   setRawMode: (mode: boolean) => void;
-  refreshStatic: () => void;
-  setForceRerenderKey: (updater: (prev: number) => number) => void;
   shouldUseAlternateScreen: boolean;
 }
 
 export function useSuspend({
   handleWarning,
   setRawMode,
-  refreshStatic,
-  setForceRerenderKey,
   shouldUseAlternateScreen,
 }: UseSuspendProps) {
   const [ctrlZPressCount, setCtrlZPressCount] = useState(0);
@@ -72,8 +69,15 @@ export function useSuspend({
       if (shouldUseAlternateScreen) {
         // Leave alternate buffer before suspension so the shell stays usable.
         exitAlternateScreen();
-        enableLineWrapping();
         writeToStdout('\x1b[2J\x1b[H');
+      }
+      const lineWrappingDisabled = shouldDisableLineWrapping(
+        shouldUseAlternateScreen,
+        terminalCapabilityManager.areAmbiguousCharactersWide(),
+      );
+      if (lineWrappingDisabled) {
+        // Give the shell its normal auto-wrap back while we are suspended.
+        enableLineWrapping();
       }
 
       // Cleanup before suspend.
@@ -98,8 +102,10 @@ export function useSuspend({
 
           if (shouldUseAlternateScreen) {
             enterAlternateScreen();
-            disableLineWrapping();
             writeToStdout('\x1b[2J\x1b[H');
+          }
+          if (lineWrappingDisabled) {
+            disableLineWrapping();
           }
 
           terminalCapabilityManager.enableSupportedModes();
@@ -108,16 +114,8 @@ export function useSuspend({
             enableMouseEvents();
           }
 
-          // Force Ink to do a complete repaint by:
-          // 1. Emitting a resize event (tricks Ink into full redraw)
-          // 2. Remounting components via state changes
+          // Force Ink to do a complete repaint without remounting the app.
           process.stdout.emit('resize');
-
-          // Give a tick for resize to process, then trigger remount
-          setImmediate(() => {
-            refreshStatic();
-            setForceRerenderKey((prev) => prev + 1);
-          });
         } finally {
           if (onResumeHandlerRef.current === onResume) {
             onResumeHandlerRef.current = null;
@@ -142,14 +140,7 @@ export function useSuspend({
         ctrlZTimerRef.current = null;
       }, WARNING_PROMPT_DURATION_MS);
     }
-  }, [
-    ctrlZPressCount,
-    handleWarning,
-    setRawMode,
-    refreshStatic,
-    setForceRerenderKey,
-    shouldUseAlternateScreen,
-  ]);
+  }, [ctrlZPressCount, handleWarning, setRawMode, shouldUseAlternateScreen]);
 
   const handleSuspend = useCallback(() => {
     setCtrlZPressCount((prev) => prev + 1);

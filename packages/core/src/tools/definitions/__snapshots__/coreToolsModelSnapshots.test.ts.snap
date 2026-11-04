@@ -319,6 +319,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
       },
       "context": {
         "description": "Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.",
+        "minimum": 0,
         "type": "integer",
       },
       "dir_path": {
@@ -416,7 +417,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
     "properties": {
       "end_line": {
         "description": "Optional: The 1-based line number to end reading at (inclusive).",
-        "type": "number",
+        "minimum": 1,
+        "type": "integer",
       },
       "file_path": {
         "description": "The path to the file to read.",
@@ -424,7 +426,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
       },
       "start_line": {
         "description": "Optional: The 1-based line number to start reading from.",
-        "type": "number",
+        "minimum": 1,
+        "type": "integer",
       },
     },
     "required": [
@@ -635,41 +638,6 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
     },
     "required": [
       "command",
-    ],
-    "type": "object",
-  },
-}
-`;
-
-exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: save_memory 1`] = `
-{
-  "description": "
-Saves concise user context (preferences, facts) for use across future sessions.
-
-Supports two scopes:
-- **global** (default): Cross-project preferences loaded in every workspace. Use for "Remember X" or clear personal facts.
-- **project**: Facts specific to the current workspace, private to the user (not committed to the repo). Use for local dev setup notes, project-specific workflows, or personal reminders about this codebase.
-
-Do NOT use for session-specific context or temporary data.",
-  "name": "save_memory",
-  "parametersJsonSchema": {
-    "additionalProperties": false,
-    "properties": {
-      "fact": {
-        "description": "The specific fact or piece of information to remember. Should be a clear, self-contained statement.",
-        "type": "string",
-      },
-      "scope": {
-        "description": "Where to save the memory. 'global' (default) saves to a file loaded in every workspace. 'project' saves to a project-specific file private to the user, not committed to the repo.",
-        "enum": [
-          "global",
-          "project",
-        ],
-        "type": "string",
-      },
-    },
-    "required": [
-      "fact",
     ],
     "type": "object",
   },
@@ -1149,6 +1117,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
       },
       "context": {
         "description": "Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.",
+        "minimum": 0,
         "type": "integer",
       },
       "dir_path": {
@@ -1246,7 +1215,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
     "properties": {
       "end_line": {
         "description": "Optional: The 1-based line number to end reading at (inclusive).",
-        "type": "number",
+        "minimum": 1,
+        "type": "integer",
       },
       "file_path": {
         "description": "The path to the file to read.",
@@ -1254,7 +1224,8 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
       },
       "start_line": {
         "description": "Optional: The 1-based line number to start reading from.",
-        "type": "number",
+        "minimum": 1,
+        "type": "integer",
       },
     },
     "required": [
@@ -1441,34 +1412,6 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
     },
     "required": [
       "command",
-    ],
-    "type": "object",
-  },
-}
-`;
-
-exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: save_memory 1`] = `
-{
-  "description": "Persists preferences or facts across ALL future sessions. Supports two scopes: 'global' (default) for cross-project preferences loaded in every workspace, and 'project' for facts specific to the current workspace that are private to the user (not committed to the repo). Use 'project' scope for things like local dev setup notes, project-specific workflows, or personal reminders about this codebase. CRITICAL: Do not use for session-specific context or temporary data.",
-  "name": "save_memory",
-  "parametersJsonSchema": {
-    "additionalProperties": false,
-    "properties": {
-      "fact": {
-        "description": "A concise fact or preference to remember. Should be a clear, self-contained statement.",
-        "type": "string",
-      },
-      "scope": {
-        "description": "Where to save the memory. 'global' (default) saves to a file loaded in every workspace. 'project' saves to a project-specific file private to the user, not committed to the repo.",
-        "enum": [
-          "global",
-          "project",
-        ],
-        "type": "string",
-      },
-    },
-    "required": [
-      "fact",
     ],
     "type": "object",
   },

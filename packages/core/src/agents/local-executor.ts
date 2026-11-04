@@ -6,6 +6,7 @@
 
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { reportError } from '../utils/errorReporting.js';
+import { randomUUID } from 'node:crypto';
 import { ApprovalMode } from '../policy/types.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
 import {
@@ -30,7 +31,16 @@ import {
 } from '../tools/mcp-tool.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
-import { ChatCompressionService } from '../context/chatCompressionService.js';
+import {
+  ChatCompressionService,
+  collapseOlderFunctionResponses,
+  DEFAULT_COMPRESSION_TOKEN_THRESHOLD,
+} from '../context/chatCompressionService.js';
+import { MAX_STORED_TOOL_OUTPUT_BYTES } from '../utils/constants.js';
+import {
+  truncateFunctionResponsePart,
+  truncateToolOutput,
+} from '../utils/tool-utils.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { renderUserMemory, renderAgentSkills } from '../prompts/snippets.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
@@ -61,7 +71,10 @@ import {
 import { getErrorMessage } from '../utils/errors.js';
 import { templateString } from './utils.js';
 import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
+import { tokenLimit } from '../core/tokenLimits.js';
+import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
+import { LRUCache } from 'mnemonist';
 import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -127,6 +140,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly compressionService: ChatCompressionService;
   private readonly parentCallId?: string;
   private hasFailedCompressionAttempt = false;
+  private cache: LRUCache<string, string>;
 
   private get executionContext(): AgentLoopContext {
     return {
@@ -311,8 +325,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.onActivity = onActivity;
     this.compressionService = new ChatCompressionService();
     this.parentCallId = parentCallId;
+    this.cache = new LRUCache<string, string>(10);
 
-    this.agentId = Math.random().toString(36).slice(2, 8);
+    this.agentId = randomUUID();
   }
 
   /**
@@ -466,10 +481,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       };
 
       // We monitor both the external signal and our new grace period timeout
-      const combinedSignal = AbortSignal.any([
-        externalSignal,
-        graceTimeoutController.signal,
-      ]);
+      /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+      const combinedSignal = (
+        AbortSignal as unknown as {
+          any: (signals: AbortSignal[]) => AbortSignal;
+        }
+      ).any([externalSignal, graceTimeoutController.signal]);
+      /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
 
       const turnResult = await this.executeTurn(
         chat,
@@ -589,7 +607,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     };
 
     // Combine the external signal with the internal timeout signal.
-    const combinedSignal = AbortSignal.any([signal, deadlineTimer.signal]);
+    /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+    const combinedSignal = (
+      AbortSignal as unknown as { any: (signals: AbortSignal[]) => AbortSignal }
+    ).any([signal, deadlineTimer.signal]);
+    /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
 
     logAgentStart(
       this.context.config,
@@ -637,10 +659,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           );
         const formattedInitialHints = formatUserHintsForModel(initialHints);
 
-        // Inject loaded memory files (JIT + extension/project memory)
-        const environmentMemory = this.context.config.isJitContextEnabled?.()
-          ? this.context.config.getSessionMemory()
-          : this.context.config.getEnvironmentMemory();
+        // Inject loaded memory files. Some background agents opt out of
+        // extension memory while still retaining project session context.
+        const environmentMemory =
+          this.definition.includeExtensionContext === false
+            ? this.context.config.getSessionMemory({
+                includeExtensionContext: false,
+              })
+            : this.context.config.getSessionMemory();
 
         const initialParts: Part[] = [];
         if (environmentMemory) {
@@ -893,6 +919,30 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     abortSignal?: AbortSignal,
   ): Promise<void> {
     const model = this.definition.modelConfig.model ?? DEFAULT_GEMINI_MODEL;
+    const threshold =
+      (await this.context.config.getCompressionThreshold()) ??
+      DEFAULT_COMPRESSION_TOKEN_THRESHOLD;
+    const modelLimit = tokenLimit(model);
+
+    const lastPromptTokenCount = chat.getLastPromptTokenCount();
+    const currentHistory = chat.getHistory(false);
+    const originalTokenCount =
+      lastPromptTokenCount > 0
+        ? lastPromptTokenCount
+        : estimateTokenCountSync(currentHistory.flatMap((c) => c.parts || []));
+
+    // Only collapse older function responses when under context or memory pressure
+    if (originalTokenCount >= threshold * modelLimit) {
+      const collapsedHistory = collapseOlderFunctionResponses(currentHistory);
+      if (collapsedHistory !== currentHistory) {
+        const existingTurns = chat.getHistoryTurns?.(false) ?? [];
+        const turns = collapsedHistory.map((c, idx) => ({
+          id: existingTurns[idx]?.id ?? randomUUID(),
+          content: c,
+        }));
+        chat.setHistory(turns);
+      }
+    }
 
     const { newHistory, info } = await this.compressionService.compress(
       chat,
@@ -911,12 +961,22 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.hasFailedCompressionAttempt = true;
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
-        chat.setHistory(newHistory);
+        const existingTurns = chat.getHistoryTurns?.(false) ?? [];
+        const turns = newHistory.map((c, idx) => ({
+          id: existingTurns[idx]?.id ?? randomUUID(),
+          content: c,
+        }));
+        chat.setHistory(turns);
         this.hasFailedCompressionAttempt = false;
       }
     } else if (info.compressionStatus === CompressionStatus.CONTENT_TRUNCATED) {
       if (newHistory) {
-        chat.setHistory(newHistory);
+        const existingTurns = chat.getHistoryTurns?.(false) ?? [];
+        const turns = newHistory.map((c, idx) => ({
+          id: existingTurns[idx]?.id ?? randomUUID(),
+          content: c,
+        }));
+        chat.setHistory(turns);
         // Do NOT reset hasFailedCompressionAttempt.
         // We only truncated content because summarization previously failed.
         // We want to keep avoiding expensive summarization calls.
@@ -949,26 +1009,28 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       });
     const requestedModel = resolvedConfig.model;
 
-    let modelToUse: string;
+    let modelToUse: string | undefined;
     if (isAutoModel(requestedModel)) {
-      // TODO(joshualitt): This try / catch is inconsistent with the routing
-      // behavior for the main agent. Ideally, we would have a universal
-      // policy for routing failure. Given routing failure does not necessarily
-      // mean generation will fail, we may want to share this logic with
-      // other places we use model routing.
-      try {
-        const routingContext: RoutingContext = {
-          history: chat.getHistory(/*curated=*/ true),
-          request: message.parts || [],
-          signal,
-          requestedModel,
-        };
-        const router = this.context.config.getModelRouterService();
-        const decision = await router.route(routingContext);
-        modelToUse = decision.model;
-      } catch (error) {
-        debugLogger.warn(`Error during model routing: ${error}`);
-        modelToUse = DEFAULT_GEMINI_MODEL;
+      modelToUse = this.cache.get('modelToUse');
+
+      // If not cached, fetch from the router and cache the result.
+      if (!modelToUse) {
+        try {
+          const routingContext: RoutingContext = {
+            history: chat.getHistory(/*curated=*/ true),
+            request: message.parts || [],
+            signal,
+            requestedModel,
+          };
+          const router = this.context.config.getModelRouterService();
+          const decision = await router.route(routingContext);
+          modelToUse = decision.model;
+        } catch (error) {
+          debugLogger.warn(`Error during model routing: ${error}`);
+          modelToUse = DEFAULT_GEMINI_MODEL;
+        }
+        // Cache the result regardless of whether it succeeded or fell back
+        this.cache.set('modelToUse', modelToUse);
       }
     } else {
       modelToUse = requestedModel;
@@ -1203,6 +1265,31 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         },
       );
 
+      // Truncate response parts and display results before recording to prevent unbounded memory growth
+      for (const call of completedCalls) {
+        const outputFile = call.response?.outputFile;
+        if (call.response?.responseParts) {
+          call.response.responseParts = call.response.responseParts.map((p) =>
+            truncateFunctionResponsePart(
+              p,
+              MAX_STORED_TOOL_OUTPUT_BYTES,
+              outputFile,
+            ),
+          );
+        }
+        if (
+          typeof call.response?.resultDisplay === 'string' &&
+          Buffer.byteLength(call.response.resultDisplay, 'utf8') >
+            MAX_STORED_TOOL_OUTPUT_BYTES
+        ) {
+          call.response.resultDisplay = truncateToolOutput(
+            call.response.resultDisplay,
+            MAX_STORED_TOOL_OUTPUT_BYTES,
+            outputFile,
+          );
+        }
+      }
+
       // Record completed tool calls for persistent chat history
       chat.recordCompletedToolCalls(model, completedCalls);
 
@@ -1282,25 +1369,31 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     }
 
-    // Reconstruct toolResponseParts in the original order
+    // Ensure exactly one response per function call to satisfy the Gemini API protocol.
     const toolResponseParts: Part[] = [];
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
       const part = syncResults.get(callId);
-      if (part) {
-        toolResponseParts.push(part);
-      }
-    }
 
-    // If all authorized tool calls failed (and task isn't complete), provide a generic error.
-    if (
-      functionCalls.length > 0 &&
-      toolResponseParts.length === 0 &&
-      !taskCompleted
-    ) {
-      toolResponseParts.push({
-        text: 'All tool calls failed or were unauthorized. Please analyze the errors and try an alternative approach.',
-      });
+      if (part) {
+        toolResponseParts.push(
+          truncateFunctionResponsePart(part, MAX_STORED_TOOL_OUTPUT_BYTES),
+        );
+        continue;
+      }
+
+      const isAborted = signal.aborted;
+      const isTaskComplete =
+        functionCall.name === COMPLETE_TASK_TOOL_NAME && taskCompleted;
+
+      // Safely skip missing responses if the run was interrupted or the turn won't be sent back.
+      if (isAborted || isTaskComplete) {
+        continue;
+      }
+
+      throw new Error(
+        `[LocalAgentExecutor] Critical System Failure: Tool execution result was lost/dropped by the scheduler for callId ${callId} (${functionCall.name}). This indicates an internal race condition or scheduler bug.`,
+      );
     }
 
     return {

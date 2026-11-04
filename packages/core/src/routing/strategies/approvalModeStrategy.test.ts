@@ -16,6 +16,8 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL_AUTO,
   GEMINI_MODEL_ALIAS_AUTO,
+  LATEST_GEMINI_FLASH_MODEL,
+  resetModelsForTesting,
 } from '../../config/models.js';
 import { AuthType } from '../../core/contentGenerator.js';
 import { ApprovalMode } from '../../policy/types.js';
@@ -29,6 +31,7 @@ describe('ApprovalModeStrategy', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetModelsForTesting();
 
     strategy = new ApprovalModeStrategy();
     mockContext = {
@@ -43,7 +46,6 @@ describe('ApprovalModeStrategy', () => {
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getPlanModeRoutingEnabled: vi.fn().mockResolvedValue(true),
       getGemini31Launched: vi.fn().mockResolvedValue(false),
-      getGemini31FlashLiteLaunched: vi.fn().mockResolvedValue(false),
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
       getUseCustomToolModel: vi.fn().mockImplementation(async () => {
         const launched = await mockConfig.getGemini31Launched();
@@ -53,6 +55,8 @@ describe('ApprovalModeStrategy', () => {
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: AuthType.LOGIN_WITH_GOOGLE,
       }),
+      hasLatestFlashGAAccess: vi.fn().mockReturnValue(false),
+      hasLatestFlashLiteGAAccess: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     mockBaseLlmClient = {} as BaseLlmClient;
@@ -242,5 +246,23 @@ describe('ApprovalModeStrategy', () => {
 
     // Should resolve to Preview Flash (3.0) because resolveClassifierModel uses preview variants for Gemini 3
     expect(decision?.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+  });
+
+  it('should route to LATEST_GEMINI_FLASH_MODEL when hasLatestFlashGAAccess is true and plan is approved', async () => {
+    vi.mocked(mockConfig.getModel).mockReturnValue(GEMINI_MODEL_ALIAS_AUTO);
+    vi.mocked(mockConfig.hasLatestFlashGAAccess).mockReturnValue(true);
+
+    vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.DEFAULT);
+    vi.mocked(mockConfig.getApprovedPlanPath).mockReturnValue(
+      '/path/to/plan.md',
+    );
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+    );
+
+    expect(decision?.model).toBe(LATEST_GEMINI_FLASH_MODEL);
   });
 });

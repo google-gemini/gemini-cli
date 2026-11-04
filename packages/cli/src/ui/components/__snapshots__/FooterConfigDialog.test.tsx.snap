@@ -23,6 +23,8 @@ exports[`<FooterConfigDialog /> > highlights the active item in the preview 1`] 
 │     Memory used by the application                                                               │
 │    [ ] session-id                                                                                │
 │     Unique identifier for the current session                                                    │
+│    [ ] hostname                                                                                  │
+│     Current machine hostname                                                                     │
 │    [ ] auth                                                                                      │
 │     Current authentication info                                                                  │
 │  > [✓] code-changes                                                                              │
@@ -68,6 +70,8 @@ exports[`<FooterConfigDialog /> > renders correctly with default settings 1`] = 
 │     Memory used by the application                                                               │
 │    [ ] session-id                                                                                │
 │     Unique identifier for the current session                                                    │
+│    [ ] hostname                                                                                  │
+│     Current machine hostname                                                                     │
 │    [ ] auth                                                                                      │
 │     Current authentication info                                                                  │
 │    [ ] code-changes                                                                              │
@@ -114,6 +118,8 @@ exports[`<FooterConfigDialog /> > renders correctly with default settings 2`] = 
 │     Memory used by the application                                                               │
 │    [ ] session-id                                                                                │
 │     Unique identifier for the current session                                                    │
+│    [ ] hostname                                                                                  │
+│     Current machine hostname                                                                     │
 │    [ ] auth                                                                                      │
 │     Current authentication info                                                                  │
 │    [ ] code-changes                                                                              │
@@ -159,6 +165,8 @@ exports[`<FooterConfigDialog /> > updates the preview when Show footer labels is
 │     Memory used by the application                                                               │
 │    [ ] session-id                                                                                │
 │     Unique identifier for the current session                                                    │
+│    [ ] hostname                                                                                  │
+│     Current machine hostname                                                                     │
 │    [ ] auth                                                                                      │
 │     Current authentication info                                                                  │
 │    [ ] code-changes                                                                              │

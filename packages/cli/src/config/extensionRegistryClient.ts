@@ -94,9 +94,8 @@ export class ExtensionRegistryClient {
       fuzzy: true,
     });
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const results = await fzf.find(query);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return results.map((r: { item: RegistryExtension }) => r.item);
+    const results: Array<{ item: RegistryExtension }> = await fzf.find(query);
+    return results.map((r) => r.item);
   }
 
   async getExtension(id: string): Promise<RegistryExtension | undefined> {
@@ -113,7 +112,7 @@ export class ExtensionRegistryClient {
     ExtensionRegistryClient.fetchPromise = (async () => {
       try {
         if (uri.startsWith('http')) {
-          if (isPrivateIp(uri)) {
+          if (await isPrivateIp(uri)) {
             throw new Error(
               'Private IP addresses are not allowed for the extension registry.',
             );

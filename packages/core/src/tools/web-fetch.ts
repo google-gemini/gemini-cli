@@ -20,7 +20,7 @@ import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
-import { truncateString } from '../utils/textUtils.js';
+import { truncateString, wrapUntrusted } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
 import {
   logWebFetchFallbackAttempt,
@@ -267,14 +267,20 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     );
   }
 
-  private isBlockedHost(urlStr: string): boolean {
+  private async isBlockedHost(urlStr: string): Promise<boolean> {
     try {
       const url = new URL(urlStr);
       const hostname = url.hostname.toLowerCase();
-      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      if (
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname.endsWith('.localhost') ||
+        hostname.endsWith('.local') ||
+        hostname.endsWith('.internal')
+      ) {
         return true;
       }
-      return isPrivateIp(urlStr);
+      return await isPrivateIp(urlStr);
     } catch {
       return true;
     }
@@ -285,7 +291,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     signal: AbortSignal,
   ): Promise<string> {
     const url = convertGithubUrlToRaw(urlStr);
-    if (this.isBlockedHost(url)) {
+    if (await this.isBlockedHost(url)) {
       debugLogger.warn(`[WebFetchTool] Blocked access to host: ${url}`);
       throw new Error(
         `Access to blocked or private host ${url} is not allowed.`,
@@ -350,16 +356,16 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     return textContent;
   }
 
-  private filterAndValidateUrls(urls: string[]): {
+  private async filterAndValidateUrls(urls: string[]): Promise<{
     toFetch: string[];
     skipped: string[];
-  } {
+  }> {
     const uniqueUrls = [...new Set(urls.map(normalizeUrl))];
     const toFetch: string[] = [];
     const skipped: string[] = [];
 
     for (const url of uniqueUrls) {
-      if (this.isBlockedHost(url)) {
+      if (await this.isBlockedHost(url)) {
         debugLogger.warn(
           `[WebFetchTool] Skipped private or local host: ${url}`,
         );
@@ -489,7 +495,7 @@ ${aggregatedContent}
       );
 
       return {
-        llmContent: resultText,
+        llmContent: wrapUntrusted(resultText),
         returnDisplay: `Content for ${urls.length} URL(s) processed using fallback fetch.`,
       };
     } catch (e) {
@@ -615,7 +621,7 @@ ${aggregatedContent}
     // Convert GitHub blob URL to raw URL
     url = convertGithubUrlToRaw(url);
 
-    if (this.isBlockedHost(url)) {
+    if (await this.isBlockedHost(url)) {
       const errorMessage = `Access to blocked or private host ${url} is not allowed.`;
       debugLogger.warn(
         `[WebFetchTool] Blocked experimental fetch to host: ${url}`,
@@ -694,7 +700,7 @@ Response: ${rawResponseText}`;
           text = truncateString(text, MAX_CONTENT_LENGTH, TRUNCATION_WARNING);
         }
         return {
-          llmContent: text,
+          llmContent: wrapUntrusted(text),
           returnDisplay: `Fetched ${contentType} content from ${url}`,
         };
       }
@@ -715,7 +721,7 @@ Response: ${rawResponseText}`;
           );
         }
         return {
-          llmContent: textContent,
+          llmContent: wrapUntrusted(textContent),
           returnDisplay: `Fetched and converted HTML content from ${url}`,
         };
       }
@@ -743,7 +749,7 @@ Response: ${rawResponseText}`;
         text = truncateString(text, MAX_CONTENT_LENGTH, TRUNCATION_WARNING);
       }
       return {
-        llmContent: text,
+        llmContent: wrapUntrusted(text),
         returnDisplay: `Fetched ${contentType || 'unknown'} content from ${url}`,
       };
     } catch (e) {
@@ -769,7 +775,7 @@ Response: ${rawResponseText}`;
     const userPrompt = this.params.prompt!;
     const { validUrls } = parsePrompt(userPrompt);
 
-    const { toFetch, skipped } = this.filterAndValidateUrls(validUrls);
+    const { toFetch, skipped } = await this.filterAndValidateUrls(validUrls);
 
     // If everything was skipped, fail early
     if (toFetch.length === 0 && skipped.length > 0) {
@@ -870,7 +876,7 @@ ${toFetch.join('\n')}
       );
 
       return {
-        llmContent: responseText,
+        llmContent: wrapUntrusted(responseText),
         returnDisplay: `Content processed from prompt.`,
       };
     } catch (error: unknown) {

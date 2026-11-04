@@ -9,6 +9,17 @@ import { renderHook } from '../../../test-utils/render.js';
 import { useTextBuffer } from './text-buffer.js';
 import { parseInputForHighlighting } from '../../utils/highlight.js';
 
+vi.mock('../../contexts/SettingsContext.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../contexts/SettingsContext.js')>();
+  return {
+    ...actual,
+    useSettings: () => ({
+      merged: { general: { openEditorInNewWindow: false } },
+    }),
+  };
+});
+
 describe('text-buffer performance', () => {
   afterEach(() => {
     vi.restoreAllMocks();

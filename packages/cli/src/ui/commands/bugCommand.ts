@@ -89,7 +89,7 @@ export const bugCommand: SlashCommand = {
         const historyFilePath = path.join(tempDir, historyFileName);
         try {
           await exportHistoryToFile({ history, filePath: historyFilePath });
-          historyFileMessage = `\n\n--------------------------------------------------------------------------------\n\n📄 **Chat History Exported**\nTo help us debug, we've exported your current chat history to:\n${historyFilePath}\n\nPlease consider attaching this file to your GitHub issue if you feel comfortable doing so.\n\n**Privacy Disclaimer:** Please do not upload any logs containing sensitive or private information that you are not comfortable sharing publicly.`;
+          historyFileMessage = `\n\n--------------------------------------------------------------------------------\n\n📄 **Chat History Exported**\nTo help us debug, we've exported your current chat history to:\n\`${historyFilePath}\`\n\nPlease consider attaching this file to your GitHub issue if you feel comfortable doing so.\n\n**Privacy Disclaimer:** Please do not upload any logs containing sensitive or private information that you are not comfortable sharing publicly.`;
           problemValue += `\n\n[ACTION REQUIRED] 📎 PLEASE ATTACH THE EXPORTED CHAT HISTORY JSON FILE TO THIS ISSUE IF YOU FEEL COMFORTABLE SHARING IT.`;
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err);
@@ -145,7 +145,7 @@ export const bugCommand: SlashCommand = {
       context.ui.addItem(
         {
           type: MessageType.INFO,
-          text: `High memory usage detected (${formatBytes(rss)}). Capturing V8 heap snapshot to ${snapshotPath}.\nThis can take 20+ seconds and the CLI may be temporarily unresponsive; please do not exit.`,
+          text: `High memory usage detected (${formatBytes(rss)}). Capturing V8 heap snapshot to \`${snapshotPath}\`.\nThis can take 20+ seconds and the CLI may be temporarily unresponsive; please do not exit.`,
         },
         Date.now(),
       );
@@ -163,7 +163,7 @@ export const bugCommand: SlashCommand = {
         context.ui.addItem(
           {
             type: MessageType.INFO,
-            text: `Heap snapshot saved${sizeText} in ${durationMs}ms:\n${snapshotPath}\n\nConsider attaching it to your bug report only if it does not contain sensitive information.`,
+            text: `Heap snapshot saved${sizeText} in ${durationMs}ms:\n\`${snapshotPath}\`\n\nConsider attaching it to your bug report only if it does not contain sensitive information.`,
           },
           Date.now(),
         );

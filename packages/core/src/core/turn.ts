@@ -6,6 +6,7 @@
 
 import {
   createUserContent,
+  type Content,
   type PartListUnion,
   type GenerateContentResponse,
   type FunctionCall,
@@ -19,6 +20,7 @@ import type {
 } from '../tools/tools.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
+import { ragLogger, type RagSnippet } from '../utils/ragLogger.js';
 import {
   getErrorMessage,
   UnauthorizedError,
@@ -103,6 +105,19 @@ export type ServerGeminiContextWindowWillOverflowEvent = {
 
 export type ServerGeminiInvalidStreamEvent = {
   type: GeminiEventType.InvalidStream;
+  value: {
+    type:
+      | 'NO_FINISH_REASON'
+      | 'NO_RESPONSE_TEXT'
+      | 'MALFORMED_FUNCTION_CALL'
+      | 'UNEXPECTED_TOOL_CALL'
+      | 'MAX_TOKENS_EXCEEDED'
+      | 'SAFETY_BLOCKED'
+      | 'RECITATION_BLOCKED'
+      | 'OTHER_BLOCKED'
+      | 'THINKING_ONLY_RESPONSE';
+    message: string;
+  };
 };
 
 export type ServerGeminiModelInfoEvent = {
@@ -244,6 +259,7 @@ export class Turn {
   private pendingCitations = new Set<string>();
   private cachedResponseText: string | undefined = undefined;
   finishReason: FinishReason | undefined = undefined;
+  private hasLoggedRagTrace = false;
 
   constructor(
     private readonly chat: GeminiChat,
@@ -255,9 +271,13 @@ export class Turn {
     modelConfigKey: ModelConfigKey,
     req: PartListUnion,
     signal: AbortSignal,
-    displayContent?: PartListUnion,
-    role: LlmRole = LlmRole.MAIN,
+    options: {
+      displayContent?: PartListUnion;
+      role?: LlmRole;
+      apiHistoryOverride?: Content[];
+    } = {},
   ): AsyncGenerator<ServerGeminiStreamEvent> {
+    const { displayContent, role = LlmRole.MAIN, apiHistoryOverride } = options;
     try {
       // Note: This assumes `sendMessageStream` yields events like
       // { type: StreamEventType.RETRY } or { type: StreamEventType.CHUNK, value: GenerateContentResponse }
@@ -268,6 +288,7 @@ export class Turn {
         signal,
         role,
         displayContent,
+        apiHistoryOverride,
       );
 
       for await (const streamEvent of responseStream) {
@@ -301,6 +322,39 @@ export class Turn {
         // Assuming other events are chunks with a `value` property
         const resp = streamEvent.value;
         if (!resp) continue; // Skip if there's no response body
+
+        // Log RAG trace if enabled (only once per turn to avoid log bloat on streams)
+        if (
+          !this.hasLoggedRagTrace &&
+          this.chat.context.config.getLogRagSnippets?.()
+        ) {
+          let ragStatus: string | undefined;
+          let snippets: RagSnippet[] | undefined;
+
+          if (
+            typeof resp === 'object' &&
+            resp !== null &&
+            'metadata' in resp &&
+            typeof resp.metadata === 'object' &&
+            resp.metadata !== null
+          ) {
+            const metadata = resp.metadata as {
+              ragStatus?: string;
+              snippets?: RagSnippet[];
+            };
+            ragStatus = metadata.ragStatus;
+            snippets = metadata.snippets;
+          }
+
+          if (ragStatus || snippets) {
+            ragLogger.log({
+              sessionId: this.chat.context.config.getSessionId(),
+              ragStatus: ragStatus ?? 'UNKNOWN',
+              snippets: snippets ?? [],
+            });
+            this.hasLoggedRagTrace = true;
+          }
+        }
 
         this.debugResponses.push(resp);
 
@@ -367,7 +421,13 @@ export class Turn {
       }
 
       if (e instanceof InvalidStreamError) {
-        yield { type: GeminiEventType.InvalidStream };
+        yield {
+          type: GeminiEventType.InvalidStream,
+          value: {
+            type: e.type,
+            message: e.message,
+          },
+        };
         return;
       }
 
@@ -408,14 +468,21 @@ export class Turn {
     fnCall: FunctionCall,
     traceId?: string,
   ): ServerGeminiStreamEvent | null {
-    const name = fnCall.name || 'undefined_tool_name';
+    const name = fnCall.name?.trim() || 'generic_tool';
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const args = (fnCall.args as Record<string, unknown>) || {};
-    const callId =
+    const rawCallId =
       fnCall.id ??
       (this.chat.context.config.isContextManagementEnabled()
         ? `synth_${this.prompt_id}_${Date.now()}_${this.callCounter++}`
         : `${name}_${Date.now()}_${this.callCounter++}`);
+
+    const callId = rawCallId.startsWith(`${name}__`)
+      ? rawCallId
+      : `${name}__${rawCallId}`;
+
+    // Mutate the function call object ID so that history consolidation inherits it
+    fnCall.id = callId;
 
     const tool = this.chat.loopContext.toolRegistry.getTool(name);
     let display;

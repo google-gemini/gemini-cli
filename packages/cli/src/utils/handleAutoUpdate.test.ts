@@ -36,6 +36,17 @@ vi.mock('./installationInfo.js', async () => {
   };
 });
 
+const mockGetPackageJson = vi.hoisted(() => vi.fn());
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    getPackageJson: mockGetPackageJson,
+  };
+});
+
 vi.mock('./updateEventEmitter.js', async (importOriginal) =>
   importOriginal<typeof import('./updateEventEmitter.js')>(),
 );
@@ -53,6 +64,10 @@ describe('handleAutoUpdate', () => {
     vi.stubEnv('SANDBOX', '');
     mockSpawn = vi.fn();
     vi.clearAllMocks();
+    mockGetPackageJson.mockResolvedValue({
+      name: '@google/gemini-cli',
+      version: '2.0.0',
+    });
     vi.spyOn(updateEventEmitter, 'emit');
     mockUpdateInfo = {
       update: {
@@ -386,10 +401,13 @@ describe('handleAutoUpdate', () => {
         packageManager: PackageManager.NPM,
       });
 
+      updateEventEmitter.once('update-success', () => {
+        resolve();
+      });
+
       // Simulate successful execution
       setTimeout(() => {
         mockChildProcess.emit('close', 0);
-        resolve();
       }, 0);
 
       handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
@@ -399,6 +417,395 @@ describe('handleAutoUpdate', () => {
       message:
         'Update successful! The new version will be used on your next run.',
     });
+  });
+
+  it('should not emit "update-success" when the active binary is not updated due to PATH shadowing', async () => {
+    mockGetPackageJson.mockResolvedValue({
+      name: '@google/gemini-cli',
+      version: '1.0.0',
+    });
+
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'This is an additional message.',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
+      updateEventEmitter.once('update-failed', () => {
+        resolve();
+      });
+
+      // Simulate child process completing successfully (code 0)
+      setTimeout(() => {
+        mockChildProcess.emit('close', 0);
+      }, 0);
+
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+    });
+
+    // Due to PATH shadowing / prefix mismatch, process exit code 0 does not mean
+    // the active binary was updated. handleAutoUpdate should emit update-failed with warning.
+    expect(updateEventEmitter.emit).not.toHaveBeenCalledWith(
+      'update-success',
+      expect.anything(),
+    );
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith(
+      'update-failed',
+      expect.objectContaining({
+        message: expect.stringContaining(
+          'shadowed by another installation in your PATH',
+        ),
+      }),
+    );
+  });
+
+  it('should emit "update-success" when package version cannot be determined (graceful fallback)', async () => {
+    mockGetPackageJson.mockResolvedValue(undefined);
+
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'This is an additional message.',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
+      updateEventEmitter.once('update-success', () => {
+        resolve();
+      });
+
+      setTimeout(() => {
+        mockChildProcess.emit('close', 0);
+      }, 0);
+
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+    });
+
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-success', {
+      message:
+        'Update successful! The new version will be used on your next run.',
+    });
+  });
+
+  it('should emit "update-success" when getPackageJson throws (graceful fallback)', async () => {
+    mockGetPackageJson.mockRejectedValue(new Error('File read error'));
+
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'This is an additional message.',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
+      updateEventEmitter.once('update-success', () => {
+        resolve();
+      });
+
+      setTimeout(() => {
+        mockChildProcess.emit('close', 0);
+      }, 0);
+
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+    });
+
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-success', {
+      message:
+        'Update successful! The new version will be used on your next run.',
+    });
+  });
+
+  it('should use pre-resolved CLI path and verify even if path resolution was relative or custom', async () => {
+    mockGetPackageJson.mockImplementation(async (cwd: string) => {
+      if (cwd.includes('custom-bin')) {
+        return { name: '@google/gemini-cli', version: '1.0.0' };
+      }
+      return { name: '@google/gemini-cli', version: '2.0.0' };
+    });
+
+    const originalArgv1 = process.argv[1];
+    process.argv[1] = '/tmp/custom-bin/gemini';
+
+    try {
+      await new Promise<void>((resolve) => {
+        mockGetInstallationInfo.mockReturnValue({
+          updateCommand: 'npm i -g @google/gemini-cli@latest',
+          updateMessage: 'This is an additional message.',
+          isGlobal: true,
+          packageManager: PackageManager.NPM,
+        });
+
+        updateEventEmitter.once('update-failed', () => {
+          resolve();
+        });
+
+        setTimeout(() => {
+          mockChildProcess.emit('close', 0);
+        }, 0);
+
+        handleAutoUpdate(
+          mockUpdateInfo,
+          mockSettings,
+          '/root',
+          false,
+          mockSpawn,
+        );
+      });
+
+      expect(updateEventEmitter.emit).toHaveBeenCalledWith(
+        'update-failed',
+        expect.objectContaining({
+          message: expect.stringContaining(
+            'shadowed by another installation in your PATH',
+          ),
+        }),
+      );
+    } finally {
+      process.argv[1] = originalArgv1;
+    }
+  });
+
+  it('should not fail verification if package name differs from expected CLI package (parent monorepo fallback)', async () => {
+    // Parent package has an older version (1.0.0), but belongs to a different package name
+    mockGetPackageJson.mockResolvedValue({
+      name: 'root-monorepo',
+      version: '1.0.0',
+    });
+
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'This is an additional message.',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
+      updateEventEmitter.once('update-success', () => {
+        resolve();
+      });
+
+      setTimeout(() => {
+        mockChildProcess.emit('close', 0);
+      }, 0);
+
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+    });
+
+    // Since package name does not match @google/gemini-cli, it should not falsely treat it as an outdated CLI package
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-success', {
+      message:
+        'Update successful! The new version will be used on your next run.',
+    });
+  });
+
+  it('should fail verification when package name matches but version is outdated', async () => {
+    mockGetPackageJson.mockResolvedValue({
+      name: '@google/gemini-cli',
+      version: '1.0.0',
+    });
+
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'This is an additional message.',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
+      updateEventEmitter.once('update-failed', () => {
+        resolve();
+      });
+
+      setTimeout(() => {
+        mockChildProcess.emit('close', 0);
+      }, 0);
+
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+    });
+
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith(
+      'update-failed',
+      expect.objectContaining({
+        message: expect.stringContaining(
+          'shadowed by another installation in your PATH',
+        ),
+      }),
+    );
+  });
+
+  it('should not fail verification if parent package.json is nameless', async () => {
+    // Nameless package.json in parent directory should not trigger false failure
+    mockGetPackageJson.mockResolvedValue({
+      version: '1.0.0',
+    });
+
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'This is an additional message.',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
+      updateEventEmitter.once('update-success', () => {
+        resolve();
+      });
+
+      setTimeout(() => {
+        mockChildProcess.emit('close', 0);
+      }, 0);
+
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', false, mockSpawn);
+    });
+
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-success', {
+      message:
+        'Update successful! The new version will be used on your next run.',
+    });
+  });
+
+  it('should not fail verification if info.update.name is missing', async () => {
+    mockGetPackageJson.mockResolvedValue({
+      name: '@google/gemini-cli',
+      version: '1.0.0',
+    });
+
+    const infoWithoutName: UpdateObject = {
+      ...mockUpdateInfo,
+      update: {
+        ...mockUpdateInfo.update,
+        // @ts-expect-error intentionally undefined name for test
+        name: undefined,
+      },
+    };
+
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'This is an additional message.',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
+      updateEventEmitter.once('update-success', () => {
+        resolve();
+      });
+
+      setTimeout(() => {
+        mockChildProcess.emit('close', 0);
+      }, 0);
+
+      handleAutoUpdate(
+        infoWithoutName,
+        mockSettings,
+        '/root',
+        false,
+        mockSpawn,
+      );
+    });
+
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-success', {
+      message:
+        'Update successful! The new version will be used on your next run.',
+    });
+  });
+
+  it('should skip update and not spawn process if latest version is invalid semver', () => {
+    const maliciousUpdateInfo: UpdateObject = {
+      ...mockUpdateInfo,
+      update: {
+        ...mockUpdateInfo.update,
+        latest: '2.0.0; touch /tmp/pwned',
+      },
+    };
+
+    handleAutoUpdate(
+      maliciousUpdateInfo,
+      mockSettings,
+      '/root',
+      false,
+      mockSpawn,
+    );
+
+    expect(mockSpawn).not.toHaveBeenCalled();
+    expect(updateEventEmitter.emit).not.toHaveBeenCalledWith(
+      'update-success',
+      expect.anything(),
+    );
+  });
+
+  it('should skip update and not spawn process if latest version is missing or empty', () => {
+    const emptyLatestUpdateInfo: UpdateObject = {
+      ...mockUpdateInfo,
+      update: {
+        ...mockUpdateInfo.update,
+        latest: '',
+      },
+    };
+
+    handleAutoUpdate(
+      emptyLatestUpdateInfo,
+      mockSettings,
+      '/root',
+      false,
+      mockSpawn,
+    );
+
+    expect(mockSpawn).not.toHaveBeenCalled();
+    expect(updateEventEmitter.emit).not.toHaveBeenCalledWith(
+      'update-success',
+      expect.anything(),
+    );
+  });
+
+  it('should include resolved binary path in update-failed message when verification fails', async () => {
+    mockGetPackageJson.mockResolvedValue({
+      name: '@google/gemini-cli',
+      version: '1.0.0',
+    });
+
+    const originalArgv1 = process.argv[1];
+    process.argv[1] = '/custom/bin/gemini';
+
+    try {
+      await new Promise<void>((resolve) => {
+        mockGetInstallationInfo.mockReturnValue({
+          updateCommand: 'npm i -g @google/gemini-cli@latest',
+          updateMessage: 'This is an additional message.',
+          isGlobal: true,
+          packageManager: PackageManager.NPM,
+        });
+
+        updateEventEmitter.once('update-failed', () => {
+          resolve();
+        });
+
+        setTimeout(() => {
+          mockChildProcess.emit('close', 0);
+        }, 0);
+
+        handleAutoUpdate(
+          mockUpdateInfo,
+          mockSettings,
+          '/root',
+          false,
+          mockSpawn,
+        );
+      });
+
+      expect(updateEventEmitter.emit).toHaveBeenCalledWith(
+        'update-failed',
+        expect.objectContaining({
+          message: expect.stringMatching(
+            /active binary \(.*custom.bin.gemini\) was not updated/,
+          ),
+        }),
+      );
+    } finally {
+      process.argv[1] = originalArgv1;
+    }
   });
 
   it('should suppress update if isSandboxEnabled is true', () => {

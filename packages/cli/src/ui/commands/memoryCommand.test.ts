@@ -11,13 +11,10 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import {
-  type Config,
   refreshMemory,
-  refreshServerHierarchicalMemory,
   SimpleExtensionLoader,
   type FileDiscoveryService,
   showMemory,
-  addMemory,
   listMemoryFiles,
   flattenMemory,
 } from '@google/gemini-cli-core';
@@ -32,46 +29,28 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       return String(error);
     }),
     refreshMemory: vi.fn(async (config) => {
-      if (config.isJitContextEnabled()) {
-        await config.getContextManager()?.refresh();
-        const memoryContent = original.flattenMemory(config.getUserMemory());
-        const fileCount = config.getGeminiMdFileCount() || 0;
-        return {
-          type: 'message',
-          messageType: 'info',
-          content: `Memory reloaded successfully. Loaded ${memoryContent.length} characters from ${fileCount} file(s).`,
-        };
-      }
+      await config.getMemoryContextManager()?.refresh();
+      const memoryContent = original.flattenMemory(config.getUserMemory());
+      const fileCount = config.getGeminiMdFileCount() || 0;
       return {
         type: 'message',
         messageType: 'info',
-        content: 'Memory reloaded successfully.',
+        content: `Memory reloaded successfully. Loaded ${memoryContent.length} characters from ${fileCount} file(s).`,
       };
     }),
     showMemory: vi.fn(),
-    addMemory: vi.fn(),
     listMemoryFiles: vi.fn(),
-    refreshServerHierarchicalMemory: vi.fn(),
   };
 });
 
 const mockRefreshMemory = refreshMemory as Mock;
-const mockRefreshServerHierarchicalMemory =
-  refreshServerHierarchicalMemory as Mock;
 
 describe('memoryCommand', () => {
   let mockContext: CommandContext;
 
-  const buildMemoryCommand = (isMemoryV2 = false): SlashCommand => {
-    const config: Pick<Config, 'isMemoryV2Enabled'> = {
-      isMemoryV2Enabled: () => isMemoryV2,
-    };
-    return memoryCommand(config as Config);
-  };
+  const buildMemoryCommand = (): SlashCommand => memoryCommand(null);
 
-  const getSubCommand = (
-    name: 'show' | 'add' | 'reload' | 'list',
-  ): SlashCommand => {
+  const getSubCommand = (name: 'show' | 'reload' | 'list'): SlashCommand => {
     const subCommand = buildMemoryCommand().subCommands?.find(
       (cmd) => cmd.name === name,
     );
@@ -81,23 +60,11 @@ describe('memoryCommand', () => {
     return subCommand;
   };
 
-  describe('Memory v2', () => {
-    it('omits the /memory add subcommand when memoryV2 is enabled', () => {
-      const command = buildMemoryCommand(true);
+  describe('subcommands', () => {
+    it('does not include the legacy add subcommand', () => {
+      const command = buildMemoryCommand();
       const names = command.subCommands?.map((cmd) => cmd.name) ?? [];
-      expect(names).not.toContain('add');
-    });
-
-    it('includes the /memory add subcommand by default', () => {
-      const command = buildMemoryCommand(false);
-      const names = command.subCommands?.map((cmd) => cmd.name) ?? [];
-      expect(names).toContain('add');
-    });
-
-    it('includes the /memory add subcommand when no config is provided', () => {
-      const command = memoryCommand(null);
-      const names = command.subCommands?.map((cmd) => cmd.name) ?? [];
-      expect(names).toContain('add');
+      expect(names).toEqual(['show', 'reload', 'list', 'inbox']);
     });
   });
 
@@ -178,63 +145,6 @@ describe('memoryCommand', () => {
     });
   });
 
-  describe('/memory add', () => {
-    let addCommand: SlashCommand;
-
-    beforeEach(() => {
-      addCommand = getSubCommand('add');
-      vi.mocked(addMemory).mockImplementation((args) => {
-        if (!args || args.trim() === '') {
-          return {
-            type: 'message',
-            messageType: 'error',
-            content: 'Usage: /memory add <text to remember>',
-          };
-        }
-        return {
-          type: 'tool',
-          toolName: 'save_memory',
-          toolArgs: { fact: args.trim() },
-        };
-      });
-      mockContext = createMockCommandContext();
-    });
-
-    it('should return an error message if no arguments are provided', () => {
-      if (!addCommand.action) throw new Error('Command has no action');
-
-      const result = addCommand.action(mockContext, '  ');
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'error',
-        content: 'Usage: /memory add <text to remember>',
-      });
-
-      expect(mockContext.ui.addItem).not.toHaveBeenCalled();
-    });
-
-    it('should return a tool action and add an info message when arguments are provided', () => {
-      if (!addCommand.action) throw new Error('Command has no action');
-
-      const fact = 'remember this';
-      const result = addCommand.action(mockContext, `  ${fact}  `);
-
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: `Attempting to save to memory: "${fact}"`,
-        },
-        expect.any(Number),
-      );
-
-      expect(result).toEqual({
-        type: 'tool',
-        toolName: 'save_memory',
-        toolArgs: { fact },
-      });
-    });
-  });
-
   describe('/memory reload', () => {
     let reloadCommand: SlashCommand;
     let mockSetUserMemory: Mock;
@@ -270,8 +180,7 @@ describe('memoryCommand', () => {
         updateSystemInstructionIfInitialized: vi
           .fn()
           .mockResolvedValue(undefined),
-        isJitContextEnabled: vi.fn().mockReturnValue(false),
-        getContextManager: vi.fn().mockReturnValue({
+        getMemoryContextManager: vi.fn().mockReturnValue({
           refresh: mockContextManagerRefresh,
         }),
         getUserMemory: vi.fn().mockReturnValue(''),
@@ -294,21 +203,18 @@ describe('memoryCommand', () => {
       mockRefreshMemory.mockClear();
     });
 
-    it('should use ContextManager.refresh when JIT is enabled', async () => {
+    it('should use MemoryContextManager.refresh', async () => {
       if (!reloadCommand.action) throw new Error('Command has no action');
 
-      // Enable JIT in mock config
       const config = mockContext.services.agentContext?.config;
       if (!config) throw new Error('Config is undefined');
 
-      vi.mocked(config.isJitContextEnabled).mockReturnValue(true);
       vi.mocked(config.getUserMemory).mockReturnValue('JIT Memory Content');
       vi.mocked(config.getGeminiMdFileCount).mockReturnValue(3);
 
       await reloadCommand.action(mockContext, '');
 
       expect(mockContextManagerRefresh).toHaveBeenCalledOnce();
-      expect(mockRefreshServerHierarchicalMemory).not.toHaveBeenCalled();
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
@@ -319,7 +225,7 @@ describe('memoryCommand', () => {
       );
     });
 
-    it('should display success message when memory is reloaded with content (Legacy)', async () => {
+    it('should display success message when memory is reloaded with content', async () => {
       if (!reloadCommand.action) throw new Error('Command has no action');
 
       const successMessage = {

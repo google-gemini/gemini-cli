@@ -71,6 +71,14 @@ describe('AskUserDialog', () => {
       expectedSubmit: { '0': 'OAuth 2.0' },
     },
     {
+      name: 'Single Select with Spacebar',
+      questions: authQuestion,
+      actions: (stdin: { write: (data: string) => void }) => {
+        writeKey(stdin, ' ');
+      },
+      expectedSubmit: { '0': 'OAuth 2.0' },
+    },
+    {
       name: 'Multi-select',
       questions: [
         {
@@ -92,6 +100,31 @@ describe('AskUserDialog', () => {
         writeKey(stdin, '\x1b[B'); // Down to Other
         writeKey(stdin, '\x1b[B'); // Down to Done
         writeKey(stdin, '\r'); // Done
+      },
+      expectedSubmit: { '0': 'TypeScript, ESLint' },
+    },
+    {
+      name: 'Multi-select with Spacebar',
+      questions: [
+        {
+          question: 'Which features?',
+          header: 'Features',
+          type: QuestionType.CHOICE,
+          options: [
+            { label: 'TypeScript', description: '' },
+            { label: 'ESLint', description: '' },
+          ],
+          multiSelect: true,
+        },
+      ] as Question[],
+      actions: (stdin: { write: (data: string) => void }) => {
+        writeKey(stdin, ' '); // Toggle TS with Spacebar
+        writeKey(stdin, '\x1b[B'); // Down
+        writeKey(stdin, ' '); // Toggle ESLint with Spacebar
+        writeKey(stdin, '\x1b[B'); // Down to All of the above
+        writeKey(stdin, '\x1b[B'); // Down to Other
+        writeKey(stdin, '\x1b[B'); // Down to Done
+        writeKey(stdin, ' '); // Done with Spacebar
       },
       expectedSubmit: { '0': 'TypeScript, ESLint' },
     },
@@ -1579,6 +1612,73 @@ describe('AskUserDialog', () => {
       expect(frame).toContain('Line 25');
       // Should still show the options
       expect(frame).toContain('1.  Option 1');
+    });
+  });
+
+  it('indents multi-line descriptions correctly', async () => {
+    const questions: Question[] = [
+      {
+        question: 'Single choice?',
+        header: 'Indent Test',
+        type: QuestionType.CHOICE,
+        options: [
+          {
+            label: 'Option 1',
+            description:
+              'This is a very long description that is expected to wrap onto multiple lines in a narrow terminal. We want to ensure that all lines are correctly indented.',
+          },
+        ],
+        multiSelect: false,
+      },
+    ];
+
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
+      <AskUserDialog
+        questions={questions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        width={40} // Narrow width to force wrapping
+      />,
+      { width: 40 },
+    );
+
+    await waitFor(async () => {
+      await waitUntilReady();
+      // Snapshot will capture the visual alignment
+      expect(lastFrame()).toMatchSnapshot();
+    });
+  });
+
+  it('indents multi-line descriptions correctly in multi-select mode', async () => {
+    const questions: Question[] = [
+      {
+        question: 'Multi-select?',
+        header: 'Indent Test',
+        type: QuestionType.CHOICE,
+        options: [
+          {
+            label: 'Option 1',
+            description:
+              'This is a very long description that is expected to wrap onto multiple lines in a narrow terminal. We want to ensure that all lines are correctly indented even with checkboxes.',
+          },
+        ],
+        multiSelect: true,
+      },
+    ];
+
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
+      <AskUserDialog
+        questions={questions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        width={40} // Narrow width to force wrapping
+      />,
+      { width: 40 },
+    );
+
+    await waitFor(async () => {
+      await waitUntilReady();
+      expect(lastFrame()).toMatchSnapshot();
     });
   });
 });

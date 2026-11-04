@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getErrorMessage, isNodeError } from './errors.js';
+import { getErrorMessage, isAbortError } from './errors.js';
 import { URL } from 'node:url';
-import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
+import * as net from 'node:net';
+import * as undici from 'undici';
 import ipaddr from 'ipaddr.js';
 import { lookup } from 'node:dns/promises';
+import type { LookupAddress } from 'node:dns';
 
 export class FetchError extends Error {
   constructor(
@@ -32,9 +34,187 @@ let defaultHeadersTimeout = 60000; // 60 seconds
 const defaultBodyTimeout = 300000; // 5 minutes
 let currentProxy: string | undefined = undefined;
 
+function getBuildConnector():
+  | ((options?: object) => undici.buildConnector.connector)
+  | undefined {
+  try {
+    const fn = (
+      undici as {
+        buildConnector?: (options?: object) => undici.buildConnector.connector;
+      }
+    ).buildConnector;
+    return typeof fn === 'function' ? fn : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Custom DNS lookup function for undici.buildConnector that resolves all IP addresses,
+ * validates every address against private/reserved ranges, and passes back validated addresses
+ * to preserve dual-stack fallback (Happy Eyeballs, RFC 8305) without risking DNS rebinding.
+ */
+export function safeLookup(
+  hostname: string,
+  options: { all?: boolean; family?: number },
+  callback: (
+    err: Error | null,
+    address: string | LookupAddress[] | net.IPVersion,
+    family?: number,
+  ) => void,
+): void {
+  const sanitized = sanitizeHostname(hostname);
+
+  // Block internal TLDs / loopback domain names
+  if (
+    sanitized === 'localhost' ||
+    sanitized.endsWith('.localhost') ||
+    sanitized.endsWith('.local') ||
+    sanitized.endsWith('.internal')
+  ) {
+    callback(
+      new PrivateIpError(`Access to internal host ${sanitized} is blocked`),
+      '',
+    );
+    return;
+  }
+
+  // Direct IP literal check
+  if (net.isIP(sanitized)) {
+    if (isAddressPrivate(sanitized)) {
+      callback(
+        new PrivateIpError(`Access to private IP ${sanitized} is blocked`),
+        '',
+      );
+      return;
+    }
+    if (options?.all) {
+      callback(null, [{ address: sanitized, family: net.isIP(sanitized) }]);
+    } else {
+      callback(null, sanitized, net.isIP(sanitized));
+    }
+    return;
+  }
+
+  // Resolve all IP addresses via dns.lookup
+  lookup(sanitized, { all: true })
+    .then((addresses) => {
+      if (!addresses || addresses.length === 0) {
+        callback(new Error(`getaddrinfo ENOTFOUND ${sanitized}`), '');
+        return;
+      }
+
+      // Evaluate ALL resolved addresses against private ranges
+      for (const addr of addresses) {
+        if (isAddressPrivate(addr.address)) {
+          callback(
+            new PrivateIpError(
+              `Access to private IP ${addr.address} (resolved from ${sanitized}) is blocked`,
+            ),
+            '',
+          );
+          return;
+        }
+      }
+
+      // Pass back safe addresses to undici connector
+      if (options?.all) {
+        callback(null, addresses);
+      } else {
+        const family = options?.family;
+        const match = family
+          ? addresses.find((a) => a.family === family) || addresses[0]
+          : addresses[0];
+        callback(null, match.address, match.family);
+      }
+    })
+    .catch((err: unknown) => {
+      callback(err instanceof Error ? err : new Error(String(err)), '');
+    });
+}
+
+/**
+ * Creates an undici connector that validates destination IP addresses and configures
+ * a safe DNS lookup function to prevent DNS rebinding (TOCTOU) attacks while preserving
+ * dual-stack resilience (Happy Eyeballs).
+ */
+export function createSafeConnector(
+  connectorOpts?: undici.buildConnector.BuildOptions,
+  customDefaultConnector?: undici.buildConnector.connector,
+): undici.buildConnector.connector {
+  const buildConnectorFn = getBuildConnector();
+
+  const safeConnectorOpts = {
+    ...connectorOpts,
+    lookup: safeLookup,
+  };
+
+  const defaultConnector =
+    customDefaultConnector ??
+    (buildConnectorFn ? buildConnectorFn(safeConnectorOpts) : undefined);
+
+  return function safeConnect(
+    opts: undici.buildConnector.Options,
+    callback: undici.buildConnector.Callback,
+  ) {
+    if (!defaultConnector) {
+      callback(new Error('Connector is unavailable'), null);
+      return;
+    }
+
+    const rawHostname = opts.hostname;
+    const sanitized = sanitizeHostname(rawHostname);
+
+    // Direct IP address literal check or internal TLD check
+    if (
+      sanitized === 'localhost' ||
+      sanitized.endsWith('.localhost') ||
+      sanitized.endsWith('.local') ||
+      sanitized.endsWith('.internal')
+    ) {
+      callback(
+        new PrivateIpError(`Access to internal host ${sanitized} is blocked`),
+        null,
+      );
+      return;
+    }
+
+    if (net.isIP(sanitized) && isAddressPrivate(sanitized)) {
+      callback(
+        new PrivateIpError(`Access to private IP ${sanitized} is blocked`),
+        null,
+      );
+      return;
+    }
+
+    defaultConnector(opts, callback);
+  };
+}
+
+export function createSafeAgent(options?: {
+  headersTimeout?: number;
+  bodyTimeout?: number;
+}): undici.Agent {
+  const buildConnectorFn = getBuildConnector();
+  if (!buildConnectorFn) {
+    throw new Error(
+      'Security initialization failed: undici.buildConnector is not available.',
+    );
+  }
+
+  const connect = createSafeConnector();
+  return new undici.Agent({
+    headersTimeout: options?.headersTimeout ?? defaultHeadersTimeout,
+    bodyTimeout: options?.bodyTimeout ?? defaultBodyTimeout,
+    connect,
+  });
+}
+
+let defaultSafeAgent = createSafeAgent();
+
 // Configure default global dispatcher with higher timeouts
-setGlobalDispatcher(
-  new Agent({
+undici.setGlobalDispatcher(
+  new undici.Agent({
     headersTimeout: defaultHeadersTimeout,
     bodyTimeout: defaultBodyTimeout,
   }),
@@ -47,12 +227,16 @@ export function updateGlobalFetchTimeouts(timeoutMs: number) {
     );
   }
   defaultHeadersTimeout = timeoutMs;
+  defaultSafeAgent = createSafeAgent({
+    headersTimeout: defaultHeadersTimeout,
+    bodyTimeout: defaultBodyTimeout,
+  });
   // We keep body timeout high for LLM streaming responses
   if (currentProxy) {
     setGlobalProxy(currentProxy);
   } else {
-    setGlobalDispatcher(
-      new Agent({
+    undici.setGlobalDispatcher(
+      new undici.Agent({
         headersTimeout: defaultHeadersTimeout,
         bodyTimeout: defaultBodyTimeout,
       }),
@@ -81,15 +265,6 @@ export function isLoopbackHost(hostname: string): boolean {
   );
 }
 
-export function isPrivateIp(url: string): boolean {
-  try {
-    const hostname = new URL(url).hostname;
-    return isAddressPrivate(hostname);
-  } catch {
-    return false;
-  }
-}
-
 /**
  * IANA Benchmark Testing Range (198.18.0.0/15).
  * Classified as 'unicast' by ipaddr.js but is reserved and should not be
@@ -115,7 +290,12 @@ function isBenchmarkAddress(addr: ipaddr.IPv4 | ipaddr.IPv6): boolean {
 export function isAddressPrivate(address: string): boolean {
   const sanitized = sanitizeHostname(address);
 
-  if (sanitized === 'localhost') {
+  if (
+    sanitized === 'localhost' ||
+    sanitized.endsWith('.localhost') ||
+    sanitized.endsWith('.local') ||
+    sanitized.endsWith('.internal')
+  ) {
     return true;
   }
 
@@ -145,23 +325,83 @@ export function isAddressPrivate(address: string): boolean {
 }
 
 /**
- * Checks if a URL resolves to a private IP address.
+ * Checks if a hostname or IP address belongs to an enterprise private network range
+ * (RFC 1918, RFC 6598 Carrier-Grade NAT, RFC 4193 IPv6 Unique Local, or .internal/.local domains)
+ * while excluding loopback, link-local, multicast, broadcast, unspecified, reserved, and benchmark ranges.
  */
-export async function isPrivateIpAsync(url: string): Promise<boolean> {
-  try {
-    const parsedUrl = new URL(url);
-    const hostname = parsedUrl.hostname;
+export function isEnterprisePrivateAddress(addressOrHost: string): boolean {
+  const normalized = sanitizeHostname(addressOrHost).toLowerCase();
 
-    if (isLoopbackHost(hostname)) {
+  if (normalized.endsWith('.internal') || normalized.endsWith('.local')) {
+    return true;
+  }
+
+  if (normalized === 'localhost' || normalized.endsWith('.localhost')) {
+    return false;
+  }
+
+  try {
+    if (!ipaddr.isValid(normalized)) {
       return false;
     }
 
-    const addresses = await lookup(hostname, { all: true });
-    return addresses.some((addr) => isAddressPrivate(addr.address));
+    let addr: ipaddr.IPv4 | ipaddr.IPv6 = ipaddr.parse(normalized);
+
+    if (addr instanceof ipaddr.IPv6 && addr.isIPv4MappedAddress()) {
+      addr = addr.toIPv4Address();
+    }
+
+    if (isBenchmarkAddress(addr)) {
+      return false;
+    }
+
+    const range = addr.range();
+    return (
+      range === 'private' ||
+      range === 'carrierGradeNat' ||
+      range === 'uniqueLocal'
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Checks if a URL resolves to a private IP address.
+ */
+export async function isPrivateIpAsync(url: string): Promise<boolean> {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
   } catch (error) {
     if (error instanceof TypeError) {
       return false;
     }
+    throw error;
+  }
+
+  const hostname = sanitizeHostname(parsedUrl.hostname);
+
+  if (
+    hostname === 'localhost' ||
+    hostname.endsWith('.localhost') ||
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.internal')
+  ) {
+    return true;
+  }
+
+  if (net.isIP(hostname)) {
+    return isAddressPrivate(hostname);
+  }
+
+  try {
+    const addresses = await lookup(hostname, { all: true });
+    if (!addresses || addresses.length === 0) {
+      return true;
+    }
+    return addresses.some((addr) => isAddressPrivate(addr.address));
+  } catch (error) {
     throw new Error('Failed to verify if URL resolves to private IP', {
       cause: error,
     });
@@ -169,11 +409,76 @@ export async function isPrivateIpAsync(url: string): Promise<boolean> {
 }
 
 /**
- * Creates an undici ProxyAgent that incorporates safe DNS lookup.
+ * Checks if a URL targets or resolves to a private, loopback, or reserved network.
+ * Fails closed on resolution errors or timeouts.
+ *
+ * Checks performed:
+ * - RFC 1918 private ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
+ * - Loopback addresses (127.0.0.0/8, ::1)
+ * - Cloud Metadata and link-local addresses (169.254.0.0/16, fe80::/10)
+ * - Carrier-Grade NAT (100.64.0.0/10)
+ * - IANA benchmark testing range (198.18.0.0/15)
+ * - IPv6 unique local addresses (fc00::/7) and IPv4-mapped IPv6 (::ffff:x.x.x.x)
+ * - Internal top-level domains (.localhost, .local, .internal)
+ * - Multi-IP resolution: rejects if ANY resolved address is private or reserved
+ *
+ * @param url - The URL string to inspect
+ * @returns Promise resolving to `true` if private/reserved or resolution failed, `false` if safe public IP
  */
-export function createSafeProxyAgent(proxyUrl: string): ProxyAgent {
-  return new ProxyAgent({
-    uri: proxyUrl,
+export async function isPrivateIp(url: string): Promise<boolean> {
+  try {
+    return await isPrivateIpAsync(url);
+  } catch {
+    return true; // Fail closed
+  }
+}
+
+/**
+ * Validates a URL destination to ensure it safely targets the public internet and
+ * does not target private, local, internal, or reserved networks (SSRF defense).
+ *
+ * Returns `false` if the destination is private, reserved, invalid, or cannot be
+ * resolved (fail-closed security posture).
+ *
+ * @example
+ * ```ts
+ * import { validateUrlDestination } from '@google/gemini-cli-core';
+ *
+ * if (!(await validateUrlDestination(userSuppliedUrl))) {
+ *   throw new Error('Access to private or blocked host is not allowed.');
+ * }
+ * ```
+ *
+ * @param url - The URL string to validate
+ * @returns Promise resolving to `true` if safe for outbound fetching, `false` otherwise
+ */
+export async function validateUrlDestination(url: string): Promise<boolean> {
+  try {
+    const isPrivate = await isPrivateIp(url);
+    return !isPrivate;
+  } catch {
+    return false; // Fail closed
+  }
+}
+
+/**
+ * Creates an undici EnvHttpProxyAgent that incorporates safe DNS lookup.
+ */
+export function createSafeProxyAgent(
+  proxyUrl: string,
+): undici.EnvHttpProxyAgent {
+  const trimmedProxy = proxyUrl.trim();
+  const noProxy = (
+    process.env['NO_PROXY'] ??
+    process.env['no_proxy'] ??
+    ''
+  )?.trim();
+  return new undici.EnvHttpProxyAgent({
+    httpProxy: trimmedProxy,
+    httpsProxy: trimmedProxy,
+    noProxy,
+    headersTimeout: defaultHeadersTimeout,
+    bodyTimeout: defaultBodyTimeout,
   });
 }
 
@@ -182,6 +487,12 @@ export async function fetchWithTimeout(
   timeout: number,
   options?: RequestInit,
 ): Promise<Response> {
+  if (await isPrivateIp(url)) {
+    throw new PrivateIpError(
+      `Access to blocked or private host ${url} is not allowed.`,
+    );
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
@@ -196,14 +507,38 @@ export async function fetchWithTimeout(
   }
 
   try {
-    const response = await fetch(url, {
+    const fetchOptions: RequestInit & { dispatcher?: undici.Dispatcher } = {
       ...options,
       signal: controller.signal,
-    });
+    };
+
+    if (!fetchOptions.dispatcher) {
+      fetchOptions.dispatcher = currentProxy
+        ? createSafeProxyAgent(currentProxy)
+        : defaultSafeAgent;
+    }
+
+    const response = await fetch(url, fetchOptions);
     return response;
   } catch (error) {
-    if (isNodeError(error) && error.code === 'ABORT_ERR') {
+    if (isAbortError(error)) {
+      // If the caller's own signal was already aborted, this is a user-initiated
+      // cancellation (e.g. Ctrl+C), not an internal timeout. Re-throw as a plain
+      // AbortError so the retry layer does NOT treat it as a retryable ETIMEDOUT.
+      if (options?.signal?.aborted) {
+        // Rethrow the original abort reason or the caught error to preserve
+        // the stack trace and any custom abort reason (e.g. from Ctrl+C).
+        throw options.signal.reason ?? error;
+      }
       throw new FetchError(`Request timed out after ${timeout}ms`, 'ETIMEDOUT');
+    }
+    if (error instanceof PrivateIpError) {
+      throw error;
+    }
+    if (error && typeof error === 'object' && 'cause' in error) {
+      if (error.cause instanceof PrivateIpError) {
+        throw error.cause;
+      }
     }
     throw new FetchError(getErrorMessage(error), undefined, { cause: error });
   } finally {
@@ -212,10 +547,18 @@ export async function fetchWithTimeout(
 }
 
 export function setGlobalProxy(proxy: string) {
-  currentProxy = proxy;
-  setGlobalDispatcher(
-    new ProxyAgent({
-      uri: proxy,
+  const trimmedProxy = proxy.trim();
+  currentProxy = trimmedProxy;
+  const noProxy = (
+    process.env['NO_PROXY'] ??
+    process.env['no_proxy'] ??
+    ''
+  )?.trim();
+  undici.setGlobalDispatcher(
+    new undici.EnvHttpProxyAgent({
+      httpProxy: trimmedProxy,
+      httpsProxy: trimmedProxy,
+      noProxy,
       headersTimeout: defaultHeadersTimeout,
       bodyTimeout: defaultBodyTimeout,
     }),

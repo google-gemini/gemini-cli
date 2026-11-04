@@ -13,6 +13,7 @@ import {
   isSubagentProgress,
   checkExhaustive,
   type SubagentActivityItem,
+  SubagentState,
 } from '@google/gemini-cli-core';
 import {
   SubagentProgressDisplay,
@@ -66,13 +67,13 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
     const singleAgent = toolCalls[0].resultDisplay;
     if (isSubagentProgress(singleAgent)) {
       switch (singleAgent.state) {
-        case 'completed':
+        case SubagentState.COMPLETED:
           headerText = 'Agent Completed';
           break;
-        case 'cancelled':
+        case SubagentState.CANCELLED:
           headerText = 'Agent Cancelled';
           break;
-        case 'error':
+        case SubagentState.ERROR:
           headerText = 'Agent Error';
           break;
         default:
@@ -88,8 +89,8 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
     for (const tc of toolCalls) {
       const progress = tc.resultDisplay;
       if (isSubagentProgress(progress)) {
-        if (progress.state === 'completed') completedCount++;
-        else if (progress.state === 'running') runningCount++;
+        if (progress.state === SubagentState.COMPLETED) completedCount++;
+        else if (progress.state === SubagentState.RUNNING) runningCount++;
       } else {
         // It hasn't emitted progress yet, but it is "running"
         runningCount++;
@@ -200,7 +201,7 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
           let content = 'Starting...';
           let formattedArgs: string | undefined;
 
-          if (progress.state === 'completed') {
+          if (progress.state === SubagentState.COMPLETED) {
             if (
               progress.terminateReason &&
               progress.terminateReason !== 'GOAL'
@@ -223,18 +224,18 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
           }
 
           const displayArgs =
-            progress.state === 'completed' ? '' : formattedArgs;
+            progress.state === SubagentState.COMPLETED ? '' : formattedArgs;
 
           const renderStatusIcon = () => {
-            const state = progress.state ?? 'running';
+            const state = progress.state ?? SubagentState.RUNNING;
             switch (state) {
-              case 'running':
+              case SubagentState.RUNNING:
                 return <Text color={theme.text.primary}>!</Text>;
-              case 'completed':
+              case SubagentState.COMPLETED:
                 return <Text color={theme.status.success}>✓</Text>;
-              case 'cancelled':
+              case SubagentState.CANCELLED:
                 return <Text color={theme.status.warning}>ℹ</Text>;
-              case 'error':
+              case SubagentState.ERROR:
                 return <Text color={theme.status.error}>✗</Text>;
               default:
                 return checkExhaustive(state);

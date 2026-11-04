@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
   createDefaultPolicy,
   getModelPolicyChain,
+  getFlashLitePolicyChain,
   validateModelPolicyChain,
 } from './policyCatalog.js';
 import {
@@ -15,9 +16,16 @@ import {
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_MODEL,
+  setFlashLiteModel,
+  resetModelsForTesting,
+  LATEST_GEMINI_FLASH_LITE_MODEL,
 } from '../config/models.js';
 
 describe('policyCatalog', () => {
+  afterEach(() => {
+    resetModelsForTesting();
+  });
+
   it('returns preview chain when preview enabled', () => {
     const chain = getModelPolicyChain({ previewEnabled: true });
     expect(chain[0]?.model).toBe(PREVIEW_GEMINI_MODEL);
@@ -28,7 +36,6 @@ describe('policyCatalog', () => {
     const chain = getModelPolicyChain({
       previewEnabled: true,
       useGemini31: true,
-      useGemini31FlashLite: false,
     });
     expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);
     expect(chain).toHaveLength(2);
@@ -39,7 +46,6 @@ describe('policyCatalog', () => {
     const chain = getModelPolicyChain({
       previewEnabled: true,
       useGemini31: true,
-      useGemini31FlashLite: false,
       useCustomToolModel: true,
     });
     expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
@@ -74,6 +80,12 @@ describe('policyCatalog', () => {
     firstCall[0].actions.terminal = 'silent';
     const secondCall = getModelPolicyChain({ previewEnabled: false });
     expect(secondCall[0].actions.terminal).toBe('prompt');
+  });
+
+  it('updates getFlashLitePolicyChain head when setFlashLiteModel is called', () => {
+    setFlashLiteModel(LATEST_GEMINI_FLASH_LITE_MODEL);
+    const chain = getFlashLitePolicyChain();
+    expect(chain[0]?.model).toBe(LATEST_GEMINI_FLASH_LITE_MODEL);
   });
 
   it('passes when there is exactly one last-resort policy', () => {

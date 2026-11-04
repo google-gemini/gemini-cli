@@ -1,0 +1,10 @@
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Dynamic git worktrees and cloned target repository
+target_repo/
+worktrees/
+
+# Evaluation run output logs
+results/

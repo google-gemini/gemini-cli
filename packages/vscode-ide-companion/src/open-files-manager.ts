@@ -5,6 +5,7 @@
  */
 
 import * as vscode from 'vscode';
+import { isExcludedIdeContextFile } from '@google/gemini-cli-core/src/ide/ideContext.js';
 import type {
   File,
   IdeContext,
@@ -89,7 +90,7 @@ export class OpenFilesManager {
   }
 
   private isFileUri(uri: vscode.Uri): boolean {
-    return uri.scheme === 'file';
+    return uri.scheme === 'file' && !isExcludedIdeContextFile(uri.fsPath);
   }
 
   private addOrMoveToFront(editor: vscode.TextEditor) {

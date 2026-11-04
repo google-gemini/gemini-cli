@@ -20,7 +20,7 @@ const ALLOWED_HOSTS = [/^.+\.googleapis\.com$/, CLOUD_RUN_HOST_REGEX];
  * based on the target endpoint URL.
  */
 export class GoogleCredentialsAuthProvider extends BaseA2AAuthProvider {
-  readonly type = 'google-credentials' as const;
+  readonly type = 'google-credentials';
 
   private readonly auth: GoogleAuth;
   private readonly useIdToken: boolean = false;
@@ -40,7 +40,14 @@ export class GoogleCredentialsAuthProvider extends BaseA2AAuthProvider {
       );
     }
 
-    const hostname = new URL(targetUrl).hostname;
+    const urlObj = new URL(targetUrl);
+    if (urlObj.protocol !== 'https:') {
+      throw new Error(
+        `Protocol "${urlObj.protocol}" is not secure. Google Credential provider requires HTTPS.`,
+      );
+    }
+
+    const hostname = urlObj.hostname;
     const isRunAppHost = CLOUD_RUN_HOST_REGEX.test(hostname);
 
     if (isRunAppHost) {

@@ -18,6 +18,7 @@ import {
   AuthType,
   clearCachedCredentialFile,
   type Config,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { AuthState } from '../types.js';
@@ -83,7 +84,7 @@ export function AuthDialog({
     );
   }
 
-  let defaultAuthType = null;
+  let defaultAuthType: AuthType | null = null;
   const defaultAuthTypeEnv = process.env['GEMINI_DEFAULT_AUTH_TYPE'];
   if (
     defaultAuthTypeEnv &&
@@ -129,7 +130,25 @@ export function AuthDialog({
         } else {
           setAuthContext({});
         }
-        await clearCachedCredentialFile();
+
+        const currentAuthType = settings.merged.security?.auth?.selectedType;
+        if (
+          authType === AuthType.LOGIN_WITH_GOOGLE ||
+          currentAuthType === AuthType.LOGIN_WITH_GOOGLE
+        ) {
+          try {
+            await clearCachedCredentialFile();
+          } catch (error) {
+            debugLogger.error('Failed to clear cached credentials:', error);
+            onAuthError(
+              'Failed to clear cached credentials: ' +
+                (error instanceof Error ? error.message : String(error)),
+            );
+            if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+              return;
+            }
+          }
+        }
 
         settings.setValue(scope, 'security.auth.selectedType', authType);
         if (
@@ -137,7 +156,12 @@ export function AuthDialog({
           config.isBrowserLaunchSuppressed()
         ) {
           setExiting(true);
-          setTimeout(relaunchApp, 100);
+          setTimeout(() => {
+            void relaunchApp({ overrideAuthType: authType }).catch((err) => {
+              debugLogger.error('Failed to trigger supervisor relaunch:', err);
+              process.exit(1);
+            });
+          }, 100);
           return;
         }
 
@@ -151,16 +175,23 @@ export function AuthDialog({
       }
       setAuthState(AuthState.Unauthenticated);
     },
-    [settings, config, setAuthState, exiting, setAuthContext],
+    [settings, config, setAuthState, exiting, setAuthContext, onAuthError],
   );
 
-  const handleAuthSelect = (authMethod: AuthType) => {
-    const error = validateAuthMethodWithSettings(authMethod, settings);
+  const handleAuthSelect = async (authMethod: AuthType) => {
+    const error = await validateAuthMethodWithSettings(
+      authMethod,
+      settings,
+    ).catch((e) => (e instanceof Error ? e.message : String(e)));
     if (error) {
       onAuthError(error);
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      onSelect(authMethod, SettingScope.User);
+      onAuthError(null);
+      try {
+        await onSelect(authMethod, SettingScope.User);
+      } catch (e) {
+        onAuthError(e instanceof Error ? e.message : String(e));
+      }
     }
   };
 

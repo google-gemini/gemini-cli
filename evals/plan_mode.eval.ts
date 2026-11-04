@@ -470,4 +470,46 @@ describe('plan_mode', () => {
       ).toBeDefined();
     },
   });
+
+  evalTest('USUALLY_PASSES', {
+    suiteName: 'plan_mode',
+    suiteType: 'behavioral',
+    name: 'should autonomously draft plan and exit plan mode in non-interactive mode',
+    approvalMode: ApprovalMode.PLAN,
+    params: {
+      settings,
+    },
+    prompt:
+      'Create an implementation plan for adding a greet function in src/greeter.ts and finalize the plan with exit_plan_mode to begin implementation.',
+    assert: async (rig, result) => {
+      const exitPlanCalled = await rig.waitForToolCall('exit_plan_mode');
+      expect(
+        exitPlanCalled,
+        'Expected exit_plan_mode tool to be called autonomously',
+      ).toBe(true);
+
+      await rig.waitForTelemetryReady();
+      const toolLogs = rig.readToolLogs();
+
+      const exitPlanCall = toolLogs.find(
+        (log) => log.toolRequest.name === 'exit_plan_mode',
+      );
+      expect(
+        exitPlanCall,
+        'Expected to find exit_plan_mode in tool logs',
+      ).toBeDefined();
+
+      const planWrite = toolLogs.find(
+        (log) =>
+          log.toolRequest.name === 'write_file' &&
+          log.toolRequest.args.includes('/plans/'),
+      );
+      expect(
+        planWrite,
+        'Expected a plan file to be written in the plans directory',
+      ).toBeDefined();
+
+      assertModelHasOutput(result);
+    },
+  });
 });

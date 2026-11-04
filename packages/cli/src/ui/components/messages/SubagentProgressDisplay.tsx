@@ -9,9 +9,10 @@ import { Box, Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import Spinner from 'ink-spinner';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
-import type {
-  SubagentProgress,
-  SubagentActivityItem,
+import {
+  type SubagentProgress,
+  type SubagentActivityItem,
+  SubagentState,
 } from '@google/gemini-cli-core';
 import { TOOL_STATUS } from '../../constants.js';
 import { STATUS_INDICATOR_WIDTH } from './ToolShared.js';
@@ -62,13 +63,13 @@ export const SubagentProgressDisplay: React.FC<
   let headerText: string | undefined;
   let headerColor = theme.text.secondary;
 
-  if (progress.state === 'cancelled') {
+  if (progress.state === SubagentState.CANCELLED) {
     headerText = `Subagent ${progress.agentName} was cancelled.`;
     headerColor = theme.status.warning;
-  } else if (progress.state === 'error') {
+  } else if (progress.state === SubagentState.ERROR) {
     headerText = `Subagent ${progress.agentName} failed.`;
     headerColor = theme.status.error;
-  } else if (progress.state === 'completed') {
+  } else if (progress.state === SubagentState.COMPLETED) {
     headerText = `Subagent ${progress.agentName} completed.`;
     headerColor = theme.status.success;
   } else {
@@ -107,13 +108,13 @@ export const SubagentProgressDisplay: React.FC<
               );
             } else if (item.type === 'tool_call') {
               const statusSymbol =
-                item.status === 'running' ? (
+                item.status === SubagentState.RUNNING ? (
                   <Spinner type="dots" />
-                ) : item.status === 'completed' ? (
+                ) : item.status === SubagentState.COMPLETED ? (
                   <Text color={theme.status.success}>
                     {TOOL_STATUS.SUCCESS}
                   </Text>
-                ) : item.status === 'cancelled' ? (
+                ) : item.status === SubagentState.CANCELLED ? (
                   <Text color={theme.status.warning} bold>
                     {TOOL_STATUS.CANCELED}
                   </Text>
@@ -135,7 +136,7 @@ export const SubagentProgressDisplay: React.FC<
                     <Text
                       bold
                       color={theme.text.primary}
-                      strikethrough={item.status === 'cancelled'}
+                      strikethrough={item.status === SubagentState.CANCELLED}
                     >
                       {item.displayName || item.content}
                     </Text>
@@ -144,7 +145,9 @@ export const SubagentProgressDisplay: React.FC<
                         <Text
                           color={theme.text.secondary}
                           wrap="truncate"
-                          strikethrough={item.status === 'cancelled'}
+                          strikethrough={
+                            item.status === SubagentState.CANCELLED
+                          }
                         >
                           {displayArgs}
                         </Text>
@@ -170,7 +173,7 @@ export const SubagentProgressDisplay: React.FC<
           )}
           <MarkdownDisplay
             text={safeJsonToMarkdown(progress.result)}
-            isPending={progress.state !== 'completed'}
+            isPending={progress.state !== SubagentState.COMPLETED}
             terminalWidth={terminalWidth}
           />
         </Box>

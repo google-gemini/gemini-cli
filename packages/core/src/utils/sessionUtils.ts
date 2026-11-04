@@ -6,7 +6,77 @@
 
 import { type Part, type PartListUnion } from '@google/genai';
 import { type ConversationRecord } from '../services/chatRecordingService.js';
+export { partListUnionToString } from '../core/geminiRequest.js';
 import { partListUnionToString } from '../core/geminiRequest.js';
+import { type HistoryTurn } from '../core/agentChatHistory.js';
+import { deriveStableId } from './cryptoUtils.js';
+
+/**
+ * Ensures that all function calls and responses in a chat history have stable IDs.
+ * If IDs are missing (e.g. legacy data or manually constructed tests), it synthesizes
+ * them and MUTATES the underlying Part objects.
+ *
+ * It uses a deterministic pairing heuristic for adjacent turns to link calls and responses.
+ */
+export function ensureStableToolIds(history: HistoryTurn[]): void {
+  for (let i = 0; i < history.length; i++) {
+    const turn = history[i];
+    const parts = turn.content.parts || [];
+
+    for (let partIdx = 0; partIdx < parts.length; partIdx++) {
+      const part = parts[partIdx];
+
+      if (part.functionCall && !part.functionCall.id) {
+        const name = part.functionCall.name;
+        // Search ahead for a matching response in the next turn (common pattern)
+        const nextTurn = history[i + 1];
+        let pairedId: string | undefined;
+
+        if (nextTurn?.content.role === 'user') {
+          const matchingResp = nextTurn.content.parts?.find(
+            (p) =>
+              p.functionResponse &&
+              p.functionResponse.name === name &&
+              !p.functionResponse.id,
+          );
+          if (matchingResp) {
+            pairedId = `synth_${name}_${deriveStableId([turn.id, i.toString(), partIdx.toString()])}`;
+            part.functionCall.id = pairedId;
+            matchingResp.functionResponse!.id = pairedId;
+          }
+        }
+
+        if (!part.functionCall.id) {
+          // If no pairing found, generate a solo synthetic ID
+          part.functionCall.id = `synth_${name}_${deriveStableId([turn.id, i.toString(), partIdx.toString()])}`;
+        }
+      }
+
+      if (part.functionResponse && !part.functionResponse.id) {
+        // Orphaned response handling (search backward)
+        const name = part.functionResponse.name;
+        const prevTurn = history[i - 1];
+        if (prevTurn?.content.role === 'model') {
+          const matchingCall = prevTurn.content.parts?.find(
+            (p) =>
+              p.functionCall &&
+              p.functionCall.name === name &&
+              !p.functionCall.id,
+          );
+          if (matchingCall) {
+            const pairedId = `synth_${name}_${deriveStableId([prevTurn.id, (i - 1).toString(), partIdx.toString()])}`;
+            matchingCall.functionCall!.id = pairedId;
+            part.functionResponse.id = pairedId;
+          }
+        }
+
+        if (!part.functionResponse.id) {
+          part.functionResponse.id = `synth_orph_${name}_${deriveStableId([turn.id, i.toString(), partIdx.toString()])}`;
+        }
+      }
+    }
+  }
+}
 
 /**
  * Converts a PartListUnion into a normalized array of Part objects.
@@ -24,113 +94,222 @@ function ensurePartArray(content: PartListUnion): Part[] {
   return [content];
 }
 
+export function isIgnoredUserContent(trimmedContent: string): boolean {
+  return (
+    trimmedContent.length === 0 ||
+    trimmedContent.startsWith('/') ||
+    trimmedContent.startsWith('?') ||
+    trimmedContent.startsWith('<session_context>') ||
+    trimmedContent.startsWith('<hook_context>')
+  );
+}
+
 /**
  * Converts session/conversation data into Gemini client history formats.
+ *
+ * When a model (`gemini`) turn contains `toolCalls`, this function performs a
+ * forward scan up to the next model turn to check whether subsequent `user`
+ * messages already record `functionResponse` parts for those tool calls:
+ * - Tool calls already covered by a subsequent `user` turn are not re-synthesized.
+ * - Any remaining tool calls with a `result` are either queued in
+ *   `pendingPartsToAppend` to be merged into the existing `user` tool-response
+ *   turn in that round, or synthesized into a fallback `${msg.id}_response`
+ *   turn for legacy recordings that lack a recorded `user` response turn.
+ * - Within each tool exchange round, `seenFunctionResponseIds` deduplicates
+ *   `functionResponse` parts by ID so previously inflated recordings recover cleanly.
  */
 export function convertSessionToClientHistory(
   messages: ConversationRecord['messages'],
-): Array<{ role: 'user' | 'model'; parts: Part[] }> {
-  const clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }> = [];
+): HistoryTurn[] {
+  const clientHistory: HistoryTurn[] = [];
+  const seenFunctionResponseIds = new Set<string>();
+  const pendingPartsToAppend = new Map<string, Part[]>();
 
-  for (const msg of messages) {
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
     if (msg.type === 'info' || msg.type === 'error' || msg.type === 'warning') {
       continue;
     }
 
     if (msg.type === 'user') {
-      const contentString = partListUnionToString(msg.content);
-      if (
-        contentString.trim().startsWith('/') ||
-        contentString.trim().startsWith('?')
-      ) {
+      const extraParts = pendingPartsToAppend.get(msg.id) || [];
+      pendingPartsToAppend.delete(msg.id);
+      if (extraParts.length === 0) {
+        if (!msg.content) {
+          continue;
+        }
+        const contentString = partListUnionToString(msg.content);
+        const trimmedContent = contentString.trim();
+        if (isIgnoredUserContent(trimmedContent)) {
+          continue;
+        }
+      }
+
+      const parts = [
+        ...(msg.content ? ensurePartArray(msg.content) : []),
+        ...extraParts,
+      ].filter((part) => {
+        const respId = part?.functionResponse?.id;
+        if (!respId) {
+          return true;
+        }
+        if (seenFunctionResponseIds.has(respId)) {
+          return false;
+        }
+        seenFunctionResponseIds.add(respId);
+        return true;
+      });
+
+      if (parts.length === 0) {
         continue;
       }
 
       clientHistory.push({
-        role: 'user',
-        parts: ensurePartArray(msg.content),
+        id: msg.id,
+        content: {
+          role: 'user',
+          parts,
+        },
       });
     } else if (msg.type === 'gemini') {
+      seenFunctionResponseIds.clear();
       const modelParts: Part[] = [];
 
-      // Add thoughts if present
-      if (msg.thoughts && msg.thoughts.length > 0) {
-        for (const thought of msg.thoughts) {
-          const thoughtText = thought.subject
-            ? `**${thought.subject}** ${thought.description}`
-            : thought.description;
-          modelParts.push({
-            text: thoughtText,
-            thought: true,
-          } as Part);
-        }
-      }
+      const contentParts = msg.content ? ensurePartArray(msg.content) : [];
+      const hasCallsInContent = contentParts.some((p) => !!p.functionCall);
+      const hasThoughtsInContent = contentParts.some((p) => p.thought);
 
-      const hasToolCalls = msg.toolCalls && msg.toolCalls.length > 0;
-
-      if (hasToolCalls) {
-        // Preserve original parts to maintain multimodal integrity
-        if (msg.content) {
-          modelParts.push(...ensurePartArray(msg.content));
-        }
-
-        for (const toolCall of msg.toolCalls!) {
-          modelParts.push({
-            functionCall: {
-              name: toolCall.name,
-              args: toolCall.args,
-              ...(toolCall.id && { id: toolCall.id }),
-            },
-          });
-        }
-
-        clientHistory.push({
-          role: 'model',
-          parts: modelParts,
-        });
-
-        const functionResponseParts: Part[] = [];
-        for (const toolCall of msg.toolCalls!) {
-          if (toolCall.result) {
-            let responseData: Part;
-
-            if (typeof toolCall.result === 'string') {
-              responseData = {
-                functionResponse: {
-                  id: toolCall.id,
-                  name: toolCall.name,
-                  response: {
-                    output: toolCall.result,
-                  },
-                },
-              };
-            } else if (Array.isArray(toolCall.result)) {
-              functionResponseParts.push(...ensurePartArray(toolCall.result));
-              continue;
-            } else {
-              responseData = toolCall.result;
-            }
-
-            functionResponseParts.push(responseData);
+      if (hasCallsInContent || hasThoughtsInContent) {
+        // Modern session: content is the source of truth for all parts
+        modelParts.push(...contentParts);
+      } else {
+        // Legacy session: rebuild from components
+        // 1. Add thoughts from metadata if present
+        if (msg.thoughts && msg.thoughts.length > 0) {
+          for (const thought of msg.thoughts) {
+            const thoughtText = thought.subject
+              ? `**${thought.subject}** ${thought.description}`
+              : thought.description;
+            modelParts.push({
+              text: thoughtText,
+              thought: true,
+            } as Part);
           }
         }
 
-        if (functionResponseParts.length > 0) {
-          clientHistory.push({
-            role: 'user',
-            parts: functionResponseParts,
-          });
-        }
-      } else {
-        if (msg.content) {
-          modelParts.push(...ensurePartArray(msg.content));
-        }
+        // 2. Add content (usually just text in legacy)
+        modelParts.push(...contentParts);
 
-        if (modelParts.length > 0) {
-          clientHistory.push({
+        // 3. Add tool calls from metadata
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+          for (const toolCall of msg.toolCalls) {
+            modelParts.push({
+              functionCall: {
+                id: toolCall.id,
+                name: toolCall.name,
+                args: toolCall.args,
+              },
+            });
+          }
+        }
+      }
+
+      if (modelParts.length > 0) {
+        clientHistory.push({
+          id: msg.id,
+          content: {
             role: 'model',
             parts: modelParts,
-          });
+          },
+        });
+
+        // 4. Generate tool response turns
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+          const recordedResponseIds = new Set<string>();
+          let hasUntrackedFunctionResponse = false;
+          let targetUserMsgId: string | undefined;
+          for (let j = i + 1; j < messages.length; j++) {
+            const nextMsg = messages[j];
+            if (nextMsg.type === 'gemini') {
+              break;
+            }
+            if (nextMsg.type === 'user' && nextMsg.content) {
+              for (const part of ensurePartArray(nextMsg.content)) {
+                if (part?.functionResponse) {
+                  targetUserMsgId ??= nextMsg.id;
+                  if (part.functionResponse.id) {
+                    recordedResponseIds.add(part.functionResponse.id);
+                  } else {
+                    hasUntrackedFunctionResponse = true;
+                  }
+                }
+              }
+            }
+          }
+
+          const functionResponseParts: Part[] = [];
+          for (const toolCall of msg.toolCalls) {
+            const isAlreadyRecorded = toolCall.id
+              ? recordedResponseIds.has(toolCall.id)
+              : hasUntrackedFunctionResponse;
+            if (toolCall.result && !isAlreadyRecorded) {
+              let responseData: Part;
+
+              if (typeof toolCall.result === 'string') {
+                responseData = {
+                  functionResponse: {
+                    id: toolCall.id,
+                    name: toolCall.name,
+                    response: {
+                      output: toolCall.result,
+                    },
+                  },
+                };
+              } else if (Array.isArray(toolCall.result)) {
+                functionResponseParts.push(...ensurePartArray(toolCall.result));
+                continue;
+              } else {
+                responseData = toolCall.result;
+              }
+
+              functionResponseParts.push(responseData);
+            }
+          }
+
+          if (functionResponseParts.length > 0) {
+            if (targetUserMsgId) {
+              const existingPending =
+                pendingPartsToAppend.get(targetUserMsgId) || [];
+              pendingPartsToAppend.set(targetUserMsgId, [
+                ...existingPending,
+                ...functionResponseParts,
+              ]);
+            } else {
+              const dedupedResponseParts = functionResponseParts.filter(
+                (part) => {
+                  const respId = part?.functionResponse?.id;
+                  if (!respId) {
+                    return true;
+                  }
+                  if (seenFunctionResponseIds.has(respId)) {
+                    return false;
+                  }
+                  seenFunctionResponseIds.add(respId);
+                  return true;
+                },
+              );
+
+              if (dedupedResponseParts.length > 0) {
+                clientHistory.push({
+                  id: `${msg.id}_response`,
+                  content: {
+                    role: 'user',
+                    parts: dedupedResponseParts,
+                  },
+                });
+              }
+            }
+          }
         }
       }
     }

@@ -418,7 +418,7 @@ confirmations for tool calls (like executing a shell command), will be sent as
 ```proto
 // Request to execute a specific slash command.
 message ExecuteSlashCommandRequest {
-  // The path to the command, e.g., ["memory", "add"] for /memory add
+  // The path to the command, e.g., ["memory", "list"] for /memory list
   repeated string command_path = 1;
   // The arguments for the command as a single string.
   string args = 2;

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as path from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { MessageType, type HistoryItem } from '../types.js';
@@ -198,6 +199,25 @@ describe('<HistoryItemDisplay />', () => {
     unmount();
   });
 
+  it('renders ExportSessionMessage for "export_session" type', async () => {
+    const testPath = path.join(path.sep, 'test', 'path.json');
+    const item: HistoryItem = {
+      ...baseItem,
+      type: 'export_session',
+      exportSession: {
+        isPending: false,
+        targetPath: testPath,
+      },
+    };
+    const { lastFrame, unmount } = await renderWithProviders(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    expect(lastFrame()).toContain(
+      `Successfully exported session to ${testPath}`,
+    );
+    unmount();
+  });
+
   it('should escape ANSI codes in text content', async () => {
     const historyItem: HistoryItem = {
       id: 1,
@@ -257,6 +277,38 @@ describe('<HistoryItemDisplay />', () => {
     expect(confirmationDetails.command).toBe(
       'echo "\\u001b[31mhello\\u001b[0m"',
     );
+    unmount();
+  });
+
+  it('subtracts top margin from availableTerminalHeight when isToolGroupBoundary is true', async () => {
+    vi.mocked(ToolGroupMessage).mockClear();
+    const historyItem: HistoryItem = {
+      id: 1,
+      type: 'tool_group',
+      tools: [
+        {
+          callId: '123',
+          name: 'run_shell_command',
+          description: 'Run a shell command',
+          resultDisplay: 'output',
+          status: CoreToolCallStatus.Executing,
+          confirmationDetails: undefined,
+        },
+      ],
+    };
+
+    const { unmount } = await renderWithProviders(
+      <HistoryItemDisplay
+        item={historyItem}
+        terminalWidth={80}
+        availableTerminalHeight={10}
+        isPending={true}
+        isToolGroupBoundary={true}
+      />,
+    );
+
+    const passedProps = vi.mocked(ToolGroupMessage).mock.calls[0][0];
+    expect(passedProps.availableTerminalHeight).toBe(9);
     unmount();
   });
 

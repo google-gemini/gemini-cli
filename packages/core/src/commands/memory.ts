@@ -31,8 +31,7 @@ import {
   validateParsedSkillPatchHeaders,
 } from '../services/memoryPatchUtils.js';
 import { readExtractionState } from '../services/memoryService.js';
-import { refreshServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
-import type { MessageActionReturn, ToolActionReturn } from './types.js';
+import type { MessageActionReturn } from './types.js';
 
 export type { InboxMemoryPatchKind } from '../services/memoryPatchUtils.js';
 export { getAllowedMemoryPatchRoots } from '../services/memoryPatchUtils.js';
@@ -55,38 +54,12 @@ export function showMemory(config: Config): MessageActionReturn {
   };
 }
 
-export function addMemory(
-  args?: string,
-): MessageActionReturn | ToolActionReturn {
-  if (!args || args.trim() === '') {
-    return {
-      type: 'message',
-      messageType: 'error',
-      content: 'Usage: /memory add <text to remember>',
-    };
-  }
-  return {
-    type: 'tool',
-    toolName: 'save_memory',
-    toolArgs: { fact: args.trim() },
-  };
-}
-
 export async function refreshMemory(
   config: Config,
 ): Promise<MessageActionReturn> {
-  let memoryContent = '';
-  let fileCount = 0;
-
-  if (config.isJitContextEnabled()) {
-    await config.getMemoryContextManager()?.refresh();
-    memoryContent = flattenMemory(config.getUserMemory());
-    fileCount = config.getGeminiMdFileCount();
-  } else {
-    const result = await refreshServerHierarchicalMemory(config);
-    memoryContent = flattenMemory(result.memoryContent);
-    fileCount = result.fileCount;
-  }
+  await config.getMemoryContextManager()?.refresh();
+  const memoryContent = flattenMemory(config.getUserMemory());
+  const fileCount = config.getGeminiMdFileCount();
 
   config.updateSystemInstructionIfInitialized();
   let content: string;

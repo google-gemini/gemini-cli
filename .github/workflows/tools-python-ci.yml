@@ -1,0 +1,45 @@
+name: 'Testing: Tools (Python)'
+
+on:
+  push:
+    branches:
+      - 'main'
+      - 'release/**'
+    paths:
+      - 'tools/**'
+  pull_request:
+    branches:
+      - 'main'
+      - 'release/**'
+    paths:
+      - 'tools/**'
+
+defaults:
+  run:
+    shell: 'bash'
+
+jobs:
+  python-tests:
+    name: 'Python Tests'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' # ratchet:actions/checkout@v4
+
+      - name: 'Set up Python'
+        uses: 'actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55' # ratchet:actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: 'tools/caretaker-agent/cloudrun/triage-worker/requirements.txt'
+
+      - name: 'Install dependencies'
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f tools/caretaker-agent/cloudrun/triage-worker/requirements.txt ]; then
+            python -m pip install -r tools/caretaker-agent/cloudrun/triage-worker/requirements.txt
+          fi
+
+      - name: 'Run unittest suite'
+        run: |
+          PYTHONPATH=tools/caretaker-agent/cloudrun/triage-worker python -m unittest discover -s tools/caretaker-agent/cloudrun/triage-worker/tests -t tools/caretaker-agent/cloudrun/triage-worker

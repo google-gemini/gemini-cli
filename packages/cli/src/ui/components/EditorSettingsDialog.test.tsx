@@ -175,4 +175,45 @@ describe('EditorSettingsDialog', () => {
     }
     expect(frame).toContain('(Also modified');
   });
+
+  it('emits error feedback only once when preferredEditor is invalid', async () => {
+    const mockEmitFeedback = vi.fn();
+    vi.spyOn(
+      await import('@google/gemini-cli-core').then((m) => m.coreEvents),
+      'emitFeedback',
+    ).mockImplementation(mockEmitFeedback);
+
+    const invalidSettings = {
+      forScope: (_scope: string) => ({
+        settings: {
+          general: {
+            preferredEditor: 'invalideditor',
+          },
+        },
+      }),
+      merged: {
+        general: {
+          preferredEditor: 'invalideditor',
+        },
+      },
+    } as unknown as LoadedSettings;
+
+    const { unmount } = await renderWithProvider(
+      <EditorSettingsDialog
+        onSelect={vi.fn()}
+        settings={invalidSettings}
+        onExit={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(mockEmitFeedback).toHaveBeenCalledWith(
+        'error',
+        'Editor is not supported: invalideditor',
+      );
+    });
+
+    expect(mockEmitFeedback).toHaveBeenCalledTimes(1);
+    unmount();
+  });
 });

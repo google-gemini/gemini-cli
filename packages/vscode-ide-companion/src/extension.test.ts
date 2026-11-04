@@ -12,6 +12,8 @@ import {
   detectIdeFromEnv,
 } from '@google/gemini-cli-core/src/ide/detect-ide.js';
 
+const { vscodeMock } = await vi.hoisted(() => import('./utils/vscode-mock.js'));
+
 vi.mock('@google/gemini-cli-core/src/ide/detect-ide.js', async () => {
   const actual = await vi.importActual(
     '@google/gemini-cli-core/src/ide/detect-ide.js',
@@ -23,52 +25,12 @@ vi.mock('@google/gemini-cli-core/src/ide/detect-ide.js', async () => {
 });
 
 vi.mock('vscode', () => ({
+  ...vscodeMock,
   window: {
+    ...vscodeMock.window,
     createOutputChannel: vi.fn(() => ({
       appendLine: vi.fn(),
     })),
-    showInformationMessage: vi.fn(),
-    createTerminal: vi.fn(() => ({
-      show: vi.fn(),
-      sendText: vi.fn(),
-    })),
-    onDidChangeActiveTextEditor: vi.fn(),
-    activeTextEditor: undefined,
-    tabGroups: {
-      all: [],
-      close: vi.fn(),
-    },
-    showTextDocument: vi.fn(),
-    showWorkspaceFolderPick: vi.fn(),
-  },
-  workspace: {
-    workspaceFolders: [],
-    onDidCloseTextDocument: vi.fn(),
-    registerTextDocumentContentProvider: vi.fn(),
-    onDidChangeWorkspaceFolders: vi.fn(),
-    onDidGrantWorkspaceTrust: vi.fn(),
-    getConfiguration: vi.fn(() => ({
-      get: vi.fn(),
-    })),
-  },
-  commands: {
-    registerCommand: vi.fn(),
-    executeCommand: vi.fn(),
-  },
-  Uri: {
-    joinPath: vi.fn(),
-  },
-  ExtensionMode: {
-    Development: 1,
-    Production: 2,
-  },
-  EventEmitter: vi.fn(() => ({
-    event: vi.fn(),
-    fire: vi.fn(),
-    dispose: vi.fn(),
-  })),
-  extensions: {
-    getExtension: vi.fn(),
   },
 }));
 
@@ -129,6 +91,70 @@ describe('activate', () => {
   it('should register a handler for onDidGrantWorkspaceTrust', async () => {
     await activate(context);
     expect(vscode.workspace.onDidGrantWorkspaceTrust).toHaveBeenCalled();
+  });
+
+  it('should add all registered disposables, including gemini.diff.accept and onDidChangeWorkspaceFolders, to context.subscriptions', async () => {
+    const commandDisposables = new Map<string, vscode.Disposable>();
+    vi.mocked(vscode.commands.registerCommand).mockImplementation(
+      (command: string) => {
+        const disposable = { dispose: vi.fn() };
+        commandDisposables.set(command, disposable);
+        return disposable;
+      },
+    );
+
+    const closeDocDisposable = { dispose: vi.fn() };
+    vi.mocked(vscode.workspace.onDidCloseTextDocument).mockReturnValueOnce(
+      closeDocDisposable,
+    );
+
+    const workspaceFoldersDisposable = { dispose: vi.fn() };
+    vi.mocked(vscode.workspace.onDidChangeWorkspaceFolders).mockReturnValueOnce(
+      workspaceFoldersDisposable,
+    );
+
+    const workspaceTrustDisposable = { dispose: vi.fn() };
+    vi.mocked(vscode.workspace.onDidGrantWorkspaceTrust).mockReturnValueOnce(
+      workspaceTrustDisposable,
+    );
+
+    const contentProviderDisposable = { dispose: vi.fn() };
+    vi.mocked(
+      vscode.workspace.registerTextDocumentContentProvider,
+    ).mockReturnValueOnce(contentProviderDisposable);
+
+    await activate(context);
+
+    // At least the 9 disposables registered directly in activate()
+    expect(context.subscriptions.length).toBeGreaterThanOrEqual(9);
+    expect(commandDisposables.get('gemini.diff.accept')).toBeDefined();
+    expect(context.subscriptions).toContain(
+      commandDisposables.get('gemini.diff.accept'),
+    );
+    expect(context.subscriptions).toContain(
+      commandDisposables.get('gemini.diff.cancel'),
+    );
+    expect(context.subscriptions).toContain(
+      commandDisposables.get('gemini.diff.open'),
+    );
+    expect(context.subscriptions).toContain(
+      commandDisposables.get('gemini-cli.runGeminiCLI'),
+    );
+    expect(context.subscriptions).toContain(
+      commandDisposables.get('gemini-cli.showNotices'),
+    );
+    expect(context.subscriptions).toContain(closeDocDisposable);
+    expect(context.subscriptions).toContain(workspaceFoldersDisposable);
+    expect(context.subscriptions).toContain(workspaceTrustDisposable);
+    expect(context.subscriptions).toContain(contentProviderDisposable);
+
+    for (const subscription of context.subscriptions) {
+      subscription?.dispose?.();
+    }
+    expect(
+      commandDisposables.get('gemini.diff.accept')!.dispose,
+    ).toHaveBeenCalledTimes(1);
+    expect(workspaceFoldersDisposable.dispose).toHaveBeenCalledTimes(1);
   });
 
   it('should launch the Gemini CLI when the user clicks the button', async () => {
@@ -307,6 +333,27 @@ describe('activate', () => {
       await activate(context);
 
       expect(showInformationMessageMock).not.toHaveBeenCalled();
+    });
+
+    it('should register gemini.diff.open command and handle empty or partial arguments safely', async () => {
+      const registerCommandMock = vi.mocked(vscode.commands.registerCommand);
+
+      await activate(context);
+
+      const openCommandCall = registerCommandMock.mock.calls.find(
+        (call) => call[0] === 'gemini.diff.open',
+      );
+      expect(openCommandCall).toBeDefined();
+
+      const handler = openCommandCall![1] as (args?: {
+        filePath?: string;
+        newContent?: string;
+      }) => Promise<void>;
+      expect(handler).toBeInstanceOf(Function);
+
+      // Call handler with empty or partial args to ensure it doesn't throw or crash
+      await expect(handler()).resolves.not.toThrow();
+      await expect(handler({ filePath: '/test.ts' })).resolves.not.toThrow();
     });
   });
 });

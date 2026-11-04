@@ -374,4 +374,65 @@ describe('ProjectRegistry', () => {
 
     readFileSpy.mockRestore();
   });
+
+  it('recovers gracefully if registry is an empty object (invalid schema)', async () => {
+    // 1. Write an empty object which is valid JSON but invalid schema
+    fs.writeFileSync(registryPath, '{}');
+
+    const registry = new ProjectRegistry(registryPath);
+    await registry.initialize();
+
+    // 2. It should not crash and should allow adding new projects
+    const projectPath = path.join(tempDir, 'my-project');
+    const shortId = await registry.getShortId(projectPath);
+
+    expect(shortId).toBe('my-project');
+
+    // 3. Verify it healed the file
+    const data = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    expect(data.projects).toBeDefined();
+    expect(data.projects[normalizePath(projectPath)]).toBe('my-project');
+  });
+
+  it('recovers gracefully if registry projects property is an array (invalid schema)', async () => {
+    // 1. Write an object where 'projects' is an array
+    fs.writeFileSync(registryPath, JSON.stringify({ projects: [] }));
+
+    const registry = new ProjectRegistry(registryPath);
+    await registry.initialize();
+
+    // 2. It should reset and allow adding new projects correctly
+    const projectPath = path.join(tempDir, 'my-project');
+    const shortId = await registry.getShortId(projectPath);
+
+    expect(shortId).toBe('my-project');
+
+    // 3. Verify it healed the file to an object
+    const data = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    expect(data.projects).toBeDefined();
+    expect(Array.isArray(data.projects)).toBe(false);
+    expect(data.projects[normalizePath(projectPath)]).toBe('my-project');
+  });
+
+  it('recovers gracefully if registry contains malicious slugs (path traversal)', async () => {
+    // 1. Write a registry with a path traversal slug
+    fs.writeFileSync(
+      registryPath,
+      JSON.stringify({ projects: { '/some/path': '../../etc/passwd' } }),
+    );
+
+    const registry = new ProjectRegistry(registryPath);
+    await registry.initialize();
+
+    // 2. It should identify as invalid and reset
+    const projectPath = path.join(tempDir, 'my-project');
+    const shortId = await registry.getShortId(projectPath);
+
+    expect(shortId).toBe('my-project');
+
+    // 3. Verify it healed the file and didn't preserve the malicious entry
+    const data = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    expect(data.projects[normalizePath(projectPath)]).toBe('my-project');
+    expect(Object.values(data.projects)).not.toContain('../../etc/passwd');
+  });
 });

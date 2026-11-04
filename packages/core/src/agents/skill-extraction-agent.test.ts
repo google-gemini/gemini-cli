@@ -37,6 +37,7 @@ describe('SkillExtractionAgent', () => {
     expect(agent.modelConfig.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
     expect(agent.memoryInboxAccess).toBe(true);
     expect(agent.autoMemoryExtractionWriteAccess).toBe(true);
+    expect(agent.includeExtensionContext).toBe(false);
     expect(agent.toolConfig?.tools).toEqual(
       expect.arrayContaining([
         READ_FILE_TOOL_NAME,

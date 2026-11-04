@@ -120,6 +120,7 @@ describe('footerItems', () => {
         'quota',
         'memory-usage',
         'session-id',
+        'hostname',
         'code-changes',
         'token-count',
       ]);

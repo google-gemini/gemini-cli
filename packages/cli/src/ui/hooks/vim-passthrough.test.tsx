@@ -81,4 +81,24 @@ describe('useVim passthrough', () => {
 
     expect(handled).toBe(false);
   });
+
+  it.each(['H', 'M', 'Q', 'm'])(
+    'should ignore unmapped printable key %s in NORMAL mode',
+    async (sequence) => {
+      mockVimContext.vimMode = 'NORMAL';
+      const { result } = await renderHook(() =>
+        useVim(mockBuffer as TextBuffer),
+      );
+
+      let handled = false;
+      act(() => {
+        handled = result.current.handleInput(
+          createKey({ name: sequence, sequence, insertable: true }),
+        );
+      });
+
+      expect(handled).toBe(true);
+      expect(mockBuffer.handleInput).not.toHaveBeenCalled();
+    },
+  );
 });

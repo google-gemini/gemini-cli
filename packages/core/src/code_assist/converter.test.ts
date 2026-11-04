@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import {
   toGenerateContentRequest,
   fromGenerateContentResponse,
+  fromGenerateContentResponseUsage,
   toContents,
   type CaGenerateContentResponse,
 } from './converter.js';
@@ -338,6 +339,28 @@ describe('converter', () => {
       const genaiRes = fromGenerateContentResponse(invalidRes);
       expect(genaiRes.responseId).toEqual('some-trace-id');
       expect(genaiRes.candidates).toEqual([]);
+    });
+
+    it('should preserve extended token fields and compute totalTokenCount in fromGenerateContentResponseUsage', () => {
+      expect(fromGenerateContentResponseUsage(undefined)).toBeUndefined();
+
+      expect(
+        fromGenerateContentResponseUsage({
+          promptTokenCount: 400,
+          candidatesTokenCount: 300,
+          thoughtsTokenCount: 700,
+          toolUsePromptTokenCount: 100,
+          cachedContentTokenCount: 50,
+          totalTokenCount: 700,
+        }),
+      ).toEqual({
+        promptTokenCount: 400,
+        candidatesTokenCount: 300,
+        thoughtsTokenCount: 700,
+        toolUsePromptTokenCount: 100,
+        cachedContentTokenCount: 50,
+        totalTokenCount: 1500,
+      });
     });
   });
 

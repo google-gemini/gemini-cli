@@ -14,8 +14,8 @@
  * model call so the model only ever sees the most recent snapshot in full.
  */
 
-import type { GeminiChat } from '../../core/geminiChat.js';
-import type { Content, Part } from '@google/genai';
+import type { GeminiChat, HistoryTurn } from '../../core/geminiChat.js';
+import type { Part } from '@google/genai';
 import { debugLogger } from '../../utils/debugLogger.js';
 
 const TAKE_SNAPSHOT_TOOL_NAME = 'take_snapshot';
@@ -39,7 +39,7 @@ export const SNAPSHOT_SUPERSEDED_PLACEHOLDER =
  * Uses {@link GeminiChat.setHistory} to apply the modified history.
  */
 export function supersedeStaleSnapshots(chat: GeminiChat): void {
-  const history = chat.getHistory();
+  const history = chat.getHistoryTurns();
 
   // Locate all (contentIndex, partIndex) tuples for take_snapshot responses.
   const snapshotLocations: Array<{
@@ -48,7 +48,7 @@ export function supersedeStaleSnapshots(chat: GeminiChat): void {
   }> = [];
 
   for (let i = 0; i < history.length; i++) {
-    const parts = history[i].parts;
+    const parts = history[i].content.parts;
     if (!parts) continue;
     for (let j = 0; j < parts.length; j++) {
       const part = parts[j];
@@ -71,7 +71,7 @@ export function supersedeStaleSnapshots(chat: GeminiChat): void {
   const staleLocations = snapshotLocations.slice(0, -1);
   const needsUpdate = staleLocations.some(({ contentIdx, partIdx }) => {
     const output = getResponseOutput(
-      history[contentIdx].parts![partIdx].functionResponse?.response,
+      history[contentIdx].content.parts![partIdx].functionResponse?.response,
     );
     return !output.includes(SNAPSHOT_SUPERSEDED_PLACEHOLDER);
   });
@@ -81,15 +81,18 @@ export function supersedeStaleSnapshots(chat: GeminiChat): void {
   }
 
   // Shallow-copy the history and replace stale snapshots.
-  const newHistory: Content[] = history.map((content) => ({
-    ...content,
-    parts: content.parts ? [...content.parts] : undefined,
+  const newHistory: HistoryTurn[] = history.map((turn) => ({
+    id: turn.id,
+    content: {
+      ...turn.content,
+      parts: turn.content.parts ? [...turn.content.parts] : undefined,
+    },
   }));
 
   let replacedCount = 0;
 
   for (const { contentIdx, partIdx } of staleLocations) {
-    const originalPart = newHistory[contentIdx].parts![partIdx];
+    const originalPart = newHistory[contentIdx].content.parts![partIdx];
     if (!originalPart.functionResponse) continue;
 
     // Check if already superseded
@@ -106,7 +109,7 @@ export function supersedeStaleSnapshots(chat: GeminiChat): void {
       },
     };
 
-    newHistory[contentIdx].parts![partIdx] = replacementPart;
+    newHistory[contentIdx].content.parts![partIdx] = replacementPart;
     replacedCount++;
   }
 

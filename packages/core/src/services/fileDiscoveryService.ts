@@ -16,13 +16,19 @@ import { isGitRepository } from '../utils/gitUtils.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import { isNodeError } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import fs from 'node:fs';
 import * as path from 'node:path';
+import { LRUCache } from 'mnemonist';
+
+const MAX_SYMLINK_CACHE_SIZE = 20_000;
+const MAX_REALPATH_CACHE_SIZE = 20_000;
 
 export interface FilterFilesOptions {
   respectGitIgnore?: boolean;
   respectGeminiIgnore?: boolean;
   customIgnoreFilePaths?: string[];
+  isSymbolicLink?: boolean;
 }
 
 export interface FilterReport {
@@ -42,12 +48,42 @@ export class FileDiscoveryService {
     customIgnoreFilePaths: [],
   };
   private projectRoot: string;
+  private _realProjectRoot?: string;
+  private symlinkCache: LRUCache<string, boolean> = new LRUCache(
+    MAX_SYMLINK_CACHE_SIZE,
+  );
+  private realPathCache: LRUCache<string, string> = new LRUCache(
+    MAX_REALPATH_CACHE_SIZE,
+  );
+
+  clearCache(): void {
+    this.symlinkCache.clear();
+    this.realPathCache.clear();
+    this.initFilters();
+  }
+
+  private get realProjectRoot(): string {
+    if (!this._realProjectRoot) {
+      try {
+        this._realProjectRoot = resolveToRealPath(this.projectRoot);
+      } catch {
+        this._realProjectRoot = this.projectRoot;
+      }
+    }
+    return this._realProjectRoot;
+  }
 
   constructor(projectRoot: string, options?: FilterFilesOptions) {
     this.projectRoot = path.resolve(projectRoot);
     this.applyFilterFilesOptions(options);
+    this.initFilters();
+  }
+
+  private initFilters(): void {
     if (isGitRepository(this.projectRoot)) {
       this.gitIgnoreFilter = new GitIgnoreParser(this.projectRoot);
+    } else {
+      this.gitIgnoreFilter = null;
     }
     this.geminiIgnoreFilter = new IgnoreFileParser(
       this.projectRoot,
@@ -58,28 +94,28 @@ export class FileDiscoveryService {
         this.projectRoot,
         this.defaultFilterFileOptions.customIgnoreFilePaths,
       );
+    } else {
+      this.customIgnoreFilter = null;
     }
 
+    const geminiPatterns = this.geminiIgnoreFilter.getPatterns();
+    const customPatterns = this.customIgnoreFilter
+      ? this.customIgnoreFilter.getPatterns()
+      : [];
+    const extraPatterns = [...geminiPatterns, ...customPatterns];
+
     if (this.gitIgnoreFilter) {
-      const geminiPatterns = this.geminiIgnoreFilter.getPatterns();
-      const customPatterns = this.customIgnoreFilter
-        ? this.customIgnoreFilter.getPatterns()
-        : [];
       // Create combined parser: .gitignore + .geminiignore + custom ignore
       this.combinedIgnoreFilter = new GitIgnoreParser(
         this.projectRoot,
         // customPatterns should go the last to ensure overwriting of geminiPatterns
-        [...geminiPatterns, ...customPatterns],
+        extraPatterns,
       );
     } else {
       // Create combined parser when not git repo
-      const geminiPatterns = this.geminiIgnoreFilter.getPatterns();
-      const customPatterns = this.customIgnoreFilter
-        ? this.customIgnoreFilter.getPatterns()
-        : [];
       this.combinedIgnoreFilter = new IgnoreFileParser(
         this.projectRoot,
-        [...geminiPatterns, ...customPatterns],
+        extraPatterns,
         true,
       );
     }
@@ -118,16 +154,20 @@ export class FileDiscoveryService {
       await Promise.all(
         dirEntries.map(async (entry) => {
           const fullPath = path.join(currentDir, entry.name);
+          const entryOptions: FilterFilesOptions = {
+            ...options,
+            isSymbolicLink: entry.isSymbolicLink(),
+          };
 
           if (entry.isDirectory()) {
             // Optimization: If a directory is ignored, its contents are not traversed.
-            if (this.shouldIgnoreDirectory(fullPath, options)) {
+            if (this.shouldIgnoreDirectory(fullPath, entryOptions)) {
               ignoredPaths.push(fullPath);
             } else {
               await walk(fullPath);
             }
           } else {
-            if (this.shouldIgnoreFile(fullPath, options)) {
+            if (this.shouldIgnoreFile(fullPath, entryOptions)) {
               ignoredPaths.push(fullPath);
             }
           }
@@ -209,10 +249,7 @@ export class FileDiscoveryService {
     return this._shouldIgnore(dirPath, true, options);
   }
 
-  /**
-   * Internal unified check for paths.
-   */
-  private _shouldIgnore(
+  private _checkIgnoreFilters(
     filePath: string,
     isDirectory: boolean,
     options: FilterFilesOptions = {},
@@ -248,6 +285,68 @@ export class FileDiscoveryService {
   }
 
   /**
+   * Internal unified check for paths.
+   */
+  private _shouldIgnore(
+    filePath: string,
+    isDirectory: boolean,
+    options: FilterFilesOptions = {},
+  ): boolean {
+    if (this._checkIgnoreFilters(filePath, isDirectory, options)) {
+      return true;
+    }
+
+    try {
+      const absolutePath = path.isAbsolute(filePath)
+        ? filePath
+        : path.resolve(this.projectRoot, filePath);
+
+      let isSymlink: boolean;
+      if (options.isSymbolicLink !== undefined) {
+        isSymlink = options.isSymbolicLink;
+        this.symlinkCache.set(absolutePath, isSymlink);
+      } else {
+        const cached = this.symlinkCache.get(absolutePath);
+        if (cached !== undefined) {
+          isSymlink = cached;
+        } else {
+          const stat = fs.lstatSync(absolutePath, { throwIfNoEntry: false });
+          if (stat !== undefined) {
+            isSymlink = stat.isSymbolicLink();
+            this.symlinkCache.set(absolutePath, isSymlink);
+          } else {
+            isSymlink = false;
+          }
+        }
+      }
+
+      if (isSymlink) {
+        let realPath = this.realPathCache.get(absolutePath);
+        if (!realPath) {
+          realPath = resolveToRealPath(absolutePath);
+          this.realPathCache.set(absolutePath, realPath);
+        }
+        if (!isSubpath(this.realProjectRoot, realPath)) {
+          return true;
+        }
+        let targetIsDir = isDirectory;
+        try {
+          targetIsDir = fs.statSync(realPath).isDirectory();
+        } catch {
+          // Fallback to original isDirectory status if target is inaccessible
+        }
+        if (this._checkIgnoreFilters(realPath, targetIsDir, options)) {
+          return true;
+        }
+      }
+    } catch {
+      // Gracefully handle resolution errors or inaccessible paths
+    }
+
+    return false;
+  }
+
+  /**
    * Returns the list of ignore files being used (e.g. .geminiignore) excluding .gitignore.
    */
   getIgnoreFilePaths(): string[] {
@@ -274,7 +373,8 @@ export class FileDiscoveryService {
       this.defaultFilterFileOptions.respectGitIgnore
     ) {
       const gitIgnorePath = path.join(this.projectRoot, '.gitignore');
-      if (fs.existsSync(gitIgnorePath)) {
+      const stat = fs.statSync(gitIgnorePath, { throwIfNoEntry: false });
+      if (stat?.isFile()) {
         paths.push(gitIgnorePath);
       }
     }

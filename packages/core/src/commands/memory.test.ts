@@ -11,7 +11,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Config } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import {
-  addMemory,
   applyInboxMemoryPatch,
   dismissInboxSkill,
   dismissInboxMemoryPatch,
@@ -25,11 +24,6 @@ import {
   refreshMemory,
   showMemory,
 } from './memory.js';
-import * as memoryDiscovery from '../utils/memoryDiscovery.js';
-
-vi.mock('../utils/memoryDiscovery.js', () => ({
-  refreshServerHierarchicalMemory: vi.fn(),
-}));
 
 vi.mock('../config/storage.js', () => ({
   Storage: {
@@ -38,17 +32,19 @@ vi.mock('../config/storage.js', () => ({
   },
 }));
 
-const mockRefresh = vi.mocked(memoryDiscovery.refreshServerHierarchicalMemory);
-
 describe('memory commands', () => {
   let mockConfig: Config;
+  let mockMemoryContextRefresh: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    mockMemoryContextRefresh = vi.fn().mockResolvedValue(undefined);
     mockConfig = {
       getUserMemory: vi.fn(),
       getGeminiMdFileCount: vi.fn(),
       getGeminiMdFilePaths: vi.fn(),
-      isJitContextEnabled: vi.fn(),
+      getMemoryContextManager: vi.fn().mockReturnValue({
+        refresh: mockMemoryContextRefresh,
+      }),
       updateSystemInstructionIfInitialized: vi
         .fn()
         .mockResolvedValue(undefined),
@@ -92,63 +88,16 @@ describe('memory commands', () => {
     });
   });
 
-  describe('addMemory', () => {
-    it('should return a tool action to save memory', () => {
-      const result = addMemory('new memory');
-      expect(result.type).toBe('tool');
-      if (result.type === 'tool') {
-        expect(result.toolName).toBe('save_memory');
-        expect(result.toolArgs).toEqual({ fact: 'new memory' });
-      }
-    });
-
-    it('should trim the arguments', () => {
-      const result = addMemory('  new memory  ');
-      expect(result.type).toBe('tool');
-      if (result.type === 'tool') {
-        expect(result.toolArgs).toEqual({ fact: 'new memory' });
-      }
-    });
-
-    it('should return an error if args are empty', () => {
-      const result = addMemory('');
-      expect(result.type).toBe('message');
-      if (result.type === 'message') {
-        expect(result.messageType).toBe('error');
-        expect(result.content).toBe('Usage: /memory add <text to remember>');
-      }
-    });
-
-    it('should return an error if args are just whitespace', () => {
-      const result = addMemory('   ');
-      expect(result.type).toBe('message');
-      if (result.type === 'message') {
-        expect(result.messageType).toBe('error');
-        expect(result.content).toBe('Usage: /memory add <text to remember>');
-      }
-    });
-
-    it('should return an error if args are undefined', () => {
-      const result = addMemory(undefined);
-      expect(result.type).toBe('message');
-      if (result.type === 'message') {
-        expect(result.messageType).toBe('error');
-        expect(result.content).toBe('Usage: /memory add <text to remember>');
-      }
-    });
-  });
-
   describe('refreshMemory', () => {
     it('should refresh memory and show success message', async () => {
-      mockRefresh.mockResolvedValue({
-        memoryContent: { project: 'refreshed content' },
-        fileCount: 2,
-        filePaths: [],
+      vi.mocked(mockConfig.getUserMemory).mockReturnValue({
+        project: 'refreshed content',
       });
+      vi.mocked(mockConfig.getGeminiMdFileCount).mockReturnValue(2);
 
       const result = await refreshMemory(mockConfig);
 
-      expect(mockRefresh).toHaveBeenCalledWith(mockConfig);
+      expect(mockMemoryContextRefresh).toHaveBeenCalled();
       expect(
         mockConfig.updateSystemInstructionIfInitialized,
       ).toHaveBeenCalled();
@@ -162,11 +111,8 @@ describe('memory commands', () => {
     });
 
     it('should show a message if no memory content is found after refresh', async () => {
-      mockRefresh.mockResolvedValue({
-        memoryContent: { project: '' },
-        fileCount: 0,
-        filePaths: [],
-      });
+      vi.mocked(mockConfig.getUserMemory).mockReturnValue({ project: '' });
+      vi.mocked(mockConfig.getGeminiMdFileCount).mockReturnValue(0);
 
       const result = await refreshMemory(mockConfig);
       expect(result.type).toBe('message');

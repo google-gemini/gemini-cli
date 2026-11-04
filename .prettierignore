@@ -9,6 +9,7 @@
 .gemini/
 .idea
 .integration-tests/
+**/.vscode-test/
 *.iml
 *.tsbuildinfo
 *.vsix
@@ -23,3 +24,4 @@ Thumbs.db
 **/SKILL.md
 packages/sdk/test-data/*.json
 *.mdx
+packages/vscode-ide-companion/NOTICES.txt

@@ -280,6 +280,26 @@ describe('tokenCalculation', () => {
       expect(tokens).toBeLessThan(30);
     });
 
+    it('should respect the user supplied charsPerToken argument', () => {
+      const text = 'abcdefghijkl'; // 12 chars
+      const parts: Part[] = [{ text }];
+
+      // Default (4 chars/token) -> 12 / 4 = 3 tokens
+      expect(estimateTokenCountSync(parts)).toBe(3);
+
+      // Override to 3 chars/token -> 12 / 3 = 4 tokens
+      expect(estimateTokenCountSync(parts, 0, 3)).toBe(4);
+
+      // Override to 2 chars/token -> 12 / 2 = 6 tokens
+      expect(estimateTokenCountSync(parts, 0, 2)).toBe(6);
+
+      // Verify massive strings also respect the argument
+      const massiveText = 'a'.repeat(120_000); // Exceeds 100k
+      const massiveParts: Part[] = [{ text: massiveText }];
+      expect(estimateTokenCountSync(massiveParts, 0, 4)).toBe(30_000);
+      expect(estimateTokenCountSync(massiveParts, 0, 3)).toBe(40_000);
+    });
+
     it('should handle empty or nullish inputs gracefully', () => {
       expect(estimateTokenCountSync([])).toBe(0);
       expect(estimateTokenCountSync([{ text: '' }])).toBe(0);

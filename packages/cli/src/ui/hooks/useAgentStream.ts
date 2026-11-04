@@ -13,14 +13,20 @@ import {
   displayContentToString,
   parseThought,
   CoreToolCallStatus,
+  ToolErrorType,
   type ApprovalMode,
   Kind,
   type ThoughtSummary,
   type RetryAttemptPayload,
   type AgentEvent,
   type AgentProtocol,
+  type AnyDeclarativeTool,
+  type AnyToolInvocation,
+  type CompletedToolCall,
+  type Config,
   type Logger,
   type Part,
+  type ToolCallRequestInfo,
 } from '@google/gemini-cli-core';
 import type {
   HistoryItemWithoutId,
@@ -38,8 +44,54 @@ import { useStateAndRef } from './useStateAndRef.js';
 import { type MinimalTrackedToolCall } from './useTurnActivityMonitor.js';
 import { useKeypress } from './useKeypress.js';
 
+export const CANCELLED_TOOL_ERROR_MESSAGE =
+  '[Operation Cancelled] Reason: User cancelled operation';
+
+/**
+ * Synthesizes a cancelled CompletedToolCall with a filler functionResponse part
+ * so that aborted tool calls can be recorded cleanly in the session history.
+ */
+export function createCancelledToolCall(
+  request: ToolCallRequestInfo,
+  tool?: AnyDeclarativeTool,
+  invocation?: AnyToolInvocation,
+): CompletedToolCall {
+  const fallbackToolName = request.name.trim() || 'generic_tool';
+  return {
+    status: CoreToolCallStatus.Cancelled,
+    request,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    tool: (tool ?? {
+      name: fallbackToolName,
+      displayName: fallbackToolName,
+    }) as AnyDeclarativeTool,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    invocation: (invocation ?? {
+      getDescription: () => fallbackToolName,
+    }) as AnyToolInvocation,
+    response: {
+      callId: request.callId,
+      responseParts: [
+        {
+          functionResponse: {
+            id: request.callId,
+            name: request.name,
+            response: {
+              error: CANCELLED_TOOL_ERROR_MESSAGE,
+            },
+          },
+        },
+      ],
+      resultDisplay: undefined,
+      error: new Error(CANCELLED_TOOL_ERROR_MESSAGE),
+      errorType: ToolErrorType.UNHANDLED_EXCEPTION,
+    },
+  };
+}
+
 export interface UseAgentStreamOptions {
   agent?: AgentProtocol;
+  config?: Config;
   addItem: UseHistoryManagerReturn['addItem'];
   onCancelSubmit: (
     shouldRestorePrompt?: boolean,
@@ -49,12 +101,18 @@ export interface UseAgentStreamOptions {
   logger?: Logger | null;
 }
 
+enum CancellationState {
+  Idle = 'idle',
+  Cancelling = 'cancelling',
+}
+
 /**
  * useAgentStream implements the interactive agent loop using an AgentProtocol.
  * It is completely agnostic to the specific agent implementation.
  */
 export const useAgentStream = ({
   agent,
+  config,
   addItem,
   onCancelSubmit,
   isShellFocused,
@@ -74,9 +132,16 @@ export const useAgentStream = ({
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
 
-  const [trackedTools, , setTrackedTools] = useStateAndRef<
+  const [trackedTools, trackedToolsRef, setTrackedTools] = useStateAndRef<
     IndividualToolCallDisplay[]
   >([]);
+  const toolRequestArgsRef = useRef<Map<string, Record<string, unknown>>>(
+    new Map(),
+  );
+  const cancellationStateRef = useRef<CancellationState>(
+    CancellationState.Idle,
+  );
+  const cancelPromiseRef = useRef<Promise<void>>(Promise.resolve());
   const [pushedToolCallIds, pushedToolCallIdsRef, setPushedToolCallIds] =
     useStateAndRef<Set<string>>(new Set());
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
@@ -127,14 +192,150 @@ export const useAgentStream = ({
   }, [addItem, pendingHistoryItemRef, setPendingHistoryItem]);
 
   const cancelOngoingRequest = useCallback(
-    async (clearBuffer: boolean = true) => {
-      if (agent) {
-        await agent.abort();
-        setStreamingState(StreamingState.Idle);
-        onCancelSubmit(false, clearBuffer);
+    async (clearBuffer: boolean = true): Promise<void> => {
+      if (!agent) {
+        return;
+      }
+
+      if (cancellationStateRef.current === CancellationState.Cancelling) {
+        if (clearBuffer) {
+          onCancelSubmit(false, true);
+        }
+        try {
+          await cancelPromiseRef.current;
+        } catch (error) {
+          debugLogger.warn(`Error awaiting cancelTask: ${error}`);
+        }
+        return;
+      }
+
+      cancellationStateRef.current = CancellationState.Cancelling;
+      const cancelTask = (async () => {
+        try {
+          let timeoutId: ReturnType<typeof setTimeout> | undefined;
+          try {
+            await Promise.race([
+              agent.abort(),
+              new Promise<void>((resolve) => {
+                timeoutId = setTimeout(resolve, 1000);
+              }),
+            ]);
+          } finally {
+            if (timeoutId !== undefined) {
+              clearTimeout(timeoutId);
+            }
+          }
+
+          const unpushedTools = trackedToolsRef.current.filter(
+            (tc) => !pushedToolCallIdsRef.current.has(tc.callId),
+          );
+
+          if (unpushedTools.length > 0) {
+            setTrackedTools((prev) =>
+              prev.map((tc) => {
+                if (
+                  !pushedToolCallIdsRef.current.has(tc.callId) &&
+                  tc.status !== CoreToolCallStatus.Success &&
+                  tc.status !== CoreToolCallStatus.Error &&
+                  tc.status !== CoreToolCallStatus.Cancelled
+                ) {
+                  return {
+                    ...tc,
+                    status: CoreToolCallStatus.Cancelled,
+                  };
+                }
+                return tc;
+              }),
+            );
+          }
+
+          try {
+            const client = config?.getGeminiClient?.();
+            const chat = client?.getChat?.();
+            if (chat) {
+              const seenCallIds = new Set<string>();
+              const synthesizedCalls: CompletedToolCall[] = [];
+
+              for (const tc of unpushedTools) {
+                if (tc.isClientInitiated) {
+                  continue;
+                }
+                seenCallIds.add(tc.callId);
+                const name = tc.originalRequestName || tc.name;
+                const args = toolRequestArgsRef.current.get(tc.callId) ?? {};
+                synthesizedCalls.push(
+                  createCancelledToolCall({
+                    callId: tc.callId,
+                    name,
+                    args,
+                    isClientInitiated: false,
+                    prompt_id: '',
+                  }),
+                );
+              }
+
+              const clientHistory = client?.getHistory?.() ?? [];
+              const lastTurn = clientHistory.at(-1);
+              if (lastTurn?.role === 'model' && Array.isArray(lastTurn.parts)) {
+                let index = 0;
+                for (const part of lastTurn.parts) {
+                  const fc = part.functionCall;
+                  if (fc?.name) {
+                    const callId =
+                      fc.id ?? `${fc.name}-${Date.now()}-${index++}`;
+                    if (!seenCallIds.has(callId)) {
+                      seenCallIds.add(callId);
+                      synthesizedCalls.push(
+                        createCancelledToolCall({
+                          callId,
+                          name: fc.name,
+                          args: fc.args ?? {},
+                          isClientInitiated: false,
+                          prompt_id: '',
+                        }),
+                      );
+                    }
+                  }
+                }
+              }
+
+              if (synthesizedCalls.length > 0) {
+                const currentModel =
+                  client?.getCurrentSequenceModel?.() ??
+                  config?.getModel?.() ??
+                  '';
+                chat.recordCompletedToolCalls(currentModel, synthesizedCalls);
+              }
+            }
+          } catch (error) {
+            debugLogger.warn(
+              `Error recording cancelled tool calls in agent stream: ${error}`,
+            );
+          }
+
+          setStreamingState(StreamingState.Idle);
+          onCancelSubmit(false, clearBuffer);
+        } finally {
+          cancellationStateRef.current = CancellationState.Idle;
+        }
+      })();
+
+      cancelPromiseRef.current = cancelTask;
+      try {
+        await cancelTask;
+      } catch (error) {
+        debugLogger.warn(`Error awaiting cancelTask: ${error}`);
       }
     },
-    [agent, onCancelSubmit],
+    [
+      agent,
+      config,
+      onCancelSubmit,
+      pushedToolCallIdsRef,
+      setStreamingState,
+      setTrackedTools,
+      trackedToolsRef,
+    ],
   );
 
   // TODO: Support native handleApprovalModeChange for Plan Mode
@@ -195,6 +396,7 @@ export const useAgentStream = ({
           break;
         case 'tool_request': {
           flushPendingText();
+          toolRequestArgsRef.current.set(event.requestId, event.args);
           const legacyState = event._meta?.legacyState;
           const displayName = legacyState?.displayName ?? event.name;
           const isOutputMarkdown = legacyState?.isOutputMarkdown ?? false;
@@ -361,6 +563,7 @@ export const useAgentStream = ({
       geminiMessageBufferRef.current = '';
 
       if (!options?.isContinuation) {
+        toolRequestArgsRef.current.clear();
         if (typeof query === 'string') {
           addItem({ type: MessageType.USER, text: query }, timestamp);
           void logger?.logMessage(MessageSenderType.USER, query);

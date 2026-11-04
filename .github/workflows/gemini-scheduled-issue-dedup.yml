@@ -28,6 +28,8 @@ jobs:
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: 'Log in to GitHub Container Registry'
         uses: 'docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1' # ratchet:docker/login-action@v3
@@ -37,7 +39,7 @@ jobs:
           password: '${{ secrets.GITHUB_TOKEN }}'
 
       - name: 'Run Gemini Issue Deduplication Refresh'
-        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        uses: 'google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_refresh_embeddings'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
@@ -47,6 +49,7 @@ jobs:
           REPOSITORY: '${{ github.repository }}'
           FIRESTORE_PROJECT: '${{ vars.FIRESTORE_PROJECT }}'
         with:
+          upload_artifacts: 'true'
           gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
           gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
@@ -85,9 +88,9 @@ jobs:
                 }
               },
               "maxSessionTurns": 25,
-              "coreTools": [
-                "run_shell_command(echo)"
-              ],
+              "tools": {
+                "core": []
+              },
               "telemetry": {
                 "enabled": true,
                 "target": "gcp"

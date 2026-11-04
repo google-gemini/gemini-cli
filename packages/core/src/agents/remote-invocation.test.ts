@@ -20,7 +20,11 @@ import {
   type A2AClientManager,
 } from './a2a-client-manager.js';
 
-import type { RemoteAgentDefinition, SubagentProgress } from './types.js';
+import {
+  type RemoteAgentDefinition,
+  type SubagentProgress,
+  SubagentState,
+} from './types.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { A2AAuthProvider } from './auth-provider/types.js';
@@ -268,7 +272,9 @@ describe('RemoteAgentInvocation', () => {
         abortSignal: new AbortController().signal,
       });
 
-      expect(result.returnDisplay).toMatchObject({ state: 'error' });
+      expect(result.returnDisplay).toMatchObject({
+        state: SubagentState.ERROR,
+      });
       expect((result.returnDisplay as SubagentProgress).result).toContain(
         "Failed to create auth provider for agent 'test-agent'",
       );
@@ -461,7 +467,7 @@ describe('RemoteAgentInvocation', () => {
       expect(updateOutput).toHaveBeenCalledWith(
         expect.objectContaining({
           isSubagentProgress: true,
-          state: 'running',
+          state: SubagentState.RUNNING,
           recentActivity: expect.arrayContaining([
             expect.objectContaining({ content: 'Working...' }),
           ]),
@@ -470,7 +476,7 @@ describe('RemoteAgentInvocation', () => {
       expect(updateOutput).toHaveBeenCalledWith(
         expect.objectContaining({
           isSubagentProgress: true,
-          state: 'completed',
+          state: SubagentState.COMPLETED,
           result: 'HelloHello World',
         }),
       );
@@ -508,7 +514,9 @@ describe('RemoteAgentInvocation', () => {
         abortSignal: controller.signal,
       });
 
-      expect(result.returnDisplay).toMatchObject({ state: 'error' });
+      expect(result.returnDisplay).toMatchObject({
+        state: SubagentState.ERROR,
+      });
     });
 
     it('should handle errors gracefully', async () => {
@@ -533,7 +541,7 @@ describe('RemoteAgentInvocation', () => {
       });
 
       expect(result.returnDisplay).toMatchObject({
-        state: 'error',
+        state: SubagentState.ERROR,
         result: expect.stringContaining('Network error'),
       });
     });
@@ -616,7 +624,7 @@ describe('RemoteAgentInvocation', () => {
       expect(updateOutput).toHaveBeenCalledWith(
         expect.objectContaining({
           isSubagentProgress: true,
-          state: 'running',
+          state: SubagentState.RUNNING,
           recentActivity: expect.arrayContaining([
             expect.objectContaining({ content: 'Working...' }),
           ]),
@@ -625,7 +633,7 @@ describe('RemoteAgentInvocation', () => {
       expect(updateOutput).toHaveBeenCalledWith(
         expect.objectContaining({
           isSubagentProgress: true,
-          state: 'completed',
+          state: SubagentState.COMPLETED,
           result: 'Thinking...Final Answer',
         }),
       );
@@ -693,7 +701,7 @@ describe('RemoteAgentInvocation', () => {
       expect(updateOutput).toHaveBeenCalledWith(
         expect.objectContaining({
           isSubagentProgress: true,
-          state: 'running',
+          state: SubagentState.RUNNING,
           recentActivity: expect.arrayContaining([
             expect.objectContaining({ content: 'Working...' }),
           ]),
@@ -702,7 +710,7 @@ describe('RemoteAgentInvocation', () => {
       expect(updateOutput).toHaveBeenCalledWith(
         expect.objectContaining({
           isSubagentProgress: true,
-          state: 'completed',
+          state: SubagentState.COMPLETED,
           result: 'Generating...\n\nArtifact (Result):\nPart 1 Part 2',
         }),
       );
@@ -760,7 +768,9 @@ describe('RemoteAgentInvocation', () => {
         abortSignal: new AbortController().signal,
       });
 
-      expect(result.returnDisplay).toMatchObject({ state: 'error' });
+      expect(result.returnDisplay).toMatchObject({
+        state: SubagentState.ERROR,
+      });
       expect((result.returnDisplay as SubagentProgress).result).toContain(
         a2aError.userMessage,
       );
@@ -782,7 +792,9 @@ describe('RemoteAgentInvocation', () => {
         abortSignal: new AbortController().signal,
       });
 
-      expect(result.returnDisplay).toMatchObject({ state: 'error' });
+      expect(result.returnDisplay).toMatchObject({
+        state: SubagentState.ERROR,
+      });
       expect((result.returnDisplay as SubagentProgress).result).toContain(
         'Error calling remote agent: something unexpected',
       );
@@ -813,7 +825,9 @@ describe('RemoteAgentInvocation', () => {
         abortSignal: new AbortController().signal,
       });
 
-      expect(result.returnDisplay).toMatchObject({ state: 'error' });
+      expect(result.returnDisplay).toMatchObject({
+        state: SubagentState.ERROR,
+      });
       // Should contain both the partial output and the error message
       expect(result.returnDisplay).toMatchObject({
         result: expect.stringContaining('Partial response'),

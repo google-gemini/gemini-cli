@@ -6,7 +6,11 @@
 import { waitFor } from '../../../test-utils/async.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { SubagentGroupDisplay } from './SubagentGroupDisplay.js';
-import { Kind, CoreToolCallStatus } from '@google/gemini-cli-core';
+import {
+  Kind,
+  CoreToolCallStatus,
+  SubagentState,
+} from '@google/gemini-cli-core';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { describe, it, expect, vi } from 'vitest';
 import { Text } from 'ink';
@@ -27,12 +31,12 @@ describe('<SubagentGroupDisplay />', () => {
       resultDisplay: {
         isSubagentProgress: true,
         agentName: 'api-monitor',
-        state: 'running',
+        state: SubagentState.RUNNING,
         recentActivity: [
           {
             id: 'act-1',
             type: 'tool_call',
-            status: 'running',
+            status: SubagentState.RUNNING,
             content: '',
             displayName: 'Action Required',
             description: 'Verify server is running',
@@ -50,13 +54,13 @@ describe('<SubagentGroupDisplay />', () => {
       resultDisplay: {
         isSubagentProgress: true,
         agentName: 'db-manager',
-        state: 'completed',
+        state: SubagentState.COMPLETED,
         result: 'Database schema validated',
         recentActivity: [
           {
             id: 'act-2',
             type: 'thought',
-            status: 'completed',
+            status: SubagentState.COMPLETED,
             content: 'Database schema validated',
           },
         ],

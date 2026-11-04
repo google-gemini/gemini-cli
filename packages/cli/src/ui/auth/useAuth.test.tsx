@@ -45,7 +45,7 @@ describe('useAuth', () => {
   });
 
   describe('validateAuthMethodWithSettings', () => {
-    it('should return error if auth type is enforced and does not match', () => {
+    it('should return error if auth type is enforced and does not match', async () => {
       const settings = {
         merged: {
           security: {
@@ -56,14 +56,14 @@ describe('useAuth', () => {
         },
       } as LoadedSettings;
 
-      const error = validateAuthMethodWithSettings(
+      const error = await validateAuthMethodWithSettings(
         AuthType.USE_GEMINI,
         settings,
       );
       expect(error).toContain('Authentication is enforced to be oauth');
     });
 
-    it('should return null if useExternal is true', () => {
+    it('should return null if useExternal is true', async () => {
       const settings = {
         merged: {
           security: {
@@ -74,14 +74,14 @@ describe('useAuth', () => {
         },
       } as LoadedSettings;
 
-      const error = validateAuthMethodWithSettings(
+      const error = await validateAuthMethodWithSettings(
         AuthType.LOGIN_WITH_GOOGLE,
         settings,
       );
       expect(error).toBeNull();
     });
 
-    it('should return null if authType is USE_GEMINI', () => {
+    it('should return null if authType is USE_GEMINI', async () => {
       const settings = {
         merged: {
           security: {
@@ -90,14 +90,14 @@ describe('useAuth', () => {
         },
       } as LoadedSettings;
 
-      const error = validateAuthMethodWithSettings(
+      const error = await validateAuthMethodWithSettings(
         AuthType.USE_GEMINI,
         settings,
       );
       expect(error).toBeNull();
     });
 
-    it('should call validateAuthMethod for other auth types', () => {
+    it('should call validateAuthMethod for other auth types', async () => {
       const settings = {
         merged: {
           security: {
@@ -106,8 +106,8 @@ describe('useAuth', () => {
         },
       } as LoadedSettings;
 
-      mockValidateAuthMethod.mockReturnValue('Validation Error');
-      const error = validateAuthMethodWithSettings(
+      mockValidateAuthMethod.mockResolvedValue('Validation Error');
+      const error = await validateAuthMethodWithSettings(
         AuthType.LOGIN_WITH_GOOGLE,
         settings,
       );
@@ -265,7 +265,7 @@ describe('useAuth', () => {
     });
 
     it('should set error if validation fails', async () => {
-      mockValidateAuthMethod.mockReturnValue('Validation Failed');
+      mockValidateAuthMethod.mockResolvedValue('Validation Failed');
       const { result } = await renderHook(() =>
         useAuthCommand(createSettings(AuthType.LOGIN_WITH_GOOGLE), mockConfig),
       );
@@ -326,9 +326,25 @@ describe('useAuth', () => {
       });
 
       expect(result.current.authError).toBe(
-        'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://goo.gle/gemini-cli-auth-docs#workspace-gca',
+        'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://geminicli.com/docs/get-started/authentication/#set-gcp',
       );
       expect(result.current.authError).not.toContain('Failed to login');
+      expect(result.current.authState).toBe(AuthState.Updating);
+    });
+
+    it('should transition to Updating without setting authError on ChangeAuthRequestedError or ValidationCancelledError', async () => {
+      const { ChangeAuthRequestedError } = await import(
+        '@google/gemini-cli-core'
+      );
+      const { result } = await renderHook(() =>
+        useAuthCommand(createSettings(AuthType.LOGIN_WITH_GOOGLE), mockConfig),
+      );
+
+      await act(async () => {
+        deferredRefreshAuth.reject(new ChangeAuthRequestedError());
+      });
+
+      expect(result.current.authError).toBeNull();
       expect(result.current.authState).toBe(AuthState.Updating);
     });
   });

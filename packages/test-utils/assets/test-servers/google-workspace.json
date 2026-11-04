@@ -684,9 +684,12 @@
               "dateTime": {
                 "type": "string",
                 "description": "The start time in strict ISO 8601 format with seconds and timezone (e.g., 2024-01-15T10:30:00Z or 2024-01-15T10:30:00-05:00)."
+              },
+              "date": {
+                "type": "string",
+                "description": "The date, in the format \"yyyy-mm-dd\", for an all-day event."
               }
-            },
-            "required": ["dateTime"]
+            }
           },
           "end": {
             "type": "object",
@@ -694,9 +697,12 @@
               "dateTime": {
                 "type": "string",
                 "description": "The end time in strict ISO 8601 format with seconds and timezone (e.g., 2024-01-15T11:30:00Z or 2024-01-15T11:30:00-05:00)."
+              },
+              "date": {
+                "type": "string",
+                "description": "The date, in the format \"yyyy-mm-dd\", for an all-day event."
               }
-            },
-            "required": ["dateTime"]
+            }
           },
           "attendees": {
             "description": "The email addresses of the attendees.",
@@ -881,9 +887,12 @@
               "dateTime": {
                 "type": "string",
                 "description": "The new start time in strict ISO 8601 format with seconds and timezone (e.g., 2024-01-15T10:30:00Z or 2024-01-15T10:30:00-05:00)."
+              },
+              "date": {
+                "type": "string",
+                "description": "The new date, in the format \"yyyy-mm-dd\", for an all-day event."
               }
-            },
-            "required": ["dateTime"]
+            }
           },
           "end": {
             "type": "object",
@@ -891,9 +900,13 @@
               "dateTime": {
                 "type": "string",
                 "description": "The new end time in strict ISO 8601 format with seconds and timezone (e.g., 2024-01-15T11:30:00Z or 2024-01-15T11:30:00-05:00)."
+              },
+              "date": {
+                "type": "string",
+                "description": "The new date, in the format \"yyyy-mm-dd\", for an all-day event."
               }
             },
-            "required": ["dateTime"]
+            "anyOf": [{ "required": ["dateTime"] }, { "required": ["date"] }]
           },
           "attendees": {
             "description": "The new list of attendees for the event.",

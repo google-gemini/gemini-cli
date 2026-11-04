@@ -437,4 +437,38 @@ describe('OpenFilesManager', () => {
 
     expect(manager.state.workspaceState!.openFiles).toHaveLength(0);
   });
+
+  it.each([
+    '/test/.vscode/settings.json',
+    '/Users/test/Library/Application Support/Code/User/settings.json',
+    '/test/.gemini/settings.json',
+    '/test/GEMINI.md',
+    '/test/gemini.md',
+  ])(
+    'ignores excluded configuration and metadata file %s',
+    async (filePath) => {
+      const manager = new OpenFilesManager(context);
+      const uri = getUri(filePath);
+
+      addFile(uri);
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(manager.state.workspaceState!.openFiles).toHaveLength(0);
+    },
+  );
+
+  it('removes a tracked file when it is renamed to an excluded file', async () => {
+    const manager = new OpenFilesManager(context);
+    const oldUri = getUri('/test/file1.txt');
+    const newUri = getUri('/test/.vscode/settings.json');
+
+    addFile(oldUri);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(manager.state.workspaceState!.openFiles).toHaveLength(1);
+
+    onDidRenameFilesListener({ files: [{ oldUri, newUri }] });
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(manager.state.workspaceState!.openFiles).toHaveLength(0);
+  });
 });

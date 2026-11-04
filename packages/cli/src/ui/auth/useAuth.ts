@@ -13,15 +13,17 @@ import {
   debugLogger,
   isAccountSuspendedError,
   ProjectIdRequiredError,
+  ChangeAuthRequestedError,
+  ValidationCancelledError,
 } from '@google/gemini-cli-core';
 import { getErrorMessage } from '@google/gemini-cli-core';
 import { AuthState } from '../types.js';
 import { validateAuthMethod } from '../../config/auth.js';
 
-export function validateAuthMethodWithSettings(
+export async function validateAuthMethodWithSettings(
   authType: AuthType,
   settings: LoadedSettings,
-): string | null {
+): Promise<string | null> {
   const enforcedType = settings.merged.security.auth.enforcedType;
   if (enforcedType && enforcedType !== authType) {
     return `Authentication is enforced to be ${enforcedType}, but you are currently using ${authType}.`;
@@ -111,7 +113,11 @@ export const useAuthCommand = (
         }
       }
 
-      const error = validateAuthMethodWithSettings(authType, settings);
+      const error = await validateAuthMethodWithSettings(
+        authType,
+        settings,
+      ).catch((e: unknown) => getErrorMessage(e));
+
       if (error) {
         onAuthError(error);
         return;
@@ -137,6 +143,14 @@ export const useAuthCommand = (
         setAuthError(null);
         setAuthState(AuthState.Authenticated);
       } catch (e) {
+        if (
+          e instanceof ChangeAuthRequestedError ||
+          e instanceof ValidationCancelledError
+        ) {
+          setAuthError(null);
+          setAuthState(AuthState.Updating);
+          return;
+        }
         const suspendedError = isAccountSuspendedError(e);
         if (suspendedError) {
           setAccountSuspensionInfo({

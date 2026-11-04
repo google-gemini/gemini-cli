@@ -118,7 +118,7 @@ describe('migrate command', () => {
               expect.objectContaining({
                 command: 'echo "Before Edit"',
                 type: 'command',
-                timeout: 30,
+                timeout: 30000,
               }),
             ]),
           }),
@@ -178,7 +178,7 @@ describe('migrate command', () => {
         PostToolUse: [{ hooks: [{ type: 'command', command: 'echo 2' }] }],
         UserPromptSubmit: [{ hooks: [{ type: 'command', command: 'echo 3' }] }],
         Stop: [{ hooks: [{ type: 'command', command: 'echo 4' }] }],
-        SubAgentStop: [{ hooks: [{ type: 'command', command: 'echo 5' }] }],
+        SubagentStop: [{ hooks: [{ type: 'command', command: 'echo 5' }] }],
         SessionStart: [{ hooks: [{ type: 'command', command: 'echo 6' }] }],
         SessionEnd: [{ hooks: [{ type: 'command', command: 'echo 7' }] }],
         PreCompact: [{ hooks: [{ type: 'command', command: 'echo 8' }] }],
@@ -201,6 +201,43 @@ describe('migrate command', () => {
     expect(migratedHooks).toHaveProperty('SessionEnd');
     expect(migratedHooks).toHaveProperty('PreCompress');
     expect(migratedHooks).toHaveProperty('Notification');
+  });
+
+  it('should preserve and merge both Stop and SubagentStop hooks under AfterAgent', async () => {
+    const claudeSettings = {
+      hooks: {
+        Stop: [
+          {
+            matcher: 'Edit',
+            hooks: [{ type: 'command', command: 'echo "stop hook"' }],
+          },
+        ],
+        SubagentStop: [
+          {
+            matcher: 'Bash',
+            hooks: [{ type: 'command', command: 'echo "subagent stop hook"' }],
+          },
+        ],
+      },
+    };
+
+    mockedFs.existsSync.mockReturnValue(true);
+    mockedFs.readFileSync.mockReturnValue(JSON.stringify(claudeSettings));
+
+    await handleMigrateFromClaude();
+
+    const migratedHooks = mockSetValue.mock.calls[0][2];
+    expect(migratedHooks.AfterAgent).toHaveLength(2);
+    expect(migratedHooks.AfterAgent).toEqual([
+      {
+        matcher: 'replace',
+        hooks: [{ type: 'command', command: 'echo "stop hook"' }],
+      },
+      {
+        matcher: 'run_shell_command',
+        hooks: [{ type: 'command', command: 'echo "subagent stop hook"' }],
+      },
+    ]);
   });
 
   it('should transform tool names in matchers', async () => {
@@ -274,7 +311,7 @@ describe('migrate command', () => {
     expect(migratedHooks.BeforeTool[0].sequential).toBe(true);
   });
 
-  it('should preserve timeout values', async () => {
+  it('should convert timeout values from seconds to milliseconds', async () => {
     const claudeSettings = {
       hooks: {
         PreToolUse: [
@@ -297,7 +334,140 @@ describe('migrate command', () => {
     await handleMigrateFromClaude();
 
     const migratedHooks = mockSetValue.mock.calls[0][2];
-    expect(migratedHooks.BeforeTool[0].hooks[0].timeout).toBe(60);
+    expect(migratedHooks.BeforeTool[0].hooks[0].timeout).toBe(60000);
+  });
+
+  it('should round fractional second timeouts to integer milliseconds', async () => {
+    const claudeSettings = {
+      hooks: {
+        PreToolUse: [
+          {
+            hooks: [
+              {
+                type: 'command',
+                command: 'echo "fractional"',
+                timeout: 1.15,
+              },
+              {
+                type: 'command',
+                command: 'echo "half"',
+                timeout: 2.5,
+              },
+              {
+                type: 'command',
+                command: 'echo "sub-ms-rounds-up"',
+                timeout: 0.0005,
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    mockedFs.existsSync.mockReturnValue(true);
+    mockedFs.readFileSync.mockReturnValue(JSON.stringify(claudeSettings));
+
+    await handleMigrateFromClaude();
+
+    const migratedHooks = mockSetValue.mock.calls[0][2];
+    expect(migratedHooks.BeforeTool[0].hooks[0].timeout).toBe(1150);
+    expect(migratedHooks.BeforeTool[0].hooks[1].timeout).toBe(2500);
+    expect(migratedHooks.BeforeTool[0].hooks[2].timeout).toBe(1);
+  });
+
+  it('should cap large timeout values at Node.js maximum 32-bit signed integer', async () => {
+    const claudeSettings = {
+      hooks: {
+        PreToolUse: [
+          {
+            hooks: [
+              {
+                type: 'command',
+                command: 'echo "exceeds-32bit-int"',
+                timeout: 3000000,
+              },
+              {
+                type: 'command',
+                command: 'echo "max-double"',
+                timeout: Number.MAX_VALUE,
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    mockedFs.existsSync.mockReturnValue(true);
+    mockedFs.readFileSync.mockReturnValue(JSON.stringify(claudeSettings));
+
+    await handleMigrateFromClaude();
+
+    const migratedHooks = mockSetValue.mock.calls[0][2];
+    expect(migratedHooks.BeforeTool[0].hooks[0].timeout).toBe(2147483647);
+    expect(migratedHooks.BeforeTool[0].hooks[1].timeout).toBe(2147483647);
+  });
+
+  it('should omit invalid, non-positive, or missing timeout values', async () => {
+    const claudeSettings = {
+      hooks: {
+        PreToolUse: [
+          {
+            hooks: [
+              {
+                type: 'command',
+                command: 'echo "missing"',
+              },
+              {
+                type: 'command',
+                command: 'echo "zero"',
+                timeout: 0,
+              },
+              {
+                type: 'command',
+                command: 'echo "sub-ms-rounds-to-zero"',
+                timeout: 0.0001,
+              },
+              {
+                type: 'command',
+                command: 'echo "negative"',
+                timeout: -5,
+              },
+              {
+                type: 'command',
+                command: 'echo "null"',
+                timeout: null,
+              },
+              {
+                type: 'command',
+                command: 'echo "string"',
+                timeout: '30',
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    mockedFs.existsSync.mockReturnValue(true);
+    mockedFs.readFileSync.mockReturnValue(JSON.stringify(claudeSettings));
+
+    await handleMigrateFromClaude();
+
+    const migratedHooks = mockSetValue.mock.calls[0][2];
+    const [
+      missingTimeout,
+      zeroTimeout,
+      subMsZeroTimeout,
+      negativeTimeout,
+      nullTimeout,
+      stringTimeout,
+    ] = migratedHooks.BeforeTool[0].hooks;
+    expect(missingTimeout).not.toHaveProperty('timeout');
+    expect(zeroTimeout).not.toHaveProperty('timeout');
+    expect(subMsZeroTimeout).not.toHaveProperty('timeout');
+    expect(negativeTimeout).not.toHaveProperty('timeout');
+    expect(nullTimeout).not.toHaveProperty('timeout');
+    expect(stringTimeout).not.toHaveProperty('timeout');
   });
 
   it('should merge with existing Gemini hooks', async () => {

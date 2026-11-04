@@ -12,7 +12,7 @@ if (process.env['NO_COLOR'] !== undefined) {
 import { mkdir, readdir, rm, readFile } from 'node:fs/promises';
 import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { canUseRipgrep } from '../packages/core/src/tools/ripGrep.js';
+import { resolveRipgrepPath } from '../packages/core/src/tools/ripGrep.js';
 import { disableMouseTracking } from '@google/gemini-cli-core';
 import { isolateTestEnv } from '../packages/test-utils/src/env-setup.js';
 import { createServer, type Server } from 'node:http';
@@ -93,7 +93,7 @@ export async function setup() {
   isolateTestEnv(runDir);
 
   // Download ripgrep to avoid race conditions in parallel tests
-  const available = await canUseRipgrep();
+  const available = await resolveRipgrepPath();
   if (!available) {
     throw new Error('Failed to download ripgrep binary');
   }

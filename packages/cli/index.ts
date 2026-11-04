@@ -13,32 +13,11 @@ import {
   RELAUNCH_EXIT_CODE,
   getSpawnConfig,
   getScriptArgs,
+  setupSignalForwarding,
+  handleChildProcessClose,
 } from './src/utils/processUtils.js';
 
 // --- Global Entry Point ---
-
-// Suppress known race condition error in node-pty on Windows
-// Tracking bug: https://github.com/microsoft/node-pty/issues/827
-process.on('uncaughtException', (error) => {
-  if (
-    process.platform === 'win32' &&
-    error instanceof Error &&
-    error.message === 'Cannot resize a pty that has already exited'
-  ) {
-    // This error happens on Windows with node-pty when resizing a pty that has just exited.
-    // It is a race condition in node-pty that we cannot prevent, so we silence it.
-    return;
-  }
-
-  // For other errors, we rely on the default behavior, but since we attached a listener,
-  // we must manually replicate it.
-  if (error instanceof Error) {
-    process.stderr.write(error.stack + '\n');
-  } else {
-    process.stderr.write(String(error) + '\n');
-  }
-  process.exit(1);
-});
 
 async function getMemoryNodeArgs(): Promise<string[]> {
   let autoConfigureMemory = true;
@@ -85,12 +64,6 @@ async function run() {
 
     let latestAdminSettings: unknown = undefined;
 
-    // Prevent the parent process from exiting prematurely on signals.
-    // The child process will receive the same signals and handle its own cleanup.
-    for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-      process.on(sig as NodeJS.Signals, () => {});
-    }
-
     const runner = () => {
       process.stdin.pause();
 
@@ -99,26 +72,39 @@ async function run() {
         env: newEnv,
       });
 
+      // Clear one-time auth override from supervisor environment after passing to child
+      delete process.env['GEMINI_CLI_AUTH_OVERRIDE'];
+      delete newEnv['GEMINI_CLI_AUTH_OVERRIDE'];
+
       if (latestAdminSettings) {
         child.send({ type: 'admin-settings', settings: latestAdminSettings });
       }
 
-      child.on('message', (msg: { type?: string; settings?: unknown }) => {
-        if (msg.type === 'admin-settings-update' && msg.settings) {
-          latestAdminSettings = msg.settings;
-        }
-      });
+      child.on(
+        'message',
+        (msg: { type?: string; settings?: unknown; authType?: string }) => {
+          if (msg.type === 'admin-settings-update' && msg.settings) {
+            latestAdminSettings = msg.settings;
+          }
+          if (msg.type === 'auth-selected-type' && msg.authType) {
+            process.env['GEMINI_CLI_AUTH_OVERRIDE'] = msg.authType;
+            newEnv['GEMINI_CLI_AUTH_OVERRIDE'] = msg.authType;
+          }
+        },
+      );
+
+      const removeForwarders = setupSignalForwarding(child);
 
       return new Promise<number>((resolve) => {
         child.on('error', (err) => {
+          removeForwarders();
           process.stderr.write(
             'Error: Failed to start child process: ' + err.message + '\n',
           );
           resolve(1);
         });
-        child.on('close', (code) => {
-          process.stdin.resume();
-          resolve(code ?? 1);
+        child.on('close', (code, signal) => {
+          handleChildProcessClose(code, signal, removeForwarders, resolve);
         });
       });
     };
@@ -126,7 +112,7 @@ async function run() {
     while (true) {
       try {
         const exitCode = await runner();
-        if (exitCode !== RELAUNCH_EXIT_CODE) {
+        if (process.platform === 'android' || exitCode !== RELAUNCH_EXIT_CODE) {
           process.exit(exitCode);
         }
       } catch (error: unknown) {

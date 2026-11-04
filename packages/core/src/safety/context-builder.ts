@@ -15,6 +15,10 @@ import type { AgentLoopContext } from '../config/agent-loop-context.js';
 export class ContextBuilder {
   constructor(private readonly context: AgentLoopContext) {}
 
+  get config() {
+    return this.context.config;
+  }
+
   /**
    * Builds the full context object with all available data.
    */

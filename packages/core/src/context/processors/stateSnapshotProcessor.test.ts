@@ -167,8 +167,92 @@ describe('StateSnapshotProcessor', () => {
     const result = await processor.process(createMockProcessArgs(targets));
 
     // Should synthesize a new snapshot synchronously
-    expect(env.llmClient.generateContent).toHaveBeenCalled();
+    expect(env.llmClient.generateJson).toHaveBeenCalled();
     expect(result.length).toBe(1); // nodeA is no longer protected, so everything is snapshotted
     expect(result[0].type).toBe(NodeType.SNAPSHOT);
+  });
+
+  it('should use Global Lookback to find an existing snapshot in the graph as the baseline', async () => {
+    const env = createMockEnvironment();
+    const processor = createStateSnapshotProcessor(
+      'StateSnapshotProcessor',
+      env,
+      { target: 'incremental' },
+    );
+
+    // Create an old snapshot with existing JSON state
+    const oldStateJson = JSON.stringify({
+      discovered_facts: ['Global Lookback Works!'],
+    });
+    const oldSnapshot = createDummyNode(
+      'ep1',
+      NodeType.SNAPSHOT,
+      10,
+      { payload: { text: oldStateJson } },
+      'old-snap',
+    );
+    const nodeA = createDummyNode(
+      'ep2',
+      NodeType.USER_PROMPT,
+      50,
+      {},
+      'node-A',
+    );
+
+    // targets array contains the snapshot
+    const targets = [oldSnapshot, nodeA];
+
+    await processor.process(createMockProcessArgs(targets));
+
+    // The SnapshotGenerator should have been called with the oldStateJson as the baseline
+    expect(env.llmClient.generateJson).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contents: expect.arrayContaining([
+          expect.objectContaining({
+            parts: expect.arrayContaining([
+              expect.objectContaining({
+                text: expect.stringContaining('Global Lookback Works!'),
+              }),
+            ]),
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('should garbage collect the old baseline snapshot from the live graph when creating a new sync snapshot', async () => {
+    const env = createMockEnvironment();
+    const processor = createStateSnapshotProcessor(
+      'StateSnapshotProcessor',
+      env,
+      { target: 'incremental' },
+    );
+
+    const oldSnapshot = createDummyNode(
+      'ep1',
+      NodeType.SNAPSHOT,
+      10,
+      { payload: { text: '{}' } },
+      'old-snap',
+    );
+    const nodeA = createDummyNode(
+      'ep2',
+      NodeType.USER_PROMPT,
+      50,
+      {},
+      'node-A',
+    );
+
+    // The processor summarizes these 2 nodes
+    const result = await processor.process(
+      createMockProcessArgs([oldSnapshot, nodeA]),
+    );
+
+    // It should have replaced BOTH the old snapshot and the new node with ONE new snapshot
+    expect(result.length).toBe(1);
+    expect(result[0].type).toBe(NodeType.SNAPSHOT);
+    expect(result[0].id).not.toBe('old-snap');
+    expect(result[0].abstractsIds).toContain('old-snap');
+    expect(result[0].abstractsIds).toContain('node-A');
   });
 });

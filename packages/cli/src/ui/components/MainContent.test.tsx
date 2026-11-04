@@ -9,12 +9,22 @@ import { createMockSettings } from '../../test-utils/settings.js';
 import { makeFakeConfig, CoreToolCallStatus } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { MainContent } from './MainContent.js';
+import { Composer } from './Composer.js';
 import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Box, Text } from 'ink';
 import { act, useState, type JSX } from 'react';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
+
+const scrollableListMocks = vi.hoisted(() => ({
+  scrollToEnd: vi.fn(),
+  getScrollState: vi.fn(() => ({
+    scrollTop: 80,
+    scrollHeight: 100,
+    innerHeight: 20,
+  })),
+}));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -34,7 +44,7 @@ import {
   useUIState,
   type UIState,
 } from '../contexts/UIStateContext.js';
-import { type IndividualToolCallDisplay } from '../types.js';
+import { type HistoryItem, type IndividualToolCallDisplay } from '../types.js';
 import {
   type ConfirmingToolState,
   useConfirmingTool,
@@ -85,26 +95,57 @@ vi.mock('./AppHeader.js', () => ({
   ),
 }));
 
-vi.mock('./shared/ScrollableList.js', () => ({
-  ScrollableList: ({
-    data,
-    renderItem,
-  }: {
-    data: unknown[];
-    renderItem: (props: { item: unknown }) => JSX.Element;
-  }) => (
-    <Box flexDirection="column">
-      <Text>ScrollableList</Text>
-      {data.map((item: unknown, index: number) => (
-        <Box key={index}>{renderItem({ item })}</Box>
-      ))}
-    </Box>
-  ),
-  SCROLL_TO_ITEM_END: 0,
-}));
+// Pass-through spy so tests can observe which history items are (re)rendered.
+vi.mock('./HistoryItemDisplay.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./HistoryItemDisplay.js')>();
+  return {
+    ...actual,
+    HistoryItemDisplay: vi.fn(actual.HistoryItemDisplay),
+  };
+});
+
+const mockScrollableList = vi.fn();
+
+vi.mock('./shared/ScrollableList.js', async () => {
+  const { forwardRef, useImperativeHandle } =
+    await vi.importActual<typeof import('react')>('react');
+  const ScrollableList = forwardRef(
+    (
+      props: {
+        data: unknown[];
+        renderItem: (props: { item: unknown }) => JSX.Element;
+        isStaticItem?: (item: unknown) => boolean;
+        renderStatic?: boolean;
+      },
+      ref,
+    ) => {
+      mockScrollableList(props);
+      const { data, renderItem } = props;
+      useImperativeHandle(ref, () => ({
+        scrollToEnd: scrollableListMocks.scrollToEnd,
+        getScrollState: scrollableListMocks.getScrollState,
+      }));
+      return (
+        <Box flexDirection="column">
+          <Text>ScrollableList</Text>
+          {data.map((item: unknown, index: number) => (
+            <Box key={index}>{renderItem({ item })}</Box>
+          ))}
+        </Box>
+      );
+    },
+  );
+  ScrollableList.displayName = 'ScrollableList';
+  return {
+    ScrollableList,
+    SCROLL_TO_ITEM_END: 0,
+  };
+});
 
 import { theme } from '../semantic-colors.js';
 import { type BackgroundTask } from '../hooks/shellReducer.js';
+import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 
 describe('getToolGroupBorderAppearance', () => {
   const mockBackgroundTasks = new Map<number, BackgroundTask>();
@@ -928,5 +969,503 @@ describe('MainContent', () => {
         unmount();
       },
     );
+  });
+  describe('Scroll position preservation and dynamic height partitioning', () => {
+    beforeEach(() => {
+      scrollableListMocks.scrollToEnd.mockClear();
+      scrollableListMocks.getScrollState.mockReset();
+      vi.mocked(useConfirmingTool).mockReturnValue(null);
+      mockUseSettings.mockReturnValue(
+        createMockSettings({
+          security: { enablePermanentToolApproval: true },
+          ui: { errorVerbosity: 'full' },
+        }),
+      );
+    });
+
+    it('calls scrollToEnd when tool confirmation arrives and user is at the bottom', async () => {
+      vi.mocked(useAlternateBuffer).mockReturnValue(true);
+      scrollableListMocks.getScrollState.mockReturnValue({
+        scrollTop: 80,
+        scrollHeight: 100,
+        innerHeight: 20,
+      });
+
+      const confirmingTool = {
+        tool: {
+          callId: 'call-bottom',
+          name: SHELL_COMMAND_NAME,
+          description: 'echo test',
+          status: CoreToolCallStatus.AwaitingApproval,
+          confirmationDetails: {
+            type: 'exec' as const,
+            title: 'Confirm Shell',
+            command: 'echo test',
+            rootCommand: 'echo',
+            rootCommands: ['echo'],
+          },
+        },
+        index: 1,
+        total: 1,
+      };
+      vi.mocked(useConfirmingTool).mockReturnValue(
+        confirmingTool as unknown as ConfirmingToolState,
+      );
+
+      const { unmount } = await renderWithProviders(<MainContent />, {
+        uiState: defaultMockUiState as Partial<UIState>,
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      });
+
+      expect(scrollableListMocks.getScrollState).toHaveBeenCalled();
+      expect(scrollableListMocks.scrollToEnd).toHaveBeenCalledTimes(1);
+      unmount();
+    });
+
+    it('preserves scroll position and does not call scrollToEnd when user has scrolled up', async () => {
+      vi.mocked(useAlternateBuffer).mockReturnValue(true);
+      scrollableListMocks.getScrollState.mockReturnValue({
+        scrollTop: 30,
+        scrollHeight: 100,
+        innerHeight: 20,
+      });
+
+      const confirmingTool = {
+        tool: {
+          callId: 'call-scrolled-up',
+          name: SHELL_COMMAND_NAME,
+          description: 'echo test',
+          status: CoreToolCallStatus.AwaitingApproval,
+          confirmationDetails: {
+            type: 'exec' as const,
+            title: 'Confirm Shell',
+            command: 'echo test',
+            rootCommand: 'echo',
+            rootCommands: ['echo'],
+          },
+        },
+        index: 1,
+        total: 1,
+      };
+      vi.mocked(useConfirmingTool).mockReturnValue(
+        confirmingTool as unknown as ConfirmingToolState,
+      );
+
+      const { unmount } = await renderWithProviders(<MainContent />, {
+        uiState: defaultMockUiState as Partial<UIState>,
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      });
+
+      expect(scrollableListMocks.getScrollState).toHaveBeenCalled();
+      expect(scrollableListMocks.scrollToEnd).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('preserves scroll position when rendered alongside Composer during a pending tool confirmation', async () => {
+      vi.mocked(useAlternateBuffer).mockReturnValue(true);
+      scrollableListMocks.getScrollState.mockReturnValue({
+        scrollTop: 30,
+        scrollHeight: 100,
+        innerHeight: 20,
+      });
+
+      const confirmingTool = {
+        tool: {
+          callId: 'call-composer-scrolled-up',
+          name: SHELL_COMMAND_NAME,
+          description: 'echo test',
+          status: CoreToolCallStatus.AwaitingApproval,
+          resultDisplay: undefined,
+          confirmationDetails: {
+            type: 'exec' as const,
+            title: 'Confirm Shell',
+            command: 'echo test',
+            rootCommand: 'echo',
+            rootCommands: ['echo'],
+          },
+        },
+        index: 1,
+        total: 1,
+      };
+      vi.mocked(useConfirmingTool).mockReturnValue(
+        confirmingTool as unknown as ConfirmingToolState,
+      );
+
+      const uiStateWithPendingTool = {
+        ...defaultMockUiState,
+        activeHooks: [],
+        sessionStats: {
+          sessionId: 'test-session',
+          sessionStartTime: new Date(),
+          metrics: {} as never,
+          lastPromptTokenCount: 0,
+          promptCount: 0,
+        },
+        pendingHistoryItems: [
+          {
+            type: 'tool_group' as const,
+            id: -1,
+            tools: [confirmingTool.tool],
+          },
+        ],
+      };
+
+      const { unmount } = await renderWithProviders(
+        <>
+          <MainContent />
+          <Composer />
+        </>,
+        {
+          uiState: uiStateWithPendingTool as Partial<UIState>,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+        },
+      );
+
+      expect(scrollableListMocks.getScrollState).toHaveBeenCalled();
+      expect(scrollableListMocks.scrollToEnd).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('partitions availableTerminalHeight between pendingHistoryItems and ToolConfirmationQueue in standard buffer mode', async () => {
+      vi.mocked(useAlternateBuffer).mockReturnValue(false);
+
+      const longDiff = '@@ -1,1 +1,40 @@\n' + '+added line\n'.repeat(40);
+      const confirmingTool = {
+        tool: {
+          callId: 'call-partition',
+          name: 'replace',
+          description: 'Editing src/app.ts',
+          status: CoreToolCallStatus.AwaitingApproval,
+          confirmationDetails: {
+            type: 'edit' as const,
+            title: 'Confirm edit',
+            fileName: 'app.ts',
+            filePath: '/src/app.ts',
+            fileDiff: longDiff,
+            originalContent: 'old',
+            newContent: 'new',
+          },
+        },
+        index: 1,
+        total: 1,
+      };
+      vi.mocked(useConfirmingTool).mockReturnValue(
+        confirmingTool as unknown as ConfirmingToolState,
+      );
+
+      const uiState = {
+        ...defaultMockUiState,
+        history: [{ id: 1, type: 'user' as const, text: 'Update file' }],
+        pendingHistoryItems: [
+          {
+            type: 'tool_group' as const,
+            id: -1,
+            tools: [
+              {
+                callId: 'call-shell',
+                name: SHELL_COMMAND_NAME,
+                status: CoreToolCallStatus.Executing,
+                description: 'Running build...',
+                resultDisplay: Array.from(
+                  { length: 20 },
+                  (_, i) => `Build output line ${i + 1}`,
+                ).join('\n'),
+                ptyId: 789,
+                confirmationDetails: undefined,
+              },
+            ],
+          },
+        ],
+        availableTerminalHeight: 20,
+        terminalHeight: 24,
+        constrainHeight: true,
+      };
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <MainContent />,
+        {
+          uiState: uiState as Partial<UIState>,
+          config: makeFakeConfig({ useAlternateBuffer: false }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+        },
+      );
+
+      await waitFor(() => {
+        const output = lastFrame();
+        expect(output).toContain('Build output line 20');
+        expect(output).toContain('Editing src/app.ts');
+      });
+
+      const renderedLines = lastFrame().split('\n').length;
+      expect(renderedLines).toBeLessThanOrEqual(uiState.terminalHeight);
+      unmount();
+    });
+  });
+
+  it('marks header and non-interactive history items as static in terminalBuffer mode', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+    mockScrollableList.mockClear();
+
+    const { unmount } = await renderWithProviders(<MainContent />, {
+      uiState: defaultMockUiState as Partial<UIState>,
+      config: makeFakeConfig({
+        useAlternateBuffer: false,
+        useTerminalBuffer: true,
+      }),
+      settings: createMockSettings({
+        ui: { useAlternateBuffer: false, terminalBuffer: true },
+      }),
+    });
+
+    expect(mockScrollableList).toHaveBeenCalled();
+    const lastCallProps =
+      mockScrollableList.mock.calls[
+        mockScrollableList.mock.calls.length - 1
+      ][0];
+    expect(lastCallProps.renderStatic).toBe(true);
+    const isStaticItem = lastCallProps.isStaticItem as (
+      item: unknown,
+    ) => boolean;
+    expect(isStaticItem).toBeTypeOf('function');
+
+    expect(isStaticItem({ type: 'header' })).toBe(true);
+    expect(
+      isStaticItem({
+        type: 'history',
+        item: { id: 1, type: 'user', text: 'Hello' },
+      }),
+    ).toBe(true);
+    expect(
+      isStaticItem({
+        type: 'history',
+        item: { id: 2, type: 'gemini', text: 'Response' },
+      }),
+    ).toBe(true);
+    expect(
+      isStaticItem({
+        type: 'history',
+        item: { id: 3, type: 'gemini_content', text: 'Chunk' },
+      }),
+    ).toBe(true);
+    expect(
+      isStaticItem({
+        type: 'history',
+        item: {
+          id: 4,
+          type: 'thinking',
+          thought: { subject: 'S', description: 'D' },
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isStaticItem({
+        type: 'history',
+        item: { id: 5, type: 'tool_group', tools: [] },
+      }),
+    ).toBe(false);
+    expect(
+      isStaticItem({
+        type: 'history',
+        item: { id: 6, type: 'compression', compression: { isPending: false } },
+      }),
+    ).toBe(false);
+    expect(isStaticItem({ type: 'pending' })).toBe(false);
+
+    const keyExtractor = lastCallProps.keyExtractor as (
+      item: unknown,
+      index: number,
+    ) => string;
+    expect(keyExtractor({ type: 'header' }, 0)).toContain('undefined');
+
+    unmount();
+  });
+
+  it('marks header as non-static and updates header key when updateInfo.isUpdating is true', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+    mockScrollableList.mockClear();
+
+    const { unmount } = await renderWithProviders(<MainContent />, {
+      uiState: {
+        ...defaultMockUiState,
+        updateInfo: {
+          isUpdating: true,
+          message: 'Updating...',
+          update: {
+            latest: '2.0.0',
+            current: '1.0.0',
+            name: '@google/gemini-cli',
+          },
+        },
+      } as Partial<UIState>,
+      config: makeFakeConfig({
+        useAlternateBuffer: false,
+        useTerminalBuffer: true,
+      }),
+      settings: createMockSettings({
+        ui: { useAlternateBuffer: false, terminalBuffer: true },
+      }),
+    });
+
+    const lastCallProps =
+      mockScrollableList.mock.calls[
+        mockScrollableList.mock.calls.length - 1
+      ][0];
+    const isStaticItem = lastCallProps.isStaticItem as (
+      item: unknown,
+    ) => boolean;
+    const keyExtractor = lastCallProps.keyExtractor as (
+      item: unknown,
+      index: number,
+    ) => string;
+
+    expect(isStaticItem({ type: 'header' })).toBe(false);
+    expect(keyExtractor({ type: 'header' }, 0)).toContain('-true-');
+
+    unmount();
+  });
+
+  describe('static history refresh on terminal width change', () => {
+    const LINES_PER_MESSAGE = 8;
+
+    const createLongHistory = (count: number): HistoryItem[] =>
+      Array.from(
+        { length: count },
+        (_, index): HistoryItem => ({
+          id: index + 1,
+          type: index % 2 === 0 ? 'user' : 'gemini',
+          text: Array.from(
+            { length: LINES_PER_MESSAGE },
+            (_, line) => `message ${index + 1} line ${line + 1}`,
+          ).join('\n'),
+        }),
+      );
+
+    const renderedHistoryItemIds = () =>
+      new Set(
+        vi
+          .mocked(HistoryItemDisplay)
+          .mock.calls.map(([props]) => props.item.id),
+      );
+
+    // Renders MainContent in inline mode with UI state that the test can
+    // update the way AppContainer does on resize and on refreshStatic().
+    const renderInlineMainContent = async (history: HistoryItem[]) => {
+      let applyLayout: ((layout: Partial<UIState>) => void) | undefined;
+      const LayoutHarness = () => {
+        const outerState = useUIState();
+        const [layout, setLayout] = useState<Partial<UIState>>({});
+        applyLayout = (next) => setLayout((prev) => ({ ...prev, ...next }));
+        return (
+          <UIStateContext.Provider value={{ ...outerState, ...layout }}>
+            <MainContent />
+          </UIStateContext.Provider>
+        );
+      };
+
+      vi.mocked(HistoryItemDisplay).mockClear();
+      const { unmount } = await renderWithProviders(<LayoutHarness />, {
+        uiState: {
+          ...defaultMockUiState,
+          history,
+          terminalWidth: 100,
+          mainAreaWidth: 100,
+        } as Partial<UIState>,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+      });
+      if (!applyLayout) {
+        throw new Error('applyLayout was not initialized');
+      }
+      const applyLayoutSafe = applyLayout;
+      const updateLayout = (layout: Partial<UIState>) => {
+        act(() => {
+          applyLayoutSafe(layout);
+        });
+      };
+      return { updateLayout, unmount };
+    };
+
+    it('re-renders only a bounded trailing window of history when the static area remounts after a terminal width change', async () => {
+      // 40 multi-line items (~140 characters each) exceed the 1,000 character
+      // budget for re-printing history after a resize.
+      const history = createLongHistory(40);
+      const { updateLayout, unmount } = await renderInlineMainContent(history);
+
+      // The initial mount prints the full history.
+      expect(renderedHistoryItemIds().size).toBe(history.length);
+
+      // 1. The terminal width changes; <Static> does not re-render yet.
+      updateLayout({ terminalWidth: 80, mainAreaWidth: 80 });
+      vi.mocked(HistoryItemDisplay).mockClear();
+
+      // 2. The debounced refreshStatic() remounts the static history.
+      updateLayout({ historyRemountKey: 1 });
+
+      const rerenderedIds = renderedHistoryItemIds();
+      expect(rerenderedIds.has(history[history.length - 1].id)).toBe(true);
+      expect(rerenderedIds.has(history[0].id)).toBe(false);
+      expect(rerenderedIds.size).toBeLessThan(history.length);
+      unmount();
+    });
+
+    it('re-renders only the newest part of a long single response after a terminal width change', async () => {
+      // A long streamed response is stored as many history items after the
+      // prompt, so the whole session can be a single turn.
+      const history: HistoryItem[] = [
+        { id: 1, type: 'user', text: 'Write a long essay' },
+        ...Array.from(
+          { length: 30 },
+          (_, index): HistoryItem => ({
+            id: index + 2,
+            type: index === 0 ? 'gemini' : 'gemini_content',
+            text: `Paragraph ${index + 1}: ${'lorem ipsum '.repeat(20)}`,
+          }),
+        ),
+      ];
+      const { updateLayout, unmount } = await renderInlineMainContent(history);
+      updateLayout({ terminalWidth: 80, mainAreaWidth: 80 });
+      vi.mocked(HistoryItemDisplay).mockClear();
+
+      updateLayout({ historyRemountKey: 1 });
+
+      const rerenderedIds = renderedHistoryItemIds();
+      expect(rerenderedIds.has(history[history.length - 1].id)).toBe(true);
+      // Neither the prompt nor the start of the response is re-rendered.
+      expect(rerenderedIds.has(history[0].id)).toBe(false);
+      expect(rerenderedIds.has(history[1].id)).toBe(false);
+      unmount();
+    });
+
+    it('re-renders the full history when the static area remounts without a terminal width change', async () => {
+      const history = createLongHistory(40);
+      const { updateLayout, unmount } = await renderInlineMainContent(history);
+      vi.mocked(HistoryItemDisplay).mockClear();
+
+      // For example, a theme or Markdown toggle calling refreshStatic().
+      updateLayout({ historyRemountKey: 1 });
+
+      expect(renderedHistoryItemIds().size).toBe(history.length);
+      unmount();
+    });
+
+    it('prints history items appended after a bounded refresh', async () => {
+      const history = createLongHistory(40);
+      const { updateLayout, unmount } = await renderInlineMainContent(history);
+      updateLayout({ terminalWidth: 80, mainAreaWidth: 80 });
+      updateLayout({ historyRemountKey: 1 });
+      vi.mocked(HistoryItemDisplay).mockClear();
+
+      const nextPrompt: HistoryItem = {
+        id: history.length + 1,
+        type: 'user',
+        text: 'next prompt',
+      };
+      updateLayout({ history: [...history, nextPrompt] });
+
+      expect(renderedHistoryItemIds()).toEqual(new Set([nextPrompt.id]));
+      unmount();
+    });
   });
 });

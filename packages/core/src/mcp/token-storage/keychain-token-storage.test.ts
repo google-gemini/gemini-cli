@@ -72,7 +72,7 @@ describe('KeychainTokenStorage', () => {
       expect(retrieved?.serverName).toBe('test-server');
     });
 
-    it('should return null if no credentials are found or they are expired', async () => {
+    it('should return null if no credentials are found or they are expired and unrefreshable', async () => {
       expect(await storage.getCredentials('missing')).toBeNull();
 
       const expiredCreds = {
@@ -81,6 +81,20 @@ describe('KeychainTokenStorage', () => {
       };
       await storage.setCredentials(expiredCreds);
       expect(await storage.getCredentials('test-server')).toBeNull();
+
+      // Ensure that if it has a refresh token, it is NOT returned as null
+      const expiredWithRefresh = {
+        ...validCredentials,
+        token: {
+          ...validCredentials.token,
+          expiresAt: Date.now() - 1000,
+          refreshToken: 'some-refresh-token',
+        },
+      };
+      await storage.setCredentials(expiredWithRefresh);
+      const retrieved = await storage.getCredentials('test-server');
+      expect(retrieved).not.toBeNull();
+      expect(retrieved?.token.refreshToken).toBe('some-refresh-token');
     });
 
     it('should throw if stored data is corrupted JSON', async () => {
@@ -125,15 +139,12 @@ describe('KeychainTokenStorage', () => {
       await expect(storage.clearAll()).rejects.toThrow(
         /Failed to clear some credentials: system fail/,
       );
+    });
 
-      // Aggregating a 'not found' error (returns false)
-      vi.spyOn(KeychainService.prototype, 'deletePassword')
-        .mockResolvedValueOnce(true)
-        .mockResolvedValueOnce(false);
-
-      await expect(storage.clearAll()).rejects.toThrow(
-        /Failed to clear some credentials: No credentials found/,
-      );
+    it('should handle deleteCredentials for non-existent server gracefully', async () => {
+      await expect(
+        storage.deleteCredentials('non-existent'),
+      ).resolves.not.toThrow();
     });
 
     it('should manage secrets with prefix independently', async () => {

@@ -88,6 +88,13 @@ export interface SubagentActivityEvent {
   data: Record<string, unknown>;
 }
 
+export enum SubagentState {
+  RUNNING = 'running',
+  COMPLETED = 'completed',
+  ERROR = 'error',
+  CANCELLED = 'cancelled',
+}
+
 export interface SubagentActivityItem {
   id: string;
   type: 'thought' | 'tool_call';
@@ -95,14 +102,14 @@ export interface SubagentActivityItem {
   displayName?: string;
   description?: string;
   args?: string;
-  status: 'running' | 'completed' | 'error' | 'cancelled';
+  status: SubagentState;
 }
 
 export interface SubagentProgress {
   isSubagentProgress: true;
   agentName: string;
   recentActivity: SubagentActivityItem[];
-  state?: 'running' | 'completed' | 'error' | 'cancelled';
+  state?: SubagentState;
   result?: string;
   terminateReason?: AgentTerminateMode;
 }
@@ -243,6 +250,12 @@ export interface LocalAgentDefinition<
    * auto-memory extractor so active memory files cannot be edited directly.
    */
   autoMemoryExtractionWriteAccess?: boolean;
+
+  /**
+   * Controls whether extension memory is injected into this agent's initial
+   * session context when JIT context is enabled. Defaults to true.
+   */
+  includeExtensionContext?: boolean;
 
   /**
    * Optional inline MCP servers for this agent.

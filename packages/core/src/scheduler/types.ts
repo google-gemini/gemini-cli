@@ -52,6 +52,13 @@ export interface ToolCallRequestInfo {
   traceId?: string;
   parentCallId?: string;
   schedulerId?: string;
+  /**
+   * Set on calls that consumers should present, and treat as finished,
+   * together. Every call in a group shares the same value and the calls are
+   * adjacent within their batch. A run of two or more consecutive sub-agent
+   * invocations forms a group. Other calls leave this unset.
+   */
+  groupId?: string;
   inputModifiedByHook?: boolean;
   forcedAsk?: boolean;
 }

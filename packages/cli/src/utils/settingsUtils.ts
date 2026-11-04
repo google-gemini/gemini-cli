@@ -367,7 +367,9 @@ export function parseEditedValue(
     }
 
     const numParsed = Number(newValue.trim());
-    if (Number.isNaN(numParsed)) {
+    // Reject NaN and ±Infinity (e.g. overflow like '1e309'): JSON cannot
+    // represent non-finite numbers and would persist them as null.
+    if (!Number.isFinite(numParsed)) {
       return null;
     }
 

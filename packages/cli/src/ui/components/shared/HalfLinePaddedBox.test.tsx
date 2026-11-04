@@ -94,4 +94,26 @@ describe('<HalfLinePaddedBox />', () => {
 
     unmount();
   });
+
+  it('handles zero and negative terminal widths without throwing', async () => {
+    const { lastFrame: frameZero, unmount: unmountZero } =
+      await renderWithProviders(
+        <HalfLinePaddedBox backgroundBaseColor="blue" backgroundOpacity={0.5}>
+          <Text>Content</Text>
+        </HalfLinePaddedBox>,
+        { width: 0 },
+      );
+    expect(frameZero()).toBeDefined();
+    unmountZero();
+
+    const { lastFrame: frameNeg, unmount: unmountNeg } =
+      await renderWithProviders(
+        <HalfLinePaddedBox backgroundBaseColor="blue" backgroundOpacity={0.5}>
+          <Text>Content</Text>
+        </HalfLinePaddedBox>,
+        { width: -5 },
+      );
+    expect(frameNeg()).toBeDefined();
+    unmountNeg();
+  });
 });

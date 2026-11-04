@@ -133,7 +133,17 @@ export async function activate(context: vscode.ExtensionContext) {
       DIFF_SCHEME,
       diffContentProvider,
     ),
-    (vscode.commands.registerCommand(
+    context.extensionMode === vscode.ExtensionMode.Production
+      ? { dispose: () => {} }
+      : vscode.commands.registerCommand(
+          'gemini.diff.open',
+          async (args?: { filePath: string; newContent: string }) => {
+            if (args?.filePath && args?.newContent !== undefined) {
+              await diffManager.showDiff(args.filePath, args.newContent);
+            }
+          },
+        ),
+    vscode.commands.registerCommand(
       'gemini.diff.accept',
       (uri?: vscode.Uri) => {
         const docUri = uri ?? vscode.window.activeTextEditor?.document.uri;
@@ -152,7 +162,7 @@ export async function activate(context: vscode.ExtensionContext) {
           diffManager.cancelDiff(docUri);
         }
       },
-    )),
+    ),
   );
 
   ideServer = new IDEServer(log, diffManager);
@@ -174,14 +184,14 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   context.subscriptions.push(
-    (vscode.workspace.onDidChangeWorkspaceFolders(() => {
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       ideServer.syncEnvVars();
     }),
     vscode.workspace.onDidGrantWorkspaceTrust(() => {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       ideServer.syncEnvVars();
-    })),
+    }),
     vscode.commands.registerCommand('gemini-cli.runGeminiCLI', async () => {
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders || workspaceFolders.length === 0) {

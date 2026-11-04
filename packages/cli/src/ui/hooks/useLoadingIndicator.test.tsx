@@ -36,6 +36,7 @@ describe('useLoadingIndicator', () => {
     initialShowTips: boolean = true,
     initialShowWit: boolean = true,
     initialErrorVerbosity: 'low' | 'full' = 'full',
+    initialPauseUpdates: boolean = false,
   ) => {
     let hookResult: ReturnType<typeof useLoadingIndicator>;
     function TestComponent({
@@ -45,6 +46,7 @@ describe('useLoadingIndicator', () => {
       showTips,
       showWit,
       errorVerbosity,
+      pauseUpdates,
     }: {
       streamingState: StreamingState;
       shouldShowFocusHint?: boolean;
@@ -52,6 +54,7 @@ describe('useLoadingIndicator', () => {
       showTips?: boolean;
       showWit?: boolean;
       errorVerbosity?: 'low' | 'full';
+      pauseUpdates?: boolean;
     }) {
       hookResult = useLoadingIndicator({
         streamingState,
@@ -60,6 +63,7 @@ describe('useLoadingIndicator', () => {
         showTips,
         showWit,
         errorVerbosity,
+        pauseUpdates,
       });
       return null;
     }
@@ -72,6 +76,7 @@ describe('useLoadingIndicator', () => {
         showTips={initialShowTips}
         showWit={initialShowWit}
         errorVerbosity={initialErrorVerbosity}
+        pauseUpdates={initialPauseUpdates}
       />,
     );
     return {
@@ -87,12 +92,14 @@ describe('useLoadingIndicator', () => {
         showTips?: boolean;
         showWit?: boolean;
         errorVerbosity?: 'low' | 'full';
+        pauseUpdates?: boolean;
       }) => {
         rerender(
           <TestComponent
             showTips={initialShowTips}
             showWit={initialShowWit}
             errorVerbosity={initialErrorVerbosity}
+            pauseUpdates={initialPauseUpdates}
             {...newProps}
           />,
         );
@@ -239,6 +246,9 @@ describe('useLoadingIndicator', () => {
 
     expect(result.current.currentLoadingPhrase).toContain('Trying to reach');
     expect(result.current.currentLoadingPhrase).toContain('Attempt 3/3');
+    expect(result.current.statusPhrase).toBe(
+      'Trying to reach gemini-pro (Attempt 3/3)',
+    );
   });
 
   it('should not show retry status phrase when idle', async () => {
@@ -255,6 +265,7 @@ describe('useLoadingIndicator', () => {
     );
 
     expect(result.current.currentLoadingPhrase).toBeUndefined();
+    expect(result.current.statusPhrase).toBeUndefined();
   });
 
   it('should hide low-verbosity retry status for early retry attempts', async () => {
@@ -309,5 +320,37 @@ describe('useLoadingIndicator', () => {
     );
 
     expect(result.current.currentLoadingPhrase).toBeUndefined();
+  });
+
+  it('should pause elapsedTime updates when pauseUpdates is true', async () => {
+    const { result, rerender } = await renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      null,
+      true,
+      true,
+      'full',
+      true,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS + 5000);
+    });
+
+    expect(result.current.elapsedTime).toBe(0);
+
+    // Resuming updates should start advancing the timer
+    await act(async () => {
+      await rerender({
+        streamingState: StreamingState.Responding,
+        pauseUpdates: false,
+      });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(result.current.elapsedTime).toBe(2);
   });
 });
