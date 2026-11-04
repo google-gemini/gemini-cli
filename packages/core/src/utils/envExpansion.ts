@@ -40,7 +40,7 @@ export function expandEnvVars(
   // Filter out undefined values to satisfy the Record<string, string> requirement safely
   const processEnv: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
-    if (value !== undefined) {
+    if (value !== undefined && key !== dummyKey) {
       processEnv[key] = value;
     }
   }
