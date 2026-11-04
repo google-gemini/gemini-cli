@@ -119,9 +119,31 @@ module.exports = async ({ github, context, core }) => {
   const finalResults = Array.from(resultsByIssue.values());
   core.info(`Aggregated triage results for ${finalResults.length} issues.`);
 
+  // Only labels that already exist in the repository may be applied.
+  const repoLabels = new Set(
+    (
+      await github.paginate(github.rest.issues.listLabelsForRepo, {
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        per_page: 100,
+      })
+    ).map((l) => l.name),
+  );
+
   for (const entry of finalResults) {
-    const issueNumber = entry.issue_number;
+    const issueNumber = Number(entry.issue_number);
+    if (!Number.isInteger(issueNumber) || issueNumber <= 0) {
+      core.warning(`Skipping entry with invalid issue number: ${entry.issue_number}`);
+      continue;
+    }
     let labelsToAdd = entry.labels_to_add || [];
+    const unknownLabels = labelsToAdd.filter((l) => !repoLabels.has(l));
+    if (unknownLabels.length > 0) {
+      core.warning(
+        `Ignoring labels not defined in the repository for #${issueNumber}: ${unknownLabels.join(', ')}`,
+      );
+      labelsToAdd = labelsToAdd.filter((l) => repoLabels.has(l));
+    }
     let labelsToRemove = entry.labels_to_remove || [];
     let existingLabels = [];
 

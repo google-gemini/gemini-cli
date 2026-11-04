@@ -291,6 +291,7 @@ jobs:
           REPOSITORY: '${{ github.repository }}'
           ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
           LABELS_OUTPUT: '${{ steps.gemini_issue_analysis.outputs.summary }}'
+          AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         with:
           github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
@@ -340,6 +341,16 @@ jobs:
             }
 
             const newAreaLabel = labelsToAdd[0];
+
+            // Only a label from the list the model was given may be applied.
+            const availableLabels = (process.env.AVAILABLE_LABELS || '')
+              .split(',')
+              .map((name) => name.trim())
+              .filter((name) => name !== '');
+            if (!availableLabels.includes(newAreaLabel)) {
+              core.setFailed(`Model returned a label that is not in the available area/ list: ${newAreaLabel}`);
+              return;
+            }
 
             // Get current labels to resolve conflicts
             const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
