@@ -58,7 +58,7 @@ export function EditorSettingsDialog({
       }
       return false;
     },
-    { isActive: true },
+    { isActive: true, priority: true },
   );
 
   const editorItems: EditorDisplay[] =
@@ -163,6 +163,7 @@ export function EditorSettingsDialog({
           initialIndex={editorIndex}
           onSelect={handleEditorSelect}
           isFocused={focusedSection === 'editor'}
+          priority={true}
           key={selectedScope}
           maxItemsToShow={editorItems.length}
         />
@@ -176,6 +177,7 @@ export function EditorSettingsDialog({
             initialIndex={0}
             onSelect={handleScopeSelect}
             isFocused={focusedSection === 'scope'}
+            priority={true}
           />
         </Box>
 
