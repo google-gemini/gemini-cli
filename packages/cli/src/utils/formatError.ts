@@ -49,22 +49,17 @@ function formatStatusSuffix(
   message: string,
   status: number | string | undefined,
 ): string {
-  if (status === undefined || status === '') {
+  const statusText =
+    typeof status === 'string'
+      ? status.trim()
+      : status !== undefined
+        ? String(status)
+        : '';
+  if (!statusText) {
     return '';
   }
 
-  const statusText = String(status);
-  const lowerMessage = message.toLowerCase();
-  const lowerStatus = statusText.toLowerCase();
-  if (
-    lowerMessage.includes(`(status: ${lowerStatus})`) ||
-    lowerMessage.includes(`status code ${lowerStatus}`) ||
-    lowerMessage.includes(`http ${lowerStatus}`)
-  ) {
-    return '';
-  }
-
-  if (typeof status === 'string' && message.includes(status)) {
+  if (message.toLowerCase().includes(statusText.toLowerCase())) {
     return '';
   }
 

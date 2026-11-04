@@ -99,6 +99,20 @@ describe('formatCliError', () => {
         status: 404,
       }),
     ).toBe('Error: Request failed with status code 404');
+    expect(
+      formatCliError({
+        message: 'Error 403: Forbidden',
+        status: 403,
+      }),
+    ).toBe('Error: Error 403: Forbidden');
+    expect(
+      formatCliError({
+        error: {
+          message: 'Transient failure',
+          status: '   ',
+        },
+      }),
+    ).toBe('Error: Transient failure');
 
     const errWithStack = new Error('Network timeout');
     errWithStack.stack = 'Error: Network timeout\n    at fetch (index.js:10:5)';
