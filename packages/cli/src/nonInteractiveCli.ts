@@ -416,16 +416,19 @@ export async function runNonInteractive(
             }
             warnings.push(message);
           } else if (event.type === GeminiEventType.Error) {
-            const normalized = normalizeError(event.value.error);
+            const normalized = normalizeError(event.value?.error);
             const code =
               normalized.code ??
               (typeof normalized.status === 'string'
                 ? normalized.status
                 : undefined);
             const err = Object.assign(
-              new Error(normalized.message, {
-                cause: normalized.originalError,
-              }),
+              new Error(
+                normalized.message,
+                normalized.originalError !== undefined
+                  ? { cause: normalized.originalError }
+                  : undefined,
+              ),
               {
                 ...(typeof normalized.status === 'number'
                   ? { status: normalized.status }

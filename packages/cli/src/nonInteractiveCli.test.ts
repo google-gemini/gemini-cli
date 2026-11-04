@@ -656,6 +656,35 @@ describe('runNonInteractive', () => {
     });
   });
 
+  it('gracefully normalizes malformed GeminiEventType.Error when event.value is undefined', async () => {
+    const events = [
+      {
+        type: GeminiEventType.Error,
+      } as unknown as ServerGeminiStreamEvent,
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    let caughtError: unknown;
+    try {
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Trigger malformed error event',
+        prompt_id: 'prompt-id-malformed-error',
+      });
+    } catch (err) {
+      caughtError = err;
+    }
+
+    expect(caughtError).toBeInstanceOf(Error);
+    expect((caughtError as Error).message).toBe(
+      'Unknown error occurred (empty payload)',
+    );
+    expect((caughtError as Error).cause).toBeUndefined();
+  });
+
   it('should not exit if a tool is not found, and should send error back to model', async () => {
     const toolCallEvent: ServerGeminiStreamEvent = {
       type: GeminiEventType.ToolCallRequest,

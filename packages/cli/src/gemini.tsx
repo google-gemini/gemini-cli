@@ -626,7 +626,7 @@ export async function main() {
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
   let initialAuthFailed = false;
-  let initialAuthError: unknown;
+  let initialAuthError: unknown = undefined;
   if (!settings.merged.security.auth.useExternal && !argv.isCommand) {
     try {
       if (
