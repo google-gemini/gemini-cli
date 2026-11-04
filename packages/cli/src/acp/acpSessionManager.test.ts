@@ -27,6 +27,7 @@ import {
   debugLogger,
   GEMINI_MODEL_ALIAS_AUTO,
   type MessageBus,
+  SessionStartSource,
   Storage,
 } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
@@ -81,7 +82,9 @@ describe('AcpSessionManager', () => {
         startChat: vi.fn().mockResolvedValue({}),
         resumeChat: vi.fn().mockResolvedValue(undefined),
         getChat: vi.fn().mockReturnValue({}),
+        addHistory: vi.fn().mockResolvedValue(undefined),
       }),
+      getHookSystem: vi.fn().mockReturnValue(undefined),
       getMessageBus: vi.fn().mockReturnValue({
         publish: vi.fn(),
         subscribe: vi.fn(),
@@ -765,5 +768,92 @@ describe('AcpSessionManager', () => {
 
     expect(mockConfig.dispose).toHaveBeenCalled();
     expect(manager.getSession(sessionId)).toBeUndefined();
+  });
+
+  describe('SessionStart Hook', () => {
+    it('should fire SessionStart hook with Startup source on newSession and add context to chat history', async () => {
+      const mockAddHistory = vi.fn().mockResolvedValue(undefined);
+      const mockFireSessionStartEvent = vi.fn().mockResolvedValue({
+        getAdditionalContext: () => 'custom startup context',
+      });
+      mockConfig.getGeminiClient = vi.fn().mockReturnValue({
+        startChat: vi.fn().mockResolvedValue({}),
+        resumeChat: vi.fn().mockResolvedValue(undefined),
+        getChat: vi.fn().mockReturnValue({}),
+        addHistory: mockAddHistory,
+      });
+      mockConfig.getHookSystem = vi.fn().mockReturnValue({
+        fireSessionStartEvent: mockFireSessionStartEvent,
+      } as unknown as ReturnType<Config['getHookSystem']>);
+
+      await manager.newSession(
+        {
+          cwd: '/tmp',
+          mcpServers: [],
+        },
+        {},
+      );
+
+      expect(mockFireSessionStartEvent).toHaveBeenCalledWith(
+        SessionStartSource.Startup,
+      );
+      expect(mockAddHistory).toHaveBeenCalledWith({
+        role: 'user',
+        parts: [{ text: '<hook_context>custom startup context</hook_context>' }],
+      });
+    });
+
+    it('should fire SessionStart hook with Resume source on loadSession and add context to chat history', async () => {
+      const testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-test-'));
+      const sessionId = '22222222-3333-4444-5555-666666666666';
+      const storage = new Storage(testDir);
+      await storage.initialize();
+      const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+      await fs.mkdir(chatsDir, { recursive: true });
+
+      const sessionRecord = {
+        sessionId,
+        projectHash: 'test-hash',
+        startTime: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        kind: 'main',
+        messages: [{ type: 'user', content: 'hello' }],
+      };
+      await fs.writeFile(
+        path.join(chatsDir, `session-2026-09-30-${sessionId.slice(0, 8)}.jsonl`),
+        JSON.stringify(sessionRecord) + '\n',
+      );
+
+      const mockAddHistory = vi.fn().mockResolvedValue(undefined);
+      const mockFireSessionStartEvent = vi.fn().mockResolvedValue({
+        getAdditionalContext: () => 'resumed context',
+      });
+      mockConfig.getGeminiClient = vi.fn().mockReturnValue({
+        startChat: vi.fn().mockResolvedValue({}),
+        resumeChat: vi.fn().mockResolvedValue(undefined),
+        getChat: vi.fn().mockReturnValue({}),
+        addHistory: mockAddHistory,
+      });
+      mockConfig.getHookSystem = vi.fn().mockReturnValue({
+        fireSessionStartEvent: mockFireSessionStartEvent,
+      } as unknown as ReturnType<Config['getHookSystem']>);
+
+      await manager.loadSession(
+        {
+          sessionId,
+          cwd: testDir,
+          mcpServers: [],
+        },
+        {},
+      );
+
+      expect(mockFireSessionStartEvent).toHaveBeenCalledWith(
+        SessionStartSource.Resume,
+      );
+      expect(mockAddHistory).toHaveBeenCalledWith({
+        role: 'user',
+        parts: [{ text: '<hook_context>resumed context</hook_context>' }],
+      });
+    });
   });
 });

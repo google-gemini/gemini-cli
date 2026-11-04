@@ -138,6 +138,7 @@ describe('Session', () => {
       getEnableRecursiveFileSearch: vi.fn().mockReturnValue(false),
       getDebugMode: vi.fn().mockReturnValue(false),
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+      getHookSystem: vi.fn().mockReturnValue(undefined),
       setApprovalMode: vi.fn(),
       setModel: vi.fn(),
       isPlanEnabled: vi.fn().mockReturnValue(true),
@@ -545,6 +546,66 @@ describe('Session', () => {
 
     expect(mockConnection.requestPermission).toHaveBeenCalled();
     expect(confirmationDetails.onConfirm).toHaveBeenCalled();
+  });
+
+  it('should fire ToolNotificationEvent on hookSystem when tool requires confirmation', async () => {
+    const mockFireToolNotificationEvent = vi.fn().mockResolvedValue(undefined);
+    mockConfig.getHookSystem = vi.fn().mockReturnValue({
+      fireToolNotificationEvent: mockFireToolNotificationEvent,
+    } as unknown as ReturnType<Config['getHookSystem']>);
+
+    const confirmationDetails = {
+      type: 'info',
+      title: 'Execute command',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: 'proceed_once',
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'call-1',
+          name: 'test_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: '',
+      },
+    ]);
+
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(mockFireToolNotificationEvent).toHaveBeenCalledOnce();
+    const calledArgs = mockFireToolNotificationEvent.mock.calls[0][0];
+    expect(calledArgs.type).toBe('info');
+    expect(calledArgs.title).toBe('Execute command');
+    expect(typeof calledArgs.onConfirm).toBe('function');
   });
 
   it('should emit tool_call session update with status pending before requesting permission', async () => {
