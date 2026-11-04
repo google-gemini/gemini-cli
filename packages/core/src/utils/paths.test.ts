@@ -12,6 +12,7 @@ import {
   escapePath,
   unescapePath,
   isSubpath,
+  tildeifyPath,
   shortenPath,
   normalizePath,
   resolveToRealPath,
@@ -294,6 +295,128 @@ describe.skipIf(process.platform !== 'darwin')('isSubpath on Darwin', () => {
 
   it('should return true for a direct subpath on Darwin', () => {
     expect(isSubpath('/Users/Test', '/Users/Test/file.txt')).toBe(true);
+  });
+});
+
+describe('tildeifyPath', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  describe('on POSIX', () => {
+    beforeEach(() => {
+      mockPlatform('linux');
+      vi.stubEnv('GEMINI_CLI_HOME', '/Users/al');
+    });
+
+    it('should replace the exact home directory with ~', () => {
+      expect(tildeifyPath('/Users/al')).toBe('~');
+    });
+
+    it('should replace the home directory with a trailing slash with ~/', () => {
+      expect(tildeifyPath('/Users/al/')).toBe('~/');
+    });
+
+    it('should replace descendant paths under the home directory', () => {
+      expect(tildeifyPath('/Users/al/proj')).toBe('~/proj');
+      expect(tildeifyPath('/Users/al/Documents/app/index.ts')).toBe(
+        '~/Documents/app/index.ts',
+      );
+    });
+
+    it('should leave sibling directories sharing the home prefix unchanged', () => {
+      expect(tildeifyPath('/Users/albert')).toBe('/Users/albert');
+      expect(tildeifyPath('/Users/albert/proj')).toBe('/Users/albert/proj');
+      expect(tildeifyPath('/Users/al-work/proj')).toBe('/Users/al-work/proj');
+      expect(tildeifyPath('/Users/al2/proj')).toBe('/Users/al2/proj');
+    });
+
+    it('should not treat backslashes as path separators on POSIX', () => {
+      expect(tildeifyPath('/Users/al\\bert')).toBe('/Users/al\\bert');
+    });
+
+    it('should handle a trailing slash in GEMINI_CLI_HOME', () => {
+      vi.stubEnv('GEMINI_CLI_HOME', '/Users/al/');
+      expect(tildeifyPath('/Users/al')).toBe('~');
+      expect(tildeifyPath('/Users/al/proj')).toBe('~/proj');
+      expect(tildeifyPath('/Users/albert/proj')).toBe('/Users/albert/proj');
+    });
+
+    it('should not tildeify paths when home directory is filesystem root /', () => {
+      vi.stubEnv('GEMINI_CLI_HOME', '/');
+      expect(tildeifyPath('/usr/local/bin')).toBe('/usr/local/bin');
+      expect(tildeifyPath('/')).toBe('/');
+    });
+
+    it('should leave unrelated, relative, and empty paths unchanged', () => {
+      expect(tildeifyPath('/var/log/syslog')).toBe('/var/log/syslog');
+      expect(tildeifyPath('relative/path')).toBe('relative/path');
+      expect(tildeifyPath('')).toBe('');
+    });
+  });
+
+  describe('on Windows', () => {
+    beforeEach(() => {
+      mockPlatform('win32');
+      vi.stubEnv('GEMINI_CLI_HOME', 'C:\\Users\\Al');
+    });
+
+    it('should replace the exact home directory with ~', () => {
+      expect(tildeifyPath('C:\\Users\\Al')).toBe('~');
+    });
+
+    it('should replace descendant paths using backslashes', () => {
+      expect(tildeifyPath('C:\\Users\\Al\\proj')).toBe('~\\proj');
+      expect(tildeifyPath('C:\\Users\\Al\\Documents\\app')).toBe(
+        '~\\Documents\\app',
+      );
+    });
+
+    it('should replace descendant paths using forward slashes', () => {
+      expect(tildeifyPath('C:/Users/Al/proj')).toBe('~/proj');
+    });
+
+    it('should match the Windows home prefix case-insensitively', () => {
+      expect(tildeifyPath('c:\\users\\al\\proj')).toBe('~\\proj');
+      expect(tildeifyPath('c:/USERS/al')).toBe('~');
+    });
+
+    it('should leave sibling directories sharing the home prefix unchanged', () => {
+      expect(tildeifyPath('C:\\Users\\Albert')).toBe('C:\\Users\\Albert');
+      expect(tildeifyPath('C:\\Users\\Albert\\proj')).toBe(
+        'C:\\Users\\Albert\\proj',
+      );
+      expect(tildeifyPath('C:/Users/Albert/proj')).toBe('C:/Users/Albert/proj');
+      expect(tildeifyPath('C:\\Users\\Al-work\\proj')).toBe(
+        'C:\\Users\\Al-work\\proj',
+      );
+    });
+
+    it('should handle trailing separators in GEMINI_CLI_HOME', () => {
+      vi.stubEnv('GEMINI_CLI_HOME', 'C:\\Users\\Al\\');
+      expect(tildeifyPath('C:\\Users\\Al')).toBe('~');
+      expect(tildeifyPath('C:\\Users\\Al\\proj')).toBe('~\\proj');
+      expect(tildeifyPath('C:\\Users\\Albert\\proj')).toBe(
+        'C:\\Users\\Albert\\proj',
+      );
+    });
+
+    it('should not tildeify paths when home directory is a Windows drive root', () => {
+      vi.stubEnv('GEMINI_CLI_HOME', 'C:\\');
+      expect(tildeifyPath('C:\\Windows\\System32')).toBe(
+        'C:\\Windows\\System32',
+      );
+      expect(tildeifyPath('C:\\')).toBe('C:\\');
+    });
+
+    it('should handle UNC home paths without matching sibling UNC directories', () => {
+      vi.stubEnv('GEMINI_CLI_HOME', '\\\\server\\share\\Al');
+      expect(tildeifyPath('\\\\server\\share\\Al\\proj')).toBe('~\\proj');
+      expect(tildeifyPath('\\\\server\\share\\Albert\\proj')).toBe(
+        '\\\\server\\share\\Albert\\proj',
+      );
+    });
   });
 });
 
