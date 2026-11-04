@@ -28,7 +28,6 @@ import {
 } from '../utils/sessionUtils.js';
 import { convertSessionToClientHistory } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
-import { waitFor } from '../test-utils/async.js';
 
 vi.mock('../config/config.js', () => ({
   loadCliConfig: vi.fn(),
@@ -244,71 +243,69 @@ describe('GeminiAgent Session Resume', () => {
       }),
     );
 
-    await waitFor(() => {
-      // User message
-      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          update: expect.objectContaining({
-            sessionUpdate: 'user_message_chunk',
-            content: expect.objectContaining({ text: 'Hello' }),
-          }),
+    // User message
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'user_message_chunk',
+          content: expect.objectContaining({ text: 'Hello' }),
         }),
-      );
+      }),
+    );
 
-      // Agent thought
-      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          update: expect.objectContaining({
-            sessionUpdate: 'agent_thought_chunk',
-            content: expect.objectContaining({
-              text: '**Thinking**\nabout greeting',
-            }),
+    // Agent thought
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_thought_chunk',
+          content: expect.objectContaining({
+            text: '**Thinking**\nabout greeting',
           }),
         }),
-      );
+      }),
+    );
 
-      // Agent message
-      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          update: expect.objectContaining({
-            sessionUpdate: 'agent_message_chunk',
-            content: expect.objectContaining({ text: 'Hi there' }),
-          }),
+    // Agent message
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_message_chunk',
+          content: expect.objectContaining({ text: 'Hi there' }),
         }),
-      );
+      }),
+    );
 
-      // Successful tool call → 'completed'
-      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          update: expect.objectContaining({
-            sessionUpdate: 'tool_call',
-            toolCallId: 'call-1',
-            status: 'completed',
-            title: 'Test Tool',
-            kind: 'read',
-            content: [
-              {
-                type: 'content',
-                content: { type: 'text', text: 'Tool output' },
-              },
-            ],
-          }),
+    // Successful tool call → 'completed'
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call',
+          toolCallId: 'call-1',
+          status: 'completed',
+          title: 'Test Tool',
+          kind: 'read',
+          content: [
+            {
+              type: 'content',
+              content: { type: 'text', text: 'Tool output' },
+            },
+          ],
         }),
-      );
+      }),
+    );
 
-      // Failed tool call → 'failed'
-      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          update: expect.objectContaining({
-            sessionUpdate: 'tool_call',
-            toolCallId: 'call-2',
-            status: 'failed',
-            title: 'Write File',
-            kind: 'read',
-          }),
+    // Failed tool call → 'failed'
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call',
+          toolCallId: 'call-2',
+          status: 'failed',
+          title: 'Write File',
+          kind: 'read',
         }),
-      );
-    });
+      }),
+    );
   });
 
   it('should resolve session before initializing config or fresh chat recording', async () => {

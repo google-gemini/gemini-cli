@@ -467,7 +467,7 @@ export async function aggregateUsageFromRecordings(
   referenceDate: Date = new Date(),
 ): Promise<HeatmapDataset> {
   const usageMap = new Map<string, DailyUsageSummary>();
-  if (!chatsDir || !fs.existsSync(chatsDir)) {
+  if (!chatsDir.trim()) {
     return {
       dailyUsage: usageMap,
       totalWindowTokens: 0,

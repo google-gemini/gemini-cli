@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fsSync from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -27,6 +28,7 @@ describe('usageAggregator', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
     await fs.rm(tempDir, { recursive: true, force: true });
   });
@@ -89,6 +91,12 @@ describe('usageAggregator', () => {
 
   describe('aggregateUsageFromRecordings', () => {
     it('returns an empty dataset when directory is missing or has no .jsonl files', async () => {
+      const existsSyncSpy = vi.spyOn(fsSync, 'existsSync');
+
+      const blankResult = await aggregateUsageFromRecordings('   ');
+      expect(blankResult.dailyUsage.size).toBe(0);
+      expect(blankResult.totalWindowTokens).toBe(0);
+
       const missingPath = path.join(tempDir, 'does-not-exist');
       const missingResult = await aggregateUsageFromRecordings(missingPath);
       expect(missingResult.dailyUsage.size).toBe(0);
@@ -98,9 +106,14 @@ describe('usageAggregator', () => {
       expect(missingResult.currentStreak).toBe(0);
       expect(missingResult.longestStreak).toBe(0);
 
-      await fs.writeFile(path.join(tempDir, 'notes.txt'), 'ignored');
+      const notesFilePath = path.join(tempDir, 'notes.txt');
+      await fs.writeFile(notesFilePath, 'ignored');
+      const nonDirResult = await aggregateUsageFromRecordings(notesFilePath);
+      expect(nonDirResult.dailyUsage.size).toBe(0);
+
       const emptyResult = await aggregateUsageFromRecordings(tempDir);
       expect(emptyResult.dailyUsage.size).toBe(0);
+      expect(existsSyncSpy).not.toHaveBeenCalled();
     });
 
     it('aggregates MessageRecord.tokens, deduplicates repeated message IDs, and skips corrupt lines', async () => {
