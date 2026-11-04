@@ -21,6 +21,7 @@ import {
   CoreToolCallStatus,
   checkExhaustive,
   type SubagentActivityItem,
+  type DailyUsageSummary,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
@@ -247,6 +248,18 @@ export type HistoryItemToolStats = HistoryItemBase & {
   type: 'tool_stats';
 };
 
+export type HistoryItemHeatmapStats = HistoryItemBase & {
+  type: 'heatmap_stats';
+  dailyUsage: Record<string, DailyUsageSummary>;
+  totalWindowTokens: number;
+  totalWindowSessions: number;
+  totalWindowTurns: number;
+  currentStreak: number;
+  longestStreak: number;
+  today: string;
+  selectedDate?: string;
+};
+
 export type HistoryItemModel = HistoryItemBase & {
   type: 'model';
   model: string;
@@ -435,6 +448,7 @@ export type HistoryItemWithoutId =
   | HistoryItemStats
   | HistoryItemModelStats
   | HistoryItemToolStats
+  | HistoryItemHeatmapStats
   | HistoryItemModel
   | HistoryItemQuit
   | HistoryItemCompression
@@ -463,6 +477,7 @@ export enum MessageType {
   STATS = 'stats',
   MODEL_STATS = 'model_stats',
   TOOL_STATS = 'tool_stats',
+  HEATMAP_STATS = 'heatmap_stats',
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',
@@ -515,6 +530,11 @@ export type Message =
     }
   | {
       type: MessageType.TOOL_STATS;
+      timestamp: Date;
+      content?: string;
+    }
+  | {
+      type: MessageType.HEATMAP_STATS;
       timestamp: Date;
       content?: string;
     }
