@@ -138,6 +138,7 @@ export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
 export * from './services/FolderTrustDiscoveryService.js';
 export * from './services/chatRecordingService.js';
+export * from './services/usageAggregator.js';
 export * from './services/fileSystemService.js';
 export * from './services/sandboxedFileSystemService.js';
 export * from './services/modelConfigService.js';
