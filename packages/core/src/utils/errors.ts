@@ -479,7 +479,10 @@ export function normalizeError(error: unknown): NormalizedErrorInfo {
     if (googleApiError && typeof googleApiError.code === 'number') {
       googleMessage = asNonEmptyString(googleApiError.message);
       googleCode = googleApiError.code;
-      if (googleApiError.details.length > 0) {
+      if (
+        Array.isArray(googleApiError.details) &&
+        googleApiError.details.length > 0
+      ) {
         googleDetails = googleApiError.details;
       }
     }
