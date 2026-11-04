@@ -889,6 +889,7 @@ export async function main() {
     }
 
     if (config.getAcpMode()) {
+      initializeOutputListenersAndFlush(config);
       return runAcpClient(config, settings, argv);
     }
 
@@ -1021,12 +1022,16 @@ export async function main() {
 }
 
 export function initializeOutputListenersAndFlush(config?: Config) {
+  const outputFormat = config?.getOutputFormat?.();
+  const forceToStderr =
+    outputFormat === 'json' || Boolean(config?.getAcpMode?.());
+
   // If there are no listeners for output, make sure we flush so output is not
   // lost.
   if (coreEvents.listenerCount(CoreEvent.Output) === 0) {
-    // In non-interactive mode, ensure we drain any buffered output or logs to stderr
+    // In non-interactive or ACP mode, ensure we drain any buffered output or logs to stderr
     coreEvents.on(CoreEvent.Output, (payload: OutputPayload) => {
-      if (payload.isStderr) {
+      if (payload.isStderr || forceToStderr) {
         writeToStderr(payload.chunk, payload.encoding);
       } else {
         writeToStdout(payload.chunk, payload.encoding);
@@ -1049,9 +1054,6 @@ export function initializeOutputListenersAndFlush(config?: Config) {
       writeToStderr(payload.message + '\n');
     });
   }
-
-  const outputFormat = config?.getOutputFormat();
-  const forceToStderr = outputFormat === 'json';
 
   coreEvents.drainBacklogs(
     <K extends keyof CoreEvents>(event: K, args: CoreEvents[K]) => {
