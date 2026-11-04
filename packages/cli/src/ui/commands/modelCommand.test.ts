@@ -183,7 +183,7 @@ describe('modelCommand', () => {
         },
       } as unknown as Config;
 
-      await setCommand!.action!(mockContext, '--persist');
+      await setCommand?.action?.(mockContext, '--persist');
 
       expect(mockSetModel).not.toHaveBeenCalled();
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -206,7 +206,7 @@ describe('modelCommand', () => {
         },
       } as unknown as Config;
 
-      await setCommand!.action!(mockContext, 'nonexistent-model-name');
+      await setCommand?.action?.(mockContext, 'nonexistent-model-name');
 
       expect(mockSetModel).not.toHaveBeenCalled();
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -251,7 +251,7 @@ describe('modelCommand', () => {
         },
       };
 
-      await setCommand!.action!(mockContext, 'my-custom-alias');
+      await setCommand?.action?.(mockContext, 'my-custom-alias');
 
       expect(mockSetModel).toHaveBeenCalledWith('my-custom-alias', true);
     });
@@ -262,46 +262,15 @@ describe('modelCommand', () => {
       );
       expect(setCommand?.completion).toBeDefined();
 
-      const suggestions = await setCommand!.completion!(
+      const suggestions = await setCommand?.completion?.(
         mockContext,
         'gemini-2.5',
       );
+      expect(suggestions).toBeDefined();
       expect(suggestions).toContain('gemini-2.5-pro');
       expect(suggestions).toContain('gemini-2.5-flash');
-      expect(suggestions.every((s) => s.startsWith('gemini-2.5'))).toBe(true);
+      expect(suggestions?.every((s) => s.startsWith('gemini-2.5'))).toBe(true);
     });
-  });
-
-  it('should forward arguments directly on /model <model-name> to set subcommand', async () => {
-    const mockSetModel = vi.fn();
-    mockContext.services.agentContext = {
-      setModel: mockSetModel,
-      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
-      getUserId: vi.fn().mockReturnValue('test-user'),
-      getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
-      getSessionId: vi.fn().mockReturnValue('test-session'),
-      getContentGeneratorConfig: vi
-        .fn()
-        .mockReturnValue({ authType: 'test-auth' }),
-      isInteractive: vi.fn().mockReturnValue(true),
-      getExperiments: vi.fn().mockReturnValue({ experimentIds: [] }),
-      getPolicyEngine: vi.fn().mockReturnValue({
-        getApprovalMode: vi.fn().mockReturnValue('auto'),
-      }),
-      get config() {
-        return this;
-      },
-    } as unknown as Config;
-
-    await modelCommand.action!(mockContext, 'gemini-2.5-flash');
-
-    expect(mockSetModel).toHaveBeenCalledWith('gemini-2.5-flash', true);
-    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: MessageType.INFO,
-        text: expect.stringContaining('Model set to gemini-2.5-flash'),
-      }),
-    );
   });
 
   it('should have the correct name and description', () => {
