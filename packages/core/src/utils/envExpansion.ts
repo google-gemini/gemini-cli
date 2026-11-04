@@ -33,16 +33,21 @@ export function expandEnvVars(
     : str;
 
   // 2. Use dotenv-expand for POSIX/Bash syntax ($VAR, ${VAR}).
-  // dotenv-expand is designed to process an object of key-value pairs (like a .env file).
-  // To expand a single string, we wrap it in an object with a temporary key.
-  const dummyKey = '__GCLI_EXPAND_TARGET__';
-
-  // Filter out undefined values to satisfy the Record<string, string> requirement safely
+  // dotenv-expand is designed to process an object of key-value pairs (like a .env file),
+  // where existing keys in `processEnv` take precedence over `parsed`.
+  // Filter out undefined values first, then pick a temporary wrapper key guaranteed
+  // not to collide with `processEnv` or appear inside `processedStr`.
   const processEnv: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
     if (value !== undefined) {
       processEnv[key] = value;
     }
+  }
+
+  let dummyKey = '__GCLI_EXPAND_TARGET__';
+  let suffix = 0;
+  while (dummyKey in processEnv || processedStr.includes(dummyKey)) {
+    dummyKey = `__GCLI_EXPAND_TARGET_${suffix++}__`;
   }
 
   const result: DotenvExpandOutput = expand({

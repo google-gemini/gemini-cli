@@ -2265,6 +2265,41 @@ describe('mcp-client', () => {
         });
       });
 
+      it('expands headers without being overwritten by __GCLI_EXPAND_TARGET__ in environment', async () => {
+        vi.stubEnv('GEMINI_CLI_HEADER_VAR', 'header-value');
+        vi.stubEnv('__GCLI_EXPAND_TARGET__', 'unexpected-override');
+
+        try {
+          const transport = await createTransport(
+            'test-server',
+            {
+              url: 'http://test-server',
+              headers: {
+                'X-Custom-Header': 'Prefix $GEMINI_CLI_HEADER_VAR',
+                'X-Static-Header': 'literal-value',
+              },
+            },
+            false,
+            MOCK_CONTEXT,
+          );
+
+          expect(unwrap(transport)).toBeInstanceOf(
+            StreamableHTTPClientTransport,
+          );
+          expect(unwrap(transport)).toMatchObject({
+            _url: new URL('http://test-server'),
+            _requestInit: {
+              headers: {
+                'X-Custom-Header': 'Prefix header-value',
+                'X-Static-Header': 'literal-value',
+              },
+            },
+          });
+        } finally {
+          vi.unstubAllEnvs();
+        }
+      });
+
       it('with type="http" creates StreamableHTTPClientTransport', async () => {
         const transport = await createTransport(
           'test-server',
@@ -2616,6 +2651,7 @@ describe('mcp-client', () => {
           .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
 
         vi.stubEnv('GEMINI_CLI_TEST_VAR', 'expanded-value');
+        vi.stubEnv('__GCLI_EXPAND_TARGET__', 'unexpected-override');
 
         await createTransport(
           'test-server',
