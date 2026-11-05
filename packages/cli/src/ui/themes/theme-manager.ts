@@ -227,7 +227,7 @@ class ThemeManager {
       path.join(homeDir, '.config', 'gemini', 'theme.json'),
     ];
 
-    const xdgConfigHome = process.env['XDG_CONFIG_HOME']?.trim();
+    const xdgConfigHome = process.env['XDG_CONFIG_HOME'];
     if (xdgConfigHome) {
       candidates.push(path.join(xdgConfigHome, 'gemini', 'theme.json'));
     }
@@ -259,21 +259,23 @@ class ThemeManager {
     }
 
     if (parsed['type'] !== 'custom') {
-      if (isPlainRecord(parsed['customThemes'])) {
-        return Object.entries(parsed['customThemes']).filter(
+      const customThemes = parsed['customThemes'];
+      if (isPlainRecord(customThemes)) {
+        return Object.entries(customThemes).filter(
           (entry): entry is [string, Partial<CustomTheme>] =>
             isPlainRecord(entry[1]),
         );
       }
 
-      if (
-        isPlainRecord(parsed['ui']) &&
-        isPlainRecord(parsed['ui']['customThemes'])
-      ) {
-        return Object.entries(parsed['ui']['customThemes']).filter(
-          (entry): entry is [string, Partial<CustomTheme>] =>
-            isPlainRecord(entry[1]),
-        );
+      const ui = parsed['ui'];
+      if (isPlainRecord(ui)) {
+        const uiCustomThemes = ui['customThemes'];
+        if (isPlainRecord(uiCustomThemes)) {
+          return Object.entries(uiCustomThemes).filter(
+            (entry): entry is [string, Partial<CustomTheme>] =>
+              isPlainRecord(entry[1]),
+          );
+        }
       }
     }
 
@@ -328,7 +330,7 @@ class ThemeManager {
     }
 
     const trustedRoots = [this.resolveCanonicalDirectory(homeDir)];
-    const xdgConfigHome = process.env['XDG_CONFIG_HOME']?.trim();
+    const xdgConfigHome = process.env['XDG_CONFIG_HOME'];
     if (xdgConfigHome) {
       trustedRoots.push(this.resolveCanonicalDirectory(xdgConfigHome));
     }
