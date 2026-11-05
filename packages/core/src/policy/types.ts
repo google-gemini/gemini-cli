@@ -180,6 +180,15 @@ export interface PolicyRule {
   allowRedirection?: boolean;
 
   /**
+   * If true, explicitly allows command substitution for shell commands matched by
+   * this rule. By default (when false or omitted), ALLOW is downgraded to
+   * ASK_USER when command substitution is detected, even if inner subcommands
+   * are allowed.
+   * Only applies when decision is ALLOW.
+   */
+  allowCommandSubstitution?: boolean;
+
+  /**
    * Effect of the rule's source.
    * e.g. "my-policies.toml", "Settings (MCP Trusted)", etc.
    */
