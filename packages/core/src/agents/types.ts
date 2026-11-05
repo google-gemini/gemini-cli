@@ -91,8 +91,49 @@ export interface SubagentActivityEvent {
 export enum SubagentState {
   RUNNING = 'running',
   COMPLETED = 'completed',
+  INCOMPLETE = 'incomplete',
   ERROR = 'error',
   CANCELLED = 'cancelled',
+}
+
+/**
+ * Returns `true` only when the agent reached its objective via
+ * `complete_task` during a normal (non-recovery) turn.
+ *
+ * A recovery turn that calls `complete_task` after MAX_TURNS or TIMEOUT
+ * does NOT count as successful — the terminate_reason stays as the
+ * original limit reason and the parent must treat the result as
+ * incomplete rather than fully achieved.
+ */
+export function isSuccessfulTermination(
+  reason: AgentTerminateMode,
+): boolean {
+  return reason === AgentTerminateMode.GOAL;
+}
+
+/**
+ * Maps a non-GOAL, non-error terminate reason to the appropriate
+ * SubagentState for the parent to display.
+ */
+export function getSubagentStateFromTermination(
+  reason: AgentTerminateMode,
+): SubagentState {
+  switch (reason) {
+    case AgentTerminateMode.GOAL:
+      return SubagentState.COMPLETED;
+    case AgentTerminateMode.ABORTED:
+      return SubagentState.CANCELLED;
+    case AgentTerminateMode.MAX_TURNS:
+    case AgentTerminateMode.TIMEOUT:
+      return SubagentState.INCOMPLETE;
+    case AgentTerminateMode.ERROR:
+    case AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL:
+      return SubagentState.ERROR;
+    default: {
+      void (reason satisfies never);
+      return SubagentState.ERROR;
+    }
+  }
 }
 
 export interface SubagentActivityItem {
