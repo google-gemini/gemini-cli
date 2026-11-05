@@ -748,7 +748,9 @@ export async function main() {
 
       // Resolve folder trust before entering the sandbox, because the macOS
       // Seatbelt profiles deny the sandboxed process access to the trusted
-      // folders file.
+      // folders file. A cancelled prompt or failed save throws a FatalError,
+      // which the main().catch handler in index.ts prints before exiting with
+      // its exit code.
       await resolveFolderTrustForSandbox({
         sandboxCommand: sandboxConfig.command,
         settings,
