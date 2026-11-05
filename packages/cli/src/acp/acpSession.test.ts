@@ -1646,13 +1646,21 @@ describe('Session', () => {
       },
     });
 
-    const steer = (text: string) =>
-      steeringSession.steer([text]) as { status: string; steerId?: string };
+    const steer = (text: string, idleBehavior?: 'promptRequired') =>
+      steeringSession.steer({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text }],
+        ...(idleBehavior ? { _meta: { steering: { idleBehavior } } } : {}),
+      });
+
+    const injected = (steerId: string, pending: number) => ({
+      outcome: 'injected',
+      _meta: { 'geminicli.com': { steerId, pending } },
+    });
 
     beforeEach(() => {
       mockAddInjection = vi.fn();
       Object.assign(mockConfig, {
-        isModelSteeringEnabled: vi.fn().mockReturnValue(false),
         injectionService: { addInjection: mockAddInjection },
       });
       steeringSession = new Session(
@@ -1667,7 +1675,6 @@ describe('Session', () => {
           },
           errors: [],
         } as unknown as LoadedSettings,
-        true,
       );
     });
 
@@ -1685,7 +1692,7 @@ describe('Session', () => {
         prompt: [{ type: 'text', text: 'Go' }],
       });
 
-      expect(result).toEqual({ status: 'queued', steerId: 'st_1', pending: 1 });
+      expect(result).toEqual(injected('st_1', 1));
       const secondParts = mockSendMessageStream.mock.calls[1][0];
       expect(secondParts[0].text).toContain('User steering update:');
       expect(secondParts[0].text).toContain('Use the Logger class');
@@ -1698,9 +1705,9 @@ describe('Session', () => {
     });
 
     it('delivers several messages together in order', async () => {
+      const results: unknown[] = [];
       steerDuringTool(() => {
-        steer('first');
-        steer('second');
+        results.push(steer('first'), steer('second'));
       });
       mockSendMessageStream
         .mockReturnValueOnce(toolCallStream())
@@ -1711,6 +1718,7 @@ describe('Session', () => {
         prompt: [{ type: 'text', text: 'Go' }],
       });
 
+      expect(results).toEqual([injected('st_1', 1), injected('st_2', 2)]);
       const secondParts = mockSendMessageStream.mock.calls[1][0];
       // Joined like the terminal UI joins pending hints.
       expect(secondParts[0].text).toContain('<user_input>\nfirst second\n');
@@ -1744,8 +1752,11 @@ describe('Session', () => {
       expect(response.stopReason).toBe('end_turn');
     });
 
-    it('returns no_active_turn when no prompt is running', async () => {
-      expect(steer('hello')).toEqual({ status: 'no_active_turn' });
+    it('returns promptRequired when no turn runs and the client opted in', async () => {
+      expect(steer('hello', 'promptRequired')).toEqual({
+        outcome: 'promptRequired',
+        reason: 'noRunningTurn',
+      });
 
       mockSendMessageStream.mockReturnValueOnce(textStream('Hi'));
       await steeringSession.prompt({
@@ -1753,9 +1764,37 @@ describe('Session', () => {
         prompt: [{ type: 'text', text: 'Go' }],
       });
 
-      expect(steer('hello')).toEqual({ status: 'no_active_turn' });
+      expect(steer('hello', 'promptRequired')).toEqual({
+        outcome: 'promptRequired',
+        reason: 'noRunningTurn',
+      });
       expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
       expect(mockAddInjection).not.toHaveBeenCalled();
+    });
+
+    it('starts a new turn when no turn runs', async () => {
+      mockSendMessageStream.mockReturnValueOnce(textStream('Hi'));
+
+      expect(steer('hello')).toEqual({ outcome: 'startedNewTurn' });
+      // The new turn is registered at once, so the next steer joins it.
+      expect(steer('and be brief')).toEqual(injected('st_1', 1));
+
+      await vi.waitFor(() =>
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(1),
+      );
+      const parts = mockSendMessageStream.mock.calls[0][0];
+      expect(parts[0].text).toContain('and be brief');
+      expect(parts[1]).toEqual({ text: 'hello' });
+    });
+
+    it('allows commands and long text when starting a new turn', () => {
+      expect(steer('/memory show', 'promptRequired')).toEqual({
+        outcome: 'promptRequired',
+        reason: 'noRunningTurn',
+      });
+      expect(steer('x'.repeat(8001), 'promptRequired')).toMatchObject({
+        outcome: 'promptRequired',
+      });
     });
 
     it('reports queued steering as undelivered when the turn is cancelled', async () => {
@@ -1775,7 +1814,10 @@ describe('Session', () => {
         undeliveredSteering: [{ steerId: 'st_1', text: 'Stop using fs' }],
       });
       expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
-      expect(steer('late')).toEqual({ status: 'no_active_turn' });
+      expect(steer('late', 'promptRequired')).toEqual({
+        outcome: 'promptRequired',
+        reason: 'noRunningTurn',
+      });
     });
 
     it('accepts steering while a permission request is open', async () => {
@@ -1790,7 +1832,7 @@ describe('Session', () => {
       });
       mockConnection.requestPermission.mockImplementation(async () => {
         expect(steer('Prefer the smaller change')).toMatchObject({
-          status: 'queued',
+          outcome: 'injected',
         });
         return { outcome: { outcome: 'selected', optionId: 'proceed_once' } };
       });
@@ -1809,27 +1851,37 @@ describe('Session', () => {
       expect(secondParts[0].text).toContain('Prefer the smaller change');
     });
 
-    it('rejects steering when it is not enabled', () => {
-      expect(() => session.steer(['hello'])).toThrow(
-        expect.objectContaining({ code: -32000 }),
-      );
-    });
-
-    it('is enabled by experimental.modelSteering without client opt-in', () => {
-      mockConfig.isModelSteeringEnabled.mockReturnValue(true);
-      expect(session.isSteeringEnabled()).toBe(true);
-      expect(session.steer(['hello'])).toEqual({ status: 'no_active_turn' });
-    });
-
-    it.each([
-      ['empty text', ['   ']],
-      ['a slash command', ['/memory show']],
-      ['a skill command', ['$skill']],
-      ['text over the limit', ['x'.repeat(8001)]],
-    ])('rejects %s', (_name, texts) => {
-      expect(() => steeringSession.steer(texts)).toThrow(
+    it('rejects empty text', () => {
+      expect(() => steer('   ')).toThrow(
         expect.objectContaining({ code: -32602 }),
       );
+    });
+
+    it('rejects commands and long text while a turn runs', async () => {
+      const errors: unknown[] = [];
+      steerDuringTool(() => {
+        for (const text of ['/memory show', '$skill', 'x'.repeat(8001)]) {
+          try {
+            steer(text);
+          } catch (e) {
+            errors.push(e);
+          }
+        }
+      });
+      mockSendMessageStream
+        .mockReturnValueOnce(toolCallStream())
+        .mockReturnValueOnce(textStream('Done'));
+
+      await steeringSession.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Go' }],
+      });
+
+      expect(errors).toHaveLength(3);
+      for (const error of errors) {
+        expect(error).toMatchObject({ code: -32602 });
+      }
+      expect(mockAddInjection).not.toHaveBeenCalled();
     });
 
     it('rejects steering over the pending limit', async () => {

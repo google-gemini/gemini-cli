@@ -60,6 +60,7 @@ import {
   STEERING_MAX_PENDING,
   parseSteeringHint,
   steeringMeta,
+  type SteerRequest,
   type SteerResponse,
 } from './acpUtils.js';
 import { z } from 'zod';
@@ -78,7 +79,7 @@ interface SteeringItem {
 /** Steering queued for one `session/prompt` call. */
 interface SteeringTurn {
   signal: AbortSignal;
-  /** True only while the model loop can still deliver queued steering. */
+  /** True until the model loop can no longer deliver queued steering. */
   accepting: boolean;
   queue: SteeringItem[];
 }
@@ -87,6 +88,8 @@ export class Session {
   private pendingPrompt: AbortController | null = null;
   private steeringTurn: SteeringTurn | null = null;
   private steerCounter = 0;
+  /** Settles when the current `prompt()` call ends; null when idle. */
+  private promptDone: Promise<void> | null = null;
   private commandHandler = new CommandHandler();
   private callIdCounter = 0;
   private readonly disposeController = new AbortController();
@@ -101,7 +104,6 @@ export class Session {
     private readonly context: AgentLoopContext,
     private readonly connection: acp.AgentSideConnection,
     private readonly settings: LoadedSettings,
-    private readonly clientSteeringOptIn = false,
   ) {
     coreEvents.on(
       CoreEvent.ApprovalModeChanged,
@@ -347,27 +349,30 @@ export class Session {
     }
   }
 
-  isSteeringEnabled(): boolean {
-    return (
-      this.clientSteeringOptIn || this.context.config.isModelSteeringEnabled()
-    );
-  }
-
   /**
-   * Queues a user message for the running prompt turn. It is added to the
-   * next model request, or listed as undelivered in the prompt response.
+   * Handles `_session/steering`. While a turn runs, the message is queued and
+   * added to the next model request (`injected`). With no turn running, the
+   * message starts a new turn (`startedNewTurn`), or is handed back to the
+   * client when it asked for `idleBehavior: "promptRequired"`.
    */
-  steer(texts: string[]): SteerResponse {
-    if (!this.isSteeringEnabled()) {
-      throw new acp.RequestError(
-        -32000,
-        'Steering is not enabled for this session',
-      );
-    }
-    const text = texts.join('\n').trim();
+  steer(request: SteerRequest): SteerResponse {
+    const text = request.prompt
+      .map((block) => block.text)
+      .join('\n')
+      .trim();
     if (!text) {
       throw new acp.RequestError(-32602, 'Steering text is empty');
     }
+
+    const turn = this.steeringTurn;
+    if (!turn || !turn.accepting || turn.signal.aborted) {
+      if (request._meta?.steering?.idleBehavior === 'promptRequired') {
+        return { outcome: 'promptRequired', reason: 'noRunningTurn' };
+      }
+      this.#startSteeredTurn(request);
+      return { outcome: 'startedNewTurn' };
+    }
+
     if (text.startsWith('/') || text.startsWith('$')) {
       throw new acp.RequestError(
         -32602,
@@ -379,11 +384,6 @@ export class Session {
         -32602,
         `Steering text exceeds ${STEERING_MAX_CHARS} characters`,
       );
-    }
-
-    const turn = this.steeringTurn;
-    if (!turn || !turn.accepting || turn.signal.aborted) {
-      return { status: 'no_active_turn' };
     }
     if (turn.queue.length >= STEERING_MAX_PENDING) {
       throw new acp.RequestError(
@@ -397,7 +397,36 @@ export class Session {
     // Lets running subagents see the message too, as in the terminal UI.
     // This is a no-op unless experimental.modelSteering is on.
     this.context.config.injectionService.addInjection(text, 'user_steering');
-    return { status: 'queued', steerId, pending: turn.queue.length };
+    return {
+      outcome: 'injected',
+      _meta: {
+        [GEMINI_ACP_META_KEY]: { steerId, pending: turn.queue.length },
+      },
+    };
+  }
+
+  /**
+   * Runs a steering message as a new turn once the current one (if it is
+   * still finishing) has ended. Its output streams as session updates; there
+   * is no `session/prompt` response to return it in.
+   */
+  #startSteeredTurn(request: SteerRequest): void {
+    const run = () =>
+      this.prompt({
+        sessionId: request.sessionId,
+        prompt: request.prompt,
+      }).then(
+        () => undefined,
+        (error: unknown) => {
+          debugLogger.warn(`Steered turn failed: ${getAcpErrorMessage(error)}`);
+        },
+      );
+    if (!this.promptDone) {
+      // Starts synchronously, so a steer that follows is injected into it.
+      void run();
+      return;
+    }
+    this.promptDone = this.promptDone.then(run);
   }
 
   async prompt(params: acp.PromptRequest): Promise<acp.PromptResponse> {
@@ -407,11 +436,30 @@ export class Session {
 
     const steering: SteeringTurn = {
       signal: pendingSend.signal,
-      accepting: false,
+      accepting: true,
       queue: [],
     };
     this.steeringTurn = steering;
+    let markDone!: () => void;
+    const done = new Promise<void>((resolve) => {
+      markDone = resolve;
+    });
+    this.promptDone = done;
+    try {
+      return await this.#promptWithSteering(params, pendingSend, steering);
+    } finally {
+      if (this.promptDone === done) {
+        this.promptDone = null;
+      }
+      markDone();
+    }
+  }
 
+  async #promptWithSteering(
+    params: acp.PromptRequest,
+    pendingSend: AbortController,
+    steering: SteeringTurn,
+  ): Promise<acp.PromptResponse> {
     let response: acp.PromptResponse;
     try {
       response = await this.#runPrompt(params, pendingSend, steering);
@@ -572,7 +620,6 @@ export class Session {
     let turnCount = 0;
     const maxTurns = this.context.config.getMaxSessionTurns();
 
-    steering.accepting = true;
     while (true) {
       turnCount++;
       if (maxTurns >= 0 && turnCount > maxTurns) {

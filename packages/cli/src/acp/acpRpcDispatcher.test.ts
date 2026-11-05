@@ -64,7 +64,6 @@ describe('GeminiAgent - RPC Dispatcher', () => {
       }),
       getApprovalMode: vi.fn().mockReturnValue('default'),
       isPlanEnabled: vi.fn().mockReturnValue(true),
-      isModelSteeringEnabled: vi.fn().mockReturnValue(false),
       getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
       getCheckpointingEnabled: vi.fn().mockReturnValue(false),
@@ -145,41 +144,8 @@ describe('GeminiAgent - RPC Dispatcher', () => {
       },
     });
     expect(response.agentCapabilities?.loadSession).toBe(true);
-    expect(response.agentCapabilities?._meta).toEqual({
-      'geminicli.com': {
-        steering: {
-          version: 1,
-          content: ['text'],
-          maxPending: 20,
-          maxChars: 8000,
-          enabled: false,
-        },
-      },
-    });
-  });
-
-  it('should enable steering when the client opts in', async () => {
-    const response = await agent.initialize({
-      clientCapabilities: { _meta: { 'geminicli.com': { steering: true } } },
-      protocolVersion: 1,
-    });
-
-    expect(response.agentCapabilities?._meta?.['geminicli.com']).toMatchObject({
-      steering: { enabled: true },
-    });
-  });
-
-  it('should enable steering when experimental.modelSteering is on', async () => {
-    mockConfig.isModelSteeringEnabled.mockReturnValue(true);
-
-    const response = await agent.initialize({
-      clientCapabilities: {},
-      protocolVersion: 1,
-    });
-
-    expect(response.agentCapabilities?._meta?.['geminicli.com']).toMatchObject({
-      steering: { enabled: true },
-    });
+    expect(response._meta).toEqual({ steering: { supported: true } });
+    expect(response.agentCapabilities?._meta).toBeUndefined();
   });
 
   it('should authenticate correctly', async () => {
@@ -387,9 +353,7 @@ describe('GeminiAgent - RPC Dispatcher', () => {
 
   it('should route the steer extension method to the session', async () => {
     const mockSession = {
-      steer: vi
-        .fn()
-        .mockReturnValue({ status: 'queued', steerId: 'st_1', pending: 1 }),
+      steer: vi.fn().mockReturnValue({ outcome: 'injected' }),
     };
     (
       agent as unknown as { sessionManager: { getSession: Mock } }
@@ -397,26 +361,39 @@ describe('GeminiAgent - RPC Dispatcher', () => {
       getSession: vi.fn().mockReturnValue(mockSession),
     };
 
-    const result = await agent.extMethod('_geminicli.com/session/steer', {
+    const params = {
       sessionId: 'test-session-id',
-      content: [
+      prompt: [
         { type: 'text', text: 'Use the Logger class' },
         { type: 'text', text: 'and keep it short' },
       ],
-    });
+      _meta: { steering: { idleBehavior: 'promptRequired' } },
+    };
+    const result = await agent.extMethod('_session/steering', params);
 
-    expect(mockSession.steer).toHaveBeenCalledWith([
-      'Use the Logger class',
-      'and keep it short',
-    ]);
-    expect(result).toEqual({ status: 'queued', steerId: 'st_1', pending: 1 });
+    expect(mockSession.steer).toHaveBeenCalledWith(params);
+    expect(result).toEqual({ outcome: 'injected' });
   });
 
-  it('should reject invalid steer params', async () => {
+  it.each([
+    [
+      'non-text content',
+      { prompt: [{ type: 'image', data: 'abc', mimeType: 'image/png' }] },
+    ],
+    ['an empty prompt', { prompt: [] }],
+    ['the old content field', { content: [{ type: 'text', text: 'hi' }] }],
+    [
+      'an unknown idleBehavior',
+      {
+        prompt: [{ type: 'text', text: 'hi' }],
+        _meta: { steering: { idleBehavior: 'queue' } },
+      },
+    ],
+  ])('should reject steer params with %s', async (_name, params) => {
     await expect(
-      agent.extMethod('_geminicli.com/session/steer', {
+      agent.extMethod('_session/steering', {
         sessionId: 'test-session-id',
-        content: [{ type: 'image', data: 'abc', mimeType: 'image/png' }],
+        ...params,
       }),
     ).rejects.toMatchObject({ code: -32602 });
   });
@@ -429,9 +406,9 @@ describe('GeminiAgent - RPC Dispatcher', () => {
     };
 
     await expect(
-      agent.extMethod('_geminicli.com/session/steer', {
+      agent.extMethod('_session/steering', {
         sessionId: 'unknown',
-        content: [{ type: 'text', text: 'hi' }],
+        prompt: [{ type: 'text', text: 'hi' }],
       }),
     ).rejects.toMatchObject({ code: -32602 });
   });

@@ -19,7 +19,6 @@ import { AcpSessionManager, type AuthDetails } from './acpSessionManager.js';
 import {
   hasMeta,
   buildSteeringCapability,
-  readSteeringOptIn,
   STEER_METHOD,
   SteerRequestSchema,
 } from './acpUtils.js';
@@ -49,9 +48,6 @@ export class GeminiAgent {
     if (args.clientCapabilities) {
       this.sessionManager.setClientCapabilities(args.clientCapabilities);
     }
-    const steeringEnabled =
-      readSteeringOptIn(args.clientCapabilities) ||
-      this.context.config.isModelSteeringEnabled();
 
     const authMethods = [
       {
@@ -108,8 +104,9 @@ export class GeminiAgent {
           http: true,
           sse: true,
         },
-        _meta: buildSteeringCapability(steeringEnabled),
       },
+      // Top-level, beside agentCapabilities, per the shared steering contract.
+      _meta: buildSteeringCapability(),
     };
   }
 
@@ -264,7 +261,7 @@ export class GeminiAgent {
             `Session not found: ${result.data.sessionId}`,
           );
         }
-        return session.steer(result.data.content.map((block) => block.text));
+        return session.steer(result.data);
       }
       default:
         throw acp.RequestError.methodNotFound(method);

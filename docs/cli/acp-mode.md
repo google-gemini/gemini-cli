@@ -99,63 +99,47 @@ to control Gemini CLI.
   example, to `auto-approve`).
 - `unstable_setSessionModel`: Changes the model for the current session.
 
-### Gemini CLI extensions
-
-Gemini CLI adds the following
-[ACP extensions](https://agentclientprotocol.com/protocol/extensibility). They
-are advertised under `agentCapabilities._meta["geminicli.com"]` in the
-`initialize` response. A client that doesn't use them needs no changes.
-
-#### Steering a running turn
+### Steering a running turn
 
 A client can add a user message to a running `session/prompt` turn without
-cancelling it, like [model steering](./model-steering.md) in the terminal. The
-initialize response advertises it as follows:
+cancelling it, like [model steering](./model-steering.md) in the terminal.
+Gemini CLI implements the `_session/steering`
+[extension](https://agentclientprotocol.com/protocol/extensibility) that other
+ACP agents also support, so a client can use the same code for all of them. A
+client that doesn't use it needs no changes.
+
+The `initialize` response advertises steering in its top-level `_meta`:
 
 ```json
-{
-  "agentCapabilities": {
-    "_meta": {
-      "geminicli.com": {
-        "steering": {
-          "version": 1,
-          "content": ["text"],
-          "maxPending": 20,
-          "maxChars": 8000,
-          "enabled": true
-        }
-      }
-    }
-  }
-}
+{ "_meta": { "steering": { "supported": true } } }
 ```
 
-Steering is enabled for a connection when the client opts in with
-`clientCapabilities._meta["geminicli.com"].steering: true` in its `initialize`
-request, or when the user has `experimental.modelSteering` turned on. `enabled`
-tells the client which applies.
-
-To steer, send the `_geminicli.com/session/steer` request while a
-`session/prompt` is running:
+To steer, send a `_session/steering` request:
 
 ```json
 {
   "jsonrpc": "2.0",
   "id": 7,
-  "method": "_geminicli.com/session/steer",
+  "method": "_session/steering",
   "params": {
     "sessionId": "…",
-    "content": [{ "type": "text", "text": "Use the existing Logger class." }]
+    "prompt": [{ "type": "text", "text": "Use the existing Logger class." }],
+    "_meta": { "steering": { "idleBehavior": "promptRequired" } }
   }
 }
 ```
 
-The result is one of the following:
+`_meta` is optional. The result has one of the following `outcome` values:
 
-- `{ "status": "queued", "steerId": "st_1", "pending": 1 }`: the message reaches
-  the model in this turn, or Gemini CLI returns it as undelivered (see below).
-- `{ "status": "no_active_turn" }`: no prompt is running and nothing was stored.
-  Send the message as a normal `session/prompt` instead.
+- `injected`: a turn is running and the message was queued for it. The result
+  also has `_meta["geminicli.com"] = { "steerId": "st_1", "pending": 1 }`.
+- `startedNewTurn`: no turn was running, so the message started a new one, as if
+  it were sent with `session/prompt`. Its output arrives as `session/update`
+  notifications. If the previous turn was still finishing, the new turn starts
+  after it ends.
+- `promptRequired` (with `reason: "noRunningTurn"`): no turn was running and the
+  request set `idleBehavior: "promptRequired"`. Nothing was stored; send the
+  message with `session/prompt`.
 
 Gemini CLI adds queued messages to the next request to the model: in front of
 the results of the tool calls that are running, or as one more request if the
@@ -172,11 +156,11 @@ the turn fails with an error, each undelivered message is instead sent as a
 `user_message_chunk` update with `state: "undelivered"` before the error. The
 client can put these messages back in its input box.
 
-The request fails with `-32602` for an unknown session, empty text, a non-text
-content block, text over `maxChars`, more than `maxPending` queued messages, or
-text that starts with `/` or `$` (send commands as a prompt). It fails with
-`-32000` when steering is not enabled, and with `-32601` on versions of Gemini
-CLI without steering.
+The request fails with `-32602` for an unknown session, a non-text content
+block, or empty text. While a turn runs, it also fails with `-32602` for text
+over 8,000 characters, more than 20 queued messages, or text that starts with
+`/` or `$` (send commands as a prompt). Versions of Gemini CLI without steering
+answer `-32601`.
 
 ### File system proxy
 

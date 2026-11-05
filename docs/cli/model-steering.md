@@ -77,10 +77,9 @@ When you submit a steering hint, Gemini CLI performs the following actions:
 ## Steering from an IDE
 
 IDEs and other tools that run Gemini CLI in [ACP mode](./acp-mode.md) can send
-steering too. A client that supports it opts in when it connects, so you don't
-need to turn on the setting for it. The message reaches the model the same way
-as in the terminal, without a fast-model acknowledgment; the client shows its
-own. For details, see
+steering too, and you don't need to turn on the setting for it. The message
+reaches the model the same way as in the terminal, without a fast-model
+acknowledgment; the client shows its own. For details, see
 [Steering a running turn](./acp-mode.md#steering-a-running-turn).
 
 ## Next steps

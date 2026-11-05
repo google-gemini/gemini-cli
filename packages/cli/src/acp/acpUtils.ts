@@ -369,57 +369,49 @@ export function buildAvailableModels(
   };
 }
 
-/** Key under which Gemini CLI publishes ACP extensions in `_meta` objects. */
+/** Key under which Gemini CLI publishes its own ACP `_meta` fields. */
 export const GEMINI_ACP_META_KEY = 'geminicli.com';
 
-/** Extension method that adds a user message to a running prompt turn. */
-export const STEER_METHOD = `_${GEMINI_ACP_META_KEY}/session/steer`;
+/**
+ * Extension method that steers a running prompt turn. This is the
+ * `_session/steering` contract shared with other ACP agents.
+ */
+export const STEER_METHOD = '_session/steering';
 
-export const STEERING_VERSION = 1;
 export const STEERING_MAX_PENDING = 20;
 export const STEERING_MAX_CHARS = 8000;
 
 export const SteerRequestSchema = z.object({
-  sessionId: z.string(),
-  content: z
+  sessionId: z.string().min(1),
+  prompt: z
     .array(z.object({ type: z.literal('text'), text: z.string() }))
     .min(1),
-  _meta: z.record(z.unknown()).optional(),
+  _meta: z
+    .object({
+      steering: z
+        .object({ idleBehavior: z.literal('promptRequired').optional() })
+        .passthrough()
+        .optional(),
+    })
+    .passthrough()
+    .nullish(),
 });
 
+export type SteerRequest = z.infer<typeof SteerRequestSchema>;
+
 export type SteerResponse =
-  | { status: 'queued'; steerId: string; pending: number }
-  | { status: 'no_active_turn' };
+  | {
+      outcome: 'injected';
+      _meta: {
+        [GEMINI_ACP_META_KEY]: { steerId: string; pending: number };
+      };
+    }
+  | { outcome: 'startedNewTurn' }
+  | { outcome: 'promptRequired'; reason: 'noRunningTurn' };
 
-/**
- * Returns true when the client opted in to steering with
- * `clientCapabilities._meta["geminicli.com"].steering === true`.
- */
-export function readSteeringOptIn(
-  capabilities: acp.ClientCapabilities | undefined,
-): boolean {
-  const meta = hasMeta(capabilities) ? capabilities._meta : undefined;
-  const ours = meta?.[GEMINI_ACP_META_KEY];
-  return (
-    typeof ours === 'object' &&
-    ours !== null &&
-    'steering' in ours &&
-    ours.steering === true
-  );
-}
-
-export function buildSteeringCapability(enabled: boolean) {
-  return {
-    [GEMINI_ACP_META_KEY]: {
-      steering: {
-        version: STEERING_VERSION,
-        content: ['text'],
-        maxPending: STEERING_MAX_PENDING,
-        maxChars: STEERING_MAX_CHARS,
-        enabled,
-      },
-    },
-  };
+/** Top-level `_meta` of the `initialize` response that advertises steering. */
+export function buildSteeringCapability() {
+  return { steering: { supported: true } };
 }
 
 export function steeringMeta(
