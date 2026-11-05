@@ -166,14 +166,122 @@ describe('parsePrompt', () => {
     expect(validUrls[1]).toBe('http://google.com/');
   });
 
-  it('should accept URLs with trailing punctuation', () => {
+  it('should strip trailing sentence punctuation from URLs', () => {
     const prompt = 'Check https://example.com.';
     const { validUrls, errors } = parsePrompt(prompt);
 
     expect(errors).toHaveLength(0);
     expect(validUrls).toHaveLength(1);
-    expect(validUrls[0]).toBe('https://example.com./');
+    expect(validUrls[0]).toBe('https://example.com/');
   });
+
+  it.each(['.', ',', ';', ':'])(
+    'should strip a trailing %s from a URL',
+    (punctuation) => {
+      const prompt = `Check https://example.com/page${punctuation}`;
+      const { validUrls, errors } = parsePrompt(prompt);
+
+      expect(errors).toHaveLength(0);
+      expect(validUrls).toEqual(['https://example.com/page']);
+    },
+  );
+
+  it('should keep URLs ending in ? or ! intact', () => {
+    const { validUrls, errors } = parsePrompt(
+      'Open https://example.com/page?q=1 and https://example.com/hi!',
+    );
+
+    expect(errors).toHaveLength(0);
+    expect(validUrls).toEqual([
+      'https://example.com/page?q=1',
+      'https://example.com/hi!',
+    ]);
+  });
+
+  it('should strip unbalanced closing brackets from URLs', () => {
+    const { validUrls, errors } = parsePrompt(
+      'Read https://en.wikipedia.org/wiki/Coffee)',
+    );
+
+    expect(errors).toHaveLength(0);
+    expect(validUrls).toEqual(['https://en.wikipedia.org/wiki/Coffee']);
+  });
+
+  it('should keep balanced brackets in URLs intact', () => {
+    const { validUrls, errors } = parsePrompt(
+      'Read https://en.wikipedia.org/wiki/Foo_(bar)',
+    );
+
+    expect(errors).toHaveLength(0);
+    expect(validUrls).toEqual(['https://en.wikipedia.org/wiki/Foo_(bar)']);
+  });
+
+  it('should strip adversarially long runs of trailing brackets', () => {
+    const suffix = ')'.repeat(100_000);
+    const { validUrls, errors } = parsePrompt(
+      `Check https://example.com/page${suffix}`,
+    );
+
+    expect(errors).toHaveLength(0);
+    expect(validUrls).toEqual(['https://example.com/page']);
+  });
+
+  it('should strip long runs of trailing sentence punctuation', () => {
+    const suffix = '.,;:'.repeat(10_000);
+    const { validUrls, errors } = parsePrompt(
+      `Read https://example.com/a${suffix}`,
+    );
+
+    expect(errors).toHaveLength(0);
+    expect(validUrls).toEqual(['https://example.com/a']);
+  });
+
+  it('should strip long interleaved runs of punctuation and brackets', () => {
+    const suffix = ').'.repeat(5_000);
+    const { validUrls, errors } = parsePrompt(
+      `Read https://example.com/a${suffix}`,
+    );
+
+    expect(errors).toHaveLength(0);
+    expect(validUrls).toEqual(['https://example.com/a']);
+  });
+
+  it('should extract URLs from a comma-separated list', () => {
+    const prompt =
+      'Check https://example.com/, https://example.com/what-we-bake/, ' +
+      'https://example.com/how-we-bake/, and https://example.com/order-and-find-us/';
+    const { validUrls, errors } = parsePrompt(prompt);
+
+    expect(errors).toHaveLength(0);
+    expect(validUrls).toEqual([
+      'https://example.com/',
+      'https://example.com/what-we-bake/',
+      'https://example.com/how-we-bake/',
+      'https://example.com/order-and-find-us/',
+    ]);
+  });
+
+  it.each([
+    ['https://example.com/a.)', 'https://example.com/a'],
+    ['https://example.com/a,)', 'https://example.com/a'],
+    ['https://example.com/a),.', 'https://example.com/a'],
+    ['https://example.com/a.),', 'https://example.com/a'],
+    ['https://example.com/a)].', 'https://example.com/a'],
+    ['https://example.com/a]).', 'https://example.com/a'],
+    ['https://example.com/a:);', 'https://example.com/a'],
+    ['https://example.com/(a)).', 'https://example.com/(a)'],
+    ['https://example.com/a?)', 'https://example.com/a?'],
+    ['https://example.com/a!).', 'https://example.com/a!'],
+    ['https://example.com/a?q=(b),', 'https://example.com/a?q=(b)'],
+  ])(
+    'should strip punctuation mixed with closing brackets from %s',
+    (url, expected) => {
+      expect(parsePrompt(`Check ${url}`)).toEqual({
+        validUrls: [expected],
+        errors: [],
+      });
+    },
+  );
 
   it.each([
     {
@@ -222,7 +330,7 @@ describe('parsePrompt', () => {
     const { validUrls, errors } = parsePrompt(prompt);
 
     expect(validUrls).toHaveLength(1);
-    expect(validUrls[0]).toBe('https://google.com,/');
+    expect(validUrls[0]).toBe('https://google.com/');
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain('ftp://bad.com');
   });
