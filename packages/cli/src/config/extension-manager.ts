@@ -12,7 +12,12 @@ import { lock } from 'proper-lockfile';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import { type MergedSettings, SettingScope } from './settings.js';
 import { createHash, randomUUID } from 'node:crypto';
-import { loadInstallMetadata, type ExtensionConfig } from './extension.js';
+import {
+  loadInstallMetadata,
+  getPackageVersion,
+  formatVersion,
+  type ExtensionConfig,
+} from './extension.js';
 import {
   isWorkspaceTrusted,
   loadTrustedFolders,
@@ -1182,7 +1187,7 @@ Would you like to attempt to install via "git clone" instead?`,
     );
 
     const status = workspaceEnabled ? chalk.green('✓') : chalk.red('✗');
-    let output = `${status} ${extension.name} (${extension.version})`;
+    let output = `${status} ${extension.name} (${formatVersion(extension.version, getPackageVersion(extension.path))})`;
     output += `\n ID: ${extension.id}`;
     output += `\n name: ${hashValue(extension.name)}`;
 
