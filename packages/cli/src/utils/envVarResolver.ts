@@ -7,7 +7,8 @@
 /**
  * Resolves environment variables in a string.
  * Replaces $VAR_NAME, ${VAR_NAME}, and ${VAR_NAME:-DEFAULT_VALUE} with their corresponding
- * environment variable values. If the environment variable is not defined and no default
+ * environment variable values. As in Bash, ${VAR_NAME:-DEFAULT_VALUE} uses the default when
+ * the variable is unset or empty. If the environment variable is not defined and no default
  * value is provided, the original placeholder is preserved.
  *
  * @param value - The string that may contain environment variable placeholders
@@ -41,14 +42,14 @@ export function resolveEnvVarsInString(
         return match;
       }
 
-      if (customEnv && typeof customEnv[varName] === 'string') {
-        return customEnv[varName];
-      }
-      if (process && process.env) {
-        const val = process.env[varName];
-        if (typeof val === 'string') {
-          return val;
-        }
+      const customVal = customEnv?.[varName];
+      const val =
+        typeof customVal === 'string' ? customVal : process?.env?.[varName];
+      if (
+        typeof val === 'string' &&
+        (val !== '' || defaultValue === undefined)
+      ) {
+        return val;
       }
       if (defaultValue !== undefined) {
         return defaultValue;
