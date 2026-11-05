@@ -5240,6 +5240,37 @@ describe('GeminiChat', () => {
       expect(history).toHaveLength(2);
       expect(history[1].role).toBe('model');
     });
+
+    it('should strip turns where all parts only contain thoughtSignature or empty text', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'User prompt' }] },
+        {
+          role: 'model',
+          parts: [{ thoughtSignature: 'sig-only' } as Part],
+        },
+      ]);
+      const history = chat.getHistory(true);
+      expect(history).toHaveLength(1);
+      expect(history[0].role).toBe('user');
+    });
+
+    it('should preserve turns that contain valid parts alongside a trailing thoughtSignature-only part', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'User prompt' }] },
+        {
+          role: 'model',
+          parts: [
+            { text: 'Valid response text' },
+            { thoughtSignature: 'sig-trailing' } as Part,
+          ],
+        },
+      ]);
+      const history = chat.getHistory(true);
+      expect(history).toHaveLength(2);
+      expect(history[1].role).toBe('model');
+    });
   });
 
   describe('applyRetryNudge', () => {

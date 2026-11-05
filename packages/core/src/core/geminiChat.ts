@@ -197,7 +197,22 @@ function isValidContent(content: Content): boolean {
     if (
       !part.thought &&
       (part.text === undefined || part.text === '') &&
-      nonTextKeys.length === 0
+      nonTextKeys.length === 0 &&
+      content.parts.every((p) => {
+        if (!p) return true;
+        const ntk = Object.keys(p).filter(
+          (k) =>
+            k !== 'text' &&
+            k !== 'thought' &&
+            k !== 'callIndex' &&
+            k !== 'thoughtSignature',
+        );
+        return (
+          !p.thought &&
+          (p.text === undefined || p.text === '') &&
+          ntk.length === 0
+        );
+      })
     ) {
       return false;
     }
@@ -1607,7 +1622,7 @@ export class GeminiChat {
           let localFunctionCallCounter = 0;
           modelResponseParts.push(
             ...content.parts
-              .filter((part) => !part.thought)
+              .filter((part) => !part.thought && !isEmptyTextPart(part))
               .map((part) => {
                 if (!this.context.config.isContextManagementEnabled()) {
                   return part;
