@@ -222,6 +222,10 @@ A rule matches a tool call if all of its conditions are met:
 Policies are defined in `.toml` files. The CLI loads these files from Default,
 User, and (if configured) Admin directories.
 
+For custom policy paths, you can use `~` to refer to your home directory. On
+Windows, both `~/policies/custom.toml` and `~\policies\custom.toml` are
+supported.
+
 ### Policy locations
 
 | Tier          | Type   | Location                                                 |
