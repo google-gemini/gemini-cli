@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { resolvePath } from './resolvePath.js';
@@ -20,6 +20,24 @@ vi.mock('@google/gemini-cli-core', () => ({
 describe('resolvePath', () => {
   beforeEach(() => {
     vi.mocked(os.homedir).mockReturnValue('/home/user');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('expands a tilde followed by a Windows path separator', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+    expect(resolvePath('~\\policies\\custom.toml')).toBe(
+      path.normalize('/home/user\\policies\\custom.toml'),
+    );
+  });
+
+  it('preserves a literal backslash after a tilde on POSIX', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
+    expect(resolvePath('~\\policies\\custom.toml')).toBe(
+      path.normalize('~\\policies\\custom.toml'),
+    );
   });
 
   it.each([
