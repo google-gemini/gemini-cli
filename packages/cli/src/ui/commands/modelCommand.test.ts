@@ -273,6 +273,38 @@ describe('modelCommand', () => {
     });
   });
 
+  it('should forward arguments directly on /model <model-name> to set subcommand', async () => {
+    const mockSetModel = vi.fn();
+    mockContext.services.agentContext = {
+      setModel: mockSetModel,
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
+      getUserId: vi.fn().mockReturnValue('test-user'),
+      getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
+      getSessionId: vi.fn().mockReturnValue('test-session'),
+      getContentGeneratorConfig: vi
+        .fn()
+        .mockReturnValue({ authType: 'test-auth' }),
+      isInteractive: vi.fn().mockReturnValue(true),
+      getExperiments: vi.fn().mockReturnValue({ experimentIds: [] }),
+      getPolicyEngine: vi.fn().mockReturnValue({
+        getApprovalMode: vi.fn().mockReturnValue('auto'),
+      }),
+      get config() {
+        return this;
+      },
+    } as unknown as Config;
+
+    await modelCommand.action?.(mockContext, 'gemini-2.5-flash');
+
+    expect(mockSetModel).toHaveBeenCalledWith('gemini-2.5-flash', true);
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: MessageType.INFO,
+        text: expect.stringContaining('Model set to gemini-2.5-flash'),
+      }),
+    );
+  });
+
   it('should have the correct name and description', () => {
     expect(modelCommand.name).toBe('model');
     expect(modelCommand.description).toBe('Manage model configuration');
