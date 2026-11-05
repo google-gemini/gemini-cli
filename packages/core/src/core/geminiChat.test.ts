@@ -5240,6 +5240,37 @@ describe('GeminiChat', () => {
       expect(history).toHaveLength(2);
       expect(history[1].role).toBe('model');
     });
+
+    it('should strip turns where all parts only contain thoughtSignature or empty text', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'User prompt' }] },
+        {
+          role: 'model',
+          parts: [{ thoughtSignature: 'sig-only' } as Part],
+        },
+      ]);
+      const history = chat.getHistory(true);
+      expect(history).toHaveLength(1);
+      expect(history[0].role).toBe('user');
+    });
+
+    it('should preserve turns that contain valid parts alongside a trailing thoughtSignature-only part', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      chat.setHistory([
+        { role: 'user', parts: [{ text: 'User prompt' }] },
+        {
+          role: 'model',
+          parts: [
+            { text: 'Valid response text' },
+            { thoughtSignature: 'sig-trailing' } as Part,
+          ],
+        },
+      ]);
+      const history = chat.getHistory(true);
+      expect(history).toHaveLength(2);
+      expect(history[1].role).toBe('model');
+    });
   });
 
   describe('applyRetryNudge', () => {
@@ -5951,6 +5982,394 @@ describe('GeminiChat', () => {
         { role: 'model', parts: [{ text: 'Continuing' }] },
       ]);
     });
+
+    it('should close an unanswered tool response turn when the trailing model turn only has empty text with thoughtSignature (issue #30074)', async () => {
+      chat.setHistory([
+        {
+          id: 'u1',
+          content: { role: 'user', parts: [{ text: 'Describe image.png' }] },
+        },
+        {
+          id: 'm1',
+          content: {
+            role: 'model',
+            parts: [
+              {
+                functionCall: {
+                  id: 'read_file__call_1',
+                  name: 'read_file',
+                  args: { file_path: 'image.png' },
+                },
+                thoughtSignature: 'sig-call',
+              },
+            ],
+          },
+        },
+      ]);
+
+      // Turn 1: Send the image tool response; model stream yields only an empty text part with a thoughtSignature on STOP.
+      vi.mocked(
+        mockContentGenerator.generateContentStream,
+      ).mockResolvedValueOnce(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [
+                    {
+                      text: '',
+                      thoughtSignature: 'sig-empty-stop',
+                    } as Part,
+                  ],
+                },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const toolResponseStream = await chat.sendMessageStream(
+        { model: 'gemini-3-flash-preview' },
+        [
+          {
+            functionResponse: {
+              id: 'read_file__call_1',
+              name: 'read_file',
+              response: { output: 'Binary content provided (image/png).' },
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: 'image/png',
+                    data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+                  },
+                },
+              ],
+            },
+          },
+        ],
+        'prompt-image-read',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of toolResponseStream) {
+        // consume
+      }
+
+      // Turn 2: Empty response nudge sends 'Please continue.'
+      let capturedNudgeContents: Content[] | undefined;
+      vi.mocked(
+        mockContentGenerator.generateContentStream,
+      ).mockImplementationOnce(async (params) => {
+        capturedNudgeContents = params.contents as Content[];
+        return (async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [{ text: 'The image is a 1x1 pixel PNG.' }],
+                },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })();
+      });
+
+      const nudgeStream = await chat.sendMessageStream(
+        { model: 'gemini-3-flash-preview' },
+        [{ text: CONTINUE_PROMPT_TEXT }],
+        'prompt-image-read',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of nudgeStream) {
+        // consume
+      }
+
+      expect(capturedNudgeContents).toBeDefined();
+      expect(capturedNudgeContents!.at(-2)).toEqual({
+        role: 'model',
+        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+      });
+      expect(capturedNudgeContents!.at(-1)).toEqual({
+        role: 'user',
+        parts: [{ text: CONTINUE_PROMPT_TEXT }],
+      });
+    });
+
+    it('should populate a pre-existing trailing model turn containing only empty text and thoughtSignature in place', async () => {
+      chat.setHistory([
+        {
+          id: 'u1',
+          content: { role: 'user', parts: [{ text: 'Read image' }] },
+        },
+        {
+          id: 'm1',
+          content: {
+            role: 'model',
+            parts: [
+              { functionCall: { id: 'c1', name: 'read_file', args: {} } },
+            ],
+          },
+        },
+        {
+          id: 'u2',
+          content: {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  id: 'c1',
+                  name: 'read_file',
+                  response: { output: 'ok' },
+                },
+              },
+            ],
+          },
+        },
+        {
+          id: 'm2',
+          content: {
+            role: 'model',
+            parts: [{ text: '', thoughtSignature: 'sig-only' } as Part],
+          },
+        },
+      ]);
+
+      let capturedContents: Content[] | undefined;
+      vi.mocked(
+        mockContentGenerator.generateContentStream,
+      ).mockImplementationOnce(async (params) => {
+        capturedContents = params.contents as Content[];
+        return (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { role: 'model', parts: [{ text: 'Done' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })();
+      });
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-3-flash-preview' },
+        'Next prompt',
+        'prompt-thought-sig-model-turn',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(capturedContents).toBeDefined();
+      expect(capturedContents!.at(-2)).toEqual({
+        role: 'model',
+        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+      });
+      expect(capturedContents!.at(-1)).toEqual({
+        role: 'user',
+        parts: [{ text: 'Next prompt' }],
+      });
+    });
+
+    it('should guarantee terminal user turn even when stripToolCallIdPrefixes removes a trailing user turn with only thoughtSignature', async () => {
+      const apiHistoryOverride: Content[] = [
+        { role: 'user', parts: [{ text: 'Initial question' }] },
+        { role: 'model', parts: [{ text: 'Initial answer' }] },
+        {
+          role: 'user',
+          parts: [{ text: '', thoughtSignature: 'sig-empty' } as Part],
+        },
+      ];
+
+      let capturedContents: Content[] | undefined;
+      vi.mocked(
+        mockContentGenerator.generateContentStream,
+      ).mockImplementationOnce(async (params) => {
+        capturedContents = params.contents as Content[];
+        return (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { role: 'model', parts: [{ text: 'Response' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })();
+      });
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-3-flash-preview' },
+        'Follow-up',
+        'prompt-strip-then-ensure',
+        new AbortController().signal,
+        LlmRole.MAIN,
+        undefined,
+        apiHistoryOverride,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(capturedContents).toBeDefined();
+      expect(capturedContents!.at(-1)).toEqual({
+        role: 'user',
+        parts: [{ text: CONTINUE_PROMPT_TEXT }],
+      });
+    });
+
+    it('should preserve role alternation and terminal user turn when apiHistoryOverride has an empty thoughtSignature model turn after a tool response', async () => {
+      const apiHistoryOverride: Content[] = [
+        { role: 'user', parts: [{ text: 'Describe image.png' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'read_file__call_1',
+                name: 'read_file',
+                args: { file_path: 'image.png' },
+              },
+              thoughtSignature: 'sig-call',
+            },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'read_file__call_1',
+                name: 'read_file',
+                response: { output: 'Binary content provided (1 item(s)).' },
+              },
+            },
+            {
+              inlineData: {
+                mimeType: 'image/png',
+                data: 'base64data',
+              },
+            },
+          ],
+        },
+        {
+          role: 'model',
+          parts: [{ text: '', thoughtSignature: 'sig-empty' } as Part],
+        },
+      ];
+
+      let capturedContents: Content[] | undefined;
+      vi.mocked(
+        mockContentGenerator.generateContentStream,
+      ).mockImplementationOnce(async (params) => {
+        capturedContents = params.contents as Content[];
+        return (async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [{ text: 'Image description' }],
+                },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })();
+      });
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-3-flash-preview' },
+        CONTINUE_PROMPT_TEXT,
+        'prompt-override-empty-model-after-tool',
+        new AbortController().signal,
+        LlmRole.MAIN,
+        undefined,
+        apiHistoryOverride,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(capturedContents).toBeDefined();
+      expect(capturedContents!.at(-2)).toEqual({
+        role: 'model',
+        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+      });
+      expect(capturedContents!.at(-1)).toEqual({
+        role: 'user',
+        parts: [{ text: CONTINUE_PROMPT_TEXT }],
+      });
+    });
+
+    it('should prevent fusing a follow-up user turn into a tool response turn when stripToolCallIdPrefixes encounters an interior empty model turn', () => {
+      const contents: Content[] = [
+        { role: 'user', parts: [{ text: 'Describe image.png' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'read_file__call_1',
+                name: 'read_file',
+                args: { file_path: 'image.png' },
+              },
+            },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'read_file__call_1',
+                name: 'read_file',
+                response: { output: 'Binary content provided (1 item(s)).' },
+              },
+            },
+          ],
+        },
+        {
+          role: 'model',
+          parts: [{ text: '', thoughtSignature: 'sig-empty' } as Part],
+        },
+        {
+          role: 'user',
+          parts: [{ text: 'Please summarize the image.' }],
+        },
+      ];
+
+      const stripped = stripToolCallIdPrefixes(contents);
+      expect(stripped).toHaveLength(5);
+      expect(stripped[2]).toEqual({
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              id: 'call_1',
+              name: 'read_file',
+              response: { output: 'Binary content provided (1 item(s)).' },
+            },
+          },
+        ],
+      });
+      expect(stripped[3]).toEqual({
+        role: 'model',
+        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+      });
+      expect(stripped[4]).toEqual({
+        role: 'user',
+        parts: [{ text: 'Please summarize the image.' }],
+      });
+    });
   });
 
   describe('ensureTerminalUserTurn', () => {
@@ -6129,6 +6548,48 @@ describe('GeminiChat', () => {
           },
         ],
       });
+    });
+
+    it('drops parts that only contain empty text and thoughtSignature while keeping thoughtSignature on functionCall parts', () => {
+      const result = stripToolCallIdPrefixes([
+        {
+          role: 'user',
+          parts: [{ text: 'Read file' }],
+        },
+        {
+          role: 'model',
+          parts: [
+            {
+              text: '',
+              functionCall: {
+                id: 'read_file__1',
+                name: 'read_file',
+                args: { file_path: 'a.png' },
+              },
+              thoughtSignature: 'sig-keep',
+            } as Part,
+            {
+              text: '',
+              thoughtSignature: 'sig-drop',
+            } as Part,
+            {
+              thoughtSignature: 'sig-drop-no-text',
+            } as Part,
+          ],
+        },
+      ]);
+
+      expect(result).toHaveLength(2);
+      expect(result[1].parts).toEqual([
+        {
+          functionCall: {
+            id: '1',
+            name: 'read_file',
+            args: { file_path: 'a.png' },
+          },
+          thoughtSignature: 'sig-keep',
+        },
+      ]);
     });
   });
 
