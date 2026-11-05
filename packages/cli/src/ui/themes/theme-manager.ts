@@ -571,7 +571,12 @@ class ThemeManager {
       }
 
       // 2. Perform security check.
-      const homeDir = path.resolve(this.homedir());
+      let homeDir = path.resolve(this.homedir());
+      try {
+        homeDir = this.fs.realpathSync(homeDir);
+      } catch {
+        // Fallback to resolved path if realpathSync fails
+      }
       if (!isSubpath(homeDir, canonicalPath)) {
         debugLogger.warn(
           `Theme file at "${themePath}" is outside your home directory. ` +

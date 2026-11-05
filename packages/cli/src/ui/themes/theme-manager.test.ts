@@ -222,6 +222,22 @@ describe('ThemeManager', () => {
         expect(themeManager.getActiveTheme().name).toBe('My File Theme');
       },
     );
+
+    it('should load a theme when homedir is a symlink', () => {
+      vi.mocked(os.homedir).mockReturnValue('/var/home/user');
+      vi.spyOn(fs, 'realpathSync').mockImplementation((p) =>
+        String(p).replace(/^\/var\/home\/user/, '/private/var/home/user'),
+      );
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(mockTheme));
+
+      const result = themeManager.setActiveTheme(
+        '/var/home/user/my-theme.json',
+      );
+
+      expect(result).toBe(true);
+      expect(themeManager.getActiveTheme().name).toBe('My File Theme');
+    });
   });
 
   describe('extension themes', () => {
