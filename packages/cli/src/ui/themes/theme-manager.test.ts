@@ -426,6 +426,22 @@ describe('ThemeManager', () => {
       expect(themeManager.getSemanticColors().background.primary).toBe(
         '#101216',
       );
+
+      // Verify a catalog whose theme name collides with SINGLE_CUSTOM_THEME_KEYS (e.g. "border") is still parsed as a catalog
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(
+        JSON.stringify({
+          border: {
+            type: 'custom',
+            background: { primary: '#30343f' },
+          },
+        }),
+      );
+      themeManager.loadUserThemes();
+      expect(themeManager.getCustomThemeNames()).toContain('border');
+      expect(themeManager.setActiveTheme('border')).toBe(true);
+      expect(themeManager.getSemanticColors().background.primary).toBe(
+        '#30343f',
+      );
     });
 
     it('supports customThemes wrapper format and prioritizes ~/.gemini/theme.json over XDG and settings.json', () => {

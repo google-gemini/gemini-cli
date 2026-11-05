@@ -278,10 +278,14 @@ class ThemeManager {
     }
 
     const rawName = parsed['name'];
+    const hasNestedCustomTheme = Object.values(parsed).some(
+      (val) => isPlainRecord(val) && val['type'] === 'custom',
+    );
     const isSingleTheme =
-      parsed['type'] === 'custom' ||
-      isStringValue(rawName) ||
-      keys.every((key) => SINGLE_CUSTOM_THEME_KEYS.has(key));
+      !hasNestedCustomTheme &&
+      (parsed['type'] === 'custom' ||
+        isStringValue(rawName) ||
+        keys.every((key) => SINGLE_CUSTOM_THEME_KEYS.has(key)));
 
     if (isSingleTheme) {
       const themeName =
