@@ -1129,6 +1129,42 @@ describe('ModelConfigService', () => {
         }),
       ).toBe('gemini-2.5-flash');
     });
+
+    it('should resolve gemini-2.5-flash-image to itself', () => {
+      const service = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
+
+      expect(service.resolveModelId('gemini-2.5-flash-image', {})).toBe(
+        'gemini-2.5-flash-image',
+      );
+    });
+  });
+
+  describe('gemini-2.5-flash-image model config', () => {
+    it('should request text and image response modalities', () => {
+      const service = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
+      const resolved = service.getResolvedConfig({
+        model: 'gemini-2.5-flash-image',
+      });
+
+      expect(resolved.model).toBe('gemini-2.5-flash-image');
+      expect(resolved.generateContentConfig.responseModalities).toEqual([
+        'TEXT',
+        'IMAGE',
+      ]);
+    });
+
+    it('should expose the image model definition with flash tier', () => {
+      const service = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
+      const definition = service.getModelDefinition('gemini-2.5-flash-image');
+
+      expect(definition).toMatchObject({
+        tier: 'flash',
+        family: 'gemini-2.5',
+        isPreview: false,
+        isVisible: true,
+        features: { thinking: false, multimodalToolUse: false },
+      });
+    });
   });
 
   describe('getAvailableModelOptions', () => {
@@ -1140,6 +1176,18 @@ describe('ModelConfigService', () => {
       });
 
       expect(options.map((o) => o.modelId)).toContain('gemini-2.5-flash');
+    });
+    it('should list gemini-2.5-flash-image as a visible flash model', () => {
+      const service = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
+      const options = service.getAvailableModelOptions({
+        hasAccessToPreview: true,
+      });
+
+      const imageOption = options.find(
+        (o) => o.modelId === 'gemini-2.5-flash-image',
+      );
+      expect(imageOption).toBeDefined();
+      expect(imageOption?.tier).toBe('flash');
     });
     it('should include auto in DEFAULT_MODEL_CONFIGS when hasAccessToPreview is false', () => {
       const service = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
