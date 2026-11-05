@@ -143,17 +143,13 @@ export interface SessionSelectionResult {
  * Cleans and sanitizes message content for display by:
  * - Converting newlines to spaces
  * - Collapsing multiple whitespace to single spaces
- * - Removing non-printable characters (keeping only ASCII 32-126)
+ * - Removing terminal control sequences while preserving Unicode text
  * - Trimming leading/trailing whitespace
  * @param message - The raw message content to clean
  * @returns Sanitized message suitable for display
  */
 export const cleanMessage = (message: string): string =>
-  message
-    .replace(/\n+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/[^\x20-\x7E]+/g, '') // Non-printable.
-    .trim();
+  stripUnsafeCharacters(message).replace(/\s+/g, ' ').trim();
 
 /**
  * Extracts the first meaningful user message from conversation messages.
