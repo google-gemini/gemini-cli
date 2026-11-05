@@ -363,7 +363,7 @@ describe('gemini.tsx main function cleanup', () => {
   });
 
   it('installs output listeners before entering ACP mode so stderr is not buffered until exit (#30128)', async () => {
-    const { coreEvents } = await import('@google/gemini-cli-core');
+    const { coreEvents, CoreEvent } = await import('@google/gemini-cli-core');
     const { ConsolePatcher } = await import('./ui/utils/ConsolePatcher.js');
     const { loadCliConfig, parseArguments } = await import(
       './config/config.js'
@@ -406,13 +406,28 @@ describe('gemini.tsx main function cleanup', () => {
       }),
     );
 
-    // A patched stderr write during the ACP session must reach the real
-    // stderr immediately, not only when the exit cleanup flushes.
-    const { writeToStderr } = await import('@google/gemini-cli-core');
+    // Patched stdio writes during the ACP session must reach the real
+    // stderr immediately (not only when the exit cleanup flushes), and
+    // stdout writes must be redirected there too: stdout carries the
+    // JSON-RPC protocol stream, so stray output would corrupt it.
+    const { writeToStderr, writeToStdout } = await import(
+      '@google/gemini-cli-core'
+    );
     vi.mocked(writeToStderr).mockClear();
+    vi.mocked(writeToStdout).mockClear();
+    // Earlier cases in this file install output listeners on the shared
+    // singleton and never remove them; a non-zero count would make main()
+    // skip installing the ACP listener this case exercises.
+    coreEvents.removeAllListeners(CoreEvent.Output);
     await main();
     coreEvents.emitOutput(true, 'hook-warned-live\n');
     expect(writeToStderr).toHaveBeenCalledWith('hook-warned-live\n', undefined);
+    coreEvents.emitOutput(false, 'library-stdout-noise\n');
+    expect(writeToStderr).toHaveBeenCalledWith(
+      'library-stdout-noise\n',
+      undefined,
+    );
+    expect(writeToStdout).not.toHaveBeenCalled();
   });
 
   it('should register ConsolePatcher cleanup in non-ACP mode', async () => {
