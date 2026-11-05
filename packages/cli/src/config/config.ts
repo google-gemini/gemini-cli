@@ -964,6 +964,7 @@ export async function loadCliConfig(
   }
 
   const contextManagement = {
+    ...settings.contextManagement,
     enabled: !!profileSelector,
   };
 
