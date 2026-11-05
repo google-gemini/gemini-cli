@@ -50,6 +50,7 @@ import dns from 'node:dns';
 import * as path from 'node:path';
 import * as fsPromises from 'node:fs/promises';
 import { start_sandbox } from './utils/sandbox.js';
+import { resolveFolderTrustForSandbox } from './utils/sandboxFolderTrust.js';
 import {
   loadSettings,
   SettingScope,
@@ -744,6 +745,18 @@ export async function main() {
       };
 
       const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
+
+      // Resolve folder trust before entering the sandbox, because the macOS
+      // Seatbelt profiles deny the sandboxed process access to the trusted
+      // folders file.
+      await resolveFolderTrustForSandbox({
+        sandboxCommand: sandboxConfig.command,
+        settings,
+        interactive:
+          partialConfig.isInteractive() &&
+          !!process.stdin?.isTTY &&
+          !!process.stdout?.isTTY,
+      });
 
       await relaunchOnExitCode(() =>
         start_sandbox(sandboxConfig, memoryArgs, partialConfig, sandboxArgs),
