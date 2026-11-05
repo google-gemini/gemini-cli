@@ -120,30 +120,46 @@ module.exports = async ({ github, context, core }) => {
   core.info(`Aggregated triage results for ${finalResults.length} issues.`);
 
   // Only labels that already exist in the repository may be applied.
-  const repoLabels = new Set(
+  // GitHub label names are case-insensitive: key by lowercase, keep the
+  // repository's own casing as the value so that is what gets applied.
+  const repoLabels = new Map(
     (
       await github.paginate(github.rest.issues.listLabelsForRepo, {
         owner: context.repo.owner,
         repo: context.repo.repo,
         per_page: 100,
       })
-    ).map((l) => l.name),
+    ).map((l) => [l.name.toLowerCase(), l.name]),
   );
 
   for (const entry of finalResults) {
-    const issueNumber = Number(entry.issue_number);
-    if (!Number.isInteger(issueNumber) || issueNumber <= 0) {
-      core.warning(`Skipping entry with invalid issue number: ${entry.issue_number}`);
+    const rawIssueNumber = entry.issue_number;
+    const issueNumber = Number(rawIssueNumber);
+    if (
+      (typeof rawIssueNumber !== 'number' &&
+        typeof rawIssueNumber !== 'string') ||
+      !Number.isInteger(issueNumber) ||
+      issueNumber <= 0
+    ) {
+      core.warning(
+        `Skipping entry with invalid issue number: ${rawIssueNumber}`,
+      );
       continue;
     }
-    let labelsToAdd = entry.labels_to_add || [];
-    const unknownLabels = labelsToAdd.filter((l) => !repoLabels.has(l));
+    let labelsToAdd = (entry.labels_to_add || []).filter(
+      (l) => typeof l === 'string',
+    );
+    const unknownLabels = labelsToAdd.filter(
+      (l) => !repoLabels.has(l.toLowerCase()),
+    );
     if (unknownLabels.length > 0) {
       core.warning(
         `Ignoring labels not defined in the repository for #${issueNumber}: ${unknownLabels.join(', ')}`,
       );
-      labelsToAdd = labelsToAdd.filter((l) => repoLabels.has(l));
     }
+    labelsToAdd = labelsToAdd
+      .filter((l) => repoLabels.has(l.toLowerCase()))
+      .map((l) => repoLabels.get(l.toLowerCase()));
     let labelsToRemove = entry.labels_to_remove || [];
     let existingLabels = [];
 
