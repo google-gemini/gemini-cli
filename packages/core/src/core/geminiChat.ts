@@ -184,16 +184,19 @@ function isValidContent(content: Content): boolean {
     if (part === undefined || Object.keys(part).length === 0) {
       return false;
     }
-    // Check if the part contains any keys other than 'text', 'thought', or 'callIndex'.
+    // Check if the part contains any keys other than 'text', 'thought', 'callIndex', or 'thoughtSignature'.
     // If it has other keys, it carries an active payload (such as tools, files, or code execution)
     // and must be preserved even if the text itself is empty, preventing history sequence corruption.
     const nonTextKeys = Object.keys(part).filter(
-      (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+      (key) =>
+        key !== 'text' &&
+        key !== 'thought' &&
+        key !== 'callIndex' &&
+        key !== 'thoughtSignature',
     );
     if (
       !part.thought &&
-      part.text !== undefined &&
-      part.text === '' &&
+      (part.text === undefined || part.text === '') &&
       nonTextKeys.length === 0
     ) {
       return false;
@@ -909,7 +912,7 @@ export class GeminiChat {
     let hadEmptyTrailingModelTurn = false;
     if (
       targetTurn?.content.role === 'model' &&
-      (!targetTurn.content.parts || targetTurn.content.parts.length === 0)
+      !hasNonEmptyParts(targetTurn.content)
     ) {
       hadEmptyTrailingModelTurn = true;
       targetTurn = turns[turns.length - 2];
@@ -922,8 +925,19 @@ export class GeminiChat {
     }
     if (hadEmptyTrailingModelTurn) {
       const lastTurn = turns[turns.length - 1];
-      lastTurn.content.parts = [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }];
-      this.chatRecordingService.updateMessagesFromHistory(turns);
+      this.agentHistory.set([
+        ...turns.slice(0, -1),
+        {
+          id: lastTurn.id,
+          content: {
+            ...lastTurn.content,
+            parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+          },
+        },
+      ]);
+      this.chatRecordingService.updateMessagesFromHistory(
+        this.agentHistory.get(),
+      );
     } else {
       this.agentHistory.push({
         id: randomUUID(),
@@ -1199,12 +1213,14 @@ export class GeminiChat {
         this.tools = await this.onModelChanged(modelToUse);
       }
 
-      // Normalize the outbound payload so it always ends with a user turn that
-      // carries content. This is a pure transformation: retries, per-call
-      // history overrides and hook-modified contents never leak into the
-      // persistent history or the session log.
-      const normalizedContents = ensureTerminalUserTurn(contentsToUse);
-      if (normalizedContents !== contentsToUse) {
+      // Strip tool call ID prefixes and empty parts first, then normalize the
+      // outbound payload so it always ends with a user turn that carries
+      // content. This is a pure transformation: retries, per-call history
+      // overrides and hook-modified contents never leak into the persistent
+      // history or the session log.
+      const strippedContents = stripToolCallIdPrefixes(contentsToUse);
+      const finalContents = ensureTerminalUserTurn(strippedContents);
+      if (finalContents !== strippedContents) {
         debugLogger.warn(
           'Final contents do not end with a valid user turn. Normalizing contents to satisfy Gemini API invariant.',
         );
@@ -1213,9 +1229,7 @@ export class GeminiChat {
       // Track final request parameters for AfterModel hooks
       lastModelToUse = modelToUse;
       lastConfig = config;
-      lastContentsToUse = normalizedContents;
-
-      const finalContents = stripToolCallIdPrefixes(normalizedContents);
+      lastContentsToUse = finalContents;
 
       return this.context.config.getContentGenerator().generateContentStream(
         {
@@ -1914,11 +1928,15 @@ export function isInvalidArgumentError(errorMessage: string): boolean {
  * alongside bookkeeping keys) and no other payload.
  */
 function isEmptyTextPart(part: Part): boolean {
-  if (part.text !== '') {
+  if (part.text !== undefined && part.text !== '') {
     return false;
   }
   return !Object.keys(part).some(
-    (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+    (key) =>
+      key !== 'text' &&
+      key !== 'thought' &&
+      key !== 'callIndex' &&
+      key !== 'thoughtSignature',
   );
 }
 
@@ -1977,58 +1995,72 @@ export function ensureTerminalUserTurn(contents: Content[]): Content[] {
 }
 
 export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
-  const stripped = contents
-    .map((content) => {
-      const parts = (content.parts || [])
-        .map((part) => {
-          const newPart = { ...part };
-          if (newPart.functionCall) {
-            const fc = newPart.functionCall;
-            const name = fc.name?.trim() || 'generic_tool';
-            if (fc.id && fc.id.startsWith(`${name}__`)) {
-              newPart.functionCall = {
-                ...fc,
-                id: fc.id.substring(name.length + 2),
-              };
-            }
+  const stripped: Content[] = [];
+  for (const content of contents) {
+    const parts = (content.parts || [])
+      .map((part) => {
+        const newPart = { ...part };
+        if (newPart.functionCall) {
+          const fc = newPart.functionCall;
+          const name = fc.name?.trim() || 'generic_tool';
+          if (fc.id && fc.id.startsWith(`${name}__`)) {
+            newPart.functionCall = {
+              ...fc,
+              id: fc.id.substring(name.length + 2),
+            };
           }
-          if (newPart.functionResponse) {
-            const fr = newPart.functionResponse;
-            const name = fr.name?.trim() || 'generic_tool';
-            if (fr.id && fr.id.startsWith(`${name}__`)) {
-              newPart.functionResponse = {
-                // History parts are plain JSON objects, not class instances.
-                // eslint-disable-next-line @typescript-eslint/no-misused-spread
-                ...fr,
-                id: fr.id.substring(name.length + 2),
-              };
-            }
+        }
+        if (newPart.functionResponse) {
+          const fr = newPart.functionResponse;
+          const name = fr.name?.trim() || 'generic_tool';
+          if (fr.id && fr.id.startsWith(`${name}__`)) {
+            newPart.functionResponse = {
+              // History parts are plain JSON objects, not class instances.
+              // eslint-disable-next-line @typescript-eslint/no-misused-spread
+              ...fr,
+              id: fr.id.substring(name.length + 2),
+            };
           }
+        }
 
-          // If there's an empty text key alongside other active properties, remove the empty text key
-          // so it doesn't trigger "contains empty parts" validation errors on the Gemini API.
-          const hasOtherKeys = Object.keys(newPart).some(
-            (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
-          );
-          if (
-            newPart.text !== undefined &&
-            newPart.text === '' &&
-            hasOtherKeys
-          ) {
-            delete newPart.text;
-          }
+        // If there's an empty text key alongside other active properties, remove the empty text key
+        // so it doesn't trigger "contains empty parts" validation errors on the Gemini API.
+        const hasOtherKeys = Object.keys(newPart).some(
+          (key) =>
+            key !== 'text' &&
+            key !== 'thought' &&
+            key !== 'callIndex' &&
+            key !== 'thoughtSignature',
+        );
+        if (newPart.text !== undefined && newPart.text === '' && hasOtherKeys) {
+          delete newPart.text;
+        }
 
-          return newPart;
-        })
-        // Filter out truly empty parts that have only text: '' and no payload
-        .filter((part) => !isEmptyTextPart(part));
+        return newPart;
+      })
+      // Filter out truly empty parts that have only text: '' and no payload
+      .filter((part) => !isEmptyTextPart(part));
 
-      return {
-        ...content,
-        parts,
-      };
-    })
-    .filter((content) => content.parts.length > 0);
+    if (parts.length === 0) {
+      const prev = stripped.at(-1);
+      if (
+        content.role === 'model' &&
+        prev?.role === 'user' &&
+        prev.parts?.some((part) => !!part.functionResponse)
+      ) {
+        stripped.push({
+          ...content,
+          parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+        });
+      }
+      continue;
+    }
+
+    stripped.push({
+      ...content,
+      parts,
+    });
+  }
 
   return coalesceConsecutiveContents(stripped);
 }
