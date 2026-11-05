@@ -48,7 +48,7 @@ export async function readStdin(): Promise<string> {
     let settled = false;
     process.stdin.setEncoding('utf8');
 
-    const pipedInputShouldBeAvailableInMs = 15000;
+    const pipedInputShouldBeAvailableInMs = 1000;
     let pipedInputTimerId: null | NodeJS.Timeout = setTimeout(() => {
       // stop reading if input is not available yet, this is needed
       // in terminals where stdin is never TTY and nothing's piped
