@@ -1244,6 +1244,8 @@ describe('gemini.tsx main function exit codes', () => {
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 
     originalIsTTY = process.stdin.isTTY;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = true;
   });
 
   afterEach(() => {
@@ -1518,8 +1520,13 @@ describe('project hooks loading based on trust', () => {
   let loadCliConfig: Mock;
   let loadSettings: Mock;
   let parseArguments: Mock;
+  let originalIsTTY: boolean | undefined;
 
   beforeEach(async () => {
+    originalIsTTY = process.stdin.isTTY;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = true;
+
     // Dynamically import and get the mocked functions
     const configModule = await import('./config/config.js');
     loadCliConfig = vi.mocked(configModule.loadCliConfig);
@@ -1553,6 +1560,8 @@ describe('project hooks loading based on trust', () => {
   });
 
   afterEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = originalIsTTY;
     vi.restoreAllMocks();
   });
 

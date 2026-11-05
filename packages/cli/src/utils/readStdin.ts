@@ -12,6 +12,7 @@ import { debugLogger } from '@google/gemini-cli-core';
  * complete character boundary.
  */
 function truncateUtf8Bytes(str: string, maxBytes: number): string {
+  if (maxBytes <= 0) return '';
   const buf = Buffer.from(str, 'utf8');
   if (buf.length <= maxBytes) return str;
   let end = maxBytes;
@@ -24,60 +25,68 @@ function truncateUtf8Bytes(str: string, maxBytes: number): string {
 }
 
 export async function readStdin(): Promise<string> {
+  if (
+    process.stdin.isTTY ||
+    process.stdin.destroyed ||
+    process.stdin.readableEnded
+  ) {
+    return '';
+  }
+
   const MAX_STDIN_SIZE = 8 * 1024 * 1024; // 8MB
   return new Promise((resolve, reject) => {
     let data = '';
     let totalSize = 0;
+    let settled = false;
     process.stdin.setEncoding('utf8');
 
-    const pipedInputShouldBeAvailableInMs = 500;
-    let pipedInputTimerId: null | NodeJS.Timeout = setTimeout(() => {
-      // stop reading if input is not available yet, this is needed
-      // in terminals where stdin is never TTY and nothing's piped
-      // which causes the program to get stuck expecting data from stdin
-      onEnd();
-    }, pipedInputShouldBeAvailableInMs);
-
     const onReadable = () => {
-      let chunk;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      let chunk: unknown;
       while ((chunk = process.stdin.read()) !== null) {
-        if (pipedInputTimerId) {
-          clearTimeout(pipedInputTimerId);
-          pipedInputTimerId = null;
-        }
-
-        const chunkByteLength = Buffer.byteLength(chunk, 'utf8');
+        const chunkStr =
+          typeof chunk === 'string'
+            ? chunk
+            : Buffer.isBuffer(chunk)
+              ? chunk.toString('utf8')
+              : String(chunk);
+        const chunkByteLength = Buffer.byteLength(chunkStr, 'utf8');
         if (totalSize + chunkByteLength > MAX_STDIN_SIZE) {
           const remainingBytes = MAX_STDIN_SIZE - totalSize;
-          data += truncateUtf8Bytes(chunk, remainingBytes);
+          data += truncateUtf8Bytes(chunkStr, remainingBytes);
           debugLogger.warn(
             `Warning: stdin input truncated to ${MAX_STDIN_SIZE} bytes.`,
           );
-          process.stdin.destroy(); // Stop reading further
-          onEnd();
+          cleanup();
+          if (typeof process.stdin.unpipe === 'function') {
+            process.stdin.unpipe();
+          }
+          if (typeof process.stdin.pause === 'function') {
+            process.stdin.pause();
+          }
+          settled = true;
+          resolve(data);
           break;
         }
-        data += chunk;
+        data += chunkStr;
         totalSize += chunkByteLength;
       }
     };
 
     const onEnd = () => {
+      if (settled) return;
+      settled = true;
       cleanup();
       resolve(data);
     };
 
     const onError = (err: Error) => {
+      if (settled) return;
+      settled = true;
       cleanup();
       reject(err);
     };
 
     const cleanup = () => {
-      if (pipedInputTimerId) {
-        clearTimeout(pipedInputTimerId);
-        pipedInputTimerId = null;
-      }
       process.stdin.removeListener('readable', onReadable);
       process.stdin.removeListener('end', onEnd);
       process.stdin.removeListener('error', onError);
