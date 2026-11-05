@@ -889,6 +889,13 @@ export async function main() {
     }
 
     if (config.getAcpMode()) {
+      // ACP mode returns before the interactive paths install output
+      // listeners, so every patched stdio write (hook warnings, library
+      // output) stays buffered until the process exits — and is lost
+      // entirely on SIGKILL or a crash (#30128). Install and flush before
+      // the protocol takes over: stderr becomes visible live, stdout keeps
+      // flowing to the ACP protocol stream as before.
+      initializeOutputListenersAndFlush(config);
       return runAcpClient(config, settings, argv);
     }
 
