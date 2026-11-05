@@ -334,8 +334,9 @@ export class AcpSessionManager {
         const additionalContext = result.getAdditionalContext();
         if (additionalContext) {
           const geminiClient = config.getGeminiClient();
-          if (geminiClient) {
-            await geminiClient.addHistory({
+          const chat = geminiClient?.getChat();
+          if (chat) {
+            chat.addHistory({
               role: 'user',
               parts: [
                 { text: `<hook_context>${additionalContext}</hook_context>` },

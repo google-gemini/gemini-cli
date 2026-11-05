@@ -79,10 +79,9 @@ describe('AcpSessionManager', () => {
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getGeminiClient: vi.fn().mockReturnValue({
-        startChat: vi.fn().mockResolvedValue({}),
+        startChat: vi.fn().mockResolvedValue({ addHistory: vi.fn() }),
         resumeChat: vi.fn().mockResolvedValue(undefined),
-        getChat: vi.fn().mockReturnValue({}),
-        addHistory: vi.fn().mockResolvedValue(undefined),
+        getChat: vi.fn().mockReturnValue({ addHistory: vi.fn() }),
       }),
       getHookSystem: vi.fn().mockReturnValue(undefined),
       getMessageBus: vi.fn().mockReturnValue({
@@ -776,11 +775,13 @@ describe('AcpSessionManager', () => {
       const mockFireSessionStartEvent = vi.fn().mockResolvedValue({
         getAdditionalContext: () => 'custom startup context',
       });
-      mockConfig.getGeminiClient = vi.fn().mockReturnValue({
-        startChat: vi.fn().mockResolvedValue({}),
-        resumeChat: vi.fn().mockResolvedValue(undefined),
-        getChat: vi.fn().mockReturnValue({}),
+      const mockChat = {
         addHistory: mockAddHistory,
+      };
+      mockConfig.getGeminiClient = vi.fn().mockReturnValue({
+        startChat: vi.fn().mockResolvedValue(mockChat),
+        resumeChat: vi.fn().mockResolvedValue(undefined),
+        getChat: vi.fn().mockReturnValue(mockChat),
       });
       mockConfig.getHookSystem = vi.fn().mockReturnValue({
         fireSessionStartEvent: mockFireSessionStartEvent,
@@ -828,11 +829,13 @@ describe('AcpSessionManager', () => {
       const mockFireSessionStartEvent = vi.fn().mockResolvedValue({
         getAdditionalContext: () => 'resumed context',
       });
-      mockConfig.getGeminiClient = vi.fn().mockReturnValue({
-        startChat: vi.fn().mockResolvedValue({}),
-        resumeChat: vi.fn().mockResolvedValue(undefined),
-        getChat: vi.fn().mockReturnValue({}),
+      const mockChat = {
         addHistory: mockAddHistory,
+      };
+      mockConfig.getGeminiClient = vi.fn().mockReturnValue({
+        startChat: vi.fn().mockResolvedValue(mockChat),
+        resumeChat: vi.fn().mockResolvedValue(undefined),
+        getChat: vi.fn().mockReturnValue(mockChat),
       });
       mockConfig.getHookSystem = vi.fn().mockReturnValue({
         fireSessionStartEvent: mockFireSessionStartEvent,
