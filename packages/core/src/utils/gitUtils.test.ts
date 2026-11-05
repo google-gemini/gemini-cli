@@ -147,6 +147,40 @@ describe('gitUtils', () => {
       );
     });
 
+    it('should handle GIT_SSH and TortoiseGitPlink correctly', () => {
+      // TortoiseGit's bundled plink must be treated as a PuTTY-family client,
+      // so it gets -batch instead of OpenSSH's -o BatchMode=yes (#29917).
+      const safeEnv1 = getSafeGitEnv({
+        GIT_SSH: 'C:/Program Files/TortoiseGit/bin/TortoiseGitPlink.exe',
+      });
+      expect(safeEnv1['GIT_SSH_COMMAND']).toBe(
+        '"C:/Program Files/TortoiseGit/bin/TortoiseGitPlink.exe" -batch',
+      );
+
+      // Quoted GIT_SSH_COMMAND: existing quoting and arguments preserved.
+      const safeEnv2 = getSafeGitEnv({
+        GIT_SSH_COMMAND:
+          '"C:/Program Files/TortoiseGit/bin/TortoiseGitPlink.exe" -i /path/to/key',
+      });
+      expect(safeEnv2['GIT_SSH_COMMAND']).toBe(
+        '"C:/Program Files/TortoiseGit/bin/TortoiseGitPlink.exe" -batch -i /path/to/key',
+      );
+
+      // -batch already present: no duplicate flag.
+      const safeEnv3b = getSafeGitEnv({
+        GIT_SSH_COMMAND: 'TortoiseGitPlink.exe -batch -i /path/to/key',
+      });
+      expect(safeEnv3b['GIT_SSH_COMMAND']).toBe(
+        'TortoiseGitPlink.exe -batch -i /path/to/key',
+      );
+
+      // Legacy TortoisePlink stays recognized.
+      const safeEnv4 = getSafeGitEnv({
+        GIT_SSH: 'TortoisePlink',
+      });
+      expect(safeEnv4['GIT_SSH_COMMAND']).toBe('TortoisePlink -batch');
+    });
+
     it('should not configure diff.external to an empty string', () => {
       const safeEnv = getSafeGitEnv({});
       const count = parseInt(safeEnv['GIT_CONFIG_COUNT'] || '0', 10);
