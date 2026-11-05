@@ -1448,7 +1448,9 @@ export class Session {
                 processedQueryParts.push({
                   text: `\nContent from @${filePathSpecInContent}:\n`,
                 });
-                processedQueryParts.push({ text: fileActualContent });
+                if (fileActualContent !== '') {
+                  processedQueryParts.push({ text: fileActualContent });
+                }
               } else {
                 processedQueryParts.push({ text: part });
               }

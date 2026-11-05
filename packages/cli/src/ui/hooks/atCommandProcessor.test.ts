@@ -1955,7 +1955,7 @@ describe('handleAtCommand', () => {
           { text: `@${relativePath}` },
           { text: '\n--- Content from referenced files ---' },
           { text: `\nContent from @${relativePath}:\n` },
-          { text: fileContent },
+          ...(fileContent !== '' ? [{ text: fileContent }] : []),
           { text: '\n--- End of content ---' },
         ],
       });

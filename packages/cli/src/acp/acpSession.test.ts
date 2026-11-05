@@ -1668,7 +1668,7 @@ describe('Session', () => {
           { text: `Explain @${fileName}` },
           { text: '\n--- Content from referenced files ---' },
           { text: `\nContent from @${fileName}:\n` },
-          { text: fileContent },
+          ...(fileContent !== '' ? [{ text: fileContent }] : []),
         ],
         expect.any(AbortSignal),
         expect.any(String),

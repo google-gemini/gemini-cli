@@ -616,7 +616,9 @@ async function readLocalFiles(
             parts.push({
               text: `\nContent from @${displayPath}:\n`,
             });
-            parts.push({ text: fileActualContent });
+            if (fileActualContent !== '') {
+              parts.push({ text: fileActualContent });
+            }
           } else {
             parts.push({ text: part });
           }
