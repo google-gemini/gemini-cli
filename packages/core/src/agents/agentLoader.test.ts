@@ -719,6 +719,20 @@ Prompt`,
       expect(result.errors).toHaveLength(0);
     });
 
+    it('should skip dangling and non-file symlinks', async () => {
+      await fs.symlink(
+        path.join(tempDir, 'missing.md'),
+        path.join(tempDir, 'dangling.md'),
+      );
+      const subDir = path.join(tempDir, 'sub');
+      await fs.mkdir(subDir);
+      await fs.symlink(subDir, path.join(tempDir, 'dir.md'));
+
+      const result = await loadAgentsFromDirectory(tempDir);
+      expect(result.agents).toHaveLength(0);
+      expect(result.errors).toHaveLength(0);
+    });
+
     it('should capture errors for malformed individual files', async () => {
       // Create a malformed Markdown file
       await writeAgentMarkdown('invalid markdown', 'malformed.md');
