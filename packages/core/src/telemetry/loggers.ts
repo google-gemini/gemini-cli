@@ -460,17 +460,18 @@ export function logChatCompression(
   event: ChatCompressionEvent,
 ): void {
   ClearcutLogger.getInstance(config)?.logChatCompressionEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
 
-  const logger = logs.getLogger(SERVICE_NAME);
-  const logRecord: LogRecord = {
-    body: event.toLogBody(),
-    attributes: event.toOpenTelemetryAttributes(config),
-  };
-  logger.emit(logRecord);
-
-  recordChatCompressionMetrics(config, {
-    tokens_before: event.tokens_before,
-    tokens_after: event.tokens_after,
+    recordChatCompressionMetrics(config, {
+      tokens_before: event.tokens_before,
+      tokens_after: event.tokens_after,
+    });
   });
 }
 
