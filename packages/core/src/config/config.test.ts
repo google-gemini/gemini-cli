@@ -3116,13 +3116,17 @@ describe('Availability Service Integration', () => {
     expect(config.getActiveModel()).toBe(baseModel);
   });
 
-  it('resetTurn delegates to availability service', () => {
+  it('resetTurn delegates to availability service and restores activeModel to configured model', () => {
     const config = new Config(baseParams);
     const service = config.getModelAvailabilityService();
     const spy = vi.spyOn(service, 'resetTurn');
 
+    config.setActiveModel('gemini-3-flash-preview');
+    expect(config.getActiveModel()).toBe('gemini-3-flash-preview');
+
     config.resetTurn();
     expect(spy).toHaveBeenCalled();
+    expect(config.getActiveModel()).toBe(baseModel);
   });
 
   it('resetTurn does NOT reset billing state', () => {

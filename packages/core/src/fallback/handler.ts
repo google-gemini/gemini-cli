@@ -117,12 +117,19 @@ export async function handleFallback(
   try {
     const intent = await handler(failedModel, fallbackModel, error);
 
-    // If the user chose to switch/retry, we apply the availability transition
-    // to the failed model (e.g. marking it terminal if it had a quota error).
-    // We DO NOT apply it if the user chose 'stop' or 'retry_later', allowing
-    // them to try again later with the same model state.
-    if (intent === 'retry_always' || intent === 'retry_once') {
+    // If the user chose a permanent switch ('retry_always'), apply the policy
+    // availability transition (e.g. marking manual models terminal).
+    // For a turn-scoped retry ('retry_once'), mark the failed model as
+    // sticky_retry and consume its turn attempt so it falls back for the
+    // remainder of the current turn only and recovers on resetTurn().
+    // We DO NOT apply any transition if the user chose 'stop' or 'retry_later',
+    // allowing them to try again later with the same model state.
+    if (intent === 'retry_always') {
       applyAvailabilityTransition(getAvailabilityContext, failureKind);
+    } else if (intent === 'retry_once' && fallbackModel !== failedModel) {
+      const targetModel = failedPolicy?.model ?? failedModel;
+      availability.markRetryOncePerTurn(targetModel, failedPolicy?.maxAttempts);
+      availability.consumeStickyAttempt(targetModel);
     }
 
     return await processIntent(

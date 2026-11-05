@@ -35,6 +35,7 @@ import {
   removeMCPStatusChangeListener,
   MCPDiscoveryState,
   CoreToolCallStatus,
+  formatLocalDateKey,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
@@ -187,6 +188,17 @@ export const useSlashCommandProcessor = (
       } else if (message.type === MessageType.TOOL_STATS) {
         historyItemContent = {
           type: 'tool_stats',
+        };
+      } else if (message.type === MessageType.HEATMAP_STATS) {
+        historyItemContent = {
+          type: 'heatmap_stats',
+          dailyUsage: {},
+          totalWindowTokens: 0,
+          totalWindowSessions: 0,
+          totalWindowTurns: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          today: formatLocalDateKey(message.timestamp),
         };
       } else if (message.type === MessageType.QUIT) {
         historyItemContent = {

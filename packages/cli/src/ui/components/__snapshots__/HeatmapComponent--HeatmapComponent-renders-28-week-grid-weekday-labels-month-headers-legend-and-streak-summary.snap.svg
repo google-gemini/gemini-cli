@@ -1,0 +1,261 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="740" height="343" viewBox="0 0 740 343">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="740" height="343" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="2" fill="#333333" textLength="720" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────╮</text>
+    <text x="0" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="711" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="36" fill="#d7afff" textLength="171" lengthAdjust="spacingAndGlyphs" font-weight="bold">Token Usage Heatmap</text>
+    <text x="711" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="711" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="70" fill="#afafaf" textLength="459" lengthAdjust="spacingAndGlyphs">    Apr       Jun     Jul     Aug       Sep     Oct</text>
+    <text x="711" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="63" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="81" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="99" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="117" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="135" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="153" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="171" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="189" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="207" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="225" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="243" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="261" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="279" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="297" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="315" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="333" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="351" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="369" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="387" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="405" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="423" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="441" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="459" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="477" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="495" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="513" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="531" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="549" y="87" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="711" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="104" fill="#afafaf" textLength="36" lengthAdjust="spacingAndGlyphs">Mon </text>
+    <text x="63" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="81" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="99" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="117" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="135" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="153" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="171" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="189" y="104" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="207" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="225" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="243" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="261" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="279" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="297" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="315" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="333" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="351" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="369" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="387" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="405" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="423" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="441" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="459" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="477" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="495" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="513" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="531" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="549" y="104" fill="#d7afff" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="711" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="63" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="81" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="99" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="117" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="135" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="153" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="171" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="189" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="207" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="225" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="243" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="261" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="279" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="297" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="315" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="333" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="351" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="369" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="387" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="405" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="423" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="441" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="459" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="477" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="495" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="513" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="531" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="549" y="121" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="711" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="138" fill="#afafaf" textLength="36" lengthAdjust="spacingAndGlyphs">Wed </text>
+    <text x="63" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="81" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="99" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="117" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="135" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="153" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="171" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="189" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="207" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="225" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="243" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="261" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="279" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="297" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="315" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="333" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="351" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="369" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="387" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="405" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="423" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="441" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="459" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="477" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="495" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="513" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="531" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="711" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="63" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="81" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="99" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="117" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="135" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="153" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="171" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="189" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="207" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="225" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="243" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="261" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="279" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="297" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="315" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="333" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="351" y="155" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="369" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="387" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="405" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="423" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="441" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="459" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="477" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="495" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="513" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="531" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="711" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="172" fill="#afafaf" textLength="36" lengthAdjust="spacingAndGlyphs">Fri </text>
+    <text x="63" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="81" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="99" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="117" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="135" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="153" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="171" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="189" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="207" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="225" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="243" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="261" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="279" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="297" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="315" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="333" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="351" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="369" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="387" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="405" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="423" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="441" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="459" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="477" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="495" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="513" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="531" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="711" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="63" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="81" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="99" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="117" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="135" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="153" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="171" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="189" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="207" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="225" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="243" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="261" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="279" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="297" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="315" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="333" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="351" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="369" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="387" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="405" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="423" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="441" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="459" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="477" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="495" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="513" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="531" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="711" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="206" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="711" y="206" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="223" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="223" fill="#afafaf" textLength="45" lengthAdjust="spacingAndGlyphs">Less </text>
+    <text x="72" y="223" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="90" y="223" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="108" y="223" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="126" y="223" fill="#d7afff" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="144" y="223" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">■</text>
+    <text x="153" y="223" fill="#afafaf" textLength="45" lengthAdjust="spacingAndGlyphs"> More</text>
+    <text x="711" y="223" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="240" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="711" y="240" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="257" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="257" fill="#ffffff" textLength="72" lengthAdjust="spacingAndGlyphs" font-weight="bold">Summary </text>
+    <text x="99" y="257" fill="#afafaf" textLength="234" lengthAdjust="spacingAndGlyphs">(last 28 weeks / 196 days)</text>
+    <text x="711" y="257" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="274" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="274" fill="#87afff" textLength="126" lengthAdjust="spacingAndGlyphs">Total Tokens: </text>
+    <text x="153" y="274" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs">29,000</text>
+    <text x="207" y="274" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs"> · </text>
+    <text x="234" y="274" fill="#ffffff" textLength="90" lengthAdjust="spacingAndGlyphs">4 sessions</text>
+    <text x="324" y="274" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs"> · </text>
+    <text x="351" y="274" fill="#ffffff" textLength="72" lengthAdjust="spacingAndGlyphs">10 turns</text>
+    <text x="711" y="274" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="291" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="291" fill="#87afff" textLength="144" lengthAdjust="spacingAndGlyphs">Current streak: </text>
+    <text x="171" y="291" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs">3 days</text>
+    <text x="225" y="291" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs"> · </text>
+    <text x="252" y="291" fill="#87afff" textLength="144" lengthAdjust="spacingAndGlyphs">Longest streak: </text>
+    <text x="396" y="291" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs">7 days</text>
+    <text x="711" y="291" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="308" fill="#333333" textLength="720" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────╯</text>
+  </g>
+</svg>
