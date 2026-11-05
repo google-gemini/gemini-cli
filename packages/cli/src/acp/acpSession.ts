@@ -1444,7 +1444,7 @@ export class Session {
               const match = fileContentRegex.exec(part);
               if (match) {
                 const filePathSpecInContent = match[1]; // This is a resolved pathSpec
-                const fileActualContent = match[2].trim();
+                const fileActualContent = match[2];
                 processedQueryParts.push({
                   text: `\nContent from @${filePathSpecInContent}:\n`,
                 });
