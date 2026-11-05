@@ -153,7 +153,7 @@ describe('readStdin', () => {
     });
 
     // Advance well past the former 500ms cutoff while upstream pipe is slow
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(3000);
     expect(settled).toBe(false);
 
     mockStdin.read
@@ -168,22 +168,50 @@ describe('readStdin', () => {
     expect(debugLogger.warn).not.toHaveBeenCalled();
   });
 
-  it('should accumulate slow multi-chunk piped input separated by long delays', async () => {
+  it('should accumulate slow multi-chunk piped input even when total duration exceeds 5000ms', async () => {
     vi.useFakeTimers();
 
     const promise = readStdin();
 
-    await vi.advanceTimersByTimeAsync(800);
+    await vi.advanceTimersByTimeAsync(2000);
     mockStdin.read.mockReturnValueOnce('chunk1-').mockReturnValueOnce(null);
     onReadableHandler();
 
-    await vi.advanceTimersByTimeAsync(2000);
+    // Once the first chunk arrives, the initial 5000ms timer is cleared
+    await vi.advanceTimersByTimeAsync(10000);
     mockStdin.read.mockReturnValueOnce('chunk2').mockReturnValueOnce(null);
     onReadableHandler();
 
     onEndHandler();
 
     await expect(promise).resolves.toBe('chunk1-chunk2');
+  });
+
+  it('should timeout and resolve with empty string if no input arrives within 5000ms in non-TTY environments', async () => {
+    vi.useFakeTimers();
+
+    let settled = false;
+    const promise = readStdin().then((value) => {
+      settled = true;
+      return value;
+    });
+    const initialErrorHandler = onErrorHandler;
+
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(settled).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(promise).resolves.toBe('');
+    expect(mockStdin.removeListener).toHaveBeenCalledWith(
+      'readable',
+      onReadableHandler,
+    );
+    expect(mockStdin.removeListener).toHaveBeenCalledWith('end', onEndHandler);
+    expect(mockStdin.removeListener).toHaveBeenCalledWith(
+      'error',
+      initialErrorHandler,
+    );
+    expect(mockStdin.destroy).not.toHaveBeenCalled();
   });
 
   it('should truncate input if it exceeds MAX_STDIN_SIZE and pause+unpipe without destroying stdin', async () => {
