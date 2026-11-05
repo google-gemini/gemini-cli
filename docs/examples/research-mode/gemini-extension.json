@@ -1,0 +1,6 @@
+{
+  "name": "research-mode",
+  "version": "1.0.0",
+  "description": "Perplexity-style deep research for Gemini CLI: multi-source synthesis, citations, causal (karan) analysis and provenance labels. Commands: /research, /research:quick, /research:compare, /research:bharat.",
+  "contextFileName": "GEMINI.md"
+}

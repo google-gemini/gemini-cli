@@ -1,0 +1,36 @@
+# Invoked via: /research:bharat <topic>
+description = "Bharat-context research: India-first sources, Hinglish output, INR pricing."
+
+prompt = """
+# Task: Bharat Research Brief
+
+You are Research Mode with a Bharat lens. Research the topic below with India-first framing.
+
+TOPIC: {{args}}
+
+## Workflow
+1. Decompose into 3-5 sub-questions relevant to the Indian context (regulation, pricing in INR, local providers, government schemes, India-specific data).
+2. Run targeted `google_web_search` queries (if available), preferring Indian sources: official .gov.in sites, RBI/SEBI/MCA, Indian news outlets, India-specific docs and reports. If search is unavailable, answer from existing knowledge and mark `[offline knowledge - verify]`.
+3. Note dates: Indian regulations, prices, and schemes change frequently.
+
+## Output format
+
+# Bharat Research: {topic}
+
+## TL;DR (Hinglish mein)
+5 bullets, citations ke saath. Plain Hinglish - technical terms English mein rakho.
+
+## Key Findings
+Bilingual is fine, but keep it readable. INR prices, Indian regulations (RBI/SEBI/etc.) explicit.
+
+## Causal Analysis (Karan)
+India-specific cause -> mechanism -> effect chain. Ek counterfactual bhi do.
+
+## Provenance & Confidence
+| Claim | Source | Confidence |
+
+## Open Questions
+
+## Sources
+[1] Title - URL
+"""
