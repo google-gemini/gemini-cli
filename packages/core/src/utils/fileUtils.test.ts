@@ -272,8 +272,29 @@ describe('fileUtils', () => {
       expect(await isEmpty(testFile)).toBe(true);
     });
 
-    it('should return true for a non-existent file (defensive)', async () => {
+    it('should return true for a zero-byte file', async () => {
+      const testFile = path.join(tempRootDir, 'zero-byte.txt');
+      actualNodeFs.writeFileSync(testFile, '');
+      expect(await isEmpty(testFile)).toBe(true);
+    });
+
+    it('should reject for a non-existent file', async () => {
       const testFile = path.join(tempRootDir, 'ghost.txt');
+      await expect(isEmpty(testFile)).rejects.toThrow();
+    });
+
+    it.each([1023, 1024, 4096, 8192])(
+      'should find content after %i bytes of whitespace',
+      async (prefixLength) => {
+        const testFile = path.join(tempRootDir, 'prefixed.txt');
+        actualNodeFs.writeFileSync(testFile, ' '.repeat(prefixLength) + 'plan');
+        expect(await isEmpty(testFile)).toBe(false);
+      },
+    );
+
+    it('should preserve multibyte whitespace across read boundaries', async () => {
+      const testFile = path.join(tempRootDir, 'unicode-whitespace.txt');
+      actualNodeFs.writeFileSync(testFile, '\u2003'.repeat(5000));
       expect(await isEmpty(testFile)).toBe(true);
     });
 
@@ -332,6 +353,14 @@ describe('fileUtils', () => {
       };
 
       it.each(encodings)(
+        'should return true for a $name file containing only a BOM',
+        async ({ bom, encode }) => {
+          const testFile = writeBomFile(bom, encode(''));
+          expect(await isEmpty(testFile)).toBe(true);
+        },
+      );
+
+      it.each(encodings)(
         'should return true for a $name file that contains only whitespace',
         async ({ bom, encode }) => {
           const testFile = writeBomFile(bom, encode(' \n\t'));
@@ -344,6 +373,36 @@ describe('fileUtils', () => {
         async ({ bom, encode }) => {
           const testFile = writeBomFile(bom, encode(' '.repeat(3000)));
           expect(await isEmpty(testFile)).toBe(true);
+        },
+      );
+
+      it.each(encodings)(
+        'should find text beyond the initial chunk in a $name file',
+        async ({ bom, encode }) => {
+          const testFile = writeBomFile(
+            bom,
+            encode(' '.repeat(8192) + '# Plan'),
+          );
+          expect(await isEmpty(testFile)).toBe(false);
+        },
+      );
+
+      it.each(encodings)(
+        'should preserve Unicode whitespace across chunks in a $name file',
+        async ({ bom, encode }) => {
+          const testFile = writeBomFile(bom, encode('\u2003'.repeat(5000)));
+          expect(await isEmpty(testFile)).toBe(true);
+        },
+      );
+
+      it.each(encodings)(
+        'should not treat a truncated trailing code unit as empty in a $name file',
+        async ({ bom, encode }) => {
+          const testFile = writeBomFile(
+            bom,
+            Buffer.concat([encode(' '.repeat(5000)), Buffer.from([0xff])]),
+          );
+          expect(await isEmpty(testFile)).toBe(false);
         },
       );
 
