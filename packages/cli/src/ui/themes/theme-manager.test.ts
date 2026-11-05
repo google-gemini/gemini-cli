@@ -188,6 +188,38 @@ describe('ThemeManager', () => {
 
       consoleWarnSpy.mockRestore();
     });
+
+    it('should not load a theme from a sibling directory sharing a prefix with home', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(mockTheme));
+      const consoleWarnSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+
+      const result = themeManager.setActiveTheme(
+        '/home/user-sibling/my-theme.json',
+      );
+
+      expect(result).toBe(false);
+      expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('is outside your home directory'),
+      );
+
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should accept a theme on Windows even when path casing differs from home directory', () => {
+      if (process.platform === 'win32') {
+        vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+        vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(mockTheme));
+        vi.mocked(os.homedir).mockReturnValue('C:\\Users\\User');
+
+        const testPath = 'c:\\users\\user\\my-theme.json';
+        const result = themeManager.setActiveTheme(testPath);
+        expect(result).toBe(true);
+      }
+    });
   });
 
   describe('extension themes', () => {

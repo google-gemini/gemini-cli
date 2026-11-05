@@ -170,6 +170,12 @@ describe('fileUtils', () => {
         root: '/project/root',
         expected: false,
       },
+      {
+        name: 'a path with different casing on Windows',
+        path: 'C:\\Users\\user\\file.txt',
+        root: 'c:\\users\\user',
+        expected: process.platform === 'win32',
+      },
     ])(
       'should return $expected for $name',
       ({ path: testPath, root, expected }) => {
