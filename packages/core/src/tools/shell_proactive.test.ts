@@ -86,6 +86,7 @@ describe('ShellTool Proactive Expansion', () => {
       isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       getShellToolInactivityTimeout: vi.fn().mockReturnValue(1000),
+      getAllowCommandSubstitution: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     const bus = createMockMessageBus();
