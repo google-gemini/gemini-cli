@@ -770,6 +770,32 @@ function isValidSedNArg(arg: string | undefined): boolean {
 }
 
 /**
+ * Checks whether `rm` arguments request a recursive (`-r`, `-R`,
+ * `--recursive`) or forced (`-f`, `--force`) removal. Short flags may be
+ * combined in any order (`-vrf`) and options may follow operands
+ * (`rm x -rf`), as GNU rm allows. A `--` argument ends option parsing.
+ *
+ * @param args - Arguments passed to `rm`.
+ * @returns true if any option makes the removal recursive or forced.
+ */
+function isRecursiveOrForcedRm(args: string[]): boolean {
+  for (const arg of args) {
+    if (arg === '--') {
+      return false;
+    }
+    if (arg.startsWith('--')) {
+      // GNU getopt_long also accepts unambiguous prefixes such as `--rec`.
+      if ('--recursive'.startsWith(arg) || '--force'.startsWith(arg)) {
+        return true;
+      }
+    } else if (arg.startsWith('-') && /[rRf]/.test(arg)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Checks if a command with its arguments is explicitly known to be dangerous
  * and should be blocked or require strict user confirmation. This catches
  * destructive commands like `rm -rf`, `sudo`, and commands with execution
@@ -802,7 +828,7 @@ export function isDangerousCommand(
   }
 
   if (cmd === 'rm') {
-    return args[1] === '-f' || args[1] === '-rf' || args[1] === '-fr';
+    return isRecursiveOrForcedRm(args.slice(1));
   }
 
   if (cmd === 'sudo') {

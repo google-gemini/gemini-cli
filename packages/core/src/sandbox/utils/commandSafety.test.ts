@@ -342,4 +342,42 @@ describe('commandSafety', () => {
       expect(isDangerousCommand(['ln', 'target', 'link'])).toBe(false);
     });
   });
+
+  describe('rm command safety in isDangerousCommand', () => {
+    it.each([
+      // Recursive or forced removals.
+      ['rm -rf x', true],
+      ['rm -fr x', true],
+      ['rm -f x', true],
+      ['rm -r x', true],
+      ['rm -R x', true],
+      ['rm -r -f x', true],
+      ['rm -Rf x', true],
+      ['rm -rfv x', true],
+      ['rm -vrf x', true],
+      ['rm --recursive --force x', true],
+      ['rm --recursive x', true],
+      ['rm --force x', true],
+      ['rm --rec x', true],
+      ['rm x -rf', true],
+      ['rm -rf -- x', true],
+      ['sudo rm -r -f x', true],
+      // Neither recursive nor forced.
+      ['rm', false],
+      ['rm x', false],
+      ['rm file', false],
+      ['rm -i x', false],
+      ['rm -v x', false],
+      ['rm -d x', false],
+      ['rm --verbose x', false],
+      ['rm --interactive=always x', false],
+      ['rm --one-file-system x', false],
+      ['rm - x', false],
+      ['rm -- -rf', false],
+      ['rm -- x -rf', false],
+      ['ls -rf', false],
+    ])('classifies "%s" as dangerous: %s', (command, expected) => {
+      expect(isDangerousCommand(command.split(' '))).toBe(expected);
+    });
+  });
 });
