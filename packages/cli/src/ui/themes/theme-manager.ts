@@ -99,6 +99,7 @@ class ThemeManager {
   private settingsThemes: Map<string, Theme> = new Map();
   private extensionThemes: Map<string, Theme> = new Map();
   private fileThemes: Map<string, Theme> = new Map();
+  private fileThemesByPath: Map<string, Theme> = new Map();
   private terminalBackground: string | undefined;
 
   // Cache for dynamic colors
@@ -387,10 +388,7 @@ class ThemeManager {
 
           try {
             const theme = createCustomTheme(themeWithDefaults);
-            this.userThemes.set(entryKey, theme);
-            if (resolvedName !== entryKey) {
-              this.userThemes.set(resolvedName, theme);
-            }
+            this.userThemes.set(resolvedName, theme);
           } catch (error) {
             debugLogger.warn(
               `Failed to load custom theme "${entryKey}" from "${candidatePath}":`,
@@ -531,6 +529,7 @@ class ThemeManager {
    */
   clearFileThemes(): void {
     this.fileThemes.clear();
+    this.fileThemesByPath.clear();
   }
 
   /**
@@ -546,6 +545,8 @@ class ThemeManager {
     }
     this.userThemes.clear();
     this.userThemesLoaded = false;
+    this.fileThemes.clear();
+    this.fileThemesByPath.clear();
   }
 
   /**
@@ -564,6 +565,7 @@ class ThemeManager {
     this.settingsThemes.clear();
     this.extensionThemes.clear();
     this.fileThemes.clear();
+    this.fileThemesByPath.clear();
     this.activeTheme = DEFAULT_THEME;
     this.terminalBackground = undefined;
     this.clearCache();
@@ -594,10 +596,10 @@ class ThemeManager {
         (t) => t.name === this.activeTheme.name,
       );
       const isCustom =
-        [...this.userThemes.values()].includes(this.activeTheme) ||
-        [...this.settingsThemes.values()].includes(this.activeTheme) ||
-        [...this.extensionThemes.values()].includes(this.activeTheme) ||
-        [...this.fileThemes.values()].includes(this.activeTheme);
+        this.userThemes.get(this.activeTheme.name) === this.activeTheme ||
+        this.settingsThemes.get(this.activeTheme.name) === this.activeTheme ||
+        this.extensionThemes.get(this.activeTheme.name) === this.activeTheme ||
+        this.fileThemes.get(this.activeTheme.name) === this.activeTheme;
 
       if (isBuiltIn || isCustom) {
         return this.activeTheme;
@@ -735,19 +737,12 @@ class ThemeManager {
   }
 
   private _getAllCustomThemes(): Theme[] {
-    const mergedByName = new Map<string, Theme>();
-    for (const theme of this.settingsThemes.values()) {
-      mergedByName.set(theme.name, theme);
-    }
-    for (const theme of this.userThemes.values()) {
-      mergedByName.set(theme.name, theme);
-    }
-    for (const theme of this.extensionThemes.values()) {
-      mergedByName.set(theme.name, theme);
-    }
-    for (const theme of this.fileThemes.values()) {
-      mergedByName.set(theme.name, theme);
-    }
+    const mergedByName = new Map<string, Theme>([
+      ...this.fileThemes,
+      ...this.extensionThemes,
+      ...this.settingsThemes,
+      ...this.userThemes,
+    ]);
     return Array.from(mergedByName.values());
   }
 
@@ -848,8 +843,8 @@ class ThemeManager {
       const canonicalPath = this.fs.realpathSync(path.resolve(themePath));
 
       // 1. Check cache using the canonical path.
-      if (this.fileThemes.has(canonicalPath)) {
-        return this.fileThemes.get(canonicalPath);
+      if (this.fileThemesByPath.has(canonicalPath)) {
+        return this.fileThemesByPath.get(canonicalPath);
       }
 
       // 2. Perform security check.
@@ -894,7 +889,8 @@ class ThemeManager {
       };
 
       const theme = createCustomTheme(themeWithDefaults);
-      this.fileThemes.set(canonicalPath, theme); // Cache by canonical path
+      this.fileThemesByPath.set(canonicalPath, theme);
+      this.fileThemes.set(theme.name, theme);
       return theme;
     } catch (error) {
       // Any error in the process (file not found, bad JSON, etc.) is caught here.

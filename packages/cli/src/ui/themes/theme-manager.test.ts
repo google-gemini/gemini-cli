@@ -472,6 +472,10 @@ describe('ThemeManager', () => {
           .getAvailableThemes()
           .filter((t) => t.name === 'matugen-theme'),
       ).toHaveLength(1);
+      expect(
+        themeManager.getAllThemes().find((t) => t.name === 'matugen-theme')
+          ?.semanticColors.background.primary,
+      ).toBe('#222222');
       expect(themeManager.setActiveTheme('matugen-theme')).toBe(true);
       expect(themeManager.getSemanticColors().background.primary).toBe(
         '#222222',
