@@ -75,6 +75,8 @@ describe('ShellTool Proactive Expansion', () => {
       getSandboxEnabled: vi.fn().mockReturnValue(false),
       getTargetDir: vi.fn().mockReturnValue('/tmp'),
       getApprovalMode: vi.fn().mockReturnValue('strict'),
+      getAllowCommandSubstitution: vi.fn().mockReturnValue(false),
+      isYoloModeDisabled: vi.fn().mockReturnValue(false),
       sandboxPolicyManager: {
         getCommandPermissions: vi.fn().mockReturnValue({
           fileSystem: { read: [], write: [] },
