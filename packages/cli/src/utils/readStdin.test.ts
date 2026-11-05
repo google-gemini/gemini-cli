@@ -143,7 +143,7 @@ describe('readStdin', () => {
     expect(mockStdin.on).not.toHaveBeenCalled();
   });
 
-  it('should wait for slow piped input arriving after 500ms instead of resolving empty', async () => {
+  it('should wait for slow piped input arriving after 6000ms instead of resolving empty', async () => {
     vi.useFakeTimers();
 
     let settled = false;
@@ -152,8 +152,8 @@ describe('readStdin', () => {
       return value;
     });
 
-    // Advance well past the former 500ms cutoff while upstream pipe is slow
-    await vi.advanceTimersByTimeAsync(3000);
+    // Advance well past the former 500ms cutoff (e.g. `sleep 6` pipe)
+    await vi.advanceTimersByTimeAsync(6000);
     expect(settled).toBe(false);
 
     mockStdin.read
@@ -168,17 +168,17 @@ describe('readStdin', () => {
     expect(debugLogger.warn).not.toHaveBeenCalled();
   });
 
-  it('should accumulate slow multi-chunk piped input even when total duration exceeds 5000ms', async () => {
+  it('should accumulate slow multi-chunk piped input even when total duration exceeds 15000ms', async () => {
     vi.useFakeTimers();
 
     const promise = readStdin();
 
-    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(6000);
     mockStdin.read.mockReturnValueOnce('chunk1-').mockReturnValueOnce(null);
     onReadableHandler();
 
-    // Once the first chunk arrives, the initial 5000ms timer is cleared
-    await vi.advanceTimersByTimeAsync(10000);
+    // Once the first chunk arrives, the initial 15000ms timer is cleared
+    await vi.advanceTimersByTimeAsync(20000);
     mockStdin.read.mockReturnValueOnce('chunk2').mockReturnValueOnce(null);
     onReadableHandler();
 
@@ -187,7 +187,7 @@ describe('readStdin', () => {
     await expect(promise).resolves.toBe('chunk1-chunk2');
   });
 
-  it('should timeout and resolve with empty string if no input arrives within 5000ms in non-TTY environments', async () => {
+  it('should timeout and resolve with empty string if no input arrives within 15000ms in non-TTY environments', async () => {
     vi.useFakeTimers();
 
     let settled = false;
@@ -197,7 +197,7 @@ describe('readStdin', () => {
     });
     const initialErrorHandler = onErrorHandler;
 
-    await vi.advanceTimersByTimeAsync(4999);
+    await vi.advanceTimersByTimeAsync(14999);
     expect(settled).toBe(false);
 
     await vi.advanceTimersByTimeAsync(1);
@@ -211,6 +211,23 @@ describe('readStdin', () => {
       'error',
       initialErrorHandler,
     );
+    expect(mockStdin.destroy).not.toHaveBeenCalled();
+  });
+
+  it('should truncate oversize multi-byte Buffer chunks without splitting UTF-8 characters', async () => {
+    const MAX_STDIN_SIZE = 8 * 1024 * 1024;
+    const charCount = Math.floor(MAX_STDIN_SIZE / 3) + 5;
+    const multiByteBuf = Buffer.from('한'.repeat(charCount), 'utf8');
+
+    mockStdin.read.mockReturnValueOnce(multiByteBuf).mockReturnValueOnce(null);
+
+    const promise = readStdin();
+    onReadableHandler();
+
+    const result = await promise;
+    const resultBytes = Buffer.byteLength(result, 'utf8');
+    expect(resultBytes).toBe(Math.floor(MAX_STDIN_SIZE / 3) * 3);
+    expect(result).not.toContain('\uFFFD');
     expect(mockStdin.destroy).not.toHaveBeenCalled();
   });
 
