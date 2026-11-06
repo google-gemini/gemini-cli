@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { ThinkingLevel } from '@google/genai';
 import { DEFAULT_MODEL_CONFIGS } from '../config/defaultModelConfigs.js';
 import {
   ModelConfigService,
@@ -568,6 +569,29 @@ describe('ModelConfigService', () => {
         'overrideFoo',
       ]);
     });
+
+    it.each([
+      [{ thinkingLevel: ThinkingLevel.HIGH }, { thinkingBudget: -1 }],
+      [{ thinkingBudget: 8192 }, { thinkingLevel: ThinkingLevel.LOW }],
+    ])(
+      'should replace inherited %o when an override sets %o',
+      (base, override) => {
+        const merged = ModelConfigService.merge(
+          {
+            generateContentConfig: {
+              thinkingConfig: { includeThoughts: true, ...base },
+            },
+          },
+          { generateContentConfig: { thinkingConfig: override } },
+        );
+
+        // The API rejects thinkingLevel and thinkingBudget in one request.
+        expect(merged.generateContentConfig?.thinkingConfig).toEqual({
+          includeThoughts: true,
+          ...override,
+        });
+      },
+    );
   });
 
   describe('runtime aliases', () => {
@@ -693,6 +717,77 @@ describe('ModelConfigService', () => {
         service.getResolvedConfig({ model: 'gemini-pro' }).generateContentConfig
           .temperature,
       ).toBeUndefined();
+    });
+  });
+
+  describe('runtime scope overrides', () => {
+    const config: ModelConfigServiceConfig = {
+      aliases: {
+        'gemini-pro': {
+          modelConfig: {
+            model: 'gemini-pro',
+            generateContentConfig: { temperature: 1, topK: 64 },
+          },
+        },
+      },
+      overrides: [],
+    };
+    const resolve = (service: ModelConfigService, model = 'gemini-pro') =>
+      service.getResolvedConfig({ model, overrideScope: 'my-agent' })
+        .generateContentConfig;
+
+    it('should apply to every model requested in the scope', () => {
+      const service = new ModelConfigService(config);
+      service.registerRuntimeScopeOverride('my-agent', {
+        generateContentConfig: { temperature: 0.1 },
+      });
+
+      expect(resolve(service)).toEqual({ temperature: 0.1, topK: 64 });
+      expect(resolve(service, 'other-model')).toEqual({ temperature: 0.1 });
+      expect(
+        service.getResolvedConfig({ model: 'gemini-pro' })
+          .generateContentConfig,
+      ).toEqual({ temperature: 1, topK: 64 });
+    });
+
+    it('should replace the earlier override for the same scope', () => {
+      const service = new ModelConfigService(config);
+      service.registerRuntimeScopeOverride('my-agent', {
+        generateContentConfig: { temperature: 0.1, topP: 0.5 },
+      });
+      service.registerRuntimeScopeOverride('my-agent', {
+        generateContentConfig: { temperature: 0.2 },
+      });
+
+      expect(resolve(service)).toEqual({ temperature: 0.2, topK: 64 });
+    });
+
+    it('should not be removed by clearRuntimeOverrides', () => {
+      const service = new ModelConfigService(config);
+      service.registerRuntimeScopeOverride('my-agent', {
+        generateContentConfig: { temperature: 0.1 },
+      });
+
+      service.clearRuntimeOverrides();
+
+      expect(resolve(service).temperature).toBe(0.1);
+    });
+
+    it('should yield to configured overrides for the same scope', () => {
+      const service = new ModelConfigService({
+        ...config,
+        overrides: [
+          {
+            match: { overrideScope: 'my-agent' },
+            modelConfig: { generateContentConfig: { temperature: 0.7 } },
+          },
+        ],
+      });
+      service.registerRuntimeScopeOverride('my-agent', {
+        generateContentConfig: { temperature: 0.1 },
+      });
+
+      expect(resolve(service).temperature).toBe(0.7);
     });
   });
 
