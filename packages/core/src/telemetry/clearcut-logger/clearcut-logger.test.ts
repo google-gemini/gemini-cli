@@ -43,6 +43,8 @@ import {
   HookCallEvent,
   OnboardingStartEvent,
   OnboardingSuccessEvent,
+  IdeConnectionEvent,
+  IdeConnectionType,
 } from '../types.js';
 import { HookType } from '../../hooks/types.js';
 import { AgentTerminateMode } from '../../agents/types.js';
@@ -1514,6 +1516,29 @@ describe('ClearcutLogger', () => {
       expect(events[0]).toHaveMetadataValue([
         EventMetadataKey.GEMINI_CLI_WEB_FETCH_FALLBACK_REASON,
         'private_ip',
+      ]);
+    });
+  });
+
+  describe('logIdeConnectionEvent', () => {
+    it('logs an event with the proper name and connection type', async () => {
+      const { logger } = setup();
+      // Keep the event in the queue so it can be inspected after enqueueing
+      vi.spyOn(logger!, 'flushToClearcut').mockResolvedValue({
+        nextRequestWaitMs: 0,
+      });
+
+      logger?.logIdeConnectionEvent(
+        new IdeConnectionEvent(IdeConnectionType.SESSION),
+      );
+      await vi.runAllTimersAsync();
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.IDE_CONNECTION);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_IDE_CONNECTION_TYPE,
+        JSON.stringify(IdeConnectionType.SESSION),
       ]);
     });
   });
