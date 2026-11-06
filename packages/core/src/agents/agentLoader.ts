@@ -664,13 +664,20 @@ export async function loadAgentsFromDirectory(
 
   const files = dirEntries.filter(
     (entry) =>
-      entry.isFile() &&
+      (entry.isFile() || entry.isSymbolicLink()) &&
       !entry.name.startsWith('_') &&
       entry.name.endsWith('.md'),
   );
 
   for (const entry of files) {
     const filePath = path.join(dir, entry.name);
+    if (entry.isSymbolicLink()) {
+      // Quietly skip broken links and links to non-files.
+      const stats = await fs.stat(filePath).catch(() => undefined);
+      if (!stats?.isFile()) {
+        continue;
+      }
+    }
     try {
       const content = await fs.readFile(filePath, 'utf-8');
       const hash = crypto.createHash('sha256').update(content).digest('hex');
