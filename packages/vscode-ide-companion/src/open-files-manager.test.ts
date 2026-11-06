@@ -383,6 +383,48 @@ describe('OpenFilesManager', () => {
     expect(getTextMock).not.toHaveBeenCalled();
   });
 
+  it('skips document.getText when document is closed or throws', async () => {
+    const manager = new OpenFilesManager(context);
+    const uri = getUri('/test/file1.txt');
+    const selection = {
+      active: { line: 10, character: 20 },
+      isEmpty: false,
+    } as vscode.Selection;
+
+    const getTextMock = vi.fn().mockImplementation(() => {
+      throw new Error('Document is disposed');
+    });
+    const textEditor = {
+      document: {
+        uri,
+        isClosed: false,
+        getText: getTextMock,
+      },
+      selection,
+    } as unknown as vscode.TextEditor;
+
+    onDidChangeActiveTextEditorListener(textEditor);
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(
+      manager.state.workspaceState!.openFiles![0].selectedText,
+    ).toBeUndefined();
+
+    getTextMock.mockClear();
+    (textEditor.document as { isClosed: boolean }).isClosed = true;
+    onDidChangeTextEditorSelectionListener({
+      textEditor,
+      selections: [selection],
+      kind: vscode.TextEditorSelectionChangeKind.Mouse,
+    });
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(getTextMock).not.toHaveBeenCalled();
+    expect(
+      manager.state.workspaceState!.openFiles![0].selectedText,
+    ).toBeUndefined();
+  });
+
   it('debounces document.getText across rapid selection changes', async () => {
     const manager = new OpenFilesManager(context);
     const uri = getUri('/test/file1.txt');

@@ -180,9 +180,15 @@ export class OpenFilesManager implements vscode.Disposable {
         }
       : undefined;
 
-    let selectedText: string | undefined = editor.selection.isEmpty
-      ? undefined
-      : editor.document.getText(editor.selection) || undefined;
+    let selectedText: string | undefined;
+    try {
+      selectedText =
+        editor.selection.isEmpty || editor.document.isClosed
+          ? undefined
+          : editor.document.getText(editor.selection) || undefined;
+    } catch {
+      selectedText = undefined;
+    }
     if (selectedText && selectedText.length > MAX_SELECTED_TEXT_LENGTH) {
       selectedText = selectedText.substring(0, MAX_SELECTED_TEXT_LENGTH);
     }

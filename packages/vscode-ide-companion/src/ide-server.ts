@@ -219,7 +219,7 @@ export class IDEServer {
         },
       );
       this.subscriptions.push(
-        this.openFilesManager,
+        ...(this.openFilesManager ? [this.openFilesManager] : []),
         onDidChangeSubscription,
         onDidChangeDiffSubscription,
       );
@@ -506,6 +506,13 @@ export class IDEServer {
   }
 }
 
+const sanitizeDiffFilePath = (filePath: string): string => {
+  if (!path.isAbsolute(filePath) || filePath.split(/[/\\]/).includes('..')) {
+    throw new Error(`Invalid filePath: ${filePath}`);
+  }
+  return path.normalize(filePath);
+};
+
 const createMcpServer = (
   diffManager: DiffManager,
   log: (message: string) => void,
@@ -525,8 +532,9 @@ const createMcpServer = (
       inputSchema: OpenDiffRequestSchema.shape,
     },
     async ({ filePath, newContent }: z.infer<typeof OpenDiffRequestSchema>) => {
-      log(`Received openDiff request for filePath: ${filePath}`);
-      await diffManager.showDiff(filePath, newContent);
+      const safeFilePath = sanitizeDiffFilePath(filePath);
+      log(`Received openDiff request for filePath: ${safeFilePath}`);
+      await diffManager.showDiff(safeFilePath, newContent);
       return { content: [] };
     },
   );
@@ -537,8 +545,9 @@ const createMcpServer = (
       inputSchema: CloseDiffRequestSchema.shape,
     },
     async ({ filePath }: z.infer<typeof CloseDiffRequestSchema>) => {
-      log(`Received closeDiff request for filePath: ${filePath}`);
-      const content = await diffManager.closeDiff(filePath);
+      const safeFilePath = sanitizeDiffFilePath(filePath);
+      log(`Received closeDiff request for filePath: ${safeFilePath}`);
+      const content = await diffManager.closeDiff(safeFilePath);
       const response = { content: content ?? undefined };
       return {
         content: [
