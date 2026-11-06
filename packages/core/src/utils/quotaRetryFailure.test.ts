@@ -217,4 +217,88 @@ describe('Issue #29805: Quota-exhausted 429 retried for hours', () => {
     expect(retryDelayRecorded).toBeGreaterThanOrEqual(2000);
     expect(retryDelayRecorded).toBeLessThanOrEqual(2400);
   });
+
+  it('should retry transient QUOTA_EXHAUSTED errors when a short delay is provided', async () => {
+    const transientQuotaError = new TerminalQuotaError(
+      'Resource exhausted (QUOTA_EXHAUSTED)',
+      {
+        code: 429,
+        message: 'QUOTA_EXHAUSTED',
+        details: [
+          {
+            '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+            reason: 'QUOTA_EXHAUSTED',
+            domain: 'cloudcode-pa.googleapis.com',
+          },
+          {
+            '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+            retryDelay: '3s',
+          },
+        ],
+      },
+      3,
+      'QUOTA_EXHAUSTED',
+    );
+
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce(transientQuotaError)
+      .mockResolvedValue('recovered-from-quota');
+
+    let retryDelayRecorded = 0;
+    const promise = retryWithBackoff(fn, {
+      maxAttempts: 3,
+      maxDelayMs: 30000,
+      onPersistent429: undefined,
+      onRetry: (_attempt, _error, delayMs) => {
+        retryDelayRecorded = delayMs;
+      },
+    });
+
+    await vi.runAllTimersAsync();
+    const result = await promise;
+    expect(result).toBe('recovered-from-quota');
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(retryDelayRecorded).toBeGreaterThanOrEqual(3000);
+    expect(retryDelayRecorded).toBeLessThanOrEqual(3600);
+  });
+
+  it('should retry errors with "quota will reset after" message when a short delay is provided', async () => {
+    const shortResetError = new TerminalQuotaError(
+      'Your quota will reset after 5s.',
+      {
+        code: 429,
+        message: 'Your quota will reset after 5s.',
+        details: [
+          {
+            '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+            retryDelay: '5s',
+          },
+        ],
+      },
+      5,
+    );
+
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce(shortResetError)
+      .mockResolvedValue('recovered-from-reset');
+
+    let retryDelayRecorded = 0;
+    const promise = retryWithBackoff(fn, {
+      maxAttempts: 3,
+      maxDelayMs: 30000,
+      onPersistent429: undefined,
+      onRetry: (_attempt, _error, delayMs) => {
+        retryDelayRecorded = delayMs;
+      },
+    });
+
+    await vi.runAllTimersAsync();
+    const result = await promise;
+    expect(result).toBe('recovered-from-reset');
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(retryDelayRecorded).toBeGreaterThanOrEqual(5000);
+    expect(retryDelayRecorded).toBeLessThanOrEqual(6000);
+  });
 });

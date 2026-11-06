@@ -191,7 +191,8 @@ describe('Session', () => {
     }));
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await session.dispose();
     vi.restoreAllMocks();
   });
 

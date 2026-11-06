@@ -351,18 +351,23 @@ export async function retryWithBackoff<T>(
       ) {
         // Fall back to automatic retry for capacity exhaustion in unattended/non-interactive mode,
         // or allow up to 3 silent retries in interactive mode before prompting the fallback dialog.
+        const hasShortDelay =
+          classifiedError instanceof TerminalQuotaError &&
+          classifiedError.retryDelayMs !== undefined &&
+          classifiedError.retryDelayMs <= maxDelayMs;
+
         const isCapacityExceeded =
           classifiedError instanceof TerminalQuotaError &&
-          classifiedError.reason !== 'QUOTA_EXHAUSTED' &&
-          (classifiedError.reason === 'MODEL_CAPACITY_EXHAUSTED' ||
-            classifiedError.reason === 'MODEL_CAPACITY_EXCEEDED' ||
-            /capacity exceeded|MODEL_CAPACITY_EXHAUSTED/i.test(
-              classifiedError.message,
-            ) ||
-            (/exhausted your capacity/i.test(classifiedError.message) &&
-              !/quota will reset after/i.test(classifiedError.message))) &&
-          (classifiedError.retryDelayMs === undefined ||
-            classifiedError.retryDelayMs <= maxDelayMs);
+          (classifiedError.reason === 'QUOTA_EXHAUSTED' ||
+          /quota will reset after/i.test(classifiedError.message)
+            ? hasShortDelay
+            : (classifiedError.reason === 'MODEL_CAPACITY_EXHAUSTED' ||
+                classifiedError.reason === 'MODEL_CAPACITY_EXCEEDED' ||
+                /capacity exceeded|MODEL_CAPACITY_EXHAUSTED|exhausted your capacity/i.test(
+                  classifiedError.message,
+                )) &&
+              (classifiedError.retryDelayMs === undefined ||
+                classifiedError.retryDelayMs <= maxDelayMs));
 
         let useSilentRetry = false;
         let silentDelayMs: number | undefined;
@@ -496,9 +501,7 @@ export async function retryWithBackoff<T>(
           classifiedError.retryDelayMs !== undefined
         ) {
           if (classifiedError.retryDelayMs > maxDelayMs) {
-            throw classifiedError instanceof RetryableQuotaError
-              ? enrichQuotaError(classifiedError, authType)
-              : classifiedError;
+            throw enrichQuotaError(classifiedError, authType);
           }
           currentDelay = Math.max(currentDelay, classifiedError.retryDelayMs);
           // Positive jitter up to +20% while respecting server minimum delay
