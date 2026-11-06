@@ -11,6 +11,7 @@ import ipaddr from 'ipaddr.js';
 import {
   OAuthUtils,
   OAuthSecurityError,
+  getOAuthFetchDispatcher,
   validateOAuthEndpointUrl,
   isLoopbackUrl,
   type OAuthAuthorizationServerMetadata,
@@ -137,6 +138,38 @@ describe('OAuthUtils', () => {
 
       expect(result).toBeNull();
     });
+
+    it('should pass a safe dispatcher for a public host', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockResourceMetadata),
+      });
+
+      await OAuthUtils.fetchProtectedResourceMetadata(
+        'https://example.com/.well-known/oauth-protected-resource',
+      );
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://example.com/.well-known/oauth-protected-resource',
+        expect.objectContaining({ dispatcher: expect.any(Object) }),
+      );
+    });
+
+    it('should not pass a dispatcher for an explicitly allowed loopback host', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockResourceMetadata),
+      });
+
+      await OAuthUtils.fetchProtectedResourceMetadata(
+        'http://localhost:8080/.well-known/oauth-protected-resource',
+        { allowLoopback: true },
+      );
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:8080/.well-known/oauth-protected-resource',
+      );
+    });
   });
 
   describe('fetchAuthorizationServerMetadata', () => {
@@ -171,6 +204,38 @@ describe('OAuthUtils', () => {
 
       expect(result).toBeNull();
     });
+
+    it('should pass a safe dispatcher for a public host', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockAuthServerMetadata),
+      });
+
+      await OAuthUtils.fetchAuthorizationServerMetadata(
+        'https://auth.example.com/.well-known/oauth-authorization-server',
+      );
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://auth.example.com/.well-known/oauth-authorization-server',
+        expect.objectContaining({ dispatcher: expect.any(Object) }),
+      );
+    });
+
+    it('should not pass a dispatcher for an explicitly allowed private host', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockAuthServerMetadata),
+      });
+
+      await OAuthUtils.fetchAuthorizationServerMetadata(
+        'https://10.0.0.5/.well-known/oauth-authorization-server',
+        { allowPrivateNetwork: true },
+      );
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://10.0.0.5/.well-known/oauth-authorization-server',
+      );
+    });
   });
 
   describe('discoverAuthorizationServerMetadata', () => {
@@ -200,10 +265,12 @@ describe('OAuthUtils', () => {
       expect(mockFetch).nthCalledWith(
         1,
         'https://auth.example.com/.well-known/oauth-authorization-server',
+        expect.objectContaining({ dispatcher: expect.any(Object) }),
       );
       expect(mockFetch).nthCalledWith(
         2,
         'https://auth.example.com/.well-known/openid-configuration',
+        expect.objectContaining({ dispatcher: expect.any(Object) }),
       );
     });
 
@@ -229,14 +296,17 @@ describe('OAuthUtils', () => {
       expect(mockFetch).nthCalledWith(
         1,
         'https://auth.example.com/.well-known/oauth-authorization-server/mcp',
+        expect.objectContaining({ dispatcher: expect.any(Object) }),
       );
       expect(mockFetch).nthCalledWith(
         2,
         'https://auth.example.com/.well-known/openid-configuration/mcp',
+        expect.objectContaining({ dispatcher: expect.any(Object) }),
       );
       expect(mockFetch).nthCalledWith(
         3,
         'https://auth.example.com/mcp/.well-known/openid-configuration',
+        expect.objectContaining({ dispatcher: expect.any(Object) }),
       );
     });
   });
@@ -760,5 +830,18 @@ describe('OAuthUtils', () => {
         ),
       ).rejects.toThrow(OAuthSecurityError);
     });
+  });
+});
+
+describe('getOAuthFetchDispatcher', () => {
+  it('returns the same agent instance across calls', () => {
+    expect(getOAuthFetchDispatcher()).toBe(getOAuthFetchDispatcher());
+  });
+
+  it('returns undefined for explicitly allowed loopback and private hosts', () => {
+    expect(getOAuthFetchDispatcher({ allowLoopback: true })).toBeUndefined();
+    expect(
+      getOAuthFetchDispatcher({ allowPrivateNetwork: true }),
+    ).toBeUndefined();
   });
 });
