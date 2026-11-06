@@ -705,6 +705,13 @@
           "default": -1,
           "type": "number"
         },
+        "requestTimeoutMs": {
+          "title": "Request Timeout (ms)",
+          "description": "How long to wait, in milliseconds, for the API to start responding before a request is aborted and retried. Defaults to 60000. Raise this if long-thinking requests are timing out.",
+          "markdownDescription": "How long to wait, in milliseconds, for the API to start responding before a request is aborted and retried. Defaults to 60000. Raise this if long-thinking requests are timing out.\n\n- Category: `Model`\n- Requires restart: `yes`",
+          "type": "number",
+          "minimum": 1
+        },
         "summarizeToolOutput": {
           "title": "Summarize Tool Output",
           "description": "Enables or disables summarization of tool output. Configure per-tool token budgets (for example {\"run_shell_command\": {\"tokenBudget\": 2000}}). Currently only the run_shell_command tool supports summarization.",
