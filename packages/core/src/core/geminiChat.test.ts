@@ -6602,4 +6602,259 @@ describe('GeminiChat', () => {
       expect(coalesceConsecutiveContents(contents)).toEqual(contents);
     });
   });
+
+  describe('interrupted thought-only turns and resumed session durability (issue #29829)', () => {
+    it('rebuilds toolCalls and thoughts via convertSessionToClientHistory when initialized from resumedSessionData without history', () => {
+      const resumedSessionData = {
+        filePath: '/tmp/session.jsonl',
+        conversation: {
+          sessionId: 'resumed-session',
+          projectHash: 'hash',
+          startTime: '2026-01-01T00:00:00.000Z',
+          lastUpdated: '2026-01-01T00:01:00.000Z',
+          messages: [
+            {
+              id: 'u1',
+              type: 'user',
+              timestamp: '2026-01-01T00:00:01.000Z',
+              content: 'Read foo.ts',
+            },
+            {
+              id: 'm1',
+              type: 'gemini',
+              timestamp: '2026-01-01T00:00:02.000Z',
+              content: '',
+              thoughts: [
+                {
+                  subject: 'Inspecting file',
+                  description: 'Checking foo.ts contents',
+                  timestamp: '2026-01-01T00:00:02.000Z',
+                },
+              ],
+              toolCalls: [
+                {
+                  id: 'read_file_1',
+                  name: 'read_file',
+                  args: { file_path: 'foo.ts' },
+                  result: 'export const x = 1;',
+                  status: 'success',
+                  timestamp: '2026-01-01T00:00:03.000Z',
+                },
+              ],
+            },
+          ],
+        },
+      } as unknown as ResumedSessionData;
+
+      const resumedChat = new GeminiChat(
+        mockConfig,
+        '',
+        [],
+        [],
+        resumedSessionData,
+      );
+
+      const turns = resumedChat.agentHistory.get();
+      expect(turns).toHaveLength(3);
+      expect(turns[0].content).toEqual({
+        role: 'user',
+        parts: [{ text: 'Read foo.ts' }],
+      });
+      expect(turns[1].content.role).toBe('model');
+      expect(turns[1].content.parts).toEqual([
+        {
+          text: '**Inspecting file** Checking foo.ts contents',
+          thought: true,
+        },
+        expect.objectContaining({
+          functionCall: {
+            id: 'read_file_1',
+            name: 'read_file',
+            args: { file_path: 'foo.ts' },
+          },
+        }),
+      ]);
+      expect(turns[2].content).toEqual({
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              id: 'read_file_1',
+              name: 'read_file',
+              response: { output: 'export const x = 1;' },
+            },
+          },
+        ],
+      });
+    });
+
+    it('replaces a trailing thought-only model turn after a tool response with INTERRUPTED_RESPONSE_PLACEHOLDER instead of fusing the next user prompt', async () => {
+      chat.setHistory([
+        { id: 'u1', content: { role: 'user', parts: [{ text: 'Run check' }] } },
+        {
+          id: 'm1',
+          content: {
+            role: 'model',
+            parts: [
+              {
+                functionCall: {
+                  id: 'run_shell_command__1',
+                  name: 'run_shell_command',
+                  args: { command: 'npm test' },
+                },
+                thoughtSignature: 'sig-1',
+              },
+            ],
+          },
+        },
+        {
+          id: 'u2',
+          content: {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  id: 'run_shell_command__1',
+                  name: 'run_shell_command',
+                  response: { output: 'PASS' },
+                },
+              },
+            ],
+          },
+        },
+        {
+          id: 'm2-interrupted-thinking',
+          content: {
+            role: 'model',
+            parts: [
+              {
+                text: '**Analyzing results** Reviewing test output...',
+                thought: true,
+              } as Part,
+            ],
+          },
+        },
+      ]);
+
+      let capturedContents: Content[] | undefined;
+      vi.mocked(
+        mockContentGenerator.generateContentStream,
+      ).mockImplementationOnce(async (params) => {
+        capturedContents = params.contents as Content[];
+        return (async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [{ text: 'All tests pass.' }],
+                },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })();
+      });
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-3-flash-preview' },
+        'What should we do next?',
+        'prompt-after-interrupted-thinking',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(capturedContents).toBeDefined();
+      expect(capturedContents).toHaveLength(5);
+      expect(capturedContents![3]).toEqual({
+        role: 'model',
+        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+      });
+      expect(capturedContents![4]).toEqual({
+        role: 'user',
+        parts: [{ text: 'What should we do next?' }],
+      });
+    });
+
+    it('normalizes a trailing thought-only user turn to CONTINUE_PROMPT_TEXT in ensureTerminalUserTurn', () => {
+      const contents: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there' }] },
+        {
+          role: 'user',
+          parts: [{ text: 'Internal thought only', thought: true } as Part],
+        },
+      ];
+      expect(ensureTerminalUserTurn(contents)).toEqual([
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there' }] },
+        { role: 'user', parts: [{ text: CONTINUE_PROMPT_TEXT }] },
+      ]);
+    });
+
+    it('preserves durable repair of pre-existing broken history when the next sendMessageStream fails and rolls back', async () => {
+      chat.setHistory([
+        { id: 'u1', content: { role: 'user', parts: [{ text: 'Run tool' }] } },
+        {
+          id: 'm1',
+          content: {
+            role: 'model',
+            parts: [
+              {
+                functionCall: {
+                  id: 'call_unanswered',
+                  name: 'read_file',
+                  args: { file_path: 'a.ts' },
+                },
+              },
+            ],
+          },
+        },
+      ]);
+
+      vi.mocked(
+        mockContentGenerator.generateContentStream,
+      ).mockRejectedValueOnce(new Error('Transient network failure'));
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-3-flash-preview' },
+        'New user message after crash',
+        'prompt-fail-after-repair',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume
+          }
+        })(),
+      ).rejects.toThrow('Transient network failure');
+
+      // The failed 'New user message after crash' turn must be rolled back,
+      // while the closing synthetic functionResponse + interrupted model turn remain intact!
+      const turnsAfterRollback = chat.agentHistory.get();
+      expect(turnsAfterRollback).toHaveLength(4);
+      expect(turnsAfterRollback[2].content).toEqual({
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              id: 'call_unanswered',
+              name: 'read_file',
+              response: { error: INTERRUPTED_TOOL_RESPONSE_ERROR },
+            },
+          },
+        ],
+      });
+      expect(turnsAfterRollback[3].content).toEqual({
+        role: 'model',
+        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+      });
+    });
+  });
 });
