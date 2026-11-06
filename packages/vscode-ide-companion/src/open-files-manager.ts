@@ -17,14 +17,15 @@ const MAX_SELECTED_TEXT_LENGTH = 16384; // 16 KiB limit
 /**
  * Keeps track of the workspace state, including open files, cursor position, and selected text.
  */
-export class OpenFilesManager {
+export class OpenFilesManager implements vscode.Disposable {
   private readonly onDidChangeEmitter = new vscode.EventEmitter<void>();
   readonly onDidChange = this.onDidChangeEmitter.event;
+  private readonly subscriptions: vscode.Disposable[] = [];
   private debounceTimer: NodeJS.Timeout | undefined;
   private pendingSelectionEditor: vscode.TextEditor | undefined;
   private openFiles: File[] = [];
 
-  constructor(private readonly context: vscode.ExtensionContext) {
+  constructor(_context?: vscode.ExtensionContext) {
     const editorWatcher = vscode.window.onDidChangeActiveTextEditor(
       (editor) => {
         if (editor && this.isFileUri(editor.document.uri)) {
@@ -73,21 +74,12 @@ export class OpenFilesManager {
       this.fireWithDebounce();
     });
 
-    context.subscriptions.push(
+    this.subscriptions.push(
       editorWatcher,
       selectionWatcher,
       closeWatcher,
       deleteWatcher,
       renameWatcher,
-      {
-        dispose: () => {
-          if (this.debounceTimer) {
-            clearTimeout(this.debounceTimer);
-          }
-          this.pendingSelectionEditor = undefined;
-          this.onDidChangeEmitter.dispose();
-        },
-      },
     );
 
     // Just add current active file on start-up.
@@ -97,6 +89,19 @@ export class OpenFilesManager {
     ) {
       this.addOrMoveToFront(vscode.window.activeTextEditor);
     }
+  }
+
+  dispose() {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = undefined;
+    }
+    this.pendingSelectionEditor = undefined;
+    for (const subscription of this.subscriptions) {
+      subscription.dispose();
+    }
+    this.subscriptions.length = 0;
+    this.onDidChangeEmitter.dispose();
   }
 
   private isFileUri(uri: vscode.Uri): boolean {

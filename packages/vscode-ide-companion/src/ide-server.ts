@@ -128,6 +128,7 @@ export class IDEServer {
   private transports: { [sessionId: string]: StreamableHTTPServerTransport } =
     {};
   private openFilesManager: OpenFilesManager | undefined;
+  private subscriptions: vscode.Disposable[] = [];
   private status: 'idle' | 'stopping' | 'stopped' = 'idle';
   private stopPromise: Promise<void> | undefined;
   /** Bumped by every start(); lets a late-finishing shutdown recognise that a
@@ -204,11 +205,11 @@ export class IDEServer {
 
       let mcpServer: McpServer | undefined;
 
+      this.disposeResources();
       this.openFilesManager = new OpenFilesManager(context);
       const onDidChangeSubscription = this.openFilesManager.onDidChange(() => {
         this.broadcastIdeContextUpdate();
       });
-      context.subscriptions.push(onDidChangeSubscription);
       const onDidChangeDiffSubscription = this.diffManager.onDidChange(
         (notification) => {
           for (const transport of Object.values(this.transports)) {
@@ -217,7 +218,11 @@ export class IDEServer {
           }
         },
       );
-      context.subscriptions.push(onDidChangeDiffSubscription);
+      this.subscriptions.push(
+        this.openFilesManager,
+        onDidChangeSubscription,
+        onDidChangeDiffSubscription,
+      );
 
       app.post('/mcp', async (req: Request, res: Response) => {
         const sessionId = getSessionId(req);
@@ -443,6 +448,15 @@ export class IDEServer {
     }
   }
 
+  private disposeResources(): void {
+    this.openFilesManager = undefined;
+    const subscriptions = this.subscriptions;
+    this.subscriptions = [];
+    for (const subscription of subscriptions) {
+      subscription.dispose();
+    }
+  }
+
   private async shutdown(generation: number): Promise<void> {
     // Detach synchronously so a stop() issued after this one completes is a
     // no-op rather than closing the same listener twice, and so a start()
@@ -453,6 +467,7 @@ export class IDEServer {
     this.transports = {};
     const portFile = this.portFile;
     this.portFile = undefined;
+    this.disposeResources();
 
     // Close every MCP session first. This ends their long-lived SSE
     // responses and fires `onclose`, which clears the keep-alive interval.

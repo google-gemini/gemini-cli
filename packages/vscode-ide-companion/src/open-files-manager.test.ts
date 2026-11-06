@@ -546,4 +546,61 @@ describe('OpenFilesManager', () => {
 
     expect(manager.state.workspaceState!.openFiles).toHaveLength(0);
   });
+
+  it('disposes all watchers, clears pending debounce timer, and disposes emitter on dispose()', async () => {
+    const editorDispose = vi.fn();
+    const selectionDispose = vi.fn();
+    const deleteDispose = vi.fn();
+    const closeDispose = vi.fn();
+    const renameDispose = vi.fn();
+
+    vi.mocked(vscode.window.onDidChangeActiveTextEditor).mockImplementation(
+      (listener) => {
+        onDidChangeActiveTextEditorListener = listener;
+        return { dispose: editorDispose };
+      },
+    );
+    vi.mocked(vscode.window.onDidChangeTextEditorSelection).mockImplementation(
+      (listener) => {
+        onDidChangeTextEditorSelectionListener = listener;
+        return { dispose: selectionDispose };
+      },
+    );
+    vi.mocked(vscode.workspace.onDidDeleteFiles).mockImplementation(
+      (listener) => {
+        onDidDeleteFilesListener = listener;
+        return { dispose: deleteDispose };
+      },
+    );
+    vi.mocked(vscode.workspace.onDidCloseTextDocument).mockImplementation(
+      (listener) => {
+        onDidCloseTextDocumentListener = listener;
+        return { dispose: closeDispose };
+      },
+    );
+    vi.mocked(vscode.workspace.onDidRenameFiles).mockImplementation(
+      (listener) => {
+        onDidRenameFilesListener = listener;
+        return { dispose: renameDispose };
+      },
+    );
+
+    const manager = new OpenFilesManager(context);
+    const onDidChangeSpy = vi.fn();
+    manager.onDidChange(onDidChangeSpy);
+
+    const uri = getUri('/test/file1.txt');
+    addFile(uri);
+
+    // Dispose before the debounce timer fires
+    manager.dispose();
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(onDidChangeSpy).not.toHaveBeenCalled();
+    expect(editorDispose).toHaveBeenCalledTimes(1);
+    expect(selectionDispose).toHaveBeenCalledTimes(1);
+    expect(deleteDispose).toHaveBeenCalledTimes(1);
+    expect(closeDispose).toHaveBeenCalledTimes(1);
+    expect(renameDispose).toHaveBeenCalledTimes(1);
+  });
 });
