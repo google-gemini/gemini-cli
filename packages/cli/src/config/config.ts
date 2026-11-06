@@ -36,6 +36,7 @@ import {
   isHeadlessMode,
   Config,
   SimpleExtensionLoader,
+  collectAppendSystemPrompt,
   resolveToRealPath,
   applyAdminAllowlist,
   applyRequiredServers,
@@ -83,6 +84,8 @@ export interface CliArgs {
   debug: boolean | undefined;
   prompt: string | undefined;
   promptInteractive: string | undefined;
+  appendSystemPrompt?: string;
+  appendSystemPromptFile?: string;
   worktree?: string;
 
   yolo: boolean | undefined;
@@ -311,6 +314,18 @@ export async function parseArguments(
           nargs: 1,
           description:
             'Execute the provided prompt and continue in interactive mode',
+        })
+        .option('append-system-prompt', {
+          type: 'string',
+          nargs: 1,
+          description:
+            'Append text to the system prompt for this session without replacing the built-in prompt',
+        })
+        .option('append-system-prompt-file', {
+          type: 'string',
+          nargs: 1,
+          description:
+            'Append the contents of a file to the system prompt for this session without replacing the built-in prompt. Relative paths and ~ are resolved like GEMINI_SYSTEM_MD',
         })
         .option('skip-trust', {
           type: 'boolean',
@@ -1021,6 +1036,11 @@ export async function loadCliConfig(
       settings.security?.environmentVariableRedaction?.allowed,
     enableEnvironmentVariableRedaction:
       settings.security?.environmentVariableRedaction?.enabled,
+    appendSystemPrompt: collectAppendSystemPrompt({
+      envPath: process.env['GEMINI_APPEND_SYSTEM_MD'],
+      filePath: argv.appendSystemPromptFile,
+      text: argv.appendSystemPrompt,
+    }),
     approvalMode,
     disableYoloMode:
       settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,

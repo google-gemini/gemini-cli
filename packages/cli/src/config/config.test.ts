@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {
@@ -402,6 +403,46 @@ describe('parseArguments', () => {
     const parsedArgs = await parseArguments(createTestMergedSettings());
     expect(parsedArgs.prompt).toBe(expected.prompt);
     expect(parsedArgs.promptInteractive).toBe(expected.promptInteractive);
+  });
+
+  describe('append system prompt flags', () => {
+    it('parses --append-system-prompt', async () => {
+      process.argv = [
+        'node',
+        'script.js',
+        '--append-system-prompt',
+        'extra rules',
+      ];
+      const parsedArgs = await parseArguments(createTestMergedSettings());
+      expect(parsedArgs.appendSystemPrompt).toBe('extra rules');
+      expect(parsedArgs.appendSystemPromptFile).toBeUndefined();
+    });
+
+    it('parses --append-system-prompt-file', async () => {
+      process.argv = [
+        'node',
+        'script.js',
+        '--append-system-prompt-file',
+        './extra.md',
+      ];
+      const parsedArgs = await parseArguments(createTestMergedSettings());
+      expect(parsedArgs.appendSystemPromptFile).toBe('./extra.md');
+      expect(parsedArgs.appendSystemPrompt).toBeUndefined();
+    });
+
+    it('parses both append flags together', async () => {
+      process.argv = [
+        'node',
+        'script.js',
+        '--append-system-prompt-file',
+        './extra.md',
+        '--append-system-prompt',
+        'more rules',
+      ];
+      const parsedArgs = await parseArguments(createTestMergedSettings());
+      expect(parsedArgs.appendSystemPromptFile).toBe('./extra.md');
+      expect(parsedArgs.appendSystemPrompt).toBe('more rules');
+    });
   });
 
   describe('positional arguments and @commands', () => {
@@ -1013,6 +1054,124 @@ describe('loadCliConfig', () => {
       DEFAULT_FILE_FILTERING_OPTIONS.customIgnoreFilePaths,
     );
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+  });
+
+  describe('append system prompt', () => {
+    let tmpDir: string;
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-append-cli-'));
+      vi.stubEnv('GEMINI_APPEND_SYSTEM_MD', '');
+    });
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it('combines env file, --append-system-prompt-file, and --append-system-prompt in order', async () => {
+      const envPath = path.join(tmpDir, 'env.md');
+      const flagPath = path.join(tmpDir, 'flag.md');
+      await fs.promises.writeFile(envPath, 'ENV FILE CONTENT', 'utf8');
+      await fs.promises.writeFile(flagPath, 'FLAG FILE CONTENT', 'utf8');
+      vi.stubEnv('GEMINI_APPEND_SYSTEM_MD', envPath);
+
+      process.argv = [
+        'node',
+        'script.js',
+        '--append-system-prompt-file',
+        flagPath,
+        '--append-system-prompt',
+        'FLAG STRING CONTENT',
+      ];
+      const argv = await parseArguments(createTestMergedSettings());
+      const config = await loadCliConfig(
+        createTestMergedSettings(),
+        'test-session',
+        argv,
+      );
+
+      expect(config.getAppendSystemPrompt()).toBe(
+        'ENV FILE CONTENT\n\nFLAG FILE CONTENT\n\nFLAG STRING CONTENT',
+      );
+    });
+
+    it('loads GEMINI_APPEND_SYSTEM_MD when no flags are set', async () => {
+      const envPath = path.join(tmpDir, 'env-only.md');
+      await fs.promises.writeFile(envPath, 'ENV ONLY CONTENT', 'utf8');
+      vi.stubEnv('GEMINI_APPEND_SYSTEM_MD', envPath);
+
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments(createTestMergedSettings());
+      const config = await loadCliConfig(
+        createTestMergedSettings(),
+        'test-session',
+        argv,
+      );
+
+      expect(config.getAppendSystemPrompt()).toBe('ENV ONLY CONTENT');
+    });
+
+    it('expands tilde in --append-system-prompt-file', async () => {
+      vi.stubEnv('GEMINI_CLI_HOME', tmpDir);
+      const filePath = path.join(tmpDir, 'tilde.md');
+      await fs.promises.writeFile(filePath, 'TILDE FILE CONTENT', 'utf8');
+
+      process.argv = [
+        'node',
+        'script.js',
+        '--append-system-prompt-file',
+        '~/tilde.md',
+      ];
+      const argv = await parseArguments(createTestMergedSettings());
+      const config = await loadCliConfig(
+        createTestMergedSettings(),
+        'test-session',
+        argv,
+      );
+      expect(config.getAppendSystemPrompt()).toBe('TILDE FILE CONTENT');
+    });
+
+    it('throws a clear error when --append-system-prompt-file cannot be read', async () => {
+      const missingPath = path.join(tmpDir, 'missing.md');
+      process.argv = [
+        'node',
+        'script.js',
+        '--append-system-prompt-file',
+        missingPath,
+      ];
+      const argv = await parseArguments(createTestMergedSettings());
+
+      await expect(
+        loadCliConfig(createTestMergedSettings(), 'test-session', argv),
+      ).rejects.toThrow(
+        `unable to read append system prompt file '${path.resolve(missingPath)}'`,
+      );
+    });
+
+    it('throws a clear error when GEMINI_APPEND_SYSTEM_MD cannot be read', async () => {
+      const missingPath = path.join(tmpDir, 'missing-env.md');
+      vi.stubEnv('GEMINI_APPEND_SYSTEM_MD', missingPath);
+
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments(createTestMergedSettings());
+
+      await expect(
+        loadCliConfig(createTestMergedSettings(), 'test-session', argv),
+      ).rejects.toThrow(
+        `unable to read append system prompt file '${path.resolve(missingPath)}'`,
+      );
+    });
+
+    it('leaves appendSystemPrompt unset by default', async () => {
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments(createTestMergedSettings());
+      const config = await loadCliConfig(
+        createTestMergedSettings(),
+        'test-session',
+        argv,
+      );
+      expect(config.getAppendSystemPrompt()).toBeUndefined();
+    });
   });
 
   it('should be non-interactive when isCommand is set', async () => {

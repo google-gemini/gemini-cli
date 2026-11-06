@@ -14,6 +14,9 @@ core instructions will apply unless you include them yourself.
 This feature is intended for advanced users who need to enforce strict,
 project-specific behavior or create a customized persona.
 
+To add instructions while keeping the built-in prompt, see
+[Appending instead of replacing](#appending-instead-of-replacing).
+
 <!-- prettier-ignore -->
 > [!TIP]
 > You can export the current default system prompt to a file first, review
@@ -102,7 +105,51 @@ safety and workflow rules.
 - Or write to a custom path:
   - `GEMINI_WRITE_SYSTEM_MD=~/prompts/DEFAULT_SYSTEM.md gemini`
 
-This creates the file and writes the current built‑in system prompt to it.
+This creates the file and writes the current built‑in system prompt to it. The
+written file is the **base** prompt only: the stock prompt or a
+`GEMINI_SYSTEM_MD` override, plus user memory. It does **not** include text
+appended with `--append-system-prompt`, `--append-system-prompt-file`, or
+`GEMINI_APPEND_SYSTEM_MD`.
+
+## Appending instead of replacing
+
+Use these options when you want extra system instructions for **this launch
+only**, without replacing the built-in prompt (and without writing a `GEMINI.md`
+file).
+
+- `--append-system-prompt "<text>"`: append the given string.
+- `--append-system-prompt-file <path>`: append the contents of a file. Relative
+  paths are resolved from the current working directory. `~` expands to the home
+  directory, matching `GEMINI_SYSTEM_MD`.
+- `GEMINI_APPEND_SYSTEM_MD=<path>`: append the contents of a file from the
+  environment. Same path rules as `--append-system-prompt-file`.
+
+These sources are mutually compatible. Non-empty parts are concatenated in this
+order, each separated by a blank line:
+
+1. Contents of `GEMINI_APPEND_SYSTEM_MD`
+2. Contents of `--append-system-prompt-file`
+3. The string from `--append-system-prompt`
+
+The extra text is added after the base prompt (the built-in prompt, or a
+`GEMINI_SYSTEM_MD` override) and before user memory from `GEMINI.md` files. It
+supplements the system prompt; it does not replace Core Mandates.
+
+If an append file is missing or unreadable, the CLI exits with
+`unable to read append system prompt file '<path>'`.
+
+### Examples
+
+```shell
+gemini --append-system-prompt "This session is mirrored; prefer concise output."
+gemini --append-system-prompt-file ~/prompts/session-extra.md
+GEMINI_APPEND_SYSTEM_MD=~/prompts/wrapper.md gemini
+gemini --append-system-prompt-file ./extra.md --append-system-prompt "Also do this."
+```
+
+Appended instructions apply to the main session. Subagents that already reuse
+the core system prompt (for example the generalist agent) inherit them;
+subagents with their own prompts do not.
 
 ## Best practices: system.md vs GEMINI.md
 
@@ -122,6 +169,9 @@ GEMINI.md focused on high‑level guidance and project specifics.
 - Error: `missing system prompt file '…'`
   - Ensure the referenced path exists and is readable.
   - For `GEMINI_SYSTEM_MD=1|true`, create `./.gemini/system.md` in your project.
+- Error: `unable to read append system prompt file '…'`
+  - Check `--append-system-prompt-file` and `GEMINI_APPEND_SYSTEM_MD`. The path
+    must exist and be readable.
 - Override not taking effect
   - Confirm the variable is loaded (use `.gemini/.env` or export in your shell).
   - Paths are resolved from the current working directory; try an absolute path.

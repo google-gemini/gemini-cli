@@ -5,7 +5,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { PromptProvider } from './promptProvider.js';
+import {
+  collectAppendSystemPrompt,
+  renderAppendedSystemPrompt,
+} from './utils.js';
 import type { Config } from '../config/config.js';
 import { makeRelative } from '../utils/paths.js';
 import {
@@ -89,6 +96,7 @@ describe('PromptProvider', () => {
       isTrackerEnabled: vi.fn().mockReturnValue(false),
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
       getGemini31LaunchedSync: vi.fn().mockReturnValue(true),
+      getAppendSystemPrompt: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
   });
 
@@ -257,6 +265,135 @@ describe('PromptProvider', () => {
       expect(prompt).toContain(
         `write .md plan files to \`${expectedRelativePath}/\``,
       );
+    });
+  });
+
+  describe('append system prompt', () => {
+    let tmpDir: string;
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-append-prompt-'));
+      vi.mocked(getAllGeminiMdFilenames).mockReturnValue([
+        DEFAULT_CONTEXT_FILENAME,
+      ]);
+    });
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it('does not include appended instructions by default', () => {
+      const provider = new PromptProvider();
+      const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+      expect(prompt).toContain('You are Gemini CLI');
+      expect(prompt).not.toContain('# Additional System Instructions');
+      expect(prompt).not.toContain('<appended_system_instructions>');
+    });
+
+    it('appends extra text after the stock prompt and before user memory', () => {
+      (
+        mockConfig.getAppendSystemPrompt as ReturnType<typeof vi.fn>
+      ).mockReturnValue('LAUNCH APPEND MARKER');
+
+      const provider = new PromptProvider();
+      const prompt = provider.getCoreSystemPrompt(
+        mockConfig,
+        'USER MEMORY MARKER',
+      );
+
+      const stockIndex = prompt.indexOf('You are Gemini CLI');
+      const appendIndex = prompt.indexOf('LAUNCH APPEND MARKER');
+      const memoryIndex = prompt.indexOf('USER MEMORY MARKER');
+
+      expect(prompt).toContain('# Additional System Instructions');
+      expect(prompt).toContain('<appended_system_instructions>');
+      expect(stockIndex).toBeGreaterThan(-1);
+      expect(appendIndex).toBeGreaterThan(stockIndex);
+      expect(memoryIndex).toBeGreaterThan(appendIndex);
+    });
+
+    it('appends extra text after a GEMINI_SYSTEM_MD override', () => {
+      const overridePath = path.join(tmpDir, 'system.md');
+      fs.writeFileSync(overridePath, 'OVERRIDE PROMPT MARKER', 'utf8');
+      vi.stubEnv('GEMINI_SYSTEM_MD', overridePath);
+      (
+        mockConfig.getAppendSystemPrompt as ReturnType<typeof vi.fn>
+      ).mockReturnValue('LAUNCH APPEND MARKER');
+
+      const provider = new PromptProvider();
+      const prompt = provider.getCoreSystemPrompt(
+        mockConfig,
+        'USER MEMORY MARKER',
+      );
+
+      const overrideIndex = prompt.indexOf('OVERRIDE PROMPT MARKER');
+      const appendIndex = prompt.indexOf('LAUNCH APPEND MARKER');
+      const memoryIndex = prompt.indexOf('USER MEMORY MARKER');
+
+      expect(overrideIndex).toBeGreaterThan(-1);
+      expect(appendIndex).toBeGreaterThan(overrideIndex);
+      expect(memoryIndex).toBeGreaterThan(appendIndex);
+      expect(prompt).not.toContain('You are Gemini CLI');
+    });
+
+    it('combines env file, flag file, and flag text in documented order', () => {
+      const envPath = path.join(tmpDir, 'env-append.md');
+      const flagPath = path.join(tmpDir, 'flag-append.md');
+      fs.writeFileSync(envPath, 'ENV FILE CONTENT', 'utf8');
+      fs.writeFileSync(flagPath, 'FLAG FILE CONTENT', 'utf8');
+
+      const combined = collectAppendSystemPrompt({
+        envPath,
+        filePath: flagPath,
+        text: 'FLAG STRING CONTENT',
+      });
+
+      expect(combined).toBe(
+        'ENV FILE CONTENT\n\nFLAG FILE CONTENT\n\nFLAG STRING CONTENT',
+      );
+
+      (
+        mockConfig.getAppendSystemPrompt as ReturnType<typeof vi.fn>
+      ).mockReturnValue(combined);
+
+      const provider = new PromptProvider();
+      const prompt = provider.getCoreSystemPrompt(mockConfig);
+      const appendedSection = renderAppendedSystemPrompt(combined ?? '');
+
+      expect(prompt).toContain(appendedSection);
+      expect(prompt.indexOf('ENV FILE CONTENT')).toBeLessThan(
+        prompt.indexOf('FLAG FILE CONTENT'),
+      );
+      expect(prompt.indexOf('FLAG FILE CONTENT')).toBeLessThan(
+        prompt.indexOf('FLAG STRING CONTENT'),
+      );
+    });
+
+    it('throws a clear error when an append file cannot be read', () => {
+      const missingPath = path.join(tmpDir, 'missing.md');
+      expect(() =>
+        collectAppendSystemPrompt({ filePath: missingPath }),
+      ).toThrow(
+        `unable to read append system prompt file '${path.resolve(missingPath)}'`,
+      );
+    });
+
+    it('writes the base prompt only when GEMINI_WRITE_SYSTEM_MD is set', () => {
+      const writePath = path.join(tmpDir, 'written-system.md');
+      vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', writePath);
+      (
+        mockConfig.getAppendSystemPrompt as ReturnType<typeof vi.fn>
+      ).mockReturnValue('LAUNCH APPEND MARKER');
+
+      const provider = new PromptProvider();
+      const prompt = provider.getCoreSystemPrompt(mockConfig);
+      const written = fs.readFileSync(writePath, 'utf8');
+
+      expect(prompt).toContain('LAUNCH APPEND MARKER');
+      expect(written).toContain('You are Gemini CLI');
+      expect(written).not.toContain('LAUNCH APPEND MARKER');
+      expect(written).not.toContain('# Additional System Instructions');
     });
   });
 

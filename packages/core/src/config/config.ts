@@ -625,6 +625,8 @@ export interface ConfigParameters {
   mcpServers?: Record<string, MCPServerConfig>;
   mcpEnablementCallbacks?: McpEnablementCallbacks;
   userMemory?: string | HierarchicalMemory;
+  /** Extra system-prompt text appended after the stock or overridden prompt. */
+  appendSystemPrompt?: string;
   geminiMdFileCount?: number;
   geminiMdFilePaths?: string[];
   approvalMode?: ApprovalMode;
@@ -810,6 +812,7 @@ export class Config implements McpContext, AgentLoopContext {
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private readonly mcpEnablementCallbacks?: McpEnablementCallbacks;
   private userMemory: string | HierarchicalMemory;
+  private readonly appendSystemPrompt?: string;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
   private readonly showMemoryUsage: boolean;
@@ -1090,6 +1093,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.enableEnvironmentVariableRedaction =
       params.enableEnvironmentVariableRedaction ?? false;
     this.userMemory = params.userMemory ?? '';
+    this.appendSystemPrompt = params.appendSystemPrompt;
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
     this.showMemoryUsage = params.showMemoryUsage ?? false;
@@ -2580,6 +2584,10 @@ export class Config implements McpContext, AgentLoopContext {
       };
     }
     return this.userMemory;
+  }
+
+  getAppendSystemPrompt(): string | undefined {
+    return this.appendSystemPrompt;
   }
 
   /**
