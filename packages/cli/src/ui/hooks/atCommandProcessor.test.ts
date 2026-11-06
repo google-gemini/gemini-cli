@@ -1898,6 +1898,69 @@ describe('handleAtCommand', () => {
       );
     },
   );
+
+  it.each<{
+    description: string;
+    fileName: string;
+    fileContent: string;
+  }>([
+    {
+      description: 'leading indentation and trailing newline',
+      fileName: 'indented.py',
+      fileContent: '    print("hello")\n',
+    },
+    {
+      description: 'leading and trailing blank lines',
+      fileName: 'blank-lines.txt',
+      fileContent: '\n\nfirst line\nsecond line\n\n',
+    },
+    {
+      description: 'whitespace-only content',
+      fileName: 'whitespace.txt',
+      fileContent: '    \n\t\n  ',
+    },
+    {
+      description: 'empty content',
+      fileName: 'empty.txt',
+      fileContent: '',
+    },
+  ])(
+    'should preserve $description in referenced file content (#29934)',
+    async ({
+      fileName,
+      fileContent,
+    }: {
+      description: string;
+      fileName: string;
+      fileContent: string;
+    }) => {
+      const filePath = await createTestFile(
+        path.join(testRootDir, fileName),
+        fileContent,
+      );
+      const relativePath = getRelativePath(filePath);
+      const query = `@${filePath}`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 713,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [
+          { text: `@${relativePath}` },
+          { text: '\n--- Content from referenced files ---' },
+          { text: `\nContent from @${relativePath}:\n` },
+          ...(fileContent !== '' ? [{ text: fileContent }] : []),
+          { text: '\n--- End of content ---' },
+        ],
+      });
+    },
+  );
 });
 
 describe('escapeAtSymbols', () => {

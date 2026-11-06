@@ -1441,6 +1441,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         addItem: historyManager.addItem,
         onCancelSubmit,
         isShellFocused: embeddedShellFocused,
+        isEditorDialogOpen,
         logger,
       })
     : // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -1464,6 +1465,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         terminalHeight,
         embeddedShellFocused,
         consumePendingHints,
+        isEditorDialogOpen,
       );
 
   const {
