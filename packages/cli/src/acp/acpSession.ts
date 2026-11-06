@@ -193,12 +193,14 @@ export class Session {
   private handleRetryAttempt = (payload: RetryAttemptPayload) => {
     if (payload.sessionId === this.id) {
       const delaySec = Math.max(1, Math.round(payload.delayMs / 1000));
-      void this.sendUpdate({
+      this.sendUpdate({
         sessionUpdate: 'agent_thought_chunk',
         content: {
           type: 'text',
           text: `[Retry ${payload.attempt}/${payload.maxAttempts}] ${payload.error || 'Request failed'}. Retrying in ${delaySec}s...`,
         },
+      }).catch((err) => {
+        debugLogger.error(`Failed to send retry session update: ${err}`);
       });
     }
   };
