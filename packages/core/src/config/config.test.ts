@@ -48,6 +48,7 @@ import {
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
+import { updateGlobalFetchTimeouts } from '../utils/fetch.js';
 import { ShellTool } from '../tools/shell.js';
 import {
   acknowledgeUntrustedFlags,
@@ -786,7 +787,15 @@ describe('Server Config (config.ts)', () => {
     });
 
     describe('getRequestTimeoutMs', () => {
-      it('should return undefined if the flag is not set', () => {
+      beforeEach(() => {
+        vi.stubEnv('GEMINI_API_HEADERS_TIMEOUT_MS', '');
+      });
+
+      afterEach(() => {
+        vi.unstubAllEnvs();
+      });
+
+      it('should return undefined if neither setting, env var, nor flag is set', () => {
         const config = new Config(baseParams);
         expect(config.getRequestTimeoutMs()).toBeUndefined();
       });
@@ -821,19 +830,98 @@ describe('Server Config (config.ts)', () => {
         expect(config.getRequestTimeoutMs()).toBeUndefined();
       });
 
-      it('should return undefined if intValue is negative', () => {
+      it('should return undefined if intValue is zero or negative', () => {
+        for (const intValue of ['0', '-10']) {
+          const config = new Config({
+            ...baseParams,
+            experiments: {
+              flags: {
+                [ExperimentFlags.DEFAULT_REQUEST_TIMEOUT]: {
+                  intValue,
+                },
+              },
+              experimentIds: [],
+            },
+          } as unknown as ConfigParameters);
+          expect(config.getRequestTimeoutMs()).toBeUndefined();
+        }
+      });
+
+      it('should use requestTimeoutMs from settings when no flag is set', () => {
         const config = new Config({
           ...baseParams,
+          requestTimeoutMs: 300000,
+        });
+        expect(config.getRequestTimeoutMs()).toBe(300000);
+      });
+
+      it('should prefer requestTimeoutMs from settings over the flag', () => {
+        const config = new Config({
+          ...baseParams,
+          requestTimeoutMs: 300000,
           experiments: {
             flags: {
               [ExperimentFlags.DEFAULT_REQUEST_TIMEOUT]: {
-                intValue: '-10',
+                intValue: '30',
               },
             },
             experimentIds: [],
           },
         } as unknown as ConfigParameters);
-        expect(config.getRequestTimeoutMs()).toBeUndefined();
+        expect(config.getRequestTimeoutMs()).toBe(300000);
+      });
+
+      it('should use GEMINI_API_HEADERS_TIMEOUT_MS environment variable and prefer it over settings and flag', () => {
+        vi.stubEnv('GEMINI_API_HEADERS_TIMEOUT_MS', '240000');
+        const config = new Config({
+          ...baseParams,
+          requestTimeoutMs: 120000,
+          experiments: {
+            flags: {
+              [ExperimentFlags.DEFAULT_REQUEST_TIMEOUT]: {
+                intValue: '30',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(config.getRequestTimeoutMs()).toBe(240000);
+      });
+
+      it('should ignore invalid or non-positive requestTimeoutMs and GEMINI_API_HEADERS_TIMEOUT_MS and fall back to the flag', () => {
+        for (const envValue of ['0', '-5000', 'abc', 'Infinity']) {
+          vi.stubEnv('GEMINI_API_HEADERS_TIMEOUT_MS', envValue);
+          for (const requestTimeoutMs of [0, -1, NaN, Infinity]) {
+            const config = new Config({
+              ...baseParams,
+              requestTimeoutMs,
+              experiments: {
+                flags: {
+                  [ExperimentFlags.DEFAULT_REQUEST_TIMEOUT]: {
+                    intValue: '30',
+                  },
+                },
+                experimentIds: [],
+              },
+            } as unknown as ConfigParameters);
+            expect(config.getRequestTimeoutMs()).toBe(30000);
+          }
+        }
+      });
+
+      it('should apply requestTimeoutMs to the global fetch timeouts on refreshAuth (including Vertex AI)', async () => {
+        const config = new Config({
+          ...baseParams,
+          requestTimeoutMs: 300000,
+        });
+        vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+          authType: AuthType.USE_VERTEX_AI,
+        });
+        vi.mocked(updateGlobalFetchTimeouts).mockClear();
+
+        await config.refreshAuth(AuthType.USE_VERTEX_AI);
+
+        expect(updateGlobalFetchTimeouts).toHaveBeenCalledWith(300000);
       });
     });
   });

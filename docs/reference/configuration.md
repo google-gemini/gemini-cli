@@ -547,6 +547,14 @@ their corresponding top-level category object in your `settings.json` file.
     session. -1 means unlimited.
   - **Default:** `-1`
 
+- **`model.requestTimeoutMs`** (number):
+
+  - **Description:** How long to wait, in milliseconds, for the API to start
+    responding before a request is aborted and retried. Defaults to 60000. Raise
+    this if long-thinking requests are timing out.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
 - **`model.summarizeToolOutput`** (object):
 
   - **Description:** Enables or disables summarization of tool output. Configure

@@ -652,6 +652,7 @@ export interface ConfigParameters {
   model: string;
   disableLoopDetection?: boolean;
   maxSessionTurns?: number;
+  requestTimeoutMs?: number;
   acpMode?: boolean;
   listSessions?: boolean;
   deleteSession?: string;
@@ -851,6 +852,7 @@ export class Config implements McpContext, AgentLoopContext {
   private _activeModel: string;
   private fallbackOverrides = new Map<string, string>();
   private readonly maxSessionTurns: number;
+  private readonly requestTimeoutMs: number | undefined;
   private readonly listSessions: boolean;
   private readonly deleteSession: string | undefined;
   private readonly listExtensions: boolean;
@@ -1254,6 +1256,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
     ExecutionLifecycleService.setInjectionService(this.injectionService);
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
+    this.requestTimeoutMs = params.requestTimeoutMs;
     this.acpMode = params.acpMode ?? false;
     this.listSessions = params.listSessions ?? false;
     this.deleteSession = params.deleteSession;
@@ -1420,6 +1423,11 @@ export class Config implements McpContext, AgentLoopContext {
     if (this.telemetrySettings.enabled) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       initializeTelemetry(this);
+    }
+
+    const initialRequestTimeoutMs = this.getRequestTimeoutMs();
+    if (initialRequestTimeoutMs !== undefined) {
+      updateGlobalFetchTimeouts(initialRequestTimeoutMs);
     }
 
     const proxy = this.getProxy();
@@ -3676,13 +3684,31 @@ export class Config implements McpContext, AgentLoopContext {
 
   /**
    * Returns the configured default request timeout in milliseconds.
+   *
+   * Precedence:
+   * 1. `GEMINI_API_HEADERS_TIMEOUT_MS` environment variable
+   * 2. `model.requestTimeoutMs` setting (`ConfigParameters.requestTimeoutMs`)
+   * 3. `DEFAULT_REQUEST_TIMEOUT` experiment flag (in seconds, converted to ms)
    */
   getRequestTimeoutMs(): number | undefined {
+    const envTimeout = Number(process.env['GEMINI_API_HEADERS_TIMEOUT_MS']);
+    if (Number.isFinite(envTimeout) && envTimeout > 0) {
+      return envTimeout;
+    }
+
+    if (
+      this.requestTimeoutMs !== undefined &&
+      Number.isFinite(this.requestTimeoutMs) &&
+      this.requestTimeoutMs > 0
+    ) {
+      return this.requestTimeoutMs;
+    }
+
     const flag =
       this.experiments?.flags?.[ExperimentFlags.DEFAULT_REQUEST_TIMEOUT];
     if (flag?.intValue !== undefined) {
       const seconds = parseInt(flag.intValue, 10);
-      if (Number.isInteger(seconds) && seconds >= 0) {
+      if (Number.isInteger(seconds) && seconds > 0) {
         return seconds * 1000; // Convert seconds to milliseconds
       }
     }
