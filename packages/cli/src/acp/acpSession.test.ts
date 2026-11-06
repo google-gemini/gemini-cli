@@ -948,6 +948,33 @@ describe('Session', () => {
     expect(result.stopReason).toBe('max_turn_requests');
   });
 
+  it('should tell the client why a hook blocked the prompt', async () => {
+    const stream = createMockStream([
+      {
+        type: GeminiEventType.AgentExecutionBlocked,
+        value: { reason: 'denied by policy' },
+      },
+    ]);
+    mockSendMessageStream.mockReturnValue(stream);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'deny-this-word' }],
+    });
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'agent_message_chunk',
+        content: {
+          type: 'text',
+          text: 'Agent execution blocked: denied by policy',
+        },
+      },
+    });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
+  });
+
   it('should send sessionUpdate when approval mode changes', async () => {
     const { coreEvents, CoreEvent, ApprovalMode } = await import(
       '@google/gemini-cli-core'
