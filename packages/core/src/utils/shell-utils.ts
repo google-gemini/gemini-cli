@@ -2373,10 +2373,12 @@ function tokenizeShellCommandWords(segment: string): string[] {
         }
       } else {
         const isWindowsPathToken =
+          process.platform === 'win32' ||
           /^[A-Za-z]:$/.test(current) ||
           current === '.' ||
           current === '..' ||
-          current.includes('\\');
+          current.includes('\\') ||
+          (current.length > 0 && next === '.');
         const isWhitespaceOrQuote =
           next === ' ' ||
           next === '\t' ||

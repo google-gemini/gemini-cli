@@ -936,6 +936,7 @@ describe('isInteractiveGeminiCommand', () => {
     expect(isInteractiveGeminiCommand('\\gemini')).toBe(true);
     expect(isInteractiveGeminiCommand('/path/with\\ space/gemini')).toBe(true);
     expect(isInteractiveGeminiCommand('C:\\Users\\dev\\gemini.cmd')).toBe(true);
+    expect(isInteractiveGeminiCommand('node_modules\\.bin\\gemini')).toBe(true);
   });
 
   it('should allow non-interactive flags and subcommands', () => {
