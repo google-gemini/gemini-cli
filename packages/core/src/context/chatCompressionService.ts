@@ -303,15 +303,11 @@ export function collapseOlderFunctionResponses(
       ) {
         if (hasNestedParts) {
           partsModified = true;
+          const { parts: _parts, ...cleanFunctionResponse } =
+            part.functionResponse;
           return {
             ...part,
-            functionResponse: {
-              id: part.functionResponse.id,
-              name: part.functionResponse.name,
-              willContinue: part.functionResponse.willContinue,
-              scheduling: part.functionResponse.scheduling,
-              response: part.functionResponse.response,
-            },
+            functionResponse: cleanFunctionResponse,
           };
         }
         return part;
@@ -322,13 +318,12 @@ export function collapseOlderFunctionResponses(
 
       if (newResp !== resp || hasNestedParts) {
         partsModified = true;
+        const { parts: _parts, ...cleanFunctionResponse } =
+          part.functionResponse;
         return {
           ...part,
           functionResponse: {
-            id: part.functionResponse.id,
-            name: part.functionResponse.name,
-            willContinue: part.functionResponse.willContinue,
-            scheduling: part.functionResponse.scheduling,
+            ...cleanFunctionResponse,
             // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             response: newResp as Record<string, unknown>,
           },

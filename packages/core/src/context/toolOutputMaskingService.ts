@@ -230,13 +230,11 @@ export class ToolOutputMaskingService {
         preview,
       });
 
+      const { parts: _parts, ...cleanFunctionResponse } = part.functionResponse;
       const maskedPart = {
         ...part,
         functionResponse: {
-          id: part.functionResponse.id,
-          name: part.functionResponse.name,
-          willContinue: part.functionResponse.willContinue,
-          scheduling: part.functionResponse.scheduling,
+          ...cleanFunctionResponse,
           response: { output: maskedSnippet },
         },
       };
