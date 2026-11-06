@@ -11,6 +11,47 @@ import {
   type WorktreeInfo,
 } from '@google/gemini-cli-core';
 
+const WORKTREE_ACK_TIMEOUT_MS = 500;
+const initialProcessSend = process.send;
+
+async function notifyWorktreeSelected(worktreePath: string): Promise<void> {
+  if (
+    typeof process.send !== 'function' ||
+    (process.env['VITEST'] &&
+      process.env['GEMINI_CLI_NO_RELAUNCH'] !== 'true' &&
+      process.send === initialProcessSend &&
+      !('mock' in process.send))
+  ) {
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    let resolved = false;
+    const done = () => {
+      if (!resolved) {
+        resolved = true;
+        resolve();
+      }
+    };
+    const timeout = setTimeout(done, WORKTREE_ACK_TIMEOUT_MS);
+    try {
+      process.send!(
+        {
+          type: 'worktree-selected',
+          path: worktreePath,
+        },
+        () => {
+          clearTimeout(timeout);
+          done();
+        },
+      );
+    } catch {
+      clearTimeout(timeout);
+      done();
+    }
+  });
+}
+
 /**
  * Sets up a git worktree for parallel sessions.
  *
@@ -33,6 +74,8 @@ export async function setupWorktree(
 
     process.chdir(worktreeInfo.path);
     process.env['GEMINI_CLI_WORKTREE_HANDLED'] = '1';
+
+    await notifyWorktreeSelected(worktreeInfo.path);
 
     return worktreeInfo;
   } catch (error) {

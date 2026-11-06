@@ -47,6 +47,7 @@ export async function relaunchAppInChildProcess(
   }
 
   let latestAdminSettings = remoteAdminSettings;
+  let selectedWorktreePath: string | undefined;
 
   const runner = () => {
     const scriptArgs = getScriptArgs();
@@ -61,6 +62,7 @@ export async function relaunchAppInChildProcess(
     const child = spawn(process.execPath, spawnArgs, {
       stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
       env: newEnv,
+      ...(selectedWorktreePath ? { cwd: selectedWorktreePath } : {}),
     });
 
     // Clear one-time auth override from supervisor environment after passing to child
@@ -73,13 +75,32 @@ export async function relaunchAppInChildProcess(
 
     child.on(
       'message',
-      (msg: { type?: string; settings?: unknown; authType?: string }) => {
-        if (msg.type === 'admin-settings-update' && msg.settings) {
+      (msg: {
+        type?: string;
+        settings?: unknown;
+        authType?: string;
+        path?: string;
+      }) => {
+        if (msg?.type === 'admin-settings-update' && msg.settings) {
           latestAdminSettings = msg.settings as AdminControlsSettings;
         }
-        if (msg.type === 'auth-selected-type' && msg.authType) {
+        if (msg?.type === 'auth-selected-type' && msg.authType) {
           process.env['GEMINI_CLI_AUTH_OVERRIDE'] = msg.authType;
           newEnv['GEMINI_CLI_AUTH_OVERRIDE'] = msg.authType;
+        }
+        if (
+          msg?.type === 'worktree-selected' &&
+          typeof msg.path === 'string' &&
+          msg.path.length > 0
+        ) {
+          try {
+            process.chdir(msg.path);
+            selectedWorktreePath = msg.path;
+            process.env['GEMINI_CLI_WORKTREE_HANDLED'] = '1';
+            newEnv['GEMINI_CLI_WORKTREE_HANDLED'] = '1';
+          } catch {
+            // Ignore chdir errors if path is inaccessible
+          }
         }
       },
     );
