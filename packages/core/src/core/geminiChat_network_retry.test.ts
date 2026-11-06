@@ -301,6 +301,65 @@ describe('GeminiChat Network Retries', () => {
     expect(mockLogContentRetry).not.toHaveBeenCalled();
   });
 
+  it('should NOT replay the request when the body timeout fires mid-stream (UND_ERR_BODY_TIMEOUT)', async () => {
+    // fetch reports an undici body timeout as `TypeError: terminated` with the
+    // BodyTimeoutError as its cause.
+    const bodyTimeoutError = new TypeError('terminated', {
+      cause: Object.assign(new Error('Body Timeout Error'), {
+        name: 'BodyTimeoutError',
+        code: 'UND_ERR_BODY_TIMEOUT',
+      }),
+    });
+
+    vi.mocked(mockContentGenerator.generateContentStream)
+      .mockImplementationOnce(async () =>
+        (async function* () {
+          yield {
+            candidates: [{ content: { parts: [{ text: 'Partial' }] } }],
+          } as unknown as GenerateContentResponse;
+          throw bodyTimeoutError;
+        })(),
+      )
+      .mockImplementationOnce(async () =>
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'Replayed' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+    const stream = await chat.sendMessageStream(
+      { model: 'test-model' },
+      'test message',
+      'prompt-id-body-timeout',
+      new AbortController().signal,
+      LlmRole.MAIN,
+    );
+
+    const events: StreamEvent[] = [];
+    await expect(async () => {
+      for await (const event of stream) {
+        events.push(event);
+      }
+    }).rejects.toThrow(bodyTimeoutError);
+
+    expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(1);
+    expect(events.some((e) => e.type === StreamEventType.RETRY)).toBe(false);
+    expect(mockLogNetworkRetryAttempt).not.toHaveBeenCalled();
+    expect(mockLogContentRetryFailure).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        total_attempts: 1,
+        final_error_type: 'UND_ERR_BODY_TIMEOUT',
+      }),
+    );
+  });
+
   it('should retry on SSL error during connection phase (ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC)', async () => {
     // Create an SSL error that occurs during connection (before any yield)
     const sslError = new Error(

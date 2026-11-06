@@ -32,6 +32,10 @@ export class PrivateIpError extends Error {
 
 let defaultHeadersTimeout = 60000; // 60 seconds
 const defaultBodyTimeout = 300000; // 5 minutes
+// The global dispatcher carries the streamed model responses, which can stay
+// silent for minutes, e.g. while one large tool-call argument is generated.
+// Google recommends client timeouts of at least 15 minutes for hard prompts.
+const globalBodyTimeout = 900000; // 15 minutes
 let currentProxy: string | undefined = undefined;
 
 function getBuildConnector():
@@ -216,7 +220,7 @@ let defaultSafeAgent = createSafeAgent();
 undici.setGlobalDispatcher(
   new undici.Agent({
     headersTimeout: defaultHeadersTimeout,
-    bodyTimeout: defaultBodyTimeout,
+    bodyTimeout: globalBodyTimeout,
   }),
 );
 
@@ -238,7 +242,7 @@ export function updateGlobalFetchTimeouts(timeoutMs: number) {
     undici.setGlobalDispatcher(
       new undici.Agent({
         headersTimeout: defaultHeadersTimeout,
-        bodyTimeout: defaultBodyTimeout,
+        bodyTimeout: globalBodyTimeout,
       }),
     );
   }
@@ -560,7 +564,7 @@ export function setGlobalProxy(proxy: string) {
       httpsProxy: trimmedProxy,
       noProxy,
       headersTimeout: defaultHeadersTimeout,
-      bodyTimeout: defaultBodyTimeout,
+      bodyTimeout: globalBodyTimeout,
     }),
   );
 }
