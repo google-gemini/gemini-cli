@@ -47,6 +47,8 @@ import {
   GEMINI_DIR,
   homedir,
   isSubpath,
+  normalizePath,
+  stripExtendedLengthPrefix,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 
@@ -203,11 +205,15 @@ class ThemeManager {
     if (
       this.activeTheme &&
       this.activeTheme.type === 'custom' &&
-      !this.userThemes.has(this.activeTheme.name) &&
-      this.settingsThemes.has(this.activeTheme.name)
+      !this.userThemes.has(this.activeTheme.name)
     ) {
-      this.activeTheme = this.settingsThemes.get(this.activeTheme.name)!;
-      this.clearCache();
+      const updatedSettingsTheme = this.settingsThemes.get(
+        this.activeTheme.name,
+      );
+      if (updatedSettingsTheme) {
+        this.activeTheme = updatedSettingsTheme;
+        this.clearCache();
+      }
     }
   }
 
@@ -234,16 +240,14 @@ class ThemeManager {
 
     candidates.push(path.join(homeDir, GEMINI_DIR, 'theme.json'));
 
-    const seen = new Set<string>();
-    const deduplicated: string[] = [];
+    const deduplicatedByKey = new Map<string, string>();
     for (const candidate of candidates) {
-      const normalized = path.resolve(candidate);
-      if (!seen.has(normalized)) {
-        seen.add(normalized);
-        deduplicated.push(normalized);
-      }
+      const resolved = path.resolve(candidate);
+      const key = normalizePath(resolved);
+      deduplicatedByKey.delete(key);
+      deduplicatedByKey.set(key, resolved);
     }
-    return deduplicated;
+    return Array.from(deduplicatedByKey.values());
   }
 
   private parseUserThemeEntries(
@@ -303,10 +307,14 @@ class ThemeManager {
     );
   }
 
+  private resolveRealPath(targetPath: string): string {
+    return stripExtendedLengthPrefix(this.fs.realpathSync(targetPath));
+  }
+
   private resolveCanonicalDirectory(dirPath: string): string {
     const resolvedDir = path.resolve(dirPath);
     try {
-      const canonical = this.fs.realpathSync(resolvedDir);
+      const canonical = this.resolveRealPath(resolvedDir);
       if (isStringValue(canonical) && canonical.length > 0) {
         return path.resolve(canonical);
       }
@@ -341,7 +349,7 @@ class ThemeManager {
           continue;
         }
 
-        const canonicalPath = this.fs.realpathSync(candidatePath);
+        const canonicalPath = this.resolveRealPath(candidatePath);
         if (
           !trustedRoots.some((rootDir) => isSubpath(rootDir, canonicalPath))
         ) {
@@ -420,12 +428,11 @@ class ThemeManager {
 
     this.clearCache();
 
-    if (
-      this.activeTheme &&
-      this.activeTheme.type === 'custom' &&
-      this.userThemes.has(this.activeTheme.name)
-    ) {
-      this.activeTheme = this.userThemes.get(this.activeTheme.name)!;
+    if (this.activeTheme && this.activeTheme.type === 'custom') {
+      const updatedUserTheme = this.userThemes.get(this.activeTheme.name);
+      if (updatedUserTheme) {
+        this.activeTheme = updatedUserTheme;
+      }
     }
   }
 
@@ -743,6 +750,9 @@ class ThemeManager {
   }
 
   private _getAllCustomThemes(): Theme[] {
+    if (!this.userThemesLoaded) {
+      this.loadUserThemes();
+    }
     const mergedByName = new Map<string, Theme>([
       ...this.fileThemes,
       ...this.extensionThemes,
@@ -766,6 +776,9 @@ class ThemeManager {
    * @returns True if the theme is custom.
    */
   isCustomTheme(themeName: string): boolean {
+    if (!this.userThemesLoaded) {
+      this.loadUserThemes();
+    }
     return (
       this.userThemes.has(themeName) ||
       this.settingsThemes.has(themeName) ||
@@ -846,7 +859,7 @@ class ThemeManager {
   private loadThemeFromFile(themePath: string): Theme | undefined {
     try {
       // realpathSync resolves the path and throws if it doesn't exist.
-      const canonicalPath = this.fs.realpathSync(path.resolve(themePath));
+      const canonicalPath = this.resolveRealPath(path.resolve(themePath));
 
       // 1. Check cache using the canonical path.
       if (this.fileThemesByPath.has(canonicalPath)) {
@@ -931,6 +944,10 @@ class ThemeManager {
       return this.loadThemeFromFile(themeName);
     }
 
+    if (!this.userThemesLoaded) {
+      this.loadUserThemes();
+    }
+
     if (this.userThemes.has(themeName)) {
       return this.userThemes.get(themeName);
     }
@@ -945,13 +962,6 @@ class ThemeManager {
 
     if (this.fileThemes.has(themeName)) {
       return this.fileThemes.get(themeName);
-    }
-
-    if (!this.userThemesLoaded) {
-      this.loadUserThemes();
-      if (this.userThemes.has(themeName)) {
-        return this.userThemes.get(themeName);
-      }
     }
 
     // If it's not a built-in, not in cache, and not a valid file path,

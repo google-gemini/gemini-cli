@@ -481,6 +481,11 @@ describe('ThemeManager', () => {
           background: { primary: '#333333' },
         },
       });
+      // Even before loadUserThemes() is explicitly called, findThemeByName lazily loads theme.json and prioritizes it over settings.json
+      expect(
+        themeManager.findThemeByName('matugen-theme')?.semanticColors.background
+          .primary,
+      ).toBe('#222222');
       themeManager.loadUserThemes();
 
       expect(
