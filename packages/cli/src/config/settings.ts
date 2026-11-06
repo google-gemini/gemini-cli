@@ -611,8 +611,9 @@ function findEnvFile(
 ): string | null {
   let currentDir = path.resolve(startDir);
   while (true) {
-    // prefer gemini-specific .env under GEMINI_DIR
-    if (isTrusted) {
+    // prefer gemini-specific .env under GEMINI_DIR; the user's own
+    // ~/.gemini/.env is allowed even when the workspace is untrusted
+    if (isTrusted || currentDir === homedir()) {
       const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
       if (fs.existsSync(geminiEnvPath)) {
         return geminiEnvPath;
@@ -627,11 +628,9 @@ function findEnvFile(
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
       // check .env under home as fallback, again preferring gemini-specific .env
-      if (isTrusted) {
-        const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
-        if (fs.existsSync(homeGeminiEnvPath)) {
-          return homeGeminiEnvPath;
-        }
+      const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
+      if (fs.existsSync(homeGeminiEnvPath)) {
+        return homeGeminiEnvPath;
       }
       const homeEnvPath = path.join(homedir(), '.env');
       if (fs.existsSync(homeEnvPath)) {
