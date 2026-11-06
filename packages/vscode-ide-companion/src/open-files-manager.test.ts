@@ -351,6 +351,38 @@ describe('OpenFilesManager', () => {
     expect(textEditor.document.getText).toHaveBeenCalledWith(selection);
   });
 
+  it('skips document.getText when selection is empty', async () => {
+    const manager = new OpenFilesManager(context);
+    const uri = getUri('/test/file1.txt');
+    const selection = {
+      active: { line: 10, character: 20 },
+      isEmpty: true,
+    } as vscode.Selection;
+
+    const getTextMock = vi.fn().mockReturnValue('should not be read');
+    const textEditor = {
+      document: {
+        uri,
+        getText: getTextMock,
+      },
+      selection,
+    } as unknown as vscode.TextEditor;
+
+    onDidChangeActiveTextEditorListener(textEditor);
+    await vi.advanceTimersByTimeAsync(100);
+
+    onDidChangeTextEditorSelectionListener({
+      textEditor,
+      selections: [selection],
+      kind: vscode.TextEditorSelectionChangeKind.Mouse,
+    });
+    await vi.advanceTimersByTimeAsync(100);
+
+    const file = manager.state.workspaceState!.openFiles![0];
+    expect(file.selectedText).toBeUndefined();
+    expect(getTextMock).not.toHaveBeenCalled();
+  });
+
   it('truncates long selected text', async () => {
     const manager = new OpenFilesManager(context);
     const uri = getUri('/test/file1.txt');
