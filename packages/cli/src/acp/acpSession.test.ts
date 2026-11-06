@@ -2024,6 +2024,94 @@ describe('Session', () => {
     });
   });
 
+  it.each<{
+    description: string;
+    fileName: string;
+    fileContent: string;
+  }>([
+    {
+      description: 'leading indentation and trailing newline',
+      fileName: 'indented.py',
+      fileContent: '    print("hello")\n',
+    },
+    {
+      description: 'leading and trailing blank lines',
+      fileName: 'blank-lines.txt',
+      fileContent: '\n\nfirst line\nsecond line\n\n',
+    },
+    {
+      description: 'whitespace-only content',
+      fileName: 'whitespace.txt',
+      fileContent: '    \n\t\n  ',
+    },
+    {
+      description: 'empty content',
+      fileName: 'empty.txt',
+      fileContent: '',
+    },
+  ])(
+    'should preserve $description in @file resource_link content (#29934)',
+    async ({
+      fileName,
+      fileContent,
+    }: {
+      description: string;
+      fileName: string;
+      fileContent: string;
+    }) => {
+      const mockBuild = vi.fn().mockReturnValue({
+        getDescription: () => 'Read files',
+        toolLocations: () => [],
+        execute: vi.fn().mockResolvedValue({
+          llmContent: [`--- ${fileName} ---\n\n${fileContent}\n\n`],
+        }),
+      });
+      (ReadManyFilesTool as unknown as Mock).mockImplementation(() => ({
+        name: 'read_many_files',
+        kind: 'read',
+        build: mockBuild,
+      }));
+
+      (path.resolve as unknown as Mock).mockReturnValue(`/tmp/${fileName}`);
+      (fs.stat as unknown as Mock).mockResolvedValue({
+        isDirectory: () => false,
+        isFile: () => true,
+      });
+
+      const stream = createMockStream([
+        {
+          type: GeminiEventType.Content,
+          value: 'Done',
+        },
+      ]);
+      mockSendMessageStream.mockReturnValue(stream);
+
+      await session.prompt({
+        sessionId: 'session-1',
+        prompt: [
+          { type: 'text', text: 'Explain ' },
+          {
+            type: 'resource_link',
+            uri: `file://${fileName}`,
+            mimeType: 'text/plain',
+            name: fileName,
+          },
+        ],
+      });
+
+      expect(mockSendMessageStream).toHaveBeenCalledWith(
+        [
+          { text: `Explain @${fileName}` },
+          { text: '\n--- Content from referenced files ---' },
+          { text: `\nContent from @${fileName}:\n` },
+          ...(fileContent !== '' ? [{ text: fileContent }] : []),
+        ],
+        expect.any(AbortSignal),
+        expect.any(String),
+      );
+    },
+  );
+
   describe('dispose', () => {
     it('should safely dispose without throwing when config.dispose is undefined', async () => {
       delete (mockConfig as { dispose?: unknown }).dispose;

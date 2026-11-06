@@ -61,6 +61,7 @@ export interface ToolCallRequestInfo {
   groupId?: string;
   inputModifiedByHook?: boolean;
   forcedAsk?: boolean;
+  isUserConfirmed?: boolean;
 }
 
 export interface ToolCallResponseInfo {

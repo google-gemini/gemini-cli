@@ -54,3 +54,4 @@ decision = "allow"
 priority = 998
 modes = ["yolo"]
 allowRedirection = true
+allowCommandSubstitution = true
