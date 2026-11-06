@@ -514,6 +514,9 @@ const sanitizeDiffFilePath = (filePath: string): string => {
   if (trimmedPath.includes('\u0000')) {
     throw new Error('Invalid filePath: contains null byte');
   }
+  if (trimmedPath.startsWith('\\\\') || trimmedPath.startsWith('//')) {
+    throw new Error('Invalid filePath: UNC paths are not allowed');
+  }
   if (
     !path.isAbsolute(trimmedPath) ||
     trimmedPath.split(/[/\\]/).includes('..')
