@@ -50,6 +50,9 @@ const { Terminal } = pkg;
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 
 const PTY_ORPHAN_FD_SEARCH_RANGE = 8;
+const DARWIN_DEV_MAJOR_SHIFT = 24;
+const DARWIN_DEV_MAJOR_MASK = 0xff;
+const STDERR_FILENO = 2;
 
 /**
  * An environment variable that is set for shell executions. This can be used
@@ -1045,6 +1048,113 @@ export class ShellExecutionService {
   }
 
   /**
+   * Synchronously closes the orphan dummy `/dev/ptmx` master file descriptor
+   * (`low_fds[0]`) leaked in the parent process by `@lydell/node-pty` on macOS
+   * (`darwin`).
+   *
+   * In `@lydell/node-pty`'s `pty_posix_spawn`, a `low_fds` loop calls
+   * `posix_openpt(O_RDWR)` before allocating `*master` to guard `stdin`,
+   * `stdout`, and `stderr` (`0..2`). When `low_fds[0] >= STDERR_FILENO`, the
+   * loop breaks with `count === 0` and the cleanup loop
+   * `for (; count > 0; count--) close(low_fds[count]);` never closes
+   * `low_fds[0]`. This leaks one `/dev/ptmx` master FD (`< masterFd`) per
+   * spawned PTY until `kern.tty.ptmx_max` is exhausted.
+   *
+   * Must be called immediately and synchronously on the same JS tick as
+   * `pty.spawn()` while `masterFd` is open and before the new PTY entry is
+   * added to `activePtys`.
+   */
+  private static closeOrphanMasterFd(
+    masterFd: number | undefined,
+  ): number | undefined {
+    if (os.platform() !== 'darwin') {
+      return undefined;
+    }
+    if (
+      typeof masterFd !== 'number' ||
+      !Number.isFinite(masterFd) ||
+      masterFd <= STDERR_FILENO + 1
+    ) {
+      return undefined;
+    }
+
+    let masterStat: fs.Stats | undefined;
+    try {
+      masterStat = fs.fstatSync(masterFd);
+    } catch {
+      return undefined;
+    }
+    if (
+      !masterStat ||
+      typeof masterStat.rdev !== 'number' ||
+      (typeof masterStat.isCharacterDevice === 'function' &&
+        !masterStat.isCharacterDevice())
+    ) {
+      return undefined;
+    }
+
+    const masterMajor =
+      (masterStat.rdev >>> DARWIN_DEV_MAJOR_SHIFT) & DARWIN_DEV_MAJOR_MASK;
+    if (masterMajor === 0) {
+      return undefined;
+    }
+
+    const activeMasterFds = new Set<number>();
+    for (const entry of this.activePtys.values()) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const activeFd = (entry.ptyProcess as unknown as { fd?: number })?.fd;
+      if (typeof activeFd === 'number') {
+        activeMasterFds.add(activeFd);
+      }
+    }
+
+    for (
+      let candidateFd = masterFd - 1;
+      candidateFd > STDERR_FILENO;
+      candidateFd--
+    ) {
+      if (activeMasterFds.has(candidateFd)) {
+        continue;
+      }
+      try {
+        const candidateStat = fs.fstatSync(candidateFd);
+        if (
+          !candidateStat ||
+          typeof candidateStat.rdev !== 'number' ||
+          (typeof candidateStat.isCharacterDevice === 'function' &&
+            !candidateStat.isCharacterDevice())
+        ) {
+          continue;
+        }
+        if (candidateStat.rdev === masterStat.rdev) {
+          continue;
+        }
+        const candidateMajor =
+          (candidateStat.rdev >>> DARWIN_DEV_MAJOR_SHIFT) &
+          DARWIN_DEV_MAJOR_MASK;
+        if (candidateMajor !== masterMajor) {
+          continue;
+        }
+        if (
+          typeof masterStat.ino === 'number' &&
+          masterStat.ino > 0 &&
+          typeof candidateStat.ino === 'number' &&
+          candidateStat.ino > 0 &&
+          candidateStat.ino !== masterStat.ino
+        ) {
+          continue;
+        }
+        fs.closeSync(candidateFd);
+        return candidateFd;
+      } catch {
+        // ignored
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
    * Synchronously closes the orphan slave PTY file descriptor leaked in the
    * parent process by @lydell/node-pty on macOS (darwin).
    *
@@ -1215,6 +1325,7 @@ export class ShellExecutionService {
       const masterFd = (ptyProcess as unknown as { fd?: number }).fd;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const ptsName = (ptyProcess as unknown as { ptsName?: string }).ptsName;
+      ShellExecutionService.closeOrphanMasterFd(masterFd);
       ShellExecutionService.closeOrphanSlaveFd(masterFd, ptsName);
 
       const agent = pty._agent;
