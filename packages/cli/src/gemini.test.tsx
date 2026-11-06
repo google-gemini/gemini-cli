@@ -1249,6 +1249,11 @@ describe('gemini.tsx main function exit codes', () => {
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 
     originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
   });
 
   afterEach(() => {
@@ -1257,8 +1262,11 @@ describe('gemini.tsx main function exit codes', () => {
     } else {
       delete process.env['GEMINI_CLI_NO_RELAUNCH'];
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (process.stdin as any).isTTY = originalIsTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalIsTTY,
+      configurable: true,
+      writable: true,
+    });
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -1613,8 +1621,16 @@ describe('project hooks loading based on trust', () => {
   let loadCliConfig: Mock;
   let loadSettings: Mock;
   let parseArguments: Mock;
+  let originalIsTTY: boolean | undefined;
 
   beforeEach(async () => {
+    originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
+
     // Dynamically import and get the mocked functions
     const configModule = await import('./config/config.js');
     loadCliConfig = vi.mocked(configModule.loadCliConfig);
@@ -1648,6 +1664,11 @@ describe('project hooks loading based on trust', () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalIsTTY,
+      configurable: true,
+      writable: true,
+    });
     vi.restoreAllMocks();
   });
 

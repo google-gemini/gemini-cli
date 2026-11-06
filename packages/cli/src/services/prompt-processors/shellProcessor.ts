@@ -70,7 +70,12 @@ export class ShellProcessor implements IPromptProcessor {
 
     if (!prompt.includes(SHELL_INJECTION_TRIGGER)) {
       return [
-        { text: prompt.replaceAll(SHORTHAND_ARGS_PLACEHOLDER, userArgsRaw) },
+        {
+          text: prompt.replaceAll(
+            SHORTHAND_ARGS_PLACEHOLDER,
+            () => userArgsRaw,
+          ),
+        },
       ];
     }
 
@@ -90,7 +95,12 @@ export class ShellProcessor implements IPromptProcessor {
     // If extractInjections found no closed blocks (and didn't throw), treat as raw.
     if (injections.length === 0) {
       return [
-        { text: prompt.replaceAll(SHORTHAND_ARGS_PLACEHOLDER, userArgsRaw) },
+        {
+          text: prompt.replaceAll(
+            SHORTHAND_ARGS_PLACEHOLDER,
+            () => userArgsRaw,
+          ),
+        },
       ];
     }
 
@@ -107,7 +117,7 @@ export class ShellProcessor implements IPromptProcessor {
 
         const resolvedCommand = command.replaceAll(
           SHORTHAND_ARGS_PLACEHOLDER,
-          userArgsEscaped,
+          () => userArgsEscaped,
         );
         return { ...injection, resolvedCommand };
       },
@@ -157,7 +167,7 @@ export class ShellProcessor implements IPromptProcessor {
       const segment = prompt.substring(lastIndex, injection.startIndex);
       processedPrompt += segment.replaceAll(
         SHORTHAND_ARGS_PLACEHOLDER,
-        userArgsRaw,
+        () => userArgsRaw,
       );
 
       // Execute the resolved command (which already has ESCAPED input).
@@ -209,7 +219,7 @@ export class ShellProcessor implements IPromptProcessor {
     const finalSegment = prompt.substring(lastIndex);
     processedPrompt += finalSegment.replaceAll(
       SHORTHAND_ARGS_PLACEHOLDER,
-      userArgsRaw,
+      () => userArgsRaw,
     );
 
     return [{ text: processedPrompt }];
