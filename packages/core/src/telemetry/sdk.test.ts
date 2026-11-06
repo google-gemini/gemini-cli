@@ -19,6 +19,7 @@ import { OTLPLogExporter as OTLPLogExporterHttp } from '@opentelemetry/exporter-
 import { OTLPMetricExporter as OTLPMetricExporterHttp } from '@opentelemetry/exporter-metrics-otlp-http';
 import { Metadata } from '@grpc/grpc-js';
 import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-node';
+import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { GoogleAuth, type JWTInput } from 'google-auth-library';
 import {
@@ -103,6 +104,23 @@ describe('Telemetry SDK', () => {
       compression: 'gzip',
     });
     expect(NodeSDK.prototype.start).toHaveBeenCalled();
+  });
+
+  it('should set SERVICE_VERSION to the CLI version rather than process.version', async () => {
+    (mockConfig as unknown as { clientVersion: string }).clientVersion =
+      '1.2.3';
+
+    await initializeTelemetry(mockConfig);
+
+    expect(NodeSDK).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resource: expect.objectContaining({
+          attributes: expect.objectContaining({
+            [SemanticResourceAttributes.SERVICE_VERSION]: '1.2.3',
+          }),
+        }),
+      }),
+    );
   });
 
   it('should use HTTP exporters when protocol is http', async () => {

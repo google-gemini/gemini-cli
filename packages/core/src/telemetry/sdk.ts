@@ -39,6 +39,7 @@ import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import type { JWTInput } from 'google-auth-library';
 import type { Config } from '../config/config.js';
 import { SERVICE_NAME } from './constants.js';
+import { getVersion } from '../utils/version.js';
 import { initializeMetrics } from './metrics.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 import {
@@ -212,9 +213,14 @@ export async function initializeTelemetry(
     return;
   }
 
+  const cliVersion =
+    config.clientVersion && config.clientVersion !== 'unknown'
+      ? config.clientVersion
+      : await getVersion();
+
   const resource = resourceFromAttributes({
     [SemanticResourceAttributes.SERVICE_NAME]: SERVICE_NAME,
-    [SemanticResourceAttributes.SERVICE_VERSION]: process.version,
+    [SemanticResourceAttributes.SERVICE_VERSION]: cliVersion,
     'session.id': config.getSessionId(),
   });
 
