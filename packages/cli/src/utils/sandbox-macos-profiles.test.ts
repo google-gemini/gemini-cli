@@ -41,6 +41,11 @@ const PERMISSIVE_PROFILES = [
   'sandbox-macos-permissive-proxied.sb',
 ];
 
+// FSEvents backs fs.watch directory watches on macOS. Without it, watchers fail
+// asynchronously with EMFILE (https://github.com/google-gemini/gemini-cli/issues/28598).
+const ALLOWS_FSEVENTS =
+  /\(allow mach-lookup(?:\s*\(global-name "[^"]+"\))*\s*\(global-name "com\.apple\.FSEvents"\)/;
+
 // These two profiles are the default macOS Seatbelt profiles, so the invariants
 // below must never silently regress. Keep them deny-default and confirm the
 // reviewed allow-list stays in place.
@@ -68,6 +73,10 @@ describe('macOS permissive Seatbelt profiles', () => {
 
     it('allows binding local ports for dev/test servers', () => {
       expect(rules).toContain('(allow network-bind (local ip "*:*"))');
+    });
+
+    it('allows FSEvents so fs.watch-based file watchers keep working', () => {
+      expect(rules).toMatch(ALLOWS_FSEVENTS);
     });
   });
 
@@ -266,6 +275,14 @@ describe('BUILTIN_SEATBELT_PROFILE_CONTENTS consistency', () => {
         expect(embeddedContent).toContain(
           '(literal (string-append (param "HOME_DIR") "/.gemini/policy_integrity.json"))',
         );
+      });
+
+      it('allows FSEvents in embedded content for permissive profiles', () => {
+        if (['permissive-open', 'permissive-proxied'].includes(key)) {
+          const embeddedContent = BUILTIN_SEATBELT_PROFILE_CONTENTS[key];
+          expect(embeddedContent).toBeDefined();
+          expect(embeddedContent).toMatch(ALLOWS_FSEVENTS);
+        }
       });
 
       it('contains settings and keybindings read rules in embedded content for restrictive and strict profiles', () => {

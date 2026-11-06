@@ -89,6 +89,9 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (global-name "com.apple.SystemConfiguration.DNSConfiguration")
     (global-name "com.apple.SystemConfiguration.configd")
 )
+(allow mach-lookup
+    (global-name "com.apple.FSEvents")
+)
 (allow system-socket
     (require-all
         (socket-domain AF_SYSTEM)
@@ -255,6 +258,9 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (global-name "com.apple.mDNSResponderHelper")
     (global-name "com.apple.SystemConfiguration.DNSConfiguration")
     (global-name "com.apple.SystemConfiguration.configd")
+)
+(allow mach-lookup
+    (global-name "com.apple.FSEvents")
 )
 (allow system-socket
     (require-all
