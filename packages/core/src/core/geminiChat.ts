@@ -807,6 +807,7 @@ export class GeminiChat {
                   error: errorType,
                   model,
                   status: getErrorStatus(error),
+                  sessionId: this.context.config.getSessionId?.(),
                 });
                 await new Promise((res) => setTimeout(res, delayMs));
                 continue;
@@ -1295,6 +1296,7 @@ export class GeminiChat {
           error: error instanceof Error ? error.message : String(error),
           model: lastModelToUse,
           status: getErrorStatus(error),
+          sessionId: this.context.config.getSessionId?.(),
         });
       },
     });

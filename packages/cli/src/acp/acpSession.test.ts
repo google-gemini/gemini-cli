@@ -970,6 +970,47 @@ describe('Session', () => {
     });
   });
 
+  it('should send sessionUpdate with agent_thought_chunk when a retry attempt occurs for this session', async () => {
+    const { coreEvents, CoreEvent } = await import('@google/gemini-cli-core');
+
+    coreEvents.emit(CoreEvent.RetryAttempt, {
+      attempt: 1,
+      maxAttempts: 3,
+      delayMs: 2500,
+      error: 'RESOURCE_EXHAUSTED',
+      model: 'gemini-2.5-pro',
+      sessionId: 'session-1',
+    });
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'agent_thought_chunk',
+        content: {
+          type: 'text',
+          text: '[Retry 1/3] RESOURCE_EXHAUSTED. Retrying in 3s...',
+        },
+      },
+    });
+  });
+
+  it('should not send sessionUpdate when a retry attempt occurs for a different session', async () => {
+    const { coreEvents, CoreEvent } = await import('@google/gemini-cli-core');
+
+    mockConnection.sessionUpdate.mockClear();
+
+    coreEvents.emit(CoreEvent.RetryAttempt, {
+      attempt: 1,
+      maxAttempts: 3,
+      delayMs: 2000,
+      error: 'RESOURCE_EXHAUSTED',
+      model: 'gemini-2.5-pro',
+      sessionId: 'different-session',
+    });
+
+    expect(mockConnection.sessionUpdate).not.toHaveBeenCalled();
+  });
+
   it('should add explanation to tool call content instead of thought chunk', async () => {
     mockTool.build.mockReturnValue({
       getDescription: () => 'Test Tool',
