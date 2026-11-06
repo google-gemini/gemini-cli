@@ -23,6 +23,7 @@ import {
   resolveDefensiveToolPath,
   hasBlockedPathSegment,
   stripExtendedLengthPrefix,
+  tildeifyPath,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -294,6 +295,31 @@ describe.skipIf(process.platform !== 'darwin')('isSubpath on Darwin', () => {
 
   it('should return true for a direct subpath on Darwin', () => {
     expect(isSubpath('/Users/Test', '/Users/Test/file.txt')).toBe(true);
+  });
+});
+
+describe('tildeifyPath', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should replace the home directory and paths under it', () => {
+    vi.stubEnv('GEMINI_CLI_HOME', '/Users/al');
+    expect(tildeifyPath('/Users/al')).toBe('~');
+    expect(tildeifyPath('/Users/al/proj')).toBe('~/proj');
+  });
+
+  it('should not replace sibling directories that share a prefix', () => {
+    vi.stubEnv('GEMINI_CLI_HOME', '/Users/al');
+    expect(tildeifyPath('/Users/albert/proj')).toBe('/Users/albert/proj');
+  });
+
+  it('should handle Windows separators', () => {
+    vi.stubEnv('GEMINI_CLI_HOME', 'C:\\Users\\Al');
+    expect(tildeifyPath('C:\\Users\\Al\\proj')).toBe('~\\proj');
+    expect(tildeifyPath('C:\\Users\\Albert\\proj')).toBe(
+      'C:\\Users\\Albert\\proj',
+    );
   });
 });
 
