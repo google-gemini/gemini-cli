@@ -274,6 +274,7 @@ export const ToolConfirmationMessage: React.FC<
   // resolves properly first.
   useEffect(() => {
     if (isCancelling) {
+      setIsCancelling(false);
       handleConfirm(ToolConfirmationOutcome.Cancel);
     }
   }, [isCancelling, handleConfirm]);

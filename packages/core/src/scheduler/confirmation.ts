@@ -46,6 +46,7 @@ export interface ConfirmationResult {
 export interface ResolutionResult {
   outcome: ToolConfirmationOutcome;
   lastDetails?: SerializableConfirmationDetails;
+  confirmedByUser?: boolean;
 }
 
 /**
@@ -125,11 +126,13 @@ export async function resolveConfirmation(
   const callId = toolCall.request.callId;
   let outcome = ToolConfirmationOutcome.ModifyWithEditor;
   let lastDetails: SerializableConfirmationDetails | undefined;
+  let confirmedByUser = false;
 
   // Loop exists to allow the user to modify the parameters and see the new
   // diff.
   while (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
     if (signal.aborted) throw new Error('Operation cancelled by user');
+    confirmedByUser = false;
 
     const currentCall = state.getToolCall(callId);
     if (!currentCall || !('invocation' in currentCall)) {
@@ -189,13 +192,24 @@ export async function resolveConfirmation(
       if (modResult.error) {
         coreEvents.emitFeedback('error', modResult.error);
       }
-    } else if (response.payload && 'newContent' in response.payload) {
-      await handleInlineModification(deps, toolCall, response.payload, signal);
-      outcome = ToolConfirmationOutcome.ProceedOnce;
+    } else {
+      if (outcome !== ToolConfirmationOutcome.Cancel) {
+        confirmedByUser = true;
+      }
+      if (response.payload && 'newContent' in response.payload) {
+        await handleInlineModification(
+          deps,
+          toolCall,
+          response.payload,
+          signal,
+        );
+        outcome = ToolConfirmationOutcome.ProceedOnce;
+        confirmedByUser = true;
+      }
     }
   }
 
-  return { outcome, lastDetails };
+  return { outcome, lastDetails, confirmedByUser };
 }
 
 /**
