@@ -258,6 +258,8 @@ gemini
   and resume conversations.
 - [**Token Caching**](https://www.geminicli.com/docs/cli/token-caching) -
   Optimize token usage.
+- [**Model Routing**](docs/cli/model-routing.md) - Configure fallback behavior
+  and numerical complexity score bands to select request models.
 
 ### Tools & Extensions
 

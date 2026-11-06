@@ -247,6 +247,17 @@ export interface GemmaModelRouterSettings {
   };
 }
 
+export interface NumericalRoutingRule {
+  /** Inclusive upper bound for the classifier score. */
+  maxScore: number;
+  /** Model ID or configured model alias to use for this score band. */
+  model: string;
+}
+
+export interface NumericalRoutingSettings {
+  numericalRules?: NumericalRoutingRule[];
+}
+
 export interface ADKSettings {
   agentSessionNoninteractiveEnabled?: boolean;
   agentSessionInteractiveEnabled?: boolean;
@@ -696,6 +707,7 @@ export interface ConfigParameters {
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
   gemmaModelRouter?: GemmaModelRouterSettings;
+  routing?: NumericalRoutingSettings;
   adk?: ADKSettings;
   disableModelRouterForAuth?: AuthType[];
   retryFetchErrors?: boolean;
@@ -931,6 +943,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly outputSettings: OutputSettings;
 
   private readonly gemmaModelRouter: GemmaModelRouterSettings;
+  private readonly routingSettings: NumericalRoutingSettings;
   private readonly agentSessionNoninteractiveEnabled: boolean;
   private readonly agentSessionInteractiveEnabled: boolean;
   private readonly agentSessionSubagentEnabled: boolean;
@@ -1381,6 +1394,7 @@ export class Config implements McpContext, AgentLoopContext {
           params.gemmaModelRouter?.classifier?.model ?? 'gemma3-1b-gpu-custom',
       },
     };
+    this.routingSettings = params.routing ?? {};
 
     this.agentSessionNoninteractiveEnabled =
       params.adk?.agentSessionNoninteractiveEnabled ?? false;
@@ -3919,6 +3933,14 @@ export class Config implements McpContext, AgentLoopContext {
 
   getGemmaModelRouterSettings(): GemmaModelRouterSettings {
     return this.gemmaModelRouter;
+  }
+
+  getNumericalRoutingRules(): NumericalRoutingRule[] {
+    return this.routingSettings.numericalRules ?? [];
+  }
+
+  hasCustomNumericalRoutingRules(): boolean {
+    return this.getNumericalRoutingRules().length > 0;
   }
 
   getAgentSessionNoninteractiveEnabled(): boolean {

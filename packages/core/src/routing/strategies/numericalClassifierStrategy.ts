@@ -114,7 +114,9 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         return null;
       }
 
-      if (!isGemini3Model(model, config)) {
+      const hasCustomRules = config.hasCustomNumericalRoutingRules?.() ?? false;
+      const routingRules = config.getNumericalRoutingRules?.() ?? [];
+      if (!hasCustomRules && !isGemini3Model(model, config)) {
         return null;
       }
 
@@ -178,6 +180,19 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
       const score = routerResponse.complexity_score;
 
+      const validRules = [...routingRules]
+        .filter(
+          (rule) =>
+            Number.isFinite(rule.maxScore) &&
+            rule.maxScore >= 1 &&
+            rule.maxScore <= 100 &&
+            typeof rule.model === 'string' &&
+            rule.model.length > 0,
+        )
+        .sort((a, b) => a.maxScore - b.maxScore);
+      const configuredRule = validRules.find((rule) => score <= rule.maxScore);
+      const selectedRule =
+        configuredRule ?? (hasCustomRules ? validRules.at(-1) : undefined);
       const { threshold, groupLabel, modelAlias } =
         await this.getRoutingDecision(score, config);
       const [useGemini3_1, useCustomToolModel] = await Promise.all([
@@ -187,16 +202,17 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
       const useLatestFlash = config.hasLatestFlashGAAccess?.() ?? false;
       const useLatestFlashLite = config.hasLatestFlashLiteGAAccess?.() ?? false;
       const selectedModel = normalizeModelId(
-        resolveClassifierModel(
-          normalizeModelId(model),
-          modelAlias,
-          useGemini3_1,
-          useCustomToolModel,
-          config.getHasAccessToPreviewModel?.() ?? true,
-          config,
-          useLatestFlash,
-          useLatestFlashLite,
-        ),
+        selectedRule?.model ??
+          resolveClassifierModel(
+            normalizeModelId(model),
+            modelAlias,
+            useGemini3_1,
+            useCustomToolModel,
+            config.getHasAccessToPreviewModel?.() ?? true,
+            config,
+            useLatestFlash,
+            useLatestFlashLite,
+          ),
       );
 
       const service = config.getModelAvailabilityService();
@@ -214,9 +230,11 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
       return {
         model: selectedModel,
         metadata: {
-          source: `NumericalClassifier (${groupLabel})`,
+          source: `NumericalClassifier (${selectedRule ? 'Custom' : groupLabel})`,
           latencyMs,
-          reasoning: `[Score: ${score} / Threshold: ${threshold}] ${routerResponse.complexity_reasoning}`,
+          reasoning: selectedRule
+            ? `[Score: ${score} / ${configuredRule ? `Max score: ${selectedRule.maxScore}` : `Above final max score: ${selectedRule.maxScore}`} / Model: ${selectedRule.model}] ${routerResponse.complexity_reasoning}`
+            : `[Score: ${score} / Threshold: ${threshold}] ${routerResponse.complexity_reasoning}`,
         },
       };
     } catch (error) {
