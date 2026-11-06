@@ -42,7 +42,48 @@ import { ANSI } from './builtin/dark/ansi-dark.js';
 import { ANSILight } from './builtin/light/ansi-light.js';
 import { NoColorTheme } from './builtin/no-color.js';
 import process from 'node:process';
-import { debugLogger, homedir } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  GEMINI_DIR,
+  homedir,
+  isSubpath,
+  normalizePath,
+  stripExtendedLengthPrefix,
+} from '@google/gemini-cli-core';
+import stripJsonComments from 'strip-json-comments';
+
+const SINGLE_CUSTOM_THEME_KEYS = new Set([
+  'type',
+  'name',
+  'text',
+  'background',
+  'border',
+  'ui',
+  'status',
+  'Background',
+  'Foreground',
+  'LightBlue',
+  'AccentBlue',
+  'AccentPurple',
+  'AccentCyan',
+  'AccentGreen',
+  'AccentYellow',
+  'AccentRed',
+  'DiffAdded',
+  'DiffRemoved',
+  'Comment',
+  'Gray',
+  'DarkGray',
+  'GradientColors',
+]);
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isStringValue(value: unknown): value is string {
+  return typeof value === 'string';
+}
 
 export interface ThemeDisplay {
   name: string;
@@ -55,9 +96,12 @@ export const DEFAULT_THEME: Theme = DefaultDark;
 class ThemeManager {
   private readonly availableThemes: Theme[];
   private activeTheme: Theme;
+  private userThemes: Map<string, Theme> = new Map();
+  private userThemesLoaded = false;
   private settingsThemes: Map<string, Theme> = new Map();
   private extensionThemes: Map<string, Theme> = new Map();
   private fileThemes: Map<string, Theme> = new Map();
+  private fileThemesByPath: Map<string, Theme> = new Map();
   private terminalBackground: string | undefined;
 
   // Cache for dynamic colors
@@ -157,13 +201,238 @@ class ThemeManager {
         debugLogger.warn(`Invalid custom theme "${name}": ${validation.error}`);
       }
     }
-    // If the current active theme is a settings theme, keep it if still valid
+    // If the current active theme is a settings theme (and not overridden in theme.json), keep it if still valid
     if (
       this.activeTheme &&
       this.activeTheme.type === 'custom' &&
-      this.settingsThemes.has(this.activeTheme.name)
+      !this.userThemes.has(this.activeTheme.name)
     ) {
-      this.activeTheme = this.settingsThemes.get(this.activeTheme.name)!;
+      const updatedSettingsTheme = this.settingsThemes.get(
+        this.activeTheme.name,
+      );
+      if (updatedSettingsTheme) {
+        this.activeTheme = updatedSettingsTheme;
+        this.clearCache();
+      }
+    }
+  }
+
+  /**
+   * Returns candidate standalone theme.json paths in ascending precedence order:
+   * 1. ~/.config/gemini/theme.json
+   * 2. $XDG_CONFIG_HOME/gemini/theme.json (if XDG_CONFIG_HOME is set)
+   * 3. ~/.gemini/theme.json (respecting GEMINI_CLI_HOME via homedir())
+   */
+  getUserThemePaths(): string[] {
+    const homeDir = this.homedir();
+    if (!homeDir) {
+      return [];
+    }
+
+    const candidates: string[] = [
+      path.join(homeDir, '.config', 'gemini', 'theme.json'),
+    ];
+
+    const xdgConfigHome = process.env['XDG_CONFIG_HOME'];
+    if (xdgConfigHome) {
+      candidates.push(path.join(xdgConfigHome, 'gemini', 'theme.json'));
+    }
+
+    candidates.push(path.join(homeDir, GEMINI_DIR, 'theme.json'));
+
+    const deduplicatedByKey = new Map<string, string>();
+    for (const candidate of candidates) {
+      const resolved = path.resolve(candidate);
+      const key = normalizePath(resolved);
+      deduplicatedByKey.delete(key);
+      deduplicatedByKey.set(key, resolved);
+    }
+    return Array.from(deduplicatedByKey.values());
+  }
+
+  private parseUserThemeEntries(
+    parsed: unknown,
+  ): Array<[string, Partial<CustomTheme>]> {
+    if (!isPlainRecord(parsed)) {
+      return [];
+    }
+
+    const keys = Object.keys(parsed);
+    if (keys.length === 0) {
+      return [];
+    }
+
+    if (parsed['type'] !== 'custom') {
+      const customThemes = parsed['customThemes'];
+      if (isPlainRecord(customThemes)) {
+        return Object.entries(customThemes).filter(
+          (entry): entry is [string, Partial<CustomTheme>] =>
+            isPlainRecord(entry[1]),
+        );
+      }
+
+      const ui = parsed['ui'];
+      if (isPlainRecord(ui)) {
+        const uiCustomThemes = ui['customThemes'];
+        if (isPlainRecord(uiCustomThemes)) {
+          return Object.entries(uiCustomThemes).filter(
+            (entry): entry is [string, Partial<CustomTheme>] =>
+              isPlainRecord(entry[1]),
+          );
+        }
+      }
+    }
+
+    const rawName = parsed['name'];
+    const hasNestedCustomTheme = Object.values(parsed).some(
+      (val) => isPlainRecord(val) && val['type'] === 'custom',
+    );
+    const isSingleTheme =
+      !hasNestedCustomTheme &&
+      (parsed['type'] === 'custom' ||
+        isStringValue(rawName) ||
+        keys.every((key) => SINGLE_CUSTOM_THEME_KEYS.has(key)));
+
+    if (isSingleTheme) {
+      const themeName =
+        isStringValue(rawName) && rawName.trim().length > 0
+          ? rawName
+          : 'custom';
+      return [[themeName, parsed as Partial<CustomTheme>]];
+    }
+
+    return Object.entries(parsed).filter(
+      (entry): entry is [string, Partial<CustomTheme>] =>
+        isPlainRecord(entry[1]),
+    );
+  }
+
+  private resolveRealPath(targetPath: string): string {
+    return stripExtendedLengthPrefix(this.fs.realpathSync(targetPath));
+  }
+
+  private resolveCanonicalDirectory(dirPath: string): string {
+    const resolvedDir = path.resolve(dirPath);
+    try {
+      const canonical = this.resolveRealPath(resolvedDir);
+      if (isStringValue(canonical) && canonical.length > 0) {
+        return path.resolve(canonical);
+      }
+    } catch {
+      // Fall back to resolvedDir when the directory does not exist on disk yet.
+    }
+    return resolvedDir;
+  }
+
+  /**
+   * Loads custom themes from standalone user theme.json files
+   * (~/.gemini/theme.json and XDG fallback ~/.config/gemini/theme.json).
+   */
+  loadUserThemes(): void {
+    this.userThemes.clear();
+    this.userThemesLoaded = true;
+
+    const homeDir = this.homedir();
+    if (!homeDir) {
+      return;
+    }
+
+    const trustedRoots = [this.resolveCanonicalDirectory(homeDir)];
+    const xdgConfigHome = process.env['XDG_CONFIG_HOME'];
+    if (xdgConfigHome) {
+      trustedRoots.push(this.resolveCanonicalDirectory(xdgConfigHome));
+    }
+
+    for (const candidatePath of this.getUserThemePaths()) {
+      try {
+        if (!this.fs.existsSync(candidatePath)) {
+          continue;
+        }
+
+        const canonicalPath = this.resolveRealPath(candidatePath);
+        if (
+          !trustedRoots.some((rootDir) => isSubpath(rootDir, canonicalPath))
+        ) {
+          debugLogger.warn(
+            `Theme file at "${candidatePath}" resolves outside trusted configuration directories. ` +
+              `Only load themes from trusted sources.`,
+          );
+          continue;
+        }
+
+        const rawContent = this.fs.readFileSync(canonicalPath, 'utf-8');
+        const parsed: unknown = JSON.parse(stripJsonComments(rawContent));
+        if (!isPlainRecord(parsed)) {
+          debugLogger.warn(
+            `Invalid theme file "${candidatePath}": expected a JSON object.`,
+          );
+          continue;
+        }
+
+        const entries = this.parseUserThemeEntries(parsed);
+        for (const [entryKey, rawThemeConfig] of entries) {
+          const rawConfigName: unknown = rawThemeConfig.name;
+          const resolvedName =
+            isStringValue(rawConfigName) && rawConfigName.trim().length > 0
+              ? rawConfigName
+              : entryKey;
+          const candidateConfig: Partial<CustomTheme> = {
+            ...rawThemeConfig,
+            name: resolvedName,
+          };
+
+          const validation = validateCustomTheme(candidateConfig);
+          if (!validation.isValid) {
+            debugLogger.warn(
+              `Invalid custom theme "${entryKey}" in "${candidatePath}": ${validation.error}`,
+            );
+            continue;
+          }
+
+          if (validation.warning) {
+            debugLogger.warn(`Theme "${entryKey}": ${validation.warning}`);
+          }
+
+          const themeWithDefaults: CustomTheme = {
+            ...DEFAULT_THEME.colors,
+            ...candidateConfig,
+            name: resolvedName,
+            type: 'custom',
+          };
+
+          try {
+            const theme = createCustomTheme(themeWithDefaults);
+            this.userThemes.set(resolvedName, theme);
+          } catch (error) {
+            debugLogger.warn(
+              `Failed to load custom theme "${entryKey}" from "${candidatePath}":`,
+              error,
+            );
+          }
+        }
+      } catch (error) {
+        if (
+          !(
+            error instanceof Error &&
+            'code' in error &&
+            error.code === 'ENOENT'
+          )
+        ) {
+          debugLogger.warn(
+            `Could not load themes from "${candidatePath}":`,
+            error,
+          );
+        }
+      }
+    }
+
+    this.clearCache();
+
+    if (this.activeTheme && this.activeTheme.type === 'custom') {
+      const updatedUserTheme = this.userThemes.get(this.activeTheme.name);
+      if (updatedUserTheme) {
+        this.activeTheme = updatedUserTheme;
+      }
     }
   }
 
@@ -259,11 +528,21 @@ class ThemeManager {
   }
 
   /**
+   * Clears all standalone user themes loaded from theme.json files.
+   * This is primarily for testing purposes to reset state between tests.
+   */
+  clearUserThemes(): void {
+    this.userThemes.clear();
+    this.userThemesLoaded = false;
+  }
+
+  /**
    * Clears all themes loaded from files.
    * This is primarily for testing purposes to reset state between tests.
    */
   clearFileThemes(): void {
     this.fileThemes.clear();
+    this.fileThemesByPath.clear();
   }
 
   /**
@@ -277,6 +556,10 @@ class ThemeManager {
     if (dependencies.homedir) {
       this.homedir = dependencies.homedir;
     }
+    this.userThemes.clear();
+    this.userThemesLoaded = false;
+    this.fileThemes.clear();
+    this.fileThemesByPath.clear();
   }
 
   /**
@@ -290,9 +573,12 @@ class ThemeManager {
     if (dependencies) {
       this.reinitialize(dependencies);
     }
+    this.userThemes.clear();
+    this.userThemesLoaded = false;
     this.settingsThemes.clear();
     this.extensionThemes.clear();
     this.fileThemes.clear();
+    this.fileThemesByPath.clear();
     this.activeTheme = DEFAULT_THEME;
     this.terminalBackground = undefined;
     this.clearCache();
@@ -323,9 +609,10 @@ class ThemeManager {
         (t) => t.name === this.activeTheme.name,
       );
       const isCustom =
-        [...this.settingsThemes.values()].includes(this.activeTheme) ||
-        [...this.extensionThemes.values()].includes(this.activeTheme) ||
-        [...this.fileThemes.values()].includes(this.activeTheme);
+        this.userThemes.get(this.activeTheme.name) === this.activeTheme ||
+        this.settingsThemes.get(this.activeTheme.name) === this.activeTheme ||
+        this.extensionThemes.get(this.activeTheme.name) === this.activeTheme ||
+        this.fileThemes.get(this.activeTheme.name) === this.activeTheme;
 
       if (isBuiltIn || isCustom) {
         return this.activeTheme;
@@ -463,11 +750,16 @@ class ThemeManager {
   }
 
   private _getAllCustomThemes(): Theme[] {
-    return [
-      ...Array.from(this.settingsThemes.values()),
-      ...Array.from(this.extensionThemes.values()),
-      ...Array.from(this.fileThemes.values()),
-    ];
+    if (!this.userThemesLoaded) {
+      this.loadUserThemes();
+    }
+    const mergedByName = new Map<string, Theme>([
+      ...this.fileThemes,
+      ...this.extensionThemes,
+      ...this.settingsThemes,
+      ...this.userThemes,
+    ]);
+    return Array.from(mergedByName.values());
   }
 
   /**
@@ -484,7 +776,11 @@ class ThemeManager {
    * @returns True if the theme is custom.
    */
   isCustomTheme(themeName: string): boolean {
+    if (!this.userThemesLoaded) {
+      this.loadUserThemes();
+    }
     return (
+      this.userThemes.has(themeName) ||
       this.settingsThemes.has(themeName) ||
       this.extensionThemes.has(themeName) ||
       this.fileThemes.has(themeName)
@@ -563,16 +859,20 @@ class ThemeManager {
   private loadThemeFromFile(themePath: string): Theme | undefined {
     try {
       // realpathSync resolves the path and throws if it doesn't exist.
-      const canonicalPath = this.fs.realpathSync(path.resolve(themePath));
+      const canonicalPath = this.resolveRealPath(path.resolve(themePath));
 
       // 1. Check cache using the canonical path.
-      if (this.fileThemes.has(canonicalPath)) {
-        return this.fileThemes.get(canonicalPath);
+      if (this.fileThemesByPath.has(canonicalPath)) {
+        return this.fileThemesByPath.get(canonicalPath);
       }
 
       // 2. Perform security check.
-      const homeDir = path.resolve(this.homedir());
-      if (!canonicalPath.startsWith(homeDir)) {
+      const rawHome = this.homedir();
+      if (!rawHome) {
+        return undefined;
+      }
+      const canonicalHome = this.resolveCanonicalDirectory(rawHome);
+      if (!isSubpath(canonicalHome, canonicalPath)) {
         debugLogger.warn(
           `Theme file at "${themePath}" is outside your home directory. ` +
             `Only load themes from trusted sources.`,
@@ -583,7 +883,9 @@ class ThemeManager {
       // 3. Read, parse, and validate the theme file.
       const themeContent = this.fs.readFileSync(canonicalPath, 'utf-8');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const customThemeConfig = JSON.parse(themeContent) as CustomTheme;
+      const customThemeConfig = JSON.parse(
+        stripJsonComments(themeContent),
+      ) as CustomTheme;
 
       const validation = validateCustomTheme(customThemeConfig);
       if (!validation.isValid) {
@@ -606,7 +908,8 @@ class ThemeManager {
       };
 
       const theme = createCustomTheme(themeWithDefaults);
-      this.fileThemes.set(canonicalPath, theme); // Cache by canonical path
+      this.fileThemesByPath.set(canonicalPath, theme);
+      this.fileThemes.set(theme.name, theme);
       return theme;
     } catch (error) {
       // Any error in the process (file not found, bad JSON, etc.) is caught here.
@@ -636,9 +939,17 @@ class ThemeManager {
       return builtInTheme;
     }
 
-    // Then check custom themes that have been loaded from settings, extensions, or file paths
+    // Then check custom themes that have been loaded from theme.json, settings, extensions, or file paths
     if (this.isPath(themeName)) {
       return this.loadThemeFromFile(themeName);
+    }
+
+    if (!this.userThemesLoaded) {
+      this.loadUserThemes();
+    }
+
+    if (this.userThemes.has(themeName)) {
+      return this.userThemes.get(themeName);
     }
 
     if (this.settingsThemes.has(themeName)) {
