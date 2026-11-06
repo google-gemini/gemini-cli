@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as path from 'node:path';
 import ignorePkg, { type Ignore } from 'ignore';
 const ignore = ((ignorePkg as unknown as { default?: () => Ignore }).default ??
@@ -131,6 +131,61 @@ describe('ignorePathUtils', () => {
     expect(
       getNormalizedRelativePath('C:\\project', 'D:\\outside', false),
     ).toBeNull();
+  });
+
+  describe('on Windows (win32)', () => {
+    const winRoot = 'C:\\Users\\user\\project';
+
+    beforeEach(() => {
+      vi.stubGlobal(
+        'process',
+        Object.create(process, { platform: { get: () => 'win32' } }),
+      );
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('should normalize in-root paths when drive-letter or directory casing differs', () => {
+      expect(
+        getNormalizedRelativePath(
+          winRoot,
+          'c:\\users\\user\\project\\src\\index.ts',
+          false,
+        ),
+      ).toBe('src/index.ts');
+      expect(
+        getNormalizedRelativePath(
+          'c:\\Users\\user\\project',
+          'C:\\Users\\user\\project\\dist',
+          true,
+        ),
+      ).toBe('dist/');
+      expect(
+        getNormalizedRelativePath(winRoot, 'c:\\users\\user\\project', true),
+      ).toBe('/');
+      expect(
+        getNormalizedRelativePath(winRoot, 'c:\\users\\user\\project', false),
+      ).toBe('');
+    });
+
+    it('should return null for outside-root and sibling-prefix paths regardless of casing', () => {
+      expect(
+        getNormalizedRelativePath(
+          winRoot,
+          'c:\\Users\\user\\project-other\\file.ts',
+          false,
+        ),
+      ).toBeNull();
+      expect(
+        getNormalizedRelativePath(
+          winRoot,
+          'd:\\Users\\user\\project\\file.ts',
+          false,
+        ),
+      ).toBeNull();
+    });
   });
 
   describe('expandWildcardDirectoryPatterns', () => {

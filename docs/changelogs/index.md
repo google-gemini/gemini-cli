@@ -18,6 +18,48 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.67.0 - 2026-11-04
+
+- **Model Discovery Command:** Added a new `models` command and `--list-models`
+  flag for discovering available models directly from the CLI
+  ([#29880](https://github.com/google-gemini/gemini-cli/pull/29880) by
+  @urielefrenvirtusa).
+- **Container Sandbox IDE Bridging:** Enabled bridging the IDE companion into
+  container sandboxes over exec stdio to improve IDE integration in
+  containerized environments
+  ([#29858](https://github.com/google-gemini/gemini-cli/pull/29858) by
+  @elberthc-byte).
+- **Cancellation & Signal Resilience:** Improved termination signal handling and
+  prevented post-cancellation tool execution and continuation stream processing
+  ([#29849](https://github.com/google-gemini/gemini-cli/pull/29849) by
+  @urielefrenvirtusa,
+  [#29868](https://github.com/google-gemini/gemini-cli/pull/29868) by
+  @jesussamuel-byte).
+
+## Announcements: v0.66.0 - 2026-10-27
+
+- **Terminal UI Rendering & Flicker Prevention:** Implemented synchronized
+  output mode and isolated spinner rendering, eliminated buffer flickering, and
+  preserved terminal scrollback during viewport refreshes
+  ([#29725](https://github.com/google-gemini/gemini-cli/pull/29725) by
+  @diegogodinezr,
+  [#29695](https://github.com/google-gemini/gemini-cli/pull/29695) by
+  @ugorla-dev).
+- **Tool Scheduling & Process Lifecycle:** Emitted tool call groups directly
+  from the scheduler and forwarded process termination signals from bootstrap
+  parent to child processes
+  ([#29736](https://github.com/google-gemini/gemini-cli/pull/29736) by
+  @jesussamuel-byte,
+  [#29790](https://github.com/google-gemini/gemini-cli/pull/29790) by
+  @villahernandez-coder).
+- **Environment & MCP OAuth Security:** Supported opt-in private network
+  endpoints for MCP OAuth flows and preserved user-level git configuration while
+  suppressing interactive prompts
+  ([#29844](https://github.com/google-gemini/gemini-cli/pull/29844) by
+  @luisfelipe-alt,
+  [#29832](https://github.com/google-gemini/gemini-cli/pull/29832) by
+  @jesussamuel-byte).
+
 ## Announcements: v0.65.0 - 2026-10-20
 
 - **Custom Telemetry Headers:** Added support for configuring custom OTLP

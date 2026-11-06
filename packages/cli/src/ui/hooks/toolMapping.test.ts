@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mapToDisplay } from './toolMapping.js';
+import {
+  mapToDisplay,
+  hasDensePayload,
+  getToolFileDiff,
+  hasPayloadResult,
+} from './toolMapping.js';
 import {
   type AnyDeclarativeTool,
   type AnyToolInvocation,
@@ -351,6 +356,186 @@ describe('toolMapping', () => {
       const result = mapToDisplay([clientInitiatedTool, modelInitiatedTool]);
       expect(result.tools[0].isClientInitiated).toBe(true);
       expect(result.tools[1].isClientInitiated).toBe(false);
+    });
+
+    it('populates hasDensePayload on mapped tool calls', () => {
+      const scheduledTool: ScheduledToolCall = {
+        status: CoreToolCallStatus.Scheduled,
+        request: mockRequest,
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+
+      const outputFileTool: SuccessfulToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: { ...mockRequest, callId: 'call-output-file' },
+        tool: mockTool,
+        invocation: mockInvocation,
+        response: {
+          ...mockResponse,
+          outputFile: '/tmp/out.log',
+        },
+      };
+
+      const fileDiffTool: SuccessfulToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: { ...mockRequest, callId: 'call-diff' },
+        tool: mockTool,
+        invocation: mockInvocation,
+        response: {
+          ...mockResponse,
+          resultDisplay: {
+            fileName: 'test.ts',
+            filePath: '/path/test.ts',
+            fileDiff: '@@ -1 +1 @@\n-old\n+new',
+            originalContent: 'old',
+            newContent: 'new',
+          },
+        },
+      };
+
+      const payloadResultTool: SuccessfulToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: { ...mockRequest, callId: 'call-payload' },
+        tool: mockTool,
+        invocation: mockInvocation,
+        response: {
+          ...mockResponse,
+          resultDisplay: {
+            summary: 'Read 10 lines',
+            payload: 'line 1\nline 2',
+          } as unknown as string,
+        },
+      };
+
+      const editConfirmTool: WaitingToolCall = {
+        status: CoreToolCallStatus.AwaitingApproval,
+        request: { ...mockRequest, callId: 'call-edit-confirm' },
+        tool: mockTool,
+        invocation: mockInvocation,
+        confirmationDetails: {
+          type: 'edit',
+          title: 'Confirm Edit',
+          fileName: 'file.txt',
+          filePath: '/path/file.txt',
+          fileDiff: 'diff',
+          originalContent: 'old',
+          newContent: 'new',
+        },
+      };
+
+      const result = mapToDisplay([
+        scheduledTool,
+        outputFileTool,
+        fileDiffTool,
+        payloadResultTool,
+        editConfirmTool,
+      ]);
+
+      expect(result.tools[0].hasDensePayload).toBe(false);
+      expect(result.tools[1].hasDensePayload).toBe(true);
+      expect(result.tools[2].hasDensePayload).toBe(true);
+      expect(result.tools[3].hasDensePayload).toBe(true);
+      expect(result.tools[4].hasDensePayload).toBe(true);
+    });
+  });
+
+  describe('hasPayloadResult, getToolFileDiff, and hasDensePayload', () => {
+    it('identifies valid PayloadResult objects via hasPayloadResult', () => {
+      expect(hasPayloadResult({ summary: 'sum', payload: 'data' })).toBe(true);
+      expect(hasPayloadResult({ summary: 'sum', files: ['a.txt'] })).toBe(
+        false,
+      );
+      expect(hasPayloadResult({ summary: 'sum', payload: 123 })).toBe(false);
+      expect(hasPayloadResult('plain string')).toBe(false);
+      expect(hasPayloadResult(undefined)).toBe(false);
+    });
+
+    it('extracts FileDiff from resultDisplay or edit confirmationDetails via getToolFileDiff', () => {
+      const diffResult = {
+        fileName: 'a.ts',
+        filePath: '/a.ts',
+        fileDiff: '+a',
+        originalContent: '',
+        newContent: 'a',
+      };
+      expect(
+        getToolFileDiff({
+          resultDisplay: diffResult,
+          confirmationDetails: undefined,
+        }),
+      ).toEqual(diffResult);
+
+      expect(
+        getToolFileDiff({
+          resultDisplay: undefined,
+          confirmationDetails: {
+            type: 'edit',
+            title: 'Edit a.ts',
+            fileName: 'a.ts',
+            filePath: '/a.ts',
+            fileDiff: '+a',
+            originalContent: '',
+            newContent: 'a',
+          },
+        }),
+      ).toEqual({
+        fileName: 'a.ts',
+        filePath: '/a.ts',
+        fileDiff: '+a',
+        originalContent: '',
+        newContent: 'a',
+        diffStat: undefined,
+      });
+
+      expect(
+        getToolFileDiff({
+          resultDisplay: 'plain output',
+          confirmationDetails: undefined,
+        }),
+      ).toBeUndefined();
+    });
+
+    it('computes hasDensePayload accurately across tool call display variants', () => {
+      expect(
+        hasDensePayload({
+          outputFile: '/tmp/out.txt',
+          resultDisplay: undefined,
+          confirmationDetails: undefined,
+        }),
+      ).toBe(true);
+
+      expect(
+        hasDensePayload({
+          outputFile: undefined,
+          resultDisplay: undefined,
+          confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
+            fileName: 'a.ts',
+            filePath: '/a.ts',
+            fileDiff: '+a',
+            originalContent: '',
+            newContent: 'a',
+          },
+        }),
+      ).toBe(true);
+
+      expect(
+        hasDensePayload({
+          outputFile: undefined,
+          resultDisplay: { summary: 'Listed 2 files', files: ['a', 'b'] },
+          confirmationDetails: undefined,
+        }),
+      ).toBe(false);
+
+      expect(
+        hasDensePayload({
+          outputFile: undefined,
+          resultDisplay: 'simple string output',
+          confirmationDetails: undefined,
+        }),
+      ).toBe(false);
     });
   });
 });

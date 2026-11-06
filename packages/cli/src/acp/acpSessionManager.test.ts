@@ -24,6 +24,7 @@ import {
   type Config,
   CoreEvent,
   coreEvents,
+  debugLogger,
   GEMINI_MODEL_ALIAS_AUTO,
   type MessageBus,
   Storage,
@@ -49,6 +50,14 @@ vi.mock('../utils/autoMemory.js', () => ({
   startAutoMemoryIfEnabled: (config: Config) =>
     startAutoMemoryIfEnabledMock(config),
 }));
+
+vi.mock('node:crypto', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:crypto')>();
+  return {
+    ...actual,
+    randomUUID: () => 'test-session-id',
+  };
+});
 
 describe('AcpSessionManager', () => {
   let mockConfig: Mocked<Config>;
@@ -132,9 +141,6 @@ describe('AcpSessionManager', () => {
     }));
 
     manager = new AcpSessionManager(mockSettings, mockArgv, mockConnection);
-    vi.mock('node:crypto', () => ({
-      randomUUID: () => 'test-session-id',
-    }));
   });
 
   afterEach(() => {
@@ -445,14 +451,73 @@ describe('AcpSessionManager', () => {
       lastUpdated: new Date().toISOString(),
       kind: 'main',
       messages: [
-        { type: 'user', content: 'hello' },
-        { type: 'gemini', content: 'world' },
+        { id: 'msg-1', type: 'user', content: 'hello' },
+        { id: 'msg-2', type: 'gemini', content: 'world' },
       ],
     };
     await fs.writeFile(
       path.join(chatsDir, `session-2026-09-30-${sessionId.slice(0, 8)}.jsonl`),
       JSON.stringify(sessionRecord) + '\n',
     );
+
+    const events: string[] = [];
+    mockConnection.sessionUpdate.mockImplementation(async (params) => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      events.push(`update:${params.update.sessionUpdate}`);
+    });
+
+    const response = await manager.loadSession(
+      {
+        sessionId,
+        cwd: testDir,
+        mcpServers: [],
+      },
+      {},
+    );
+    events.push('loadSession:resolved');
+
+    expect(response).toBeDefined();
+    expect(mockConfig.getGeminiClient().resumeChat).toHaveBeenCalled();
+    expect(events).toEqual([
+      'update:user_message_chunk',
+      'update:agent_message_chunk',
+      'loadSession:resolved',
+    ]);
+  });
+
+  it('should log error and still return response when streamHistory fails during loadSession', async () => {
+    const testDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'acp-load-stream-error-'),
+    );
+    const sessionId = 'test-session-stream-error';
+    const storage = new Storage(testDir, sessionId);
+    await storage.initialize();
+    const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const sessionRecord = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+      kind: 'main',
+      messages: [
+        { id: 'msg-1', type: 'user', content: 'hello' },
+        { id: 'msg-2', type: 'gemini', content: 'world' },
+      ],
+    };
+    await fs.writeFile(
+      path.join(chatsDir, `session-2026-09-30-${sessionId.slice(0, 8)}.jsonl`),
+      JSON.stringify(sessionRecord) + '\n',
+    );
+
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+    mockConnection.sessionUpdate.mockImplementationOnce(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      throw new Error('Stream write failed');
+    });
 
     const response = await manager.loadSession(
       {
@@ -464,7 +529,12 @@ describe('AcpSessionManager', () => {
     );
 
     expect(response).toBeDefined();
-    expect(mockConfig.getGeminiClient().resumeChat).toHaveBeenCalled();
+    expect(manager.getSession(sessionId)).toBeDefined();
+    expect(debugErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Error streaming history: Error: Stream write failed',
+      ),
+    );
   });
 
   it('should reject loading an invalid session identifier without leaking event listeners', async () => {

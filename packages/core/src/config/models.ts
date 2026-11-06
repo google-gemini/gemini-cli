@@ -540,7 +540,6 @@ export function isPreviewModel(
     model === PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL ||
     model === PREVIEW_GEMINI_FLASH_MODEL ||
     model === PREVIEW_GEMINI_MODEL_AUTO ||
-    model === GEMINI_MODEL_ALIAS_AUTO ||
     model === PREVIEW_GEMINI_FLASH_LITE_MODEL
   );
 }
@@ -576,10 +575,11 @@ export function isGemini3Model(
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     // Legacy behavior resolves the model first.
     const resolved = resolveModel(model, false, false, true, config);
-    return (
-      config.modelConfigService.getModelDefinition(resolved)?.family ===
-      'gemini-3'
-    );
+    const definition = config.modelConfigService.getModelDefinition(resolved);
+    if (definition?.family) {
+      return definition.family === 'gemini-3';
+    }
+    return /^gemini-3(\.|-|$)/.test(resolved);
   }
 
   const resolved = resolveModel(model);
@@ -590,12 +590,28 @@ export function isGemini3Model(
  * Checks if the model is a Gemini 2.x model.
  *
  * @param model The model name to check.
+ * @param config Optional config object for dynamic model configuration.
  * @returns True if the model is a Gemini-2.x model.
  */
-export function isGemini2Model(model: string): boolean {
+export function isGemini2Model(
+  model: string,
+  config?: ModelCapabilityContext,
+): boolean {
+  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
+    const resolved = resolveModel(model, false, false, true, config);
+    const definition = config.modelConfigService.getModelDefinition(resolved);
+    if (definition?.family) {
+      return (
+        definition.family === 'gemini-2' || definition.family === 'gemini-2.5'
+      );
+    }
+    return /^gemini-2(\.|-|$)/.test(resolved);
+  }
+
   // This is legacy behavior, will remove this when gemini 2 models are no
   // longer needed.
-  return /^gemini-2(\.|$)/.test(model);
+  const resolved = resolveModel(model);
+  return /^gemini-2(\.|-|$)/.test(resolved);
 }
 
 /**
@@ -664,13 +680,21 @@ export function supportsMultimodalFunctionResponse(
   model: string,
   config?: ModelCapabilityContext,
 ): boolean {
+  const hasAccessToPreview = config?.getHasAccessToPreviewModel?.() ?? true;
+  const resolved = resolveModel(
+    model,
+    false,
+    false,
+    hasAccessToPreview,
+    config,
+  );
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
-    return (
-      config.modelConfigService.getModelDefinition(model)?.features
-        ?.multimodalToolUse === true
-    );
+    const definition = config.modelConfigService.getModelDefinition(resolved);
+    if (definition?.features?.multimodalToolUse !== undefined) {
+      return definition.features.multimodalToolUse;
+    }
   }
-  return model.startsWith('gemini-3-');
+  return /^gemini-3(\.|-|$)/.test(resolved);
 }
 
 /**

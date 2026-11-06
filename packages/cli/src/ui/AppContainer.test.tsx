@@ -269,9 +269,14 @@ import {
 
 // In the default inline mode, refreshStatic must only clear the visible
 // viewport. It must never emit `\x1b[3J` (Erase Saved Lines), which purges the
-// terminal's native scrollback history.
-const CLEAR_VIEWPORT = ansiEscapes.eraseScreen + ansiEscapes.cursorTo(0, 0);
+// terminal's native scrollback history, and it erases the viewport in place
+// instead of using `\x1b[2J`, which some terminals implement by moving the
+// visible screen into the scrollback.
+const CLEAR_VIEWPORT = ansiEscapes.cursorTo(0, 0) + ansiEscapes.eraseDown;
 const ERASE_SCROLLBACK = '\x1b[3J';
+// Mirrors the delay AppContainer waits after the last width change before
+// refreshing the static history.
+const RESIZE_DEBOUNCE_MS = 300;
 
 const getScrollbackPurgingWrites = () =>
   mocks.mockStdout.write.mock.calls.filter((call: unknown[]) =>
@@ -3409,9 +3414,9 @@ describe('AppContainer State Management', () => {
         const initialRemountKey = capturedUIState.historyRemountKey;
         mocks.mockStdout.write.mockClear();
 
-        // Initial mount should not trigger refreshStatic after 100ms
+        // Initial mount should not trigger refreshStatic after the debounce delay
         act(() => {
-          vi.advanceTimersByTime(100);
+          vi.advanceTimersByTime(RESIZE_DEBOUNCE_MS);
         });
         expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(CLEAR_VIEWPORT);
         expect(capturedUIState.historyRemountKey).toBe(initialRemountKey);
@@ -3422,7 +3427,7 @@ describe('AppContainer State Management', () => {
           rerender(getAppContainer());
         });
         act(() => {
-          vi.advanceTimersByTime(100);
+          vi.advanceTimersByTime(RESIZE_DEBOUNCE_MS);
         });
         expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(CLEAR_VIEWPORT);
         expect(capturedUIState.historyRemountKey).toBe(initialRemountKey);
@@ -3433,24 +3438,24 @@ describe('AppContainer State Management', () => {
           rerender(getAppContainer());
         });
         act(() => {
-          vi.advanceTimersByTime(60);
+          vi.advanceTimersByTime(RESIZE_DEBOUNCE_MS - 100);
         });
         expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(CLEAR_VIEWPORT);
 
-        // Second resize before 100ms elapses should reset the debounce timer
+        // Second resize before the debounce delay elapses should reset the timer
         mockedUseTerminalSize.mockReturnValue({ columns: 60, rows: 16 });
         await act(async () => {
           rerender(getAppContainer());
         });
         act(() => {
-          vi.advanceTimersByTime(60);
+          vi.advanceTimersByTime(RESIZE_DEBOUNCE_MS - 100);
         });
         expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(CLEAR_VIEWPORT);
         expect(capturedUIState.historyRemountKey).toBe(initialRemountKey);
 
-        // Remaining 40ms completes the 100ms debounce from the last width change
+        // Remaining 100ms completes the debounce delay from the last width change
         act(() => {
-          vi.advanceTimersByTime(40);
+          vi.advanceTimersByTime(100);
         });
         expect(mocks.mockStdout.write).toHaveBeenCalledWith(CLEAR_VIEWPORT);
         expect(capturedUIState.historyRemountKey).toBe(initialRemountKey + 1);
@@ -3557,15 +3562,15 @@ describe('AppContainer State Management', () => {
           rerender(getAppContainer());
         });
 
-        // Advance 80ms (timer for 60 cols has 20ms left), then emit a new raw
+        // Advance until the timer for 60 cols has 20ms left, then emit a new raw
         // stdout resize event (columns = 50) BEFORE React commits the new size.
         act(() => {
-          vi.advanceTimersByTime(80);
+          vi.advanceTimersByTime(RESIZE_DEBOUNCE_MS - 20);
         });
         mockStdoutWithCork.columns = 50;
         resizeListener!();
 
-        // Advancing past the original 100ms mark (20ms more) must NOT flush or
+        // Advancing past the original debounce deadline must NOT flush or
         // uncork stdout for the stale 60-col width.
         act(() => {
           vi.advanceTimersByTime(30);
@@ -3574,13 +3579,13 @@ describe('AppContainer State Management', () => {
         expect(mockStdoutWithCork.uncork).not.toHaveBeenCalled();
         expect(writableState.corked).toBe(1);
 
-        // Now React commits the 50-col width and settles for 100ms
+        // Now React commits the 50-col width and settles for the debounce delay
         mockedUseTerminalSize.mockReturnValue({ columns: 50, rows: 24 });
         await act(async () => {
           rerender(getAppContainer());
         });
         act(() => {
-          vi.advanceTimersByTime(100);
+          vi.advanceTimersByTime(RESIZE_DEBOUNCE_MS);
         });
 
         // Intermediate buffered frame should have been discarded before the viewport clear,
@@ -3642,6 +3647,12 @@ describe('AppContainer State Management', () => {
         ansiEscapes.clearTerminal,
       );
       expect(getScrollbackPurgingWrites()).toHaveLength(0);
+      // The viewport is erased in place rather than with Erase in Display.
+      expect(
+        mocks.mockStdout.write.mock.calls.filter((call: unknown[]) =>
+          String(call[0]).includes(ansiEscapes.eraseScreen),
+        ),
+      ).toHaveLength(0);
       // Static history is still remounted so it is re-rendered after the clear.
       expect(capturedUIState.historyRemountKey).toBe(initialRemountKey + 1);
 

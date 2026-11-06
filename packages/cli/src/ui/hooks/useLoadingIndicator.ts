@@ -15,6 +15,15 @@ import {
 
 const LOW_VERBOSITY_RETRY_HINT_ATTEMPT_THRESHOLD = 2;
 
+export function isRateLimitRetry(
+  retryStatus: RetryAttemptPayload | null,
+): boolean {
+  if (!retryStatus) return false;
+  if (retryStatus.status === 429) return true;
+  if (!retryStatus.error) return false;
+  return /429|quota|rate\s*limit|resource_exhausted/i.test(retryStatus.error);
+}
+
 export interface UseLoadingIndicatorProps {
   streamingState: StreamingState;
   shouldShowFocusHint: boolean;
@@ -61,6 +70,56 @@ export const useLoadingIndicator = ({
   const [retainedElapsedTime, setRetainedElapsedTime] = useState(0);
   const prevStreamingStateRef = useRef<StreamingState | null>(null);
 
+  const [prevRetryStatus, setPrevRetryStatus] =
+    useState<RetryAttemptPayload | null>(null);
+  const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
+
+  const isSameRetry =
+    retryStatus === prevRetryStatus ||
+    (retryStatus !== null &&
+      prevRetryStatus !== null &&
+      retryStatus.attempt === prevRetryStatus.attempt &&
+      retryStatus.delayMs === prevRetryStatus.delayMs &&
+      retryStatus.model === prevRetryStatus.model &&
+      retryStatus.status === prevRetryStatus.status &&
+      retryStatus.error === prevRetryStatus.error);
+
+  if (!isSameRetry) {
+    setPrevRetryStatus(retryStatus);
+    setCountdownSeconds(
+      retryStatus ? Math.max(1, Math.round(retryStatus.delayMs / 1000)) : null,
+    );
+  }
+
+  const isRateLimit = isRateLimitRetry(retryStatus);
+  const attempt = retryStatus?.attempt ?? 0;
+  const delayMs = retryStatus?.delayMs ?? 0;
+  const model = retryStatus?.model ?? '';
+
+  useEffect(() => {
+    if (
+      !isTimerActive ||
+      !isRateLimit ||
+      countdownSeconds === null ||
+      countdownSeconds <= 1
+    ) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setCountdownSeconds((prev) => {
+        if (prev === null || prev <= 1) {
+          return 1;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [attempt, delayMs, model, isTimerActive, isRateLimit, countdownSeconds]);
+
   useEffect(() => {
     if (
       prevStreamingStateRef.current === StreamingState.WaitingForConfirmation &&
@@ -83,13 +142,17 @@ export const useLoadingIndicator = ({
     prevStreamingStateRef.current = streamingState;
   }, [streamingState, elapsedTimeFromTimer]);
 
+  const remainingSeconds = countdownSeconds ?? 0;
+
   const retryPhrase =
     streamingState === StreamingState.Responding && retryStatus
-      ? errorVerbosity === 'low'
-        ? retryStatus.attempt >= LOW_VERBOSITY_RETRY_HINT_ATTEMPT_THRESHOLD
-          ? "This is taking a bit longer, we're still on it."
-          : null
-        : `Trying to reach ${getDisplayString(retryStatus.model)} (Attempt ${retryStatus.attempt + 1}/${retryStatus.maxAttempts})`
+      ? isRateLimit
+        ? `Rate limit reached. Cooling down... Retrying in ${remainingSeconds}s (Attempt ${(retryStatus?.attempt ?? 0) + 1}/${retryStatus?.maxAttempts ?? 0})`
+        : errorVerbosity === 'low'
+          ? retryStatus.attempt >= LOW_VERBOSITY_RETRY_HINT_ATTEMPT_THRESHOLD
+            ? "This is taking a bit longer, we're still on it."
+            : null
+          : `Trying to reach ${getDisplayString(retryStatus.model)} (Attempt ${retryStatus.attempt + 1}/${retryStatus.maxAttempts})`
       : null;
 
   return {

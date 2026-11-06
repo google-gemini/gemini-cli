@@ -979,6 +979,9 @@ describe('ShellExecutionService', () => {
         command: 'cmd-101',
         sessionId: 'default',
       });
+      ExecutionLifecycleService.attachExecution(101, {
+        executionMethod: 'child_process',
+      });
 
       ShellExecutionService.background(101, 'default', 'cmd-101');
 
@@ -1625,18 +1628,60 @@ describe('ShellExecutionService', () => {
         shellExecutionConfig,
       );
 
-      ShellExecutionService.background(
+      const firstResult = ShellExecutionService.background(
         handle.pid!,
         'default',
         'double-background',
       );
-      ShellExecutionService.background(
+      const secondResult = ShellExecutionService.background(
         handle.pid!,
         'default',
         'double-background',
       );
 
+      expect(firstResult).toBe(true);
+      expect(secondResult).toBe(false);
       expect(mockCreateWriteStream).toHaveBeenCalledTimes(1);
+
+      await ShellExecutionService.kill(handle.pid!);
+    });
+
+    it('does not create a log stream when execution is already settled', async () => {
+      const abortController = new AbortController();
+      const handle = await ShellExecutionService.execute(
+        'already-settled-command',
+        '/',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      // Settle the execution lifecycle before calling background()
+      ExecutionLifecycleService.completeExecution(handle.pid!);
+
+      mockCreateWriteStream.mockClear();
+
+      const success = ShellExecutionService.background(
+        handle.pid!,
+        'default',
+        'already-settled-command',
+      );
+
+      expect(success).toBe(false);
+      expect(mockCreateWriteStream).not.toHaveBeenCalled();
+      const backgroundLogStreams = (
+        ShellExecutionService as unknown as {
+          backgroundLogStreams: Map<number, unknown>;
+        }
+      ).backgroundLogStreams;
+      expect(backgroundLogStreams.has(handle.pid!)).toBe(false);
+      const backgroundLogPids = (
+        ShellExecutionService as unknown as {
+          backgroundLogPids: Set<number>;
+        }
+      ).backgroundLogPids;
+      expect(backgroundLogPids.has(handle.pid!)).toBe(false);
 
       await ShellExecutionService.kill(handle.pid!);
     });
