@@ -20,6 +20,7 @@ import { waitFor } from '../../test-utils/async.js';
 import { useGeminiStream } from './useGeminiStream.js';
 import { useKeypress } from './useKeypress.js';
 import * as atCommandProcessor from './atCommandProcessor.js';
+import { useExecutionLifecycle } from './useExecutionLifecycle.js';
 import {
   useToolScheduler,
   type TrackedToolCall,
@@ -3854,6 +3855,80 @@ describe('useGeminiStream', () => {
       undefined,
       rawQuery,
     );
+  });
+
+  describe('pasted @ symbols escaped by escapePastedAtSymbols (#26730)', () => {
+    const pasted = 'scp dave\\@webserver:notes.txt .';
+    const literal = 'scp dave@webserver:notes.txt .';
+
+    const renderWithEscaping = async (shellModeActive: boolean) => {
+      const actual = await vi.importActual<typeof atCommandProcessor>(
+        './atCommandProcessor.js',
+      );
+      vi.mocked(atCommandProcessor.unescapeLiteralAt).mockImplementation(
+        actual.unescapeLiteralAt,
+      );
+      const settings = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
+        ...mockLoadedSettings,
+        merged: {
+          ...mockLoadedSettings.merged,
+          ui: { escapePastedAtSymbols: true },
+        },
+      } as LoadedSettings;
+      return renderHookWithProviders(() =>
+        useGeminiStream(
+          mockConfig.getGeminiClient(),
+          [],
+          mockAddItem,
+          mockConfig,
+          settings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          shellModeActive,
+          vi.fn(), // getPreferredEditor
+          vi.fn(), // onAuthError
+          vi.fn(), // performMemoryRefresh
+          false, // modelSwitched
+          vi.fn(), // setModelSwitched
+          vi.fn(), // onCancelSubmit
+          vi.fn(), // setShellInputFocused
+          80, // terminalWidth
+          24, // terminalHeight
+        ),
+      );
+    };
+
+    it('sends them to the model unescaped', async () => {
+      const { result } = await renderWithEscaping(false);
+
+      await act(async () => {
+        await result.current.submitQuery(pasted);
+      });
+
+      expect(mockSendMessageStream).toHaveBeenCalledWith(
+        literal,
+        expect.any(AbortSignal),
+        expect.any(String),
+        undefined,
+        pasted,
+      );
+    });
+
+    it('passes them to shell commands unescaped', async () => {
+      const { result } = await renderWithEscaping(true);
+
+      await act(async () => {
+        await result.current.submitQuery(pasted);
+      });
+
+      const { handleShellCommand } = vi.mocked(useExecutionLifecycle).mock
+        .results[0].value;
+      expect(handleShellCommand).toHaveBeenCalledWith(
+        literal,
+        expect.any(AbortSignal),
+      );
+    });
   });
 
   it('should display user query, then tool execution, then model response', async () => {
