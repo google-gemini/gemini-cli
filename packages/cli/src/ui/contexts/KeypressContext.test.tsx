@@ -15,6 +15,7 @@ import {
   ESC_TIMEOUT,
   FAST_RETURN_TIMEOUT,
   KeypressPriority,
+  isImeCommit,
   type Key,
 } from './KeypressContext.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
@@ -237,6 +238,71 @@ describe('KeypressContext', () => {
           cmd: false,
         }),
       );
+    });
+
+    it('should NOT convert enter to newline if preceded by single non-ASCII IME character', async () => {
+      const { keyHandler } = await setupKeypressTest();
+
+      // Simulate IME commit: single Korean syllable followed immediately by enter in same tick
+      act(() => stdin.write('요\r'));
+
+      expect(keyHandler).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          name: 'enter',
+          shift: false,
+        }),
+      );
+    });
+
+    it('should convert enter to newline (shift: true) on multiline non-ASCII paste without bracketed paste', async () => {
+      const { keyHandler } = await setupKeypressTest();
+
+      // Simulate multiline paste without bracketed paste (multiple chars before enter in same tick)
+      act(() => stdin.write('한글줄\r'));
+
+      expect(keyHandler).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          name: 'enter',
+          shift: true,
+        }),
+      );
+    });
+
+    it('should NOT convert enter to newline for emoji surrogate pair', async () => {
+      const { keyHandler } = await setupKeypressTest();
+
+      act(() => stdin.write('👍\r'));
+
+      expect(keyHandler).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          name: 'enter',
+          shift: false,
+        }),
+      );
+    });
+
+    describe('isImeCommit', () => {
+      it('returns true for single non-ASCII code point and rapidCount <= 2', () => {
+        expect(isImeCommit('요', 2)).toBe(true);
+        expect(isImeCommit('👍', 2)).toBe(true);
+      });
+
+      it('returns false for ASCII character', () => {
+        expect(isImeCommit('a', 2)).toBe(false);
+      });
+
+      it('returns false for multi-character chunk', () => {
+        expect(isImeCommit('한글줄', 2)).toBe(false);
+      });
+
+      it('returns false when rapidCount > 2', () => {
+        expect(isImeCommit('요', 3)).toBe(false);
+      });
+
+      it('returns false for empty sequence', () => {
+        expect(isImeCommit(undefined, 2)).toBe(false);
+        expect(isImeCommit('', 2)).toBe(false);
+      });
     });
   });
 

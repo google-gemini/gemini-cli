@@ -682,6 +682,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     { isActive: focus },
   );
 
+  const submitRequestedRef = useRef(false);
+  const [submitTick, setSubmitTick] = useState(0);
+
+  useEffect(() => {
+    if (submitRequestedRef.current) {
+      submitRequestedRef.current = false;
+      handleSubmit(buffer.text);
+    }
+  }, [submitTick, buffer.text, handleSubmit]);
+
   const handleInput = useCallback(
     (key: Key) => {
       if (!focus) {
@@ -1062,7 +1072,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           (completion.activeSuggestionIndex <= 0 &&
             !hasUserNavigatedSuggestions.current))
       ) {
-        handleSubmit(buffer.text);
+        submitRequestedRef.current = true;
+        setSubmitTick((t) => t + 1);
         return true;
       }
 
@@ -1113,7 +1124,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 setExpandedSuggestionIndex(-1);
                 hasUserNavigatedSuggestions.current = false;
                 if (buffer.text.trim()) {
-                  handleSubmit(buffer.text);
+                  submitRequestedRef.current = true;
+                  setSubmitTick((t) => t + 1);
                 }
                 return true;
               }
@@ -1272,7 +1284,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             buffer.backspace();
             buffer.newline();
           } else {
-            handleSubmit(buffer.text);
+            submitRequestedRef.current = true;
+            setSubmitTick((t) => t + 1);
           }
         }
         return true;
