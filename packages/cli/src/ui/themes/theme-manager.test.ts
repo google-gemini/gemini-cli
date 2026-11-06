@@ -352,21 +352,15 @@ describe('ThemeManager', () => {
   });
 
   describe('standalone user theme.json discovery', () => {
-    const originalXdg = process.env['XDG_CONFIG_HOME'];
-
     beforeEach(() => {
-      delete process.env['XDG_CONFIG_HOME'];
+      vi.stubEnv('XDG_CONFIG_HOME', '');
       vi.mocked(os.homedir).mockReturnValue('/home/user');
       themeManager.reinitialize({ fs, homedir: os.homedir });
       vi.spyOn(fs, 'realpathSync').mockImplementation((p) => p.toString());
     });
 
     afterEach(() => {
-      if (originalXdg === undefined) {
-        delete process.env['XDG_CONFIG_HOME'];
-      } else {
-        process.env['XDG_CONFIG_HOME'] = originalXdg;
-      }
+      vi.unstubAllEnvs();
       themeManager.clearUserThemes();
       themeManager.clearFileThemes();
     });
@@ -396,7 +390,7 @@ describe('ThemeManager', () => {
     });
 
     it('falls back to ~/.config/gemini/theme.json and $XDG_CONFIG_HOME/gemini/theme.json', () => {
-      process.env['XDG_CONFIG_HOME'] = '/home/user/.custom-xdg';
+      vi.stubEnv('XDG_CONFIG_HOME', '/home/user/.custom-xdg');
       const expectedXdgThemePath = path.resolve(
         '/home/user/.custom-xdg/gemini/theme.json',
       );
@@ -572,7 +566,7 @@ describe('ThemeManager', () => {
       const fileThemePath = path.join(symlinkHome, 'my-file-theme.json');
 
       vi.mocked(os.homedir).mockReturnValue(symlinkHome);
-      process.env['XDG_CONFIG_HOME'] = symlinkXdg;
+      vi.stubEnv('XDG_CONFIG_HOME', symlinkXdg);
       vi.spyOn(fs, 'existsSync').mockImplementation((p) => {
         const resolved = path.resolve(p.toString());
         return (
