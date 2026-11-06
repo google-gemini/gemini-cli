@@ -60,6 +60,64 @@ describe('safeJsonStringify', () => {
     expect(result).toBe('[{"id":1,"parent":"[Circular]"}]');
   });
 
+  it('should serialize shared non-circular references in full', () => {
+    const shared = { x: 1 };
+
+    expect(safeJsonStringify({ a: shared, b: shared })).toBe(
+      '{"a":{"x":1},"b":{"x":1}}',
+    );
+    expect(safeJsonStringify([shared, shared])).toBe('[{"x":1},{"x":1}]');
+  });
+
+  it('should serialize shared references that are nested at different depths', () => {
+    const boundaries = [0, 5, 10];
+    const obj = {
+      first: { boundaries },
+      second: { inner: { boundaries } },
+      third: boundaries,
+    };
+
+    expect(JSON.parse(safeJsonStringify(obj))).toEqual({
+      first: { boundaries: [0, 5, 10] },
+      second: { inner: { boundaries: [0, 5, 10] } },
+      third: [0, 5, 10],
+    });
+  });
+
+  it('should only replace the true cycle when it is mixed with shared references', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const node: any = { id: 1 };
+    node.self = node;
+    const obj = { a: node, b: node };
+
+    expect(safeJsonStringify(obj)).toBe(
+      '{"a":{"id":1,"self":"[Circular]"},"b":{"id":1,"self":"[Circular]"}}',
+    );
+  });
+
+  it('should serialize repeated OpenTelemetry-style endTime and boundaries values', () => {
+    const endTime = [1700000000, 0];
+    const boundaries = [0, 10, 100];
+    const metrics = {
+      dataPoints: [
+        { endTime, value: { boundaries } },
+        { endTime, value: { boundaries } },
+        { endTime, value: { boundaries } },
+      ],
+    };
+
+    const result = safeJsonStringify(metrics);
+
+    expect(result).not.toContain('[Circular]');
+    expect(JSON.parse(result)).toEqual({
+      dataPoints: [
+        { endTime: [1700000000, 0], value: { boundaries: [0, 10, 100] } },
+        { endTime: [1700000000, 0], value: { boundaries: [0, 10, 100] } },
+        { endTime: [1700000000, 0], value: { boundaries: [0, 10, 100] } },
+      ],
+    });
+  });
+
   it('should handle null and undefined values', () => {
     expect(safeJsonStringify(null)).toBe('null');
     expect(safeJsonStringify(undefined)).toBe(undefined);
