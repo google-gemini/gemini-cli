@@ -5,7 +5,10 @@
  */
 
 import type { AgentDefinition } from './types.js';
-import { GEMINI_MODEL_ALIAS_FLASH } from '../config/models.js';
+import {
+  DEFAULT_THINKING_MODE,
+  GEMINI_MODEL_ALIAS_FLASH,
+} from '../config/models.js';
 import { z } from 'zod';
 import { GetInternalDocsTool } from '../tools/get-internal-docs.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
@@ -75,7 +78,7 @@ export const CliHelpAgent = (
       topP: 0.95,
       thinkingConfig: {
         includeThoughts: true,
-        thinkingBudget: -1,
+        thinkingBudget: DEFAULT_THINKING_MODE,
       },
     },
   },
@@ -83,6 +86,8 @@ export const CliHelpAgent = (
   runConfig: {
     maxTimeMinutes: 3,
     maxTurns: 10,
+    // A docs lookup turn takes seconds; fail fast if the model stalls.
+    maxTurnTimeMinutes: 1,
   },
 
   toolConfig: {
