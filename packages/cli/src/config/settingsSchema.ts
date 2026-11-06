@@ -130,6 +130,10 @@ export interface SettingDefinition {
    * Optional reference identifier for generators that emit a `$ref`.
    */
   ref?: string;
+  /**
+   * Optional minimum value constraint for numeric settings.
+   */
+  minimum?: number;
 }
 
 export interface SettingsSchema {
@@ -1093,6 +1097,7 @@ const SETTINGS_SCHEMA = {
         category: 'Model',
         requiresRestart: true,
         default: undefined as number | undefined,
+        minimum: 1,
         description: oneLine`
           How long to wait, in milliseconds, for the API to start responding
           before a request is aborted and retried. Defaults to 60000. Raise this

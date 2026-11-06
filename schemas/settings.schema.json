@@ -709,7 +709,8 @@
           "title": "Request Timeout (ms)",
           "description": "How long to wait, in milliseconds, for the API to start responding before a request is aborted and retried. Defaults to 60000. Raise this if long-thinking requests are timing out.",
           "markdownDescription": "How long to wait, in milliseconds, for the API to start responding before a request is aborted and retried. Defaults to 60000. Raise this if long-thinking requests are timing out.\n\n- Category: `Model`\n- Requires restart: `yes`",
-          "type": "number"
+          "type": "number",
+          "minimum": 1
         },
         "summarizeToolOutput": {
           "title": "Summarize Tool Output",
