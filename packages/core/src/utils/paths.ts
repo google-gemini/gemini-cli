@@ -35,16 +35,63 @@ export function tmpdir(): string {
 }
 
 /**
- * Replaces the home directory with a tilde.
- * @param path - The path to tildeify.
+ * Replaces the home directory prefix with a tilde when it matches on a path-segment boundary.
+ * @param filePath - The path to tildeify.
  * @returns The tildeified path.
  */
-export function tildeifyPath(path: string): string {
+export function tildeifyPath(filePath: string): string {
   const homeDir = homedir();
-  if (path.startsWith(homeDir)) {
-    return path.replace(homeDir, '~');
+  if (!filePath || !homeDir) {
+    return filePath;
   }
-  return path;
+
+  if (process.platform === 'win32') {
+    const trimmedHome = homeDir.replace(/[\\/]+$/, '');
+    if (!trimmedHome || /^[a-zA-Z]:$/.test(trimmedHome)) {
+      return filePath;
+    }
+
+    const normHome = trimmedHome.replace(/\\/g, '/').toLowerCase();
+    const prefix = filePath.slice(0, trimmedHome.length);
+    if (prefix.replace(/\\/g, '/').toLowerCase() === normHome) {
+      if (filePath.length === trimmedHome.length) {
+        return '~';
+      }
+      const nextChar = filePath[trimmedHome.length];
+      if (nextChar === '\\' || nextChar === '/') {
+        return '~' + filePath.slice(trimmedHome.length);
+      }
+    }
+    return filePath;
+  }
+
+  const trimmedHome = homeDir.replace(/\/+$/, '');
+  if (!trimmedHome) {
+    return filePath;
+  }
+
+  if (process.platform === 'darwin') {
+    const normHome = trimmedHome.toLowerCase();
+    const prefix = filePath.slice(0, trimmedHome.length);
+    if (prefix.toLowerCase() === normHome) {
+      if (filePath.length === trimmedHome.length) {
+        return '~';
+      }
+      if (filePath[trimmedHome.length] === '/') {
+        return '~' + filePath.slice(trimmedHome.length);
+      }
+    }
+    return filePath;
+  }
+
+  if (filePath === trimmedHome) {
+    return '~';
+  }
+  if (filePath.startsWith(trimmedHome + '/')) {
+    return '~' + filePath.slice(trimmedHome.length);
+  }
+
+  return filePath;
 }
 
 /**
