@@ -23,7 +23,10 @@ import { randomUUID } from 'node:crypto';
 import { type Server as HTTPServer } from 'node:http';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import { tmpdir } from '@google/gemini-cli-core/src/utils/paths.js';
+import {
+  resolveToRealPath,
+  tmpdir,
+} from '@google/gemini-cli-core/src/utils/paths.js';
 import type { z } from 'zod';
 import type { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
@@ -517,13 +520,7 @@ const sanitizeDiffFilePath = (filePath: string): string => {
   if (trimmedPath.startsWith('\\\\') || trimmedPath.startsWith('//')) {
     throw new Error('Invalid filePath: UNC paths are not allowed');
   }
-  if (
-    !path.isAbsolute(trimmedPath) ||
-    trimmedPath.split(/[/\\]/).includes('..')
-  ) {
-    throw new Error(`Invalid filePath: ${trimmedPath}`);
-  }
-  return path.normalize(trimmedPath);
+  return resolveToRealPath(trimmedPath);
 };
 
 const createMcpServer = (
