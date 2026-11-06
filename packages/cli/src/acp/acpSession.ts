@@ -411,6 +411,7 @@ export class Session {
     let currentParts: Part[] = parts;
     let turnCount = 0;
     const maxTurns = this.context.config.getMaxSessionTurns();
+    let isFirstChunkAfterRetry = false;
 
     while (true) {
       turnCount++;
@@ -423,7 +424,6 @@ export class Session {
       }
 
       const toolCallRequests: ToolCallRequestInfo[] = [];
-      let isFirstChunkAfterRetry = false;
       let stopReason: acp.StopReason = 'end_turn';
       let turnModelId = this.context.config.getModel();
       let turnInputTokens = 0;
