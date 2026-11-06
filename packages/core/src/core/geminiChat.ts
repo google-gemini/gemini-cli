@@ -607,6 +607,10 @@ export class GeminiChat {
         }
       }
     } else {
+      const binaryParts = !isContextManagementEnabled
+        ? this.extractBinaryInjections(userContent.parts)
+        : null;
+
       // Record tool response as a message to ensure durable ID and linear history for resume.
       const id = this.chatRecordingService.recordSyntheticMessage(
         'user',
@@ -614,8 +618,6 @@ export class GeminiChat {
       );
 
       if (!isContextManagementEnabled) {
-        // Binary injections: If the tool output contains binary data, we expand the history.
-        const binaryParts = this.extractBinaryInjections(userContent.parts);
         if (binaryParts) {
           // Turn 1: The original tool response (now cleaned)
           this.agentHistory.push({ id, content: userContent });
