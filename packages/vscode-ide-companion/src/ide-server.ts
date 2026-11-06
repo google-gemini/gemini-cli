@@ -520,7 +520,21 @@ const sanitizeDiffFilePath = (filePath: string): string => {
   if (trimmedPath.startsWith('\\\\') || trimmedPath.startsWith('//')) {
     throw new Error('Invalid filePath: UNC paths are not allowed');
   }
-  return resolveToRealPath(trimmedPath);
+  const resolvedPath = resolveToRealPath(trimmedPath);
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (workspaceFolders && workspaceFolders.length > 0) {
+    const isWithinWorkspace = workspaceFolders.some((folder) => {
+      const folderPath = resolveToRealPath(folder.uri.fsPath);
+      return (
+        resolvedPath === folderPath ||
+        resolvedPath.startsWith(folderPath + path.sep)
+      );
+    });
+    if (!isWithinWorkspace) {
+      throw new Error('Invalid filePath: path is outside the workspace');
+    }
+  }
+  return resolvedPath;
 };
 
 const createMcpServer = (
