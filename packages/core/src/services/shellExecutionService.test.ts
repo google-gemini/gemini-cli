@@ -3187,4 +3187,28 @@ describe('Windows ConPTY exit desynchronization and hang regression (#25166)', (
     expect(outcome).not.toBe('timeout');
     expect((outcome as { exitCode: number }).exitCode).toBe(0);
   });
+
+  it('should inject GEMINI_CLI_IN_SHELL=1 into the child process environment', async () => {
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'echo $GEMINI_CLI_IN_SHELL',
+      '/test/dir',
+      onOutputEventMock,
+      abortController.signal,
+      true,
+      shellExecutionConfig,
+    );
+    mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+    await handle.result;
+
+    expect(mockPtySpawn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({
+        env: expect.objectContaining({
+          GEMINI_CLI_IN_SHELL: '1',
+        }),
+      }),
+    );
+  });
 });

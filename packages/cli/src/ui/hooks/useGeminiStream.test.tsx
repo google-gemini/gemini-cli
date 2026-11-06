@@ -5332,4 +5332,22 @@ describe('useGeminiStream', () => {
       }
     });
   });
+
+  describe('shellModeActive query isolation', () => {
+    it('should never fall through to sending an LLM query when shellModeActive is true', async () => {
+      const { result } = await renderHookWithDefaults({
+        shellModeActive: true,
+      });
+
+      await act(async () => {
+        await result.current.submitQuery('gemini');
+      });
+
+      expect(mockSendMessageStream).not.toHaveBeenCalled();
+      expect(mockAddItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: MessageType.USER, text: 'gemini' }),
+        expect.any(Number),
+      );
+    });
+  });
 });
