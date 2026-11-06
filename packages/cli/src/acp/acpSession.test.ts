@@ -250,6 +250,112 @@ describe('Session', () => {
     expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
+  it('should handle mid-stream GeminiEventType.Retry without concatenating abandoned attempts', async () => {
+    const stream = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: 'Abandoned attempt partial text (',
+      },
+      {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'call-1',
+          name: 'abandoned_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      },
+      {
+        type: GeminiEventType.Retry,
+      },
+      {
+        type: GeminiEventType.Content,
+        value: 'Successful attempt full text.',
+      },
+    ]);
+    mockSendMessageStream.mockReturnValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    const updates = (mockConnection.sessionUpdate as Mock).mock.calls.map(
+      (call) => call[0].update,
+    );
+
+    // 1. Verify that retry thought chunk was sent to inform the client
+    const retryThought = updates.find(
+      (u) => u.sessionUpdate === 'agent_thought_chunk' && u._meta?.retry,
+    );
+    expect(retryThought).toBeDefined();
+
+    // 2. Verify that the first content chunk after retry has reset metadata
+    const resetChunk = updates.find(
+      (u) =>
+        u.sessionUpdate === 'agent_message_chunk' &&
+        u.content?.text === 'Successful attempt full text.',
+    );
+    expect(resetChunk).toBeDefined();
+    expect(resetChunk?._meta).toEqual({ retry: true, reset: true });
+
+    // 3. Verify that the abandoned tool call request was dropped and not executed/prompted for permission
+    expect(mockConnection.requestPermission).not.toHaveBeenCalled();
+  });
+
+  it('should preserve isFirstChunkAfterRetry across sub-turns when a retry is followed by a tool call', async () => {
+    // Turn 1: Partial text -> Retry -> ToolCallRequest (no content chunks after retry in this turn)
+    const stream1 = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: 'Abandoned partial text',
+      },
+      {
+        type: GeminiEventType.Retry,
+      },
+      {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'call-1',
+          name: 'test_tool',
+          args: { foo: 'bar' },
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      },
+    ]);
+    // Turn 2 (Tool response turn): Content chunk emitted after tool execution
+    const stream2 = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: 'Result after tool execution',
+      },
+    ]);
+
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    const updates = (mockConnection.sessionUpdate as Mock).mock.calls.map(
+      (call) => call[0].update,
+    );
+
+    // Verify that the content chunk in Turn 2 still received { retry: true, reset: true }
+    const resultChunk = updates.find(
+      (u) =>
+        u.sessionUpdate === 'agent_message_chunk' &&
+        u.content?.text === 'Result after tool execution',
+    );
+    expect(resultChunk).toBeDefined();
+    expect(resultChunk?._meta).toEqual({ retry: true, reset: true });
+  });
+
   it('should include standard ACP token usage in PromptResponse.usage and emit usage_update', async () => {
     async function* mockStreamWithUsage(): AsyncGenerator<ServerGeminiStreamEvent> {
       yield {

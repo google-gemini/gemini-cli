@@ -429,6 +429,7 @@ export class Session {
     let currentParts: Part[] = parts;
     let turnCount = 0;
     const maxTurns = this.context.config.getMaxSessionTurns();
+    let isFirstChunkAfterRetry = false;
 
     while (true) {
       turnCount++;
@@ -467,10 +468,16 @@ export class Session {
                 text: event.value,
               };
 
-              await this.sendUpdate({
+              const update: acp.SessionUpdate = {
                 sessionUpdate: 'agent_message_chunk',
                 content,
-              });
+                ...(isFirstChunkAfterRetry
+                  ? { _meta: { retry: true, reset: true } }
+                  : {}),
+              };
+              isFirstChunkAfterRetry = false;
+
+              await this.sendUpdate(update);
               break;
             }
 
@@ -480,6 +487,23 @@ export class Session {
                 sessionUpdate: 'agent_thought_chunk',
                 content: { type: 'text', text: thoughtText },
               });
+              break;
+            }
+
+            case GeminiEventType.Retry: {
+              toolCallRequests.length = 0;
+              debugLogger.warn(
+                'Model stream interrupted mid-response; retrying prompt...',
+              );
+              await this.sendUpdate({
+                sessionUpdate: 'agent_thought_chunk',
+                content: {
+                  type: 'text',
+                  text: '_[Stream interrupted. Retrying response...]_',
+                },
+                _meta: { retry: true },
+              });
+              isFirstChunkAfterRetry = true;
               break;
             }
 
