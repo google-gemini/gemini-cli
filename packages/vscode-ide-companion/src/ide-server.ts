@@ -531,9 +531,13 @@ const sanitizeDiffFilePath = (filePath: string): string => {
   try {
     resolvedPath = resolveToRealPath(absolutePath);
   } catch {
-    const parentDir = path.dirname(absolutePath);
-    const resolvedParent = resolveToRealPath(parentDir);
-    resolvedPath = path.join(resolvedParent, path.basename(absolutePath));
+    try {
+      const parentDir = path.dirname(absolutePath);
+      const resolvedParent = resolveToRealPath(parentDir);
+      resolvedPath = path.join(resolvedParent, path.basename(absolutePath));
+    } catch {
+      resolvedPath = absolutePath;
+    }
   }
 
   const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -541,7 +545,12 @@ const sanitizeDiffFilePath = (filePath: string): string => {
     throw new Error('Invalid filePath: no workspace folder is open');
   }
   const isWithinWorkspace = workspaceFolders.some((folder) => {
-    const folderPath = resolveToRealPath(folder.uri.fsPath);
+    let folderPath: string;
+    try {
+      folderPath = resolveToRealPath(folder.uri.fsPath);
+    } catch {
+      folderPath = path.resolve(folder.uri.fsPath);
+    }
     const relative = path.relative(folderPath, resolvedPath);
     return (
       relative === '' ||
