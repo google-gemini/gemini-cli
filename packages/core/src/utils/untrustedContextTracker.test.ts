@@ -577,6 +577,38 @@ done`;
         ).toEqual(['./src/index.ts']);
       });
 
+      it('should not flag project temp paths that appeared in local shell output', () => {
+        const projectTempDir = path.resolve('/home/dev/.gemini/tmp/app');
+        const tempScript = path.join(projectTempDir, '42', 'parse_pr.py');
+        const untrustedContext = extractUntrustedContext([
+          shellOutputTurn(
+            `Traceback (most recent call last):\n  File "${tempScript}", line 3`,
+          ),
+        ]);
+
+        expect(
+          findUntrustedFlags(`python3 ${tempScript}`, untrustedContext, {
+            ...workspaceOptions,
+            projectTempDir,
+          }),
+        ).toEqual([]);
+        // The project temp directory is honored without a workspace scope.
+        expect(
+          findUntrustedFlags(`python3 ${tempScript}`, untrustedContext, {
+            cwd: workspaceRoot,
+            projectTempDir,
+          }),
+        ).toEqual([]);
+        // Without the project temp directory the same path is still reported.
+        expect(
+          findUntrustedFlags(
+            `python3 ${tempScript}`,
+            untrustedContext,
+            workspaceOptions,
+          ),
+        ).toEqual([tempScript]);
+      });
+
       it('should keep reporting a path when the workspace check throws', () => {
         const untrustedContext = extractUntrustedContext([
           shellOutputTurn('./src/index.ts'),

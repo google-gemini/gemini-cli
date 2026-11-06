@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import type { Content } from '@google/genai';
 import { parse as shellParse } from 'shell-quote';
 import { getCommandRoots, normalizeCommand } from './shell-utils.js';
+import { isSubpath } from './paths.js';
 import { SHELL_TOOL_NAME } from '../tools/definitions/base-declarations.js';
 
 export interface UntrustedContextData {
@@ -22,13 +23,20 @@ export interface UntrustedContextData {
 }
 
 /**
- * Options that scope untrusted flag detection to the current workspace.
+ * Options that scope untrusted flag detection to the current workspace and the
+ * session's temporary directory.
  */
 export interface UntrustedFlagOptions {
   /** Directory used to resolve relative path arguments. */
   cwd?: string;
   /** Returns true when an absolute path is inside the workspace boundary. */
   isPathWithinWorkspace?: (absolutePath: string) => boolean;
+  /**
+   * Directory where Gemini CLI writes session-scoped temporary files. Paths
+   * below it are local to this session even though they live outside the
+   * workspace.
+   */
+  projectTempDir?: string;
 }
 
 interface LogResponse {
@@ -289,9 +297,9 @@ function isHighRiskPatternToken(token: string): boolean {
 }
 
 /**
- * Returns true when a path argument resolves inside the workspace boundary and
- * is not a URL, an executable script, or a path containing shell expansions
- * that could resolve elsewhere at runtime.
+ * Returns true when a path argument resolves inside the workspace boundary or
+ * the project temp directory, and is not a URL, an executable script, or a path
+ * containing shell expansions that could resolve elsewhere at runtime.
  */
 function isWorkspaceLocalPath(
   token: string,
@@ -299,7 +307,6 @@ function isWorkspaceLocalPath(
 ): boolean {
   if (
     !options?.cwd ||
-    !options.isPathWithinWorkspace ||
     token.startsWith('http://') ||
     token.startsWith('https://') ||
     EXECUTABLE_SCRIPT_REGEX.test(token) ||
@@ -308,7 +315,12 @@ function isWorkspaceLocalPath(
     return false;
   }
   try {
-    return options.isPathWithinWorkspace(path.resolve(options.cwd, token));
+    const absolutePath = path.resolve(options.cwd, token);
+    return (
+      (options.isPathWithinWorkspace?.(absolutePath) ?? false) ||
+      (options.projectTempDir !== undefined &&
+        isSubpath(options.projectTempDir, absolutePath))
+    );
   } catch {
     // Paths that can't be resolved are not treated as workspace-local.
     return false;
