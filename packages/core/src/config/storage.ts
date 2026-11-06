@@ -155,6 +155,10 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'keybindings.json');
   }
 
+  static getUserThemesPath(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'theme.json');
+  }
+
   static getUserAgentsDir(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'agents');
   }
