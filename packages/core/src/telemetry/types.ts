@@ -241,6 +241,7 @@ const TOOL_CALL_METADATA_SAFE_KEYS = [
   'user_removed_lines',
   'user_added_chars',
   'user_removed_chars',
+  'skill_name',
 ] as const;
 export class ToolCallEvent implements BaseTelemetryEvent {
   'event.name': 'tool_call';
