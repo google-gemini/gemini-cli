@@ -30,7 +30,7 @@ export function isNetworkRetry(
   if (!retryStatus || retryStatus.status !== undefined || !retryStatus.error) {
     return false;
   }
-  return /fetch\s*failed|UND_ERR_|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|EPIPE|EPROTO|ERR_SSL_|ERR_STREAM_PREMATURE_CLOSE|network|timed?\s*out/i.test(
+  return /fetch[\s_]*failed|UND_ERR_|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|EPIPE|EPROTO|ERR_SSL_|ERR_STREAM_PREMATURE_CLOSE|network|timed?\s*out/i.test(
     retryStatus.error,
   );
 }

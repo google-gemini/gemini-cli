@@ -316,7 +316,7 @@ describe('useLoadingIndicator', () => {
       attempt: 1,
       maxAttempts: 3,
       delayMs: 5000,
-      error: 'fetch failed',
+      error: 'FETCH_FAILED',
     };
     const { result } = await renderLoadingIndicatorHook(
       StreamingState.Responding,
@@ -337,6 +337,15 @@ describe('useLoadingIndicator', () => {
 
   describe('isNetworkRetry', () => {
     it('returns true for network and timeout errors without HTTP status', () => {
+      expect(
+        isNetworkRetry({
+          model: 'gemini-pro',
+          attempt: 1,
+          maxAttempts: 3,
+          delayMs: 5000,
+          error: 'FETCH_FAILED',
+        }),
+      ).toBe(true);
       expect(
         isNetworkRetry({
           model: 'gemini-pro',
