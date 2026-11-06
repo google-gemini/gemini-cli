@@ -7,7 +7,10 @@
 import { describe, it, expect } from 'vitest';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GET_INTERNAL_DOCS_TOOL_NAME } from '../tools/tool-names.js';
-import { GEMINI_MODEL_ALIAS_FLASH } from '../config/models.js';
+import {
+  DEFAULT_THINKING_MODE,
+  GEMINI_MODEL_ALIAS_FLASH,
+} from '../config/models.js';
 import type { LocalAgentDefinition } from './types.js';
 import type { Config } from '../config/config.js';
 
@@ -43,6 +46,16 @@ describe('CliHelpAgent', () => {
       (t) => typeof t !== 'string' && t.name === GET_INTERNAL_DOCS_TOOL_NAME,
     );
     expect(hasInternalDocsTool).toBe(true);
+  });
+
+  it('should bound thinking and the time to wait for a model response', () => {
+    const thinkingConfig =
+      localAgent.modelConfig.generateContentConfig?.thinkingConfig;
+    expect(thinkingConfig?.thinkingBudget).toBe(DEFAULT_THINKING_MODE);
+
+    const { maxTurnTimeMinutes, maxTimeMinutes } = localAgent.runConfig;
+    expect(maxTurnTimeMinutes).toBeGreaterThan(0);
+    expect(maxTurnTimeMinutes).toBeLessThan(maxTimeMinutes!);
   });
 
   it('should have expected prompt placeholders', () => {
