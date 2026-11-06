@@ -55,6 +55,21 @@ const DARWIN_DEV_MAJOR_MASK = 0xff;
 const STDERR_FILENO = 2;
 
 /**
+ * Internal/undocumented properties of `@lydell/node-pty`'s Unix implementation.
+ *
+ * Rationale & Why Public API Is Insufficient:
+ * The public `IPty` interface does not expose the underlying master file descriptor (`fd`)
+ * or the slave pseudo-terminal device path (`ptsName`). Accessing these properties is
+ * required to perform synchronous cleanup of leaked/orphan file descriptors (both master
+ * and slave) on macOS immediately after spawning, preventing system-wide PTY descriptor
+ * exhaustion.
+ */
+export interface UnixPtyInternal {
+  fd?: number;
+  ptsName?: string;
+}
+
+/**
  * An environment variable that is set for shell executions. This can be used
  * by downstream executables and scripts to identify that they were executed
  * from within Gemini CLI.
@@ -180,10 +195,11 @@ export interface WindowsPtyAgentInternal {
   _$onProcessExit?: (exitCode: number) => void;
 }
 
-export type DestroyablePty = IPty & {
-  destroy?: () => void;
-  _agent?: WindowsPtyAgentInternal;
-};
+export type DestroyablePty = IPty &
+  UnixPtyInternal & {
+    destroy?: () => void;
+    _agent?: WindowsPtyAgentInternal;
+  };
 
 interface ActivePty {
   ptyProcess: DestroyablePty;
@@ -1101,8 +1117,7 @@ export class ShellExecutionService {
 
     const activeMasterFds = new Set<number>();
     for (const entry of this.activePtys.values()) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const activeFd = (entry.ptyProcess as unknown as { fd?: number })?.fd;
+      const activeFd = entry.ptyProcess?.fd;
       if (typeof activeFd === 'number') {
         activeMasterFds.add(activeFd);
       }
@@ -1309,10 +1324,8 @@ export class ShellExecutionService {
       const assignedPid = Number(pty.pid);
       ptyPid = assignedPid;
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const masterFd = (ptyProcess as unknown as { fd?: number }).fd;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const ptsName = (ptyProcess as unknown as { ptsName?: string }).ptsName;
+      const masterFd = pty.fd;
+      const ptsName = pty.ptsName;
       ShellExecutionService.closeOrphanMasterFd(masterFd);
       ShellExecutionService.closeOrphanSlaveFd(masterFd, ptsName);
 
