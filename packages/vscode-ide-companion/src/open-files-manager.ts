@@ -21,6 +21,7 @@ export class OpenFilesManager {
   private readonly onDidChangeEmitter = new vscode.EventEmitter<void>();
   readonly onDidChange = this.onDidChangeEmitter.event;
   private debounceTimer: NodeJS.Timeout | undefined;
+  private pendingSelectionEditor: vscode.TextEditor | undefined;
   private openFiles: File[] = [];
 
   constructor(private readonly context: vscode.ExtensionContext) {
@@ -36,7 +37,7 @@ export class OpenFilesManager {
     const selectionWatcher = vscode.window.onDidChangeTextEditorSelection(
       (event) => {
         if (this.isFileUri(event.textEditor.document.uri)) {
-          this.updateActiveContext(event.textEditor);
+          this.pendingSelectionEditor = event.textEditor;
           this.fireWithDebounce();
         }
       },
@@ -83,6 +84,7 @@ export class OpenFilesManager {
           if (this.debounceTimer) {
             clearTimeout(this.debounceTimer);
           }
+          this.pendingSelectionEditor = undefined;
           this.onDidChangeEmitter.dispose();
         },
       },
@@ -101,7 +103,16 @@ export class OpenFilesManager {
     return uri.scheme === 'file' && !isExcludedIdeContextFile(uri.fsPath);
   }
 
+  private flushPendingSelection() {
+    if (this.pendingSelectionEditor) {
+      const editor = this.pendingSelectionEditor;
+      this.pendingSelectionEditor = undefined;
+      this.updateActiveContext(editor);
+    }
+  }
+
   private addOrMoveToFront(editor: vscode.TextEditor) {
+    this.pendingSelectionEditor = undefined;
     // Deactivate previous active file
     const currentActive = this.openFiles.find((f) => f.isActive);
     if (currentActive) {
@@ -134,6 +145,7 @@ export class OpenFilesManager {
   }
 
   private remove(uri: vscode.Uri) {
+    this.flushPendingSelection();
     const index = this.openFiles.findIndex((f) => f.path === uri.fsPath);
     if (index !== -1) {
       this.openFiles.splice(index, 1);
@@ -141,6 +153,7 @@ export class OpenFilesManager {
   }
 
   private rename(oldUri: vscode.Uri, newUri: vscode.Uri) {
+    this.flushPendingSelection();
     const index = this.openFiles.findIndex((f) => f.path === oldUri.fsPath);
     if (index !== -1) {
       this.openFiles[index].path = newUri.fsPath;
@@ -176,11 +189,13 @@ export class OpenFilesManager {
       clearTimeout(this.debounceTimer);
     }
     this.debounceTimer = setTimeout(() => {
+      this.flushPendingSelection();
       this.onDidChangeEmitter.fire();
     }, 50); // 50ms
   }
 
   get state(): IdeContext {
+    this.flushPendingSelection();
     return {
       workspaceState: {
         openFiles: [...this.openFiles],

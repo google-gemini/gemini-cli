@@ -202,7 +202,7 @@ export class IDEServer {
         next();
       });
 
-      const mcpServer = createMcpServer(this.diffManager, this.log);
+      let mcpServer: McpServer | undefined;
 
       this.openFilesManager = new OpenFilesManager(context);
       const onDidChangeSubscription = this.openFilesManager.onDidChange(() => {
@@ -272,6 +272,7 @@ export class IDEServer {
             }
           };
 
+          mcpServer ??= createMcpServer(this.diffManager, this.log);
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
           mcpServer.connect(transport);
         } else {

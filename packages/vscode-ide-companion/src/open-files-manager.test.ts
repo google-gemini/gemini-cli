@@ -383,6 +383,49 @@ describe('OpenFilesManager', () => {
     expect(getTextMock).not.toHaveBeenCalled();
   });
 
+  it('debounces document.getText across rapid selection changes', async () => {
+    const manager = new OpenFilesManager(context);
+    const uri = getUri('/test/file1.txt');
+    const initialSelection = {
+      active: { line: 0, character: 0 },
+      isEmpty: true,
+    } as vscode.Selection;
+
+    const getTextMock = vi.fn().mockReturnValue('final selected text');
+    const textEditor = {
+      document: {
+        uri,
+        getText: getTextMock,
+      },
+      selection: initialSelection,
+    } as unknown as vscode.TextEditor;
+
+    onDidChangeActiveTextEditorListener(textEditor);
+    await vi.advanceTimersByTimeAsync(100);
+    getTextMock.mockClear();
+
+    for (let i = 1; i <= 5; i++) {
+      const nextSelection = {
+        active: { line: i, character: i },
+      } as vscode.Selection;
+      (textEditor as { selection: vscode.Selection }).selection = nextSelection;
+      onDidChangeTextEditorSelectionListener({
+        textEditor,
+        selections: [nextSelection],
+        kind: vscode.TextEditorSelectionChangeKind.Mouse,
+      });
+    }
+
+    expect(getTextMock).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(getTextMock).toHaveBeenCalledTimes(1);
+    const file = manager.state.workspaceState!.openFiles![0];
+    expect(file.selectedText).toBe('final selected text');
+    expect(file.cursor).toEqual({ line: 6, character: 6 });
+  });
+
   it('truncates long selected text', async () => {
     const manager = new OpenFilesManager(context);
     const uri = getUri('/test/file1.txt');
