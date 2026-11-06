@@ -507,10 +507,20 @@ export class IDEServer {
 }
 
 const sanitizeDiffFilePath = (filePath: string): string => {
-  if (!path.isAbsolute(filePath) || filePath.split(/[/\\]/).includes('..')) {
-    throw new Error(`Invalid filePath: ${filePath}`);
+  const trimmedPath = filePath.trim();
+  if (!trimmedPath) {
+    throw new Error('Invalid filePath: path is empty or whitespace-only');
   }
-  return path.normalize(filePath);
+  if (trimmedPath.includes('\u0000')) {
+    throw new Error('Invalid filePath: contains null byte');
+  }
+  if (
+    !path.isAbsolute(trimmedPath) ||
+    trimmedPath.split(/[/\\]/).includes('..')
+  ) {
+    throw new Error(`Invalid filePath: ${trimmedPath}`);
+  }
+  return path.normalize(trimmedPath);
 };
 
 const createMcpServer = (
