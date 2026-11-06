@@ -139,6 +139,8 @@ describe('ClassifierStrategy', () => {
       expect.objectContaining({
         modelConfigKey: { model: mockResolvedConfig.model },
         promptId: 'test-prompt-id',
+        abortSignal: mockContext.signal,
+        maxAttempts: 2,
       }),
     );
   });
