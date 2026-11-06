@@ -1624,7 +1624,7 @@ describe('ShellExecutionService', () => {
       expect(mockCloseSync).toHaveBeenCalledWith(18);
     });
 
-    it('skips active PTY master fds and non-ptmx fds when scanning below masterFd', () => {
+    it('skips active PTY master fds and returns undefined if masterFd - 1 is active', () => {
       mockPlatform.mockReturnValue('darwin');
       mockCloseSync.mockClear();
       const ptmxMajor = 15 << 24;
@@ -1636,29 +1636,13 @@ describe('ShellExecutionService', () => {
         }
       ).activePtys;
       activePtys.set(99999, {
-        ptyProcess: { fd: 19, destroy: vi.fn() },
+        ptyProcess: { fd: 18, destroy: vi.fn() },
         headlessTerminal: { dispose: vi.fn() },
       });
 
       try {
         mockFstatSync.mockImplementation((fd: number) => {
-          if (fd === 21) {
-            return {
-              rdev: ptmxMajor | 5,
-              ino: ptmxIno,
-              isCharacterDevice: () => true,
-            };
-          }
-          if (fd === 20) {
-            // Simulated kqueue or pipe fd
-            return {
-              rdev: 0,
-              ino: 0,
-              isCharacterDevice: () => false,
-            };
-          }
           if (fd === 19) {
-            // Active PTY master fd
             return {
               rdev: ptmxMajor | 3,
               ino: ptmxIno,
@@ -1666,7 +1650,6 @@ describe('ShellExecutionService', () => {
             };
           }
           if (fd === 18) {
-            // Orphan low_fds[0]
             return {
               rdev: ptmxMajor | 2,
               ino: ptmxIno,
@@ -1676,10 +1659,9 @@ describe('ShellExecutionService', () => {
           throw new Error('EBADF');
         });
 
-        const result = closeOrphanMasterFd(21);
-        expect(result).toBe(18);
-        expect(mockCloseSync).toHaveBeenCalledTimes(1);
-        expect(mockCloseSync).toHaveBeenCalledWith(18);
+        const result = closeOrphanMasterFd(19);
+        expect(result).toBeUndefined();
+        expect(mockCloseSync).not.toHaveBeenCalled();
       } finally {
         activePtys.delete(99999);
       }
@@ -1696,7 +1678,7 @@ describe('ShellExecutionService', () => {
       expect(mockCloseSync).not.toHaveBeenCalled();
     });
 
-    it('does not scan beyond PTY_ORPHAN_FD_SEARCH_RANGE below masterFd', () => {
+    it('does not check or close any fd other than masterFd - 1', () => {
       mockPlatform.mockReturnValue('darwin');
       mockCloseSync.mockClear();
       const ptmxMajor = 15 << 24;
@@ -1709,8 +1691,7 @@ describe('ShellExecutionService', () => {
             isCharacterDevice: () => true,
           };
         }
-        // Outside search range (20 - 8 = 12, so fd 11 is out of range)
-        if (fd === 11) {
+        if (fd === 18) {
           return {
             rdev: ptmxMajor | 2,
             ino: ptmxIno,
@@ -1753,7 +1734,7 @@ describe('ShellExecutionService', () => {
             isCharacterDevice: () => true,
           };
         }
-        // Even if fd <= 2 matched, loop must stop above STDERR_FILENO (2)
+        // Even if fd <= 2 matched, must not probe or close STDERR_FILENO (2)
         return {
           rdev: ptmxMajor | 1,
           ino: 643,
@@ -1761,8 +1742,9 @@ describe('ShellExecutionService', () => {
         };
       });
 
-      const result = closeOrphanMasterFd(5);
-      expect(result).toBeUndefined();
+      expect(closeOrphanMasterFd(5)).toBeUndefined();
+      expect(closeOrphanMasterFd(4)).toBeUndefined();
+      expect(closeOrphanMasterFd(3)).toBeUndefined();
       expect(mockCloseSync).not.toHaveBeenCalled();
     });
 

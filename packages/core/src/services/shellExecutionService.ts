@@ -1057,7 +1057,7 @@ export class ShellExecutionService {
    * `stdout`, and `stderr` (`0..2`). When `low_fds[0] >= STDERR_FILENO`, the
    * loop breaks with `count === 0` and the cleanup loop
    * `for (; count > 0; count--) close(low_fds[count]);` never closes
-   * `low_fds[0]`. This leaks one `/dev/ptmx` master FD (`< masterFd`) per
+   * `low_fds[0]`. This leaks one `/dev/ptmx` master FD (`masterFd - 1`) per
    * spawned PTY until `kern.tty.ptmx_max` is exhausted.
    *
    * Must be called immediately and synchronously on the same JS tick as
@@ -1087,8 +1087,8 @@ export class ShellExecutionService {
     if (
       !masterStat ||
       typeof masterStat.rdev !== 'number' ||
-      (typeof masterStat.isCharacterDevice === 'function' &&
-        !masterStat.isCharacterDevice())
+      typeof masterStat.isCharacterDevice !== 'function' ||
+      !masterStat.isCharacterDevice()
     ) {
       return undefined;
     }
@@ -1108,48 +1108,32 @@ export class ShellExecutionService {
       }
     }
 
-    const limitFd = Math.max(
-      STDERR_FILENO + 1,
-      masterFd - PTY_ORPHAN_FD_SEARCH_RANGE,
-    );
-    for (
-      let candidateFd = masterFd - 1;
-      candidateFd >= limitFd;
-      candidateFd--
-    ) {
-      if (activeMasterFds.has(candidateFd)) {
-        continue;
-      }
+    const candidateFd = masterFd - 1;
+    if (candidateFd > STDERR_FILENO && !activeMasterFds.has(candidateFd)) {
       try {
         const candidateStat = fs.fstatSync(candidateFd);
         if (
-          !candidateStat ||
-          typeof candidateStat.rdev !== 'number' ||
-          (typeof candidateStat.isCharacterDevice === 'function' &&
-            !candidateStat.isCharacterDevice())
+          candidateStat &&
+          typeof candidateStat.rdev === 'number' &&
+          typeof candidateStat.isCharacterDevice === 'function' &&
+          candidateStat.isCharacterDevice() &&
+          candidateStat.rdev !== masterStat.rdev
         ) {
-          continue;
+          const candidateMajor =
+            (candidateStat.rdev >>> DARWIN_DEV_MAJOR_SHIFT) &
+            DARWIN_DEV_MAJOR_MASK;
+          if (
+            candidateMajor === masterMajor &&
+            (typeof masterStat.ino !== 'number' ||
+              masterStat.ino <= 0 ||
+              typeof candidateStat.ino !== 'number' ||
+              candidateStat.ino <= 0 ||
+              candidateStat.ino === masterStat.ino)
+          ) {
+            fs.closeSync(candidateFd);
+            return candidateFd;
+          }
         }
-        if (candidateStat.rdev === masterStat.rdev) {
-          continue;
-        }
-        const candidateMajor =
-          (candidateStat.rdev >>> DARWIN_DEV_MAJOR_SHIFT) &
-          DARWIN_DEV_MAJOR_MASK;
-        if (candidateMajor !== masterMajor) {
-          continue;
-        }
-        if (
-          typeof masterStat.ino === 'number' &&
-          masterStat.ino > 0 &&
-          typeof candidateStat.ino === 'number' &&
-          candidateStat.ino > 0 &&
-          candidateStat.ino !== masterStat.ino
-        ) {
-          continue;
-        }
-        fs.closeSync(candidateFd);
-        return candidateFd;
       } catch {
         // ignored
       }
