@@ -1518,6 +1518,15 @@ describe('ShellExecutionService', () => {
   });
 
   describe('Orphan PTY slave FD cleanup', () => {
+    const closeOrphanMasterFd = (
+      masterFd: number | undefined,
+    ): number | undefined =>
+      (
+        ShellExecutionService as unknown as {
+          closeOrphanMasterFd: (fd: number | undefined) => number | undefined;
+        }
+      ).closeOrphanMasterFd(masterFd);
+
     const closeOrphanSlaveFd = (
       masterFd: number | undefined,
       ptsName: string | undefined,
@@ -1579,6 +1588,163 @@ describe('ShellExecutionService', () => {
 
       const result = closeOrphanSlaveFd(10, '/dev/ttys002');
       expect(result).toBeUndefined();
+      expect(mockCloseSync).not.toHaveBeenCalled();
+    });
+
+    it('synchronously closes the orphan /dev/ptmx master fd (low_fds[0]) when platform is darwin', () => {
+      mockPlatform.mockReturnValue('darwin');
+      mockCloseSync.mockClear();
+      const ptmxMajor = 15 << 24;
+      const ptmxIno = 643;
+      mockFstatSync.mockImplementation((fd: number) => {
+        if (fd === 19) {
+          return {
+            rdev: ptmxMajor | 3,
+            ino: ptmxIno,
+            isCharacterDevice: () => true,
+          };
+        }
+        if (fd === 18) {
+          return {
+            rdev: ptmxMajor | 2,
+            ino: ptmxIno,
+            isCharacterDevice: () => true,
+          };
+        }
+        return {
+          rdev: (16 << 24) | 1,
+          ino: 999,
+          isCharacterDevice: () => true,
+        };
+      });
+
+      const result = closeOrphanMasterFd(19);
+      expect(result).toBe(18);
+      expect(mockCloseSync).toHaveBeenCalledTimes(1);
+      expect(mockCloseSync).toHaveBeenCalledWith(18);
+    });
+
+    it('skips active PTY master fds and returns undefined if masterFd - 1 is active', () => {
+      mockPlatform.mockReturnValue('darwin');
+      mockCloseSync.mockClear();
+      const ptmxMajor = 15 << 24;
+      const ptmxIno = 643;
+
+      const activePtys = (
+        ShellExecutionService as unknown as {
+          activePtys: Map<number, unknown>;
+        }
+      ).activePtys;
+      activePtys.set(99999, {
+        ptyProcess: { fd: 18, destroy: vi.fn() },
+        headlessTerminal: { dispose: vi.fn() },
+      });
+
+      try {
+        mockFstatSync.mockImplementation((fd: number) => {
+          if (fd === 19) {
+            return {
+              rdev: ptmxMajor | 3,
+              ino: ptmxIno,
+              isCharacterDevice: () => true,
+            };
+          }
+          if (fd === 18) {
+            return {
+              rdev: ptmxMajor | 2,
+              ino: ptmxIno,
+              isCharacterDevice: () => true,
+            };
+          }
+          throw new Error('EBADF');
+        });
+
+        const result = closeOrphanMasterFd(19);
+        expect(result).toBeUndefined();
+        expect(mockCloseSync).not.toHaveBeenCalled();
+      } finally {
+        activePtys.delete(99999);
+      }
+    });
+
+    it('returns undefined on non-darwin platforms without probing fds for master cleanup', () => {
+      mockPlatform.mockReturnValue('linux');
+      mockFstatSync.mockClear();
+      mockCloseSync.mockClear();
+
+      const result = closeOrphanMasterFd(19);
+      expect(result).toBeUndefined();
+      expect(mockFstatSync).not.toHaveBeenCalled();
+      expect(mockCloseSync).not.toHaveBeenCalled();
+    });
+
+    it('does not check or close any fd other than masterFd - 1', () => {
+      mockPlatform.mockReturnValue('darwin');
+      mockCloseSync.mockClear();
+      const ptmxMajor = 15 << 24;
+      const ptmxIno = 643;
+      mockFstatSync.mockImplementation((fd: number) => {
+        if (fd === 20) {
+          return {
+            rdev: ptmxMajor | 5,
+            ino: ptmxIno,
+            isCharacterDevice: () => true,
+          };
+        }
+        if (fd === 18) {
+          return {
+            rdev: ptmxMajor | 2,
+            ino: ptmxIno,
+            isCharacterDevice: () => true,
+          };
+        }
+        throw new Error('EBADF');
+      });
+
+      const result = closeOrphanMasterFd(20);
+      expect(result).toBeUndefined();
+      expect(mockCloseSync).not.toHaveBeenCalled();
+    });
+
+    it('does not close stdio fds or non-matching character devices', () => {
+      mockPlatform.mockReturnValue('darwin');
+      mockCloseSync.mockClear();
+      const ptmxMajor = 15 << 24;
+      mockFstatSync.mockImplementation((fd: number) => {
+        if (fd === 5) {
+          return {
+            rdev: ptmxMajor | 3,
+            ino: 643,
+            isCharacterDevice: () => true,
+          };
+        }
+        if (fd === 4) {
+          // Different major (e.g. slave tty)
+          return {
+            rdev: (16 << 24) | 2,
+            ino: 643,
+            isCharacterDevice: () => true,
+          };
+        }
+        if (fd === 3) {
+          // Different inode
+          return {
+            rdev: ptmxMajor | 2,
+            ino: 700,
+            isCharacterDevice: () => true,
+          };
+        }
+        // Even if fd <= 2 matched, must not probe or close STDERR_FILENO (2)
+        return {
+          rdev: ptmxMajor | 1,
+          ino: 643,
+          isCharacterDevice: () => true,
+        };
+      });
+
+      expect(closeOrphanMasterFd(5)).toBeUndefined();
+      expect(closeOrphanMasterFd(4)).toBeUndefined();
+      expect(closeOrphanMasterFd(3)).toBeUndefined();
       expect(mockCloseSync).not.toHaveBeenCalled();
     });
 
