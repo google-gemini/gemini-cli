@@ -23,10 +23,7 @@ import { randomUUID } from 'node:crypto';
 import { type Server as HTTPServer } from 'node:http';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import {
-  resolveToRealPath,
-  tmpdir,
-} from '@google/gemini-cli-core/src/utils/paths.js';
+import { tmpdir } from '@google/gemini-cli-core/src/utils/paths.js';
 import type { z } from 'zod';
 import type { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
@@ -206,7 +203,7 @@ export class IDEServer {
         next();
       });
 
-      let mcpServer: McpServer | undefined;
+      const mcpServer = createMcpServer(this.diffManager, this.log);
 
       this.disposeResources();
       this.openFilesManager = new OpenFilesManager(context);
@@ -280,7 +277,6 @@ export class IDEServer {
             }
           };
 
-          mcpServer ??= createMcpServer(this.diffManager, this.log);
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
           mcpServer.connect(transport);
         } else {
@@ -509,60 +505,6 @@ export class IDEServer {
   }
 }
 
-const sanitizeDiffFilePath = (filePath: string): string => {
-  const trimmedPath = filePath.trim();
-  if (!trimmedPath) {
-    throw new Error('Invalid filePath: path is empty or whitespace-only');
-  }
-  if (trimmedPath.includes('\u0000')) {
-    throw new Error('Invalid filePath: contains null byte');
-  }
-  if (trimmedPath.startsWith('\\\\') || trimmedPath.startsWith('//')) {
-    throw new Error('Invalid filePath: UNC paths are not allowed');
-  }
-  if (
-    !path.isAbsolute(trimmedPath) ||
-    trimmedPath.split(/[/\\]/).includes('..')
-  ) {
-    throw new Error(`Invalid filePath: ${trimmedPath}`);
-  }
-  const absolutePath = path.resolve(trimmedPath);
-  let resolvedPath: string;
-  try {
-    resolvedPath = resolveToRealPath(absolutePath);
-  } catch {
-    try {
-      const parentDir = path.dirname(absolutePath);
-      const resolvedParent = resolveToRealPath(parentDir);
-      resolvedPath = path.join(resolvedParent, path.basename(absolutePath));
-    } catch {
-      resolvedPath = absolutePath;
-    }
-  }
-
-  const workspaceFolders = vscode.workspace.workspaceFolders;
-  if (!workspaceFolders || workspaceFolders.length === 0) {
-    throw new Error('Invalid filePath: no workspace folder is open');
-  }
-  const isWithinWorkspace = workspaceFolders.some((folder) => {
-    let folderPath: string;
-    try {
-      folderPath = resolveToRealPath(folder.uri.fsPath);
-    } catch {
-      folderPath = path.resolve(folder.uri.fsPath);
-    }
-    const relative = path.relative(folderPath, resolvedPath);
-    return (
-      relative === '' ||
-      (!relative.startsWith('..') && !path.isAbsolute(relative))
-    );
-  });
-  if (!isWithinWorkspace) {
-    throw new Error('Invalid filePath: path is outside the workspace');
-  }
-  return resolvedPath;
-};
-
 const createMcpServer = (
   diffManager: DiffManager,
   log: (message: string) => void,
@@ -582,9 +524,8 @@ const createMcpServer = (
       inputSchema: OpenDiffRequestSchema.shape,
     },
     async ({ filePath, newContent }: z.infer<typeof OpenDiffRequestSchema>) => {
-      const safeFilePath = sanitizeDiffFilePath(filePath);
-      log(`Received openDiff request for filePath: ${safeFilePath}`);
-      await diffManager.showDiff(safeFilePath, newContent);
+      log(`Received openDiff request for filePath: ${filePath}`);
+      await diffManager.showDiff(filePath, newContent);
       return { content: [] };
     },
   );
@@ -595,9 +536,8 @@ const createMcpServer = (
       inputSchema: CloseDiffRequestSchema.shape,
     },
     async ({ filePath }: z.infer<typeof CloseDiffRequestSchema>) => {
-      const safeFilePath = sanitizeDiffFilePath(filePath);
-      log(`Received closeDiff request for filePath: ${safeFilePath}`);
-      const content = await diffManager.closeDiff(safeFilePath);
+      log(`Received closeDiff request for filePath: ${filePath}`);
+      const content = await diffManager.closeDiff(filePath);
       const response = { content: content ?? undefined };
       return {
         content: [
