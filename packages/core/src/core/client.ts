@@ -706,9 +706,12 @@ export class GeminiClient {
             ? pendingApiHistory[0]
             : rawPendingRequest;
 
-        // Late-bind the prompt: Append the active request to the managed history
-        // only for the purpose of the upcoming API call.
-        apiHistoryOverride = [...apiHistory, finalPendingContent];
+        // Late-bind the prompt: Append all hardened pending turns (including any
+        // trailing sentinel user turn) to the managed history for the API call.
+        apiHistoryOverride =
+          pendingApiHistory.length > 0
+            ? [...apiHistory, ...pendingApiHistory]
+            : [...apiHistory, finalPendingContent];
 
         this.getChat().setHistory(newHistory);
 
@@ -1284,10 +1287,12 @@ export class GeminiClient {
         this.hasFailedCompressionAttempt || !force;
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
-        // capture current session data before resetting
+        // capture current session data before resetting using non-blocking async I/O
         const currentRecordingService =
           this.getChat().getChatRecordingService();
-        const conversation = currentRecordingService.getConversation();
+        const conversation = await (currentRecordingService.getConversationAsync
+          ? currentRecordingService.getConversationAsync()
+          : currentRecordingService.getConversation());
         const filePath = currentRecordingService.getConversationFilePath();
 
         let resumedData: ResumedSessionData | undefined;
