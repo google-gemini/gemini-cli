@@ -3893,12 +3893,16 @@ describe('loadCliConfig acpMode and clientName', () => {
 });
 
 describe('nested interactive session and invalid config subcommand guards', () => {
+  let originalArgv: string[];
+
   beforeEach(() => {
+    originalArgv = [...process.argv];
     vi.stubEnv('GEMINI_CLI_IN_SHELL', '');
     vi.stubEnv('GEMINI_CLI_NESTED_SESSION', '');
   });
 
   afterEach(() => {
+    process.argv = originalArgv;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -4019,7 +4023,7 @@ describe('nested interactive session and invalid config subcommand guards', () =
     );
   });
 
-  it('should allow single-quoted multi-word natural language prompts starting with "set model"', async () => {
+  it('should allow multi-word natural language prompts passed as a single argument starting with "set model"', async () => {
     process.argv = ['node', 'script.js', 'set model'];
     const argv = await parseArguments(createTestMergedSettings());
     expect(argv.query).toBe('set model');
