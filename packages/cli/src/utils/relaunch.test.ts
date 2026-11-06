@@ -386,23 +386,24 @@ describe('relaunchAppInChildProcess', () => {
     it('should retain selected worktree directory and GEMINI_CLI_WORKTREE_HANDLED across multiple auth restarts while preserving auth/admin lifetimes', async () => {
       vi.stubEnv('GEMINI_CLI_AUTH_OVERRIDE', '');
       vi.stubEnv('GEMINI_CLI_WORKTREE_HANDLED', '');
-      delete process.env['GEMINI_CLI_AUTH_OVERRIDE'];
-      delete process.env['GEMINI_CLI_WORKTREE_HANDLED'];
+      process.argv = ['/usr/bin/node', 'packages/cli/index.js', '--worktree'];
 
       const chdirSpy = vi
         .spyOn(process, 'chdir')
         .mockImplementation(() => undefined);
       const selectedPath = '/mock/project/.gemini/worktrees/keep-this-worktree';
       const capturedSpawns: Array<{
+        args: string[];
         cwd?: string;
         env: NodeJS.ProcessEnv;
       }> = [];
       let spawnCount = 0;
 
-      mockedSpawn.mockImplementation((_cmd, _args, opts) => {
+      mockedSpawn.mockImplementation((_cmd, args, opts) => {
         spawnCount++;
         const spawnOpts = opts as { cwd?: string; env?: NodeJS.ProcessEnv };
         capturedSpawns.push({
+          args: [...(args as string[])],
           cwd: spawnOpts?.cwd,
           env: { ...spawnOpts?.env },
         });
@@ -439,9 +440,11 @@ describe('relaunchAppInChildProcess', () => {
 
         expect(spawnCount).toBe(3);
         expect(chdirSpy).toHaveBeenCalledWith(selectedPath);
+        expect(process.argv[1]?.startsWith('/')).toBe(true);
 
         // Child #2 (after Auth Restart #1): spawns in worktree, has GEMINI_CLI_WORKTREE_HANDLED=1 and one-time GEMINI_CLI_AUTH_OVERRIDE
         expect(capturedSpawns[1]?.cwd).toBe(selectedPath);
+        expect(capturedSpawns[1]?.args).toContain(process.argv[1]);
         expect(capturedSpawns[1]?.env['GEMINI_CLI_WORKTREE_HANDLED']).toBe('1');
         expect(capturedSpawns[1]?.env['GEMINI_CLI_AUTH_OVERRIDE']).toBe(
           'login_with_google',
@@ -470,7 +473,6 @@ describe('relaunchAppInChildProcess', () => {
 
     it('should not update worktree state or spawn cwd if process.chdir fails for an invalid worktree path', async () => {
       vi.stubEnv('GEMINI_CLI_WORKTREE_HANDLED', '');
-      delete process.env['GEMINI_CLI_WORKTREE_HANDLED'];
 
       const chdirSpy = vi.spyOn(process, 'chdir').mockImplementation(() => {
         throw new Error('ENOENT: no such file or directory');
@@ -513,7 +515,7 @@ describe('relaunchAppInChildProcess', () => {
         expect(capturedSpawns[1]?.cwd).toBeUndefined();
         expect(
           capturedSpawns[1]?.env['GEMINI_CLI_WORKTREE_HANDLED'],
-        ).toBeUndefined();
+        ).toBeFalsy();
       } finally {
         chdirSpy.mockRestore();
       }

@@ -5,10 +5,12 @@
  */
 
 import { spawn } from 'node:child_process';
+import { resolve } from 'node:path';
 import {
   RELAUNCH_EXIT_CODE,
   getSpawnConfig,
   getScriptArgs,
+  isSeaEnvironment,
   setupSignalForwarding,
   handleChildProcessClose,
 } from './processUtils.js';
@@ -44,6 +46,10 @@ export async function relaunchAppInChildProcess(
 ) {
   if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
     return;
+  }
+
+  if (!isSeaEnvironment() && process.argv[1]) {
+    process.argv[1] = resolve(process.argv[1]);
   }
 
   let latestAdminSettings = remoteAdminSettings;

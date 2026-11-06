@@ -8,11 +8,13 @@
 
 import { spawn } from 'node:child_process';
 import os from 'node:os';
+import { resolve } from 'node:path';
 import v8 from 'node:v8';
 import {
   RELAUNCH_EXIT_CODE,
   getSpawnConfig,
   getScriptArgs,
+  isSeaEnvironment,
   setupSignalForwarding,
   handleChildProcessClose,
 } from './src/utils/processUtils.js';
@@ -57,6 +59,10 @@ async function run() {
   if (!process.env['GEMINI_CLI_NO_RELAUNCH'] && !process.env['SANDBOX']) {
     // --- Lightweight Parent Process / Daemon ---
     // We avoid importing heavy dependencies here to save ~1.5s of startup time.
+
+    if (!isSeaEnvironment() && process.argv[1]) {
+      process.argv[1] = resolve(process.argv[1]);
+    }
 
     const scriptArgs = getScriptArgs();
     const memoryArgs = await getMemoryNodeArgs();

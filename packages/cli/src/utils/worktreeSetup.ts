@@ -10,18 +10,12 @@ import {
   writeToStderr,
   type WorktreeInfo,
 } from '@google/gemini-cli-core';
+import { isIPCAvailable } from './processUtils.js';
 
 const WORKTREE_ACK_TIMEOUT_MS = 500;
-const initialProcessSend = process.send;
 
 async function notifyWorktreeSelected(worktreePath: string): Promise<void> {
-  if (
-    typeof process.send !== 'function' ||
-    (process.env['VITEST'] &&
-      process.env['GEMINI_CLI_NO_RELAUNCH'] !== 'true' &&
-      process.send === initialProcessSend &&
-      !('mock' in process.send))
-  ) {
+  if (!isIPCAvailable()) {
     return;
   }
 
