@@ -541,6 +541,16 @@ your prompt to Gemini. These commands include git-aware filtering.
       tools without eagerly reading every nested file into the prompt.
     - Spaces in paths should be escaped with a backslash (for example,
       `@My\ Documents/file.txt`).
+    - **Pasted text:** `@` symbols in text you paste are escaped (shown as
+      `\@`), so a pasted shell prompt like `user@host` does not attach a file.
+      Type the `@path` yourself to include a file. You can turn this off with
+      the `ui.escapePastedAtSymbols` setting.
+    - **Fuzzy matches:** If a path is not found, Gemini CLI searches the
+      workspace for a file whose name contains it. This search never picks files
+      that look like secrets: files in `.ssh`, `.gnupg`, `.aws`, `.azure` or
+      `.kube` directories, private keys such as `id_rsa` or `*.pem`, `.env`
+      files, and files that only their owner can read. To include such a file,
+      type its exact path.
     - The command uses the `read_many_files` tool internally. The content is
       fetched and then inserted into your query before being sent to the Gemini
       model.

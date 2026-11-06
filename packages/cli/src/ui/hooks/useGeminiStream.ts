@@ -87,7 +87,7 @@ import {
 } from '../types.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { useExecutionLifecycle } from './useExecutionLifecycle.js';
-import { handleAtCommand } from './atCommandProcessor.js';
+import { handleAtCommand, unescapeLiteralAt } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { useStateAndRef } from './useStateAndRef.js';
@@ -1110,6 +1110,11 @@ export const useGeminiStream = (
 
       if (typeof query === 'string') {
         const trimmedQuery = query.trim();
+        // Pasted @ symbols are kept as \@ only for the @ command processor;
+        // the shell and the model must receive the text as it was pasted.
+        const literalQuery = settings.merged.ui?.escapePastedAtSymbols
+          ? unescapeLiteralAt(trimmedQuery)
+          : trimmedQuery;
         await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
 
         if (!shellModeActive) {
@@ -1163,7 +1168,7 @@ export const useGeminiStream = (
           }
         }
 
-        if (shellModeActive && handleShellCommand(trimmedQuery, abortSignal)) {
+        if (shellModeActive && handleShellCommand(literalQuery, abortSignal)) {
           return { queryToSend: null, shouldProceed: false };
         }
 
@@ -1195,7 +1200,7 @@ export const useGeminiStream = (
             { type: MessageType.USER, text: trimmedQuery },
             userMessageTimestamp,
           );
-          localQueryToSendToGemini = trimmedQuery;
+          localQueryToSendToGemini = literalQuery;
         }
       } else {
         // It's a function response (PartListUnion that isn't a string)
