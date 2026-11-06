@@ -437,7 +437,7 @@ export class GeminiChat {
       // Otherwise, if resuming from disk, build from the persisted record
       // using the canonical converter so toolCalls and thoughts are preserved.
       initialHistory = convertSessionToClientHistory(
-        resumedSessionData.conversation.messages,
+        resumedSessionData.conversation?.messages ?? [],
       );
     } else {
       initialHistory = [];

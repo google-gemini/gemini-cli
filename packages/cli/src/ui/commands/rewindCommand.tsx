@@ -57,8 +57,9 @@ async function rewindConversation(
     }
 
     // Convert to UI and Client formats
-    const { uiHistory } = convertSessionToHistoryFormats(conversation.messages);
-    const clientHistory = convertSessionToClientHistory(conversation.messages);
+    const messages = conversation.messages ?? [];
+    const { uiHistory } = convertSessionToHistoryFormats(messages);
+    const clientHistory = convertSessionToClientHistory(messages);
 
     client.setHistory(clientHistory);
     client.clearCurrentSequenceModel?.();
@@ -140,7 +141,7 @@ export const rewindCommand: SlashCommand = {
           content: 'No conversation found.',
         };
 
-      const hasUserInteractions = conversation.messages.some(
+      const hasUserInteractions = (conversation.messages ?? []).some(
         (msg) => msg.type === 'user',
       );
       if (!hasUserInteractions) {

@@ -1300,7 +1300,7 @@ export class ChatRecordingService {
     if (loaded) {
       const fullRecord: ConversationRecord = {
         ...this.cachedConversation,
-        messages: loaded.messages,
+        messages: loaded.messages ?? [],
       };
       this.fullConversationCache = new WeakRef(fullRecord);
       this.isCacheDirty = false;
@@ -1328,7 +1328,7 @@ export class ChatRecordingService {
     if (loaded) {
       const fullRecord: ConversationRecord = {
         ...this.cachedConversation,
-        messages: loaded.messages,
+        messages: loaded.messages ?? [],
       };
       this.fullConversationCache = new WeakRef(fullRecord);
       this.isCacheDirty = false;
@@ -1716,7 +1716,7 @@ export class ChatRecordingService {
           cachedFull ?? loadConversationRecordSync(this.conversationFile);
         if (fullConversation) {
           const msgMap = new Map(
-            fullConversation.messages.map((m) => [m.id, m]),
+            (fullConversation.messages ?? []).map((m) => [m.id, m]),
           );
           this.cachedConversation.messages = targetWindowIds
             .map((id) => msgMap.get(id))

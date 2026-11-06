@@ -6688,6 +6688,29 @@ describe('GeminiChat', () => {
       });
     });
 
+    it('safely handles resumedSessionData with undefined messages without throwing', () => {
+      const malformedResumedSessionData = {
+        filePath: '/tmp/corrupt-session.jsonl',
+        conversation: {
+          sessionId: 'corrupt-session',
+          projectHash: 'hash',
+          startTime: '2026-01-01T00:00:00.000Z',
+          lastUpdated: '2026-01-01T00:01:00.000Z',
+          messages: undefined,
+        },
+      } as unknown as ResumedSessionData;
+
+      const resumedChat = new GeminiChat(
+        mockConfig,
+        '',
+        [],
+        [],
+        malformedResumedSessionData,
+      );
+
+      expect(resumedChat.agentHistory.get()).toEqual([]);
+    });
+
     it('replaces a trailing thought-only model turn after a tool response with INTERRUPTED_RESPONSE_PLACEHOLDER instead of fusing the next user prompt', async () => {
       chat.setHistory([
         { id: 'u1', content: { role: 'user', parts: [{ text: 'Run check' }] } },
