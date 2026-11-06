@@ -5,6 +5,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { MAX_STORED_TOOL_OUTPUT_BYTES } from '../utils/constants.js';
 import {
   truncateToolOutput,
@@ -16,6 +19,15 @@ import {
   COLLAPSED_FUNCTION_RESPONSE_MAX_BYTES,
   ChatCompressionService,
 } from '../context/chatCompressionService.js';
+import { ToolOutputMaskingService } from '../context/toolOutputMaskingService.js';
+import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
+import { ToolExecutor } from '../scheduler/tool-executor.js';
+import {
+  CoreToolCallStatus,
+  type ScheduledToolCall,
+} from '../scheduler/types.js';
+import { MockTool } from '../test-utils/mock-tool.js';
+import type { AnyToolInvocation } from '../index.js';
 import type { Content, Part } from '@google/genai';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { CompressionStatus } from '../core/turn.js';
@@ -446,6 +458,320 @@ describe('GH-28537 / b/561554750 Memory Leak Regression Tests', () => {
       expect(Buffer.byteLength(truncated, 'utf8')).toBeLessThanOrEqual(
         MAX_STORED_TOOL_OUTPUT_BYTES,
       );
+    });
+  });
+
+  describe('GH-29830 Heap Out-of-Memory Regression Tests', () => {
+    it('bounds total joined response output when a tool returns an array of sub-64KB parts (read_many_files pattern)', async () => {
+      const config = makeFakeConfig();
+      vi.spyOn(config, 'isContextManagementEnabled').mockReturnValue(false);
+      vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue(
+        os.tmpdir(),
+      );
+      const executor = new ToolExecutor(config);
+
+      // 20 parts of 50 KB each: each individual element is < MAX_STORED_TOOL_OUTPUT_BYTES (64 KB),
+      // but convertToFunctionResponse joins them into a single 1,000 KB (~1 MB) output string.
+      const subCapChunk = 'A'.repeat(50 * 1024);
+      const multiFileParts: Part[] = Array.from({ length: 20 }, (_, i) => ({
+        text: `--- file-${i}.json ---\n${subCapChunk}`,
+      }));
+
+      const mockTool = new MockTool({
+        name: 'read_many_files',
+        description: 'Reads multiple files',
+        execute: async () => ({
+          llmContent: multiFileParts,
+          returnDisplay: 'Read 20 files',
+        }),
+      });
+      const invocation = mockTool.build({});
+
+      const scheduledCall: ScheduledToolCall = {
+        status: CoreToolCallStatus.Scheduled,
+        request: {
+          callId: 'call-read-many',
+          name: 'read_many_files',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-read-many',
+        },
+        tool: mockTool,
+        invocation: invocation as unknown as AnyToolInvocation,
+        startTime: Date.now(),
+      };
+
+      const result = await executor.execute({
+        call: scheduledCall,
+        signal: new AbortController().signal,
+        onUpdateToolCall: vi.fn(),
+      });
+
+      expect(result.status).toBe(CoreToolCallStatus.Success);
+      if (result.status === CoreToolCallStatus.Success) {
+        const response = result.response.responseParts[0]?.functionResponse
+          ?.response as { output: string };
+        expect(response?.output).toBeDefined();
+        expect(Buffer.byteLength(response.output, 'utf8')).toBeLessThanOrEqual(
+          MAX_STORED_TOOL_OUTPUT_BYTES,
+        );
+        expect(result.response.outputFile).toBeDefined();
+        if (result.response.outputFile) {
+          const savedDiskContent = fs.readFileSync(
+            result.response.outputFile,
+            'utf8',
+          );
+          expect(savedDiskContent).toContain('--- file-0.json ---');
+          expect(savedDiskContent).toContain('--- file-19.json ---');
+        }
+      }
+    });
+
+    it('strictly bounds joined response output when the first array part leaves fewer bytes than the truncation suffix', async () => {
+      const config = makeFakeConfig();
+      vi.spyOn(config, 'isContextManagementEnabled').mockReturnValue(false);
+      const executor = new ToolExecutor(config);
+
+      // Part 0 uses 65,500 bytes (leaving only 35 bytes before the 65,536 byte cap,
+      // which is smaller than the ~100-byte truncation suffix).
+      const nearCapPart = 'A'.repeat(MAX_STORED_TOOL_OUTPUT_BYTES - 36);
+      const overflowPart = 'B'.repeat(10 * 1024);
+
+      const mockTool = new MockTool({
+        name: 'read_many_files',
+        description: 'Reads multiple files near boundary',
+        execute: async () => ({
+          llmContent: [{ text: nearCapPart }, { text: overflowPart }],
+          returnDisplay: 'Read 2 files',
+        }),
+      });
+      const invocation = mockTool.build({});
+
+      const scheduledCall: ScheduledToolCall = {
+        status: CoreToolCallStatus.Scheduled,
+        request: {
+          callId: 'call-read-many-boundary',
+          name: 'read_many_files',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-read-many-boundary',
+        },
+        tool: mockTool,
+        invocation: invocation as unknown as AnyToolInvocation,
+        startTime: Date.now(),
+      };
+
+      const result = await executor.execute({
+        call: scheduledCall,
+        signal: new AbortController().signal,
+        onUpdateToolCall: vi.fn(),
+      });
+
+      expect(result.status).toBe(CoreToolCallStatus.Success);
+      if (result.status === CoreToolCallStatus.Success) {
+        const response = result.response.responseParts[0]?.functionResponse
+          ?.response as { output: string };
+        expect(response?.output).toBeDefined();
+        expect(Buffer.byteLength(response.output, 'utf8')).toBeLessThanOrEqual(
+          MAX_STORED_TOOL_OUTPUT_BYTES,
+        );
+      }
+    });
+
+    it('accounts for nested functionResponse.parts inlineData (Gemini 3 multimodal responses) in calculateHistoryByteSize', () => {
+      const base64Image = 'B'.repeat(512 * 1024); // 512 KB base64 payload
+      const gemini3ResponseParts = convertToFunctionResponse(
+        'read_file',
+        'call-img-1',
+        [{ inlineData: { mimeType: 'image/png', data: base64Image } }],
+        'gemini-3-pro',
+      );
+
+      const history: Content[] = [
+        { role: 'user', parts: gemini3ResponseParts },
+      ];
+      const calculatedBytes = calculateHistoryByteSize(history);
+
+      expect(calculatedBytes).toBeGreaterThanOrEqual(
+        Buffer.byteLength(base64Image, 'utf8'),
+      );
+    });
+
+    it('collapses older multimodal inlineData payloads (both nested functionResponse.parts and sibling inlineData) outside recent protected turns', () => {
+      const base64Image = 'I'.repeat(256 * 1024); // 256 KB per image
+      const history: Content[] = [];
+
+      // Simulate 6 turns of multimodal tool responses (3 older prunable turns + 3 recent protected turns)
+      for (let turn = 1; turn <= 6; turn++) {
+        history.push(
+          { role: 'user', parts: [{ text: `Turn ${turn} request` }] },
+          {
+            role: 'model',
+            parts: [
+              {
+                functionCall: {
+                  name: 'shell',
+                  args: { command: `capture-${turn}` },
+                  id: `call-${turn}`,
+                },
+              },
+            ],
+          },
+          {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  name: 'shell',
+                  id: `call-${turn}`,
+                  response: { output: 'Binary content provided (1 item(s)).' },
+                  parts: [
+                    {
+                      inlineData: { mimeType: 'image/png', data: base64Image },
+                    },
+                  ],
+                },
+              },
+              { inlineData: { mimeType: 'image/png', data: base64Image } },
+            ],
+          },
+          { role: 'model', parts: [{ text: `Turn ${turn} analyzed` }] },
+        );
+      }
+
+      const collapsed = collapseOlderFunctionResponses(
+        history,
+        COLLAPSED_FUNCTION_RESPONSE_MAX_BYTES,
+      );
+
+      // Turns 1, 2, 3 (indices 2, 6, 10) must not retain raw inlineData in functionResponse.parts or sibling parts
+      for (const turnIdx of [2, 6, 10]) {
+        const parts = collapsed[turnIdx].parts ?? [];
+        const hasNestedInlineData = parts.some((p) =>
+          p.functionResponse?.parts?.some((fp) => fp.inlineData !== undefined),
+        );
+        const hasSiblingInlineData = parts.some(
+          (p) => p.inlineData !== undefined,
+        );
+        expect(hasNestedInlineData).toBe(false);
+        expect(hasSiblingInlineData).toBe(false);
+      }
+
+      // Turns 4, 5, 6 (indices 14, 18, 22 - the 3 recent protected turns) must preserve inlineData intact
+      for (const turnIdx of [14, 18, 22]) {
+        const parts = collapsed[turnIdx].parts ?? [];
+        const hasNestedInlineData = parts.some((p) =>
+          p.functionResponse?.parts?.some((fp) => fp.inlineData !== undefined),
+        );
+        const hasSiblingInlineData = parts.some(
+          (p) => p.inlineData !== undefined,
+        );
+        expect(hasNestedInlineData).toBe(true);
+        expect(hasSiblingInlineData).toBe(true);
+      }
+    });
+
+    it('masks older multimodal functionResponse.parts inlineData in ToolOutputMaskingService instead of aborting with zero savings', async () => {
+      const tempDir = await fs.promises.mkdtemp(
+        path.join(os.tmpdir(), 'gh-29830-masking-'),
+      );
+      try {
+        const maskingService = new ToolOutputMaskingService();
+        const mockConfig = makeFakeConfig();
+        vi.spyOn(mockConfig.storage, 'getHistoryDir').mockReturnValue(
+          path.join(tempDir, 'history'),
+        );
+        vi.spyOn(mockConfig.storage, 'getProjectTempDir').mockReturnValue(
+          tempDir,
+        );
+        vi.spyOn(mockConfig, 'getToolOutputMaskingConfig').mockResolvedValue({
+          protectionThresholdTokens: 3000, // 1 image protected
+          minPrunableThresholdTokens: 3000, // 1+ image triggers masking
+          protectLatestTurn: true,
+        });
+
+        const base64Image = 'M'.repeat(256 * 1024);
+        const history: Content[] = [];
+        for (let turn = 1; turn <= 4; turn++) {
+          const mediaParts = convertToFunctionResponse(
+            'read_file',
+            `call-img-${turn}`,
+            [{ inlineData: { mimeType: 'image/png', data: base64Image } }],
+            'gemini-3-pro',
+          );
+          history.push(
+            {
+              role: 'model',
+              parts: [
+                {
+                  functionCall: {
+                    name: 'read_file',
+                    args: { file_path: `img-${turn}.png` },
+                    id: `call-img-${turn}`,
+                  },
+                },
+              ],
+            },
+            { role: 'user', parts: mediaParts },
+          );
+        }
+
+        const result = await maskingService.mask(history, mockConfig);
+
+        expect(result.maskedCount).toBeGreaterThan(0);
+        expect(result.tokensSaved).toBeGreaterThan(0);
+        const oldestUserTurn = result.newHistory[1];
+        const nestedInlineData =
+          oldestUserTurn.parts?.[0]?.functionResponse?.parts?.some(
+            (p) => p.inlineData !== undefined,
+          ) ?? false;
+        expect(nestedInlineData).toBe(false);
+      } finally {
+        await fs.promises.rm(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('keeps history byte growth bounded across 50 simulated retrieval tool turns (read_many_files)', () => {
+      let currentHistory: Content[] = [];
+      const toolOutputChunk = 'R'.repeat(60 * 1024); // 60 KB per turn
+
+      for (let turn = 1; turn <= 50; turn++) {
+        currentHistory.push({
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                name: 'read_many_files',
+                args: { paths: [`allure-result-${turn}.json`] },
+              },
+            },
+          ],
+        });
+
+        const cappedPart = truncateFunctionResponsePart({
+          functionResponse: {
+            name: 'read_many_files',
+            response: { output: toolOutputChunk },
+          },
+        });
+        currentHistory.push({
+          role: 'user',
+          parts: [cappedPart],
+        });
+
+        currentHistory.push({
+          role: 'model',
+          parts: [{ text: `Turn ${turn} completed.` }],
+        });
+
+        currentHistory = collapseOlderFunctionResponses(currentHistory);
+      }
+
+      const totalByteSize = calculateHistoryByteSize(currentHistory);
+
+      // Without collapsing retrieval tools, 50 turns * 60 KB = 3,000 KB (3 MB).
+      // Older turns beyond the recent window must be collapsed so total size stays bounded under 350 KB.
+      expect(totalByteSize).toBeLessThan(350 * 1024);
     });
   });
 });

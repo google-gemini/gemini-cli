@@ -11,6 +11,7 @@ import type * as os from 'node:os';
 import * as path from 'node:path';
 import * as http from 'node:http';
 import { IDEServer } from './ide-server.js';
+import { OpenFilesManager } from './open-files-manager.js';
 import type { DiffManager } from './diff-manager.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -46,14 +47,19 @@ vi.mock('node:os', async (importOriginal) => {
   };
 });
 
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...actual,
-    tmpdir: vi.fn(() => '/tmp'),
-  };
-});
+vi.mock(
+  '@google/gemini-cli-core/src/utils/paths.js',
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import('@google/gemini-cli-core/src/utils/paths.js')
+      >();
+    return {
+      ...actual,
+      tmpdir: vi.fn(() => '/tmp'),
+    };
+  },
+);
 
 const vscodeMock = vi.hoisted(() => ({
   ...baseVscodeMock,
@@ -80,6 +86,7 @@ vi.mock('vscode', () => vscodeMock);
 vi.mock('./open-files-manager', () => {
   const OpenFilesManager = vi.fn();
   OpenFilesManager.prototype.onDidChange = vi.fn(() => ({ dispose: vi.fn() }));
+  OpenFilesManager.prototype.dispose = vi.fn();
   // A schema-valid IdeContext so the GET /mcp handler can emit the initial
   // `ide/contextUpdate` notification instead of throwing on parse.
   OpenFilesManager.prototype.state = {
@@ -323,6 +330,29 @@ describe('IDEServer', () => {
 
     expect(mockContext.environmentVariableCollection.clear).toHaveBeenCalled();
     expect(fs.unlink).toHaveBeenCalledWith(portFile);
+  });
+
+  it('should dispose OpenFilesManager and event subscriptions on stop', async () => {
+    const openFilesOnDidChangeDispose = vi.fn();
+    const diffOnDidChangeDispose = vi.fn();
+    vi.mocked(OpenFilesManager.prototype.onDidChange).mockReturnValueOnce({
+      dispose: openFilesOnDidChangeDispose,
+    });
+    vi.mocked(mocks.diffManager.onDidChange).mockReturnValueOnce({
+      dispose: diffOnDidChangeDispose,
+    });
+    vi.mocked(OpenFilesManager.prototype.dispose).mockClear();
+
+    await ideServer.start(mockContext);
+    expect(OpenFilesManager.prototype.dispose).not.toHaveBeenCalled();
+    expect(openFilesOnDidChangeDispose).not.toHaveBeenCalled();
+    expect(diffOnDidChangeDispose).not.toHaveBeenCalled();
+
+    await ideServer.stop();
+
+    expect(OpenFilesManager.prototype.dispose).toHaveBeenCalledTimes(1);
+    expect(openFilesOnDidChangeDispose).toHaveBeenCalledTimes(1);
+    expect(diffOnDidChangeDispose).toHaveBeenCalledTimes(1);
   });
 
   describe('shutdown with active MCP sessions', () => {

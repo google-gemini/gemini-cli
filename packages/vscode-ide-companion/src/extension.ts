@@ -37,6 +37,9 @@ async function checkForUpdates(
   log: (message: string) => void,
   isManagedExtensionSurface: boolean,
 ) {
+  if (isManagedExtensionSurface) {
+    return;
+  }
   try {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const currentVersion = context.extension.packageJSON.version;
@@ -123,6 +126,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const diffManager = new DiffManager(log, diffContentProvider);
 
   context.subscriptions.push(
+    diffManager,
     vscode.workspace.onDidCloseTextDocument((doc) => {
       if (doc.uri.scheme === DIFF_SCHEME) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
