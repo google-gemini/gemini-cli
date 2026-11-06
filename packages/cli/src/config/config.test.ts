@@ -3994,4 +3994,28 @@ describe('nested interactive session and invalid config subcommand guards', () =
       expect.stringContaining('/model'),
     );
   });
+
+  it('should reject quoted multi-word "config set" positional argument with exit code 1', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      'config set',
+      'default-model',
+      'gemini-2.5',
+    ];
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(mockExit).toHaveBeenCalledWith(1);
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('/model'),
+    );
+  });
 });

@@ -546,23 +546,34 @@ export async function parseArguments(
 
   // Normalize query args: handle both quoted "@path file" and unquoted @path file
   const queryArg = result['query'];
-  const rawQueryTokens = Array.isArray(queryArg)
-    ? queryArg.map((token) => String(token))
-    : typeof queryArg === 'string' && queryArg.trim().length > 0
-      ? queryArg.trim().split(/\s+/)
-      : [];
   let q: string | undefined;
   if (Array.isArray(queryArg)) {
     q = queryArg.join(' ');
   } else if (typeof queryArg === 'string') {
     q = queryArg;
   }
+  const trimmedQuery = q?.trim() ?? '';
+  const rawQueryTokens =
+    trimmedQuery.length > 0 ? trimmedQuery.split(/\s+/) : [];
 
   const firstQueryToken = rawQueryTokens[0]?.toLowerCase();
   const secondQueryToken = rawQueryTokens[1]?.toLowerCase();
   const isInvalidConfigSubcommand =
     !result['isCommand'] &&
-    (firstQueryToken === 'config' ||
+    ((firstQueryToken === 'config' &&
+      (secondQueryToken === undefined ||
+        secondQueryToken.startsWith('-') ||
+        [
+          'set',
+          'get',
+          'list',
+          'delete',
+          'unset',
+          'edit',
+          'show',
+          'default-model',
+          'model',
+        ].includes(secondQueryToken))) ||
       ((firstQueryToken === 'set' || firstQueryToken === 'model') &&
         secondQueryToken !== undefined &&
         ['set', 'get', 'list', 'default-model', 'model'].includes(
