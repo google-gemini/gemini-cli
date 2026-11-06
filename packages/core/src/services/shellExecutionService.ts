@@ -1108,9 +1108,13 @@ export class ShellExecutionService {
       }
     }
 
+    const limitFd = Math.max(
+      STDERR_FILENO + 1,
+      masterFd - PTY_ORPHAN_FD_SEARCH_RANGE,
+    );
     for (
       let candidateFd = masterFd - 1;
-      candidateFd > STDERR_FILENO;
+      candidateFd >= limitFd;
       candidateFd--
     ) {
       if (activeMasterFds.has(candidateFd)) {

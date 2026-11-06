@@ -1640,45 +1640,49 @@ describe('ShellExecutionService', () => {
         headlessTerminal: { dispose: vi.fn() },
       });
 
-      mockFstatSync.mockImplementation((fd: number) => {
-        if (fd === 21) {
-          return {
-            rdev: ptmxMajor | 5,
-            ino: ptmxIno,
-            isCharacterDevice: () => true,
-          };
-        }
-        if (fd === 20) {
-          // Simulated kqueue or pipe fd
-          return {
-            rdev: 0,
-            ino: 0,
-            isCharacterDevice: () => false,
-          };
-        }
-        if (fd === 19) {
-          // Active PTY master fd
-          return {
-            rdev: ptmxMajor | 3,
-            ino: ptmxIno,
-            isCharacterDevice: () => true,
-          };
-        }
-        if (fd === 18) {
-          // Orphan low_fds[0]
-          return {
-            rdev: ptmxMajor | 2,
-            ino: ptmxIno,
-            isCharacterDevice: () => true,
-          };
-        }
-        throw new Error('EBADF');
-      });
+      try {
+        mockFstatSync.mockImplementation((fd: number) => {
+          if (fd === 21) {
+            return {
+              rdev: ptmxMajor | 5,
+              ino: ptmxIno,
+              isCharacterDevice: () => true,
+            };
+          }
+          if (fd === 20) {
+            // Simulated kqueue or pipe fd
+            return {
+              rdev: 0,
+              ino: 0,
+              isCharacterDevice: () => false,
+            };
+          }
+          if (fd === 19) {
+            // Active PTY master fd
+            return {
+              rdev: ptmxMajor | 3,
+              ino: ptmxIno,
+              isCharacterDevice: () => true,
+            };
+          }
+          if (fd === 18) {
+            // Orphan low_fds[0]
+            return {
+              rdev: ptmxMajor | 2,
+              ino: ptmxIno,
+              isCharacterDevice: () => true,
+            };
+          }
+          throw new Error('EBADF');
+        });
 
-      const result = closeOrphanMasterFd(21);
-      expect(result).toBe(18);
-      expect(mockCloseSync).toHaveBeenCalledTimes(1);
-      expect(mockCloseSync).toHaveBeenCalledWith(18);
+        const result = closeOrphanMasterFd(21);
+        expect(result).toBe(18);
+        expect(mockCloseSync).toHaveBeenCalledTimes(1);
+        expect(mockCloseSync).toHaveBeenCalledWith(18);
+      } finally {
+        activePtys.delete(99999);
+      }
     });
 
     it('returns undefined on non-darwin platforms without probing fds for master cleanup', () => {
@@ -1689,6 +1693,35 @@ describe('ShellExecutionService', () => {
       const result = closeOrphanMasterFd(19);
       expect(result).toBeUndefined();
       expect(mockFstatSync).not.toHaveBeenCalled();
+      expect(mockCloseSync).not.toHaveBeenCalled();
+    });
+
+    it('does not scan beyond PTY_ORPHAN_FD_SEARCH_RANGE below masterFd', () => {
+      mockPlatform.mockReturnValue('darwin');
+      mockCloseSync.mockClear();
+      const ptmxMajor = 15 << 24;
+      const ptmxIno = 643;
+      mockFstatSync.mockImplementation((fd: number) => {
+        if (fd === 20) {
+          return {
+            rdev: ptmxMajor | 5,
+            ino: ptmxIno,
+            isCharacterDevice: () => true,
+          };
+        }
+        // Outside search range (20 - 8 = 12, so fd 11 is out of range)
+        if (fd === 11) {
+          return {
+            rdev: ptmxMajor | 2,
+            ino: ptmxIno,
+            isCharacterDevice: () => true,
+          };
+        }
+        throw new Error('EBADF');
+      });
+
+      const result = closeOrphanMasterFd(20);
+      expect(result).toBeUndefined();
       expect(mockCloseSync).not.toHaveBeenCalled();
     });
 
