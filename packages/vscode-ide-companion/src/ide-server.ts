@@ -520,19 +520,36 @@ const sanitizeDiffFilePath = (filePath: string): string => {
   if (trimmedPath.startsWith('\\\\') || trimmedPath.startsWith('//')) {
     throw new Error('Invalid filePath: UNC paths are not allowed');
   }
-  const resolvedPath = resolveToRealPath(trimmedPath);
+  if (
+    !path.isAbsolute(trimmedPath) ||
+    trimmedPath.split(/[/\\]/).includes('..')
+  ) {
+    throw new Error(`Invalid filePath: ${trimmedPath}`);
+  }
+  const absolutePath = path.resolve(trimmedPath);
+  let resolvedPath: string;
+  try {
+    resolvedPath = resolveToRealPath(absolutePath);
+  } catch {
+    const parentDir = path.dirname(absolutePath);
+    const resolvedParent = resolveToRealPath(parentDir);
+    resolvedPath = path.join(resolvedParent, path.basename(absolutePath));
+  }
+
   const workspaceFolders = vscode.workspace.workspaceFolders;
-  if (workspaceFolders && workspaceFolders.length > 0) {
-    const isWithinWorkspace = workspaceFolders.some((folder) => {
-      const folderPath = resolveToRealPath(folder.uri.fsPath);
-      return (
-        resolvedPath === folderPath ||
-        resolvedPath.startsWith(folderPath + path.sep)
-      );
-    });
-    if (!isWithinWorkspace) {
-      throw new Error('Invalid filePath: path is outside the workspace');
-    }
+  if (!workspaceFolders || workspaceFolders.length === 0) {
+    throw new Error('Invalid filePath: no workspace folder is open');
+  }
+  const isWithinWorkspace = workspaceFolders.some((folder) => {
+    const folderPath = resolveToRealPath(folder.uri.fsPath);
+    const relative = path.relative(folderPath, resolvedPath);
+    return (
+      relative === '' ||
+      (!relative.startsWith('..') && !path.isAbsolute(relative))
+    );
+  });
+  if (!isWithinWorkspace) {
+    throw new Error('Invalid filePath: path is outside the workspace');
   }
   return resolvedPath;
 };
