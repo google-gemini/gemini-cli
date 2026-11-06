@@ -236,6 +236,27 @@ describe('terminal notifications', () => {
     expect(writeToStdout).toHaveBeenCalledWith('\x07');
   });
 
+  it('writes BEL directly inside tmux without multiplexer wrapping', async () => {
+    vi.stubEnv('TMUX', '1');
+    vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
+
+    const shown = await notifyViaTerminal(
+      true,
+      {
+        title: 'Bell in tmux',
+        body: 'Body',
+      },
+      TerminalNotificationMethod.Bell,
+    );
+
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledTimes(1);
+    expect(writeToStdout).toHaveBeenCalledWith('\x07');
+    const emitted = String(writeToStdout.mock.calls[0][0]);
+    expect(emitted).not.toContain('\x1bPtmux;');
+    expect(emitted).not.toContain('\x1bP');
+  });
+
   it('replaces semicolons with colons in OSC 777 to avoid breaking the sequence', async () => {
     const shown = await notifyViaTerminal(
       true,
