@@ -27,11 +27,16 @@ import {
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
+  isAutoModel,
 } from '../config/models.js';
 import * as tomlLoader from './agentLoader.js';
 import { SimpleExtensionLoader } from '../utils/extensionLoader.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
-import { ThinkingLevel } from '@google/genai';
+import { ThinkingLevel, type GenerateContentParameters } from '@google/genai';
+import { GeminiChat } from '../core/geminiChat.js';
+import type { ContentGenerator } from '../core/contentGenerator.js';
+import { LlmRole } from '../telemetry/types.js';
+import { CliHelpAgent } from './cli-help-agent.js';
 import type { AcknowledgedAgentsService } from './acknowledgedAgents.js';
 import { PolicyDecision } from '../policy/types.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
@@ -610,49 +615,115 @@ describe('AgentRegistry', () => {
   });
 
   describe('registration logic', () => {
-    it('should register runtime overrides when the model is "auto"', async () => {
-      const autoAgent: LocalAgentDefinition = {
-        ...MOCK_AGENT_V1,
-        name: 'AutoAgent',
-        modelConfig: { ...MOCK_AGENT_V1.modelConfig, model: 'auto' },
-      };
+    describe('generation config sent by the agent', () => {
+      // Sends one turn the way LocalAgentExecutor.callModel does: resolve the
+      // agent's alias to a model, route `auto`, then let a real GeminiChat
+      // build the request.
+      async function sendAgentTurn(
+        agent: LocalAgentDefinition,
+      ): Promise<GenerateContentParameters> {
+        const requests: GenerateContentParameters[] = [];
+        vi.spyOn(mockConfig, 'getContentGenerator').mockReturnValue({
+          generateContentStream: vi.fn(
+            async (request: GenerateContentParameters) => {
+              requests.push(request);
+              return (async function* () {
+                yield {
+                  candidates: [
+                    {
+                      content: { role: 'model', parts: [{ text: 'done' }] },
+                      finishReason: 'STOP',
+                    },
+                  ],
+                };
+              })();
+            },
+          ),
+        } as unknown as ContentGenerator);
 
-      const registerOverrideSpy = vi.spyOn(
-        mockConfig.modelConfigService,
-        'registerRuntimeModelOverride',
-      );
+        const { model } = mockConfig.modelConfigService.getResolvedConfig({
+          model: getModelConfigAlias(agent),
+          overrideScope: agent.name,
+        });
+        const chat = new GeminiChat(mockConfig, 'system', [], []);
+        const stream = await chat.sendMessageStream(
+          {
+            model: isAutoModel(model) ? DEFAULT_GEMINI_MODEL : model,
+            overrideScope: agent.name,
+          },
+          [{ text: 'hello' }],
+          'prompt-id',
+          new AbortController().signal,
+          LlmRole.SUBAGENT,
+        );
+        for await (const _ of stream) {
+          // Drain the stream so the request is sent.
+        }
+        return requests[0];
+      }
 
-      await registry.testRegisterAgent(autoAgent);
+      it.each(['auto', 'flash', DEFAULT_GEMINI_MODEL])(
+        'should send the declared config when the agent model is %s',
+        async (model) => {
+          const agent: LocalAgentDefinition = {
+            ...MOCK_AGENT_V1,
+            modelConfig: { ...MOCK_AGENT_V1.modelConfig, model },
+          };
+          await registry.testRegisterAgent(agent);
 
-      // Should register one alias for the custom model config.
-      expect(
-        mockConfig.modelConfigService.getResolvedConfig({
-          model: getModelConfigAlias(autoAgent),
-        }),
-      ).toStrictEqual({
-        model: 'auto',
-        generateContentConfig: {
-          temperature: autoAgent.modelConfig.generateContentConfig?.temperature,
-          topP: autoAgent.modelConfig.generateContentConfig?.topP,
-          thinkingConfig: {
+          const { config } = await sendAgentTurn(agent);
+
+          expect(config?.temperature).toBe(0);
+          expect(config?.topP).toBe(1);
+          // No thinkingLevel left over from the model defaults: the API
+          // rejects a request that sets both it and thinkingBudget.
+          expect(config?.thinkingConfig).toEqual({
             includeThoughts: true,
             thinkingBudget: -1,
-          },
+          });
         },
+      );
+
+      it('should send the declared config of the cli_help agent', async () => {
+        const agent = CliHelpAgent(mockConfig) as LocalAgentDefinition;
+        await registry.testRegisterAgent(agent);
+
+        const { config } = await sendAgentTurn(agent);
+
+        const declared = agent.modelConfig.generateContentConfig;
+        expect(config?.temperature).toBe(declared?.temperature);
+        expect(config?.thinkingConfig).toEqual(declared?.thinkingConfig);
       });
 
-      // Should register one override for the agent name (scope)
-      expect(registerOverrideSpy).toHaveBeenCalledTimes(1);
+      it('should keep the declared config after runtime overrides are cleared', async () => {
+        const agent: LocalAgentDefinition = {
+          ...MOCK_AGENT_V1,
+          modelConfig: { ...MOCK_AGENT_V1.modelConfig, model: 'auto' },
+        };
+        await registry.testRegisterAgent(agent);
+        // Config.refreshAuth() and /clear (via setSessionId) do this.
+        mockConfig.modelConfigService.clearRuntimeOverrides();
 
-      // Check scope override
-      expect(registerOverrideSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          match: { overrideScope: autoAgent.name },
-          modelConfig: expect.objectContaining({
-            generateContentConfig: expect.any(Object),
-          }),
-        }),
-      );
+        const { config } = await sendAgentTurn(agent);
+
+        expect(config?.temperature).toBe(0);
+      });
+
+      it('should send the model defaults when the agent declares no config', async () => {
+        const agent: LocalAgentDefinition = {
+          ...MOCK_AGENT_V1,
+          modelConfig: { model: DEFAULT_GEMINI_MODEL },
+        };
+        await registry.testRegisterAgent(agent);
+
+        const { config } = await sendAgentTurn(agent);
+
+        expect(config).toMatchObject(
+          mockConfig.modelConfigService.getResolvedConfig({
+            model: DEFAULT_GEMINI_MODEL,
+          }).generateContentConfig,
+        );
+      });
     });
 
     it('should register a valid agent definition', async () => {
