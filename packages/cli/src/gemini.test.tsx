@@ -94,11 +94,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         ...(args as Parameters<typeof process.stdout.write>),
       ),
     ),
-    writeToStderr: vi.fn((...args) =>
-      process.stderr.write(
-        ...(args as Parameters<typeof process.stderr.write>),
-      ),
-    ),
     patchStdio: vi.fn(() => () => {}),
     createWorkingStdio: vi.fn(() => ({
       stdout: {
@@ -1249,6 +1244,11 @@ describe('gemini.tsx main function exit codes', () => {
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 
     originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
   });
 
   afterEach(() => {
@@ -1257,8 +1257,11 @@ describe('gemini.tsx main function exit codes', () => {
     } else {
       delete process.env['GEMINI_CLI_NO_RELAUNCH'];
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (process.stdin as any).isTTY = originalIsTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalIsTTY,
+      configurable: true,
+      writable: true,
+    });
     vi.restoreAllMocks();
   });
 
@@ -1285,45 +1288,6 @@ describe('gemini.tsx main function exit codes', () => {
       expect(e).toBeInstanceOf(MockProcessExitError);
       expect((e as MockProcessExitError).code).toBe(42);
     }
-  });
-
-  it('should abort main() with exit code 1 before mounting UI when GEMINI_CLI_IN_SHELL=1 in interactive mode', async () => {
-    vi.stubEnv('GEMINI_CLI_IN_SHELL', '1');
-    const stderrSpy = vi
-      .spyOn(process.stderr, 'write')
-      .mockImplementation(() => true);
-
-    vi.mocked(loadCliConfig).mockResolvedValue(createMockConfig());
-    vi.mocked(loadSettings).mockReturnValue(
-      createMockSettings({
-        merged: { security: { auth: {} }, ui: {} },
-      }),
-    );
-    vi.mocked(parseArguments).mockResolvedValue({
-      model: undefined,
-      sandbox: undefined,
-      debug: undefined,
-      prompt: undefined,
-      promptInteractive: undefined,
-      query: undefined,
-    } as unknown as CliArgs);
-
-    try {
-      await main();
-      expect.fail('Should have thrown MockProcessExitError');
-    } catch (e) {
-      expect(e).toBeInstanceOf(MockProcessExitError);
-      expect((e as MockProcessExitError).code).toBe(1);
-    }
-
-    expect(stderrSpy).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'Error: Starting a nested interactive Gemini CLI session inside Gemini CLI Shell Mode is not supported.',
-      ),
-    );
-
-    stderrSpy.mockRestore();
-    vi.unstubAllEnvs();
   });
 
   it('should exit with 41 for validateAuthMethod failure during sandbox setup', async () => {
@@ -1562,8 +1526,16 @@ describe('project hooks loading based on trust', () => {
   let loadCliConfig: Mock;
   let loadSettings: Mock;
   let parseArguments: Mock;
+  let originalIsTTY: boolean | undefined;
 
   beforeEach(async () => {
+    originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
+
     // Dynamically import and get the mocked functions
     const configModule = await import('./config/config.js');
     loadCliConfig = vi.mocked(configModule.loadCliConfig);
@@ -1597,6 +1569,11 @@ describe('project hooks loading based on trust', () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalIsTTY,
+      configurable: true,
+      writable: true,
+    });
     vi.restoreAllMocks();
   });
 

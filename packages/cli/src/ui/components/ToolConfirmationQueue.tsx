@@ -59,8 +59,10 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
     terminalHeight,
     constrainHeight,
     availableTerminalHeight: uiAvailableHeight,
+    isEditorDialogOpen,
   } = useUIState();
   const { tool, index, total } = confirmingTool;
+  const isConfirmingToolFocused = !isEditorDialogOpen;
 
   // Safety check: ToolConfirmationMessage requires confirmationDetails
   if (!tool.confirmationDetails) return null;
@@ -129,7 +131,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
             terminalWidth={safeContentWidth} // Adjust for parent border/padding
             availableTerminalHeight={availableContentHeight}
             toolName={tool.name}
-            isFocused={true}
+            isFocused={isConfirmingToolFocused}
           />
         </Box>
       </Box>

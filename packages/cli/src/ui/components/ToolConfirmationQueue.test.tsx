@@ -5,8 +5,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act } from 'react';
+import { act, useState } from 'react';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
+import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { StreamingState } from '../types.js';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
@@ -14,9 +15,12 @@ import { waitFor } from '../../test-utils/async.js';
 import {
   type Config,
   CoreToolCallStatus,
+  ToolConfirmationOutcome,
   type SerializableConfirmationDetails,
 } from '@google/gemini-cli-core';
 import type { ConfirmingToolState } from '../hooks/useConfirmingTool.js';
+import { UIStateContext, useUIState } from '../contexts/UIStateContext.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
 
 vi.mock('./StickyHeader.js', async (importOriginal) => {
@@ -32,6 +36,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
+    isEditorAvailable: () => true,
     validatePlanPath: vi.fn().mockResolvedValue(undefined),
     validatePlanContent: vi.fn().mockResolvedValue(undefined),
     processSingleFileContent: vi.fn().mockResolvedValue({
@@ -40,6 +45,16 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     }),
   };
 });
+
+vi.mock('../editors/editorSettingsManager.js', () => ({
+  editorSettingsManager: {
+    getAvailableEditorDisplays: () => [
+      { name: 'None', type: 'not_set', disabled: false },
+      { name: 'VS Code', type: 'vscode', disabled: false },
+      { name: 'Vim', type: 'vim', disabled: false },
+    ],
+  },
+}));
 
 const { StickyHeader } = await import('./StickyHeader.js');
 
@@ -593,5 +608,275 @@ describe('ToolConfirmationQueue', () => {
         unmount();
       },
     );
+  });
+
+  describe('external editor selection modal interaction (#30076)', () => {
+    const createEditorInteractionHarness = ({
+      onApplyEdit,
+      onRejectEdit,
+      onSelectEditor,
+      onStreamCancel,
+    }: {
+      onApplyEdit: () => void;
+      onRejectEdit: () => void;
+      onSelectEditor: () => void;
+      onStreamCancel: () => void;
+    }) => {
+      const settings = createMockSettings({});
+      let openEditorDialog = () => {};
+
+      const confirmationDetails = {
+        type: 'edit' as const,
+        title: 'Confirm Edit: BUILD',
+        fileName: 'BUILD',
+        filePath: '/workspace/BUILD',
+        fileDiff:
+          '--- a/BUILD\n+++ b/BUILD\n@@ -1 +1 @@\n-cc_library(name = "a")\n+cc_library(name = "b")',
+        originalContent: 'cc_library(name = "a")',
+        newContent: 'cc_library(name = "b")',
+        isBuildFile: true,
+        onConfirm: async (outcome: ToolConfirmationOutcome) => {
+          if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
+            openEditorDialog();
+          } else if (outcome === ToolConfirmationOutcome.ProceedOnce) {
+            onApplyEdit();
+          } else if (outcome === ToolConfirmationOutcome.Cancel) {
+            onRejectEdit();
+          }
+        },
+      };
+
+      const toolCall = {
+        callId: 'call-build-edit',
+        name: 'replace',
+        description: 'Editing BUILD',
+        status: CoreToolCallStatus.AwaitingApproval,
+        resultDisplay: undefined,
+        confirmationDetails,
+      };
+
+      const confirmingTool = {
+        tool: toolCall,
+        index: 1,
+        total: 1,
+      };
+
+      const Harness = () => {
+        const parentUiState = useUIState();
+        const [isEditorDialogOpen, setIsEditorDialogOpen] = useState(false);
+        openEditorDialog = () => setIsEditorDialogOpen(true);
+
+        // Competing priority stream-cancellation Escape listener
+        useKeypress(
+          (key) => {
+            if (key.name === 'escape') {
+              onStreamCancel();
+              return true;
+            }
+            return false;
+          },
+          { isActive: true, priority: true },
+        );
+
+        return (
+          <UIStateContext.Provider
+            value={{
+              ...parentUiState,
+              isEditorDialogOpen,
+            }}
+          >
+            <ToolConfirmationQueue
+              confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+            />
+            {isEditorDialogOpen && (
+              <EditorSettingsDialog
+                onSelect={onSelectEditor}
+                settings={settings}
+                onExit={() => setIsEditorDialogOpen(false)}
+              />
+            )}
+          </UIStateContext.Provider>
+        );
+      };
+
+      return {
+        Harness,
+        settings,
+        pendingHistoryItems: [
+          {
+            id: 1,
+            type: 'tool_group' as const,
+            tools: [toolCall],
+          },
+        ],
+      };
+    };
+
+    it('routes arrow keys and Escape to EditorSettingsDialog without cancelling tool approval, then allows approving the edit', async () => {
+      const onApplyEdit = vi.fn();
+      const onRejectEdit = vi.fn();
+      const onSelectEditor = vi.fn();
+      const onStreamCancel = vi.fn();
+
+      const { Harness, settings, pendingHistoryItems } =
+        createEditorInteractionHarness({
+          onApplyEdit,
+          onRejectEdit,
+          onSelectEditor,
+          onStreamCancel,
+        });
+
+      const { lastFrame, stdin, waitUntilReady, unmount } =
+        await renderWithProviders(<Harness />, {
+          config: mockConfig,
+          settings,
+          uiState: {
+            terminalWidth: 100,
+            mainAreaWidth: 100,
+            terminalHeight: 40,
+            streamingState: StreamingState.WaitingForConfirmation,
+            pendingHistoryItems,
+          },
+        });
+      await waitUntilReady();
+
+      expect(lastFrame()).toContain(
+        'CRITICAL SECURITY WARNING: Build File Modification',
+      );
+      expect(lastFrame()).not.toContain('Editor Preference');
+
+      // Navigate to "2. Modify with external editor" and press Enter
+      await act(async () => {
+        stdin.write('\x1b[B');
+      });
+      await waitUntilReady();
+      await act(async () => {
+        stdin.write('\r');
+      });
+      await waitUntilReady();
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Editor Preference');
+      });
+
+      // Press Down arrow inside EditorSettingsDialog: should move EditorSettingsDialog cursor to "2. VS Code"
+      // and NOT move ToolConfirmationMessage cursor to "3. No, suggest changes (esc)"
+      await act(async () => {
+        stdin.write('\x1b[B');
+      });
+      await waitUntilReady();
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        expect(frame).toMatch(/●\s+2\.\s+VS Code/);
+        expect(frame).toMatch(/●\s+2\.\s+Modify with external editor/);
+      });
+
+      // Press Escape once: must close ONLY EditorSettingsDialog without saving editor or cancelling stream/tool
+      await act(async () => {
+        stdin.write('\x1b');
+      });
+      await waitUntilReady();
+
+      await waitFor(() => {
+        expect(lastFrame()).not.toContain('Editor Preference');
+      });
+      expect(onSelectEditor).not.toHaveBeenCalled();
+      expect(onStreamCancel).not.toHaveBeenCalled();
+      expect(onRejectEdit).not.toHaveBeenCalled();
+      expect(lastFrame()).toContain(
+        'CRITICAL SECURITY WARNING: Build File Modification',
+      );
+
+      // Focus is back on ToolConfirmationMessage (still at "2. Modify with external editor"):
+      // Navigate Up to "1. Allow once" and press Enter
+      await act(async () => {
+        stdin.write('\x1b[A');
+      });
+      await waitUntilReady();
+      await act(async () => {
+        stdin.write('\r');
+      });
+      await waitUntilReady();
+
+      await waitFor(() => {
+        expect(onApplyEdit).toHaveBeenCalledTimes(1);
+      });
+      expect(onRejectEdit).not.toHaveBeenCalled();
+
+      unmount();
+    });
+
+    it('allows rejecting the pending edit after escaping from EditorSettingsDialog', async () => {
+      const onApplyEdit = vi.fn();
+      const onRejectEdit = vi.fn();
+      const onSelectEditor = vi.fn();
+      const onStreamCancel = vi.fn();
+
+      const { Harness, settings, pendingHistoryItems } =
+        createEditorInteractionHarness({
+          onApplyEdit,
+          onRejectEdit,
+          onSelectEditor,
+          onStreamCancel,
+        });
+
+      const { lastFrame, stdin, waitUntilReady, unmount } =
+        await renderWithProviders(<Harness />, {
+          config: mockConfig,
+          settings,
+          uiState: {
+            terminalWidth: 100,
+            mainAreaWidth: 100,
+            terminalHeight: 40,
+            streamingState: StreamingState.WaitingForConfirmation,
+            pendingHistoryItems,
+          },
+        });
+      await waitUntilReady();
+
+      // Open EditorSettingsDialog via "2. Modify with external editor"
+      await act(async () => {
+        stdin.write('\x1b[B');
+      });
+      await waitUntilReady();
+      await act(async () => {
+        stdin.write('\r');
+      });
+      await waitUntilReady();
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Editor Preference');
+      });
+
+      // Press Escape to close EditorSettingsDialog
+      await act(async () => {
+        stdin.write('\x1b');
+      });
+      await waitUntilReady();
+
+      await waitFor(() => {
+        expect(lastFrame()).not.toContain('Editor Preference');
+      });
+      expect(onRejectEdit).not.toHaveBeenCalled();
+      expect(onStreamCancel).not.toHaveBeenCalled();
+
+      // Navigate Down to "3. No, suggest changes (esc)" and press Enter
+      await act(async () => {
+        stdin.write('\x1b[B');
+      });
+      await waitUntilReady();
+      await act(async () => {
+        stdin.write('\r');
+      });
+      await waitUntilReady();
+
+      await waitFor(() => {
+        expect(onRejectEdit).toHaveBeenCalledTimes(1);
+      });
+      expect(onApplyEdit).not.toHaveBeenCalled();
+
+      unmount();
+    });
   });
 });

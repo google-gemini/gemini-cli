@@ -651,6 +651,7 @@ interface TomlRule {
   commandPrefix?: string | string[];
   argsPattern?: string;
   allowRedirection?: boolean;
+  allowCommandSubstitution?: boolean;
   modes?: ApprovalMode[];
   // Index signature to satisfy Record type if needed for toml.stringify
   [key: string]: unknown;
@@ -702,6 +703,10 @@ function createTomlRule(toolName: string, message: UpdatePolicy): TomlRule {
     rule.allowRedirection = message.allowRedirection;
   }
 
+  if (message.allowCommandSubstitution !== undefined) {
+    rule.allowCommandSubstitution = message.allowCommandSubstitution;
+  }
+
   if (message.modes) {
     rule.modes = message.modes;
   }
@@ -751,6 +756,7 @@ export function createPolicyUpdater(
               modes: message.modes,
               source: 'Dynamic (Confirmed)',
               allowRedirection: message.allowRedirection,
+              allowCommandSubstitution: message.allowCommandSubstitution,
             });
           }
         }
@@ -789,6 +795,7 @@ export function createPolicyUpdater(
           modes: message.modes,
           source: 'Dynamic (Confirmed)',
           allowRedirection: message.allowRedirection,
+          allowCommandSubstitution: message.allowCommandSubstitution,
         });
       }
 
@@ -864,6 +871,10 @@ export function createPolicyUpdater(
             if (existingRule) {
               if (message.allowRedirection !== undefined) {
                 existingRule.allowRedirection = message.allowRedirection;
+              }
+              if (message.allowCommandSubstitution !== undefined) {
+                existingRule.allowCommandSubstitution =
+                  message.allowCommandSubstitution;
               }
               if (message.modes) {
                 existingRule.modes = message.modes;

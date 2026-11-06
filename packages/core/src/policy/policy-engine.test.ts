@@ -2110,6 +2110,7 @@ describe('PolicyEngine', () => {
         {
           toolName: 'run_shell_command',
           decision: PolicyDecision.ALLOW,
+          allowCommandSubstitution: true,
         },
       ];
 

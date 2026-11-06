@@ -65,6 +65,8 @@ const PolicyRuleSchema = z.object({
   toolAnnotations: z.record(z.any()).optional(),
   allowRedirection: z.boolean().optional(),
   allow_redirection: z.boolean().optional(), // deprecated snake_case for backward compatibility
+  allowCommandSubstitution: z.boolean().optional(),
+  allow_command_substitution: z.boolean().optional(), // snake_case for compatibility
   denyMessage: z.string().optional(),
   deny_message: z.string().optional(), // deprecated snake_case for backward compatibility
 });
@@ -494,6 +496,9 @@ export async function loadPoliciesFromToml(
                   toolAnnotations: rule.toolAnnotations,
                   allowRedirection:
                     rule.allowRedirection ?? rule.allow_redirection,
+                  allowCommandSubstitution:
+                    rule.allowCommandSubstitution ??
+                    rule.allow_command_substitution,
                   source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
                   denyMessage: rule.denyMessage ?? rule.deny_message,
                 };
