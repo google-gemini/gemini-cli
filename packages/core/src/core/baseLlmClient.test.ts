@@ -155,12 +155,13 @@ describe('BaseLlmClient', () => {
 
       expect(result).toEqual({ color: 'blue' });
 
-      // Ensure the retry mechanism was engaged with shouldRetryOnContent
+      // Ensure the retry mechanism was engaged with shouldRetryOnContent and signal
       expect(retryWithBackoff).toHaveBeenCalledTimes(1);
       expect(retryWithBackoff).toHaveBeenCalledWith(
         expect.any(Function),
         expect.objectContaining({
           shouldRetryOnContent: expect.any(Function),
+          signal: defaultOptions.abortSignal,
         }),
       );
 
@@ -549,12 +550,13 @@ describe('BaseLlmClient', () => {
 
       expect(result).toBe(mockResponse);
 
-      // Ensure the retry mechanism was engaged
+      // Ensure the retry mechanism was engaged with signal
       expect(retryWithBackoff).toHaveBeenCalledTimes(1);
       expect(retryWithBackoff).toHaveBeenCalledWith(
         expect.any(Function),
         expect.objectContaining({
           shouldRetryOnContent: expect.any(Function),
+          signal: options.abortSignal,
         }),
       );
 

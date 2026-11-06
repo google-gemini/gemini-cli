@@ -61,6 +61,27 @@ const RETRYABLE_NETWORK_CODES = [
   'ERR_STREAM_PREMATURE_CLOSE',
 ];
 
+const NON_RETRYABLE_NETWORK_CODES = [
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  'ENETDOWN',
+  'EHOSTDOWN',
+  'EACCES',
+  'EPERM',
+  'ERR_INVALID_URL',
+  'UND_ERR_INVALID_ARG',
+  'UND_ERR_NOT_SUPPORTED',
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'SELF_SIGNED_CERT_IN_CHAIN',
+  'DEPTH_ZERO_SELF_SIGNED_CERT',
+  'CERT_HAS_EXPIRED',
+  'CERT_NOT_YET_VALID',
+  'ERR_TLS_CERT_ALTNAME_INVALID',
+  'UNABLE_TO_GET_ISSUER_CERT',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+  'CERT_UNTRUSTED',
+];
+
 // Node.js builds SSL error codes by prepending ERR_SSL_ to the uppercased
 // OpenSSL reason string with spaces replaced by underscores (see
 // TLSWrap::ClearOut in node/src/crypto/crypto_tls.cc). The reason string
@@ -173,8 +194,13 @@ export function isRetryableError(
 ): boolean {
   // Check for common network error codes
   const errorCode = getNetworkErrorCode(error);
-  if (errorCode && isRetryableSslErrorCode(errorCode)) {
-    return true;
+  if (errorCode) {
+    if (isRetryableSslErrorCode(errorCode)) {
+      return true;
+    }
+    if (NON_RETRYABLE_NETWORK_CODES.includes(errorCode)) {
+      return false;
+    }
   }
 
   if (retryFetchErrors && error instanceof Error) {
