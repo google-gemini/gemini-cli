@@ -4,12 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Config,
-  ToolCallRequestInfo,
-  ResumedSessionData,
-  UserFeedbackPayload,
-} from '@google/gemini-cli-core';
 import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
 import {
@@ -37,6 +31,12 @@ import {
   RECITATION_BLOCKED_MESSAGE,
   OTHER_BLOCKED_MESSAGE,
   TRUE_EMPTY_RESPONSE_MESSAGE,
+  createCancelledToolCall,
+  type CompletedToolCall,
+  type Config,
+  type ToolCallRequestInfo,
+  type ResumedSessionData,
+  type UserFeedbackPayload,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -146,10 +146,19 @@ export async function runNonInteractive(
       throw err;
     };
 
-    const triggerAbort = () => {
+    let abortExitCode = 130;
+    const triggerAbort = (signalName?: string) => {
+      if (signalName === 'SIGTERM') {
+        abortExitCode = 143;
+      } else if (signalName === 'SIGHUP') {
+        abortExitCode = 129;
+      } else {
+        abortExitCode = 130;
+      }
+
       // If already aborting, force exit immediately on repeated signal
       if (isAborting) {
-        process.exit(130);
+        process.exit(abortExitCode);
       }
 
       isAborting = true;
@@ -165,9 +174,14 @@ export async function runNonInteractive(
       // and trigger handleCancellationError() which will exit with proper code
     };
 
+    const onSigInt = () => triggerAbort('SIGINT');
+    const onSigTerm = () => triggerAbort('SIGTERM');
+    const onSigHup = () => triggerAbort('SIGHUP');
+
     const setupCancellation = () => {
-      process.on('SIGINT', triggerAbort);
-      process.on('SIGTERM', triggerAbort);
+      process.on('SIGINT', onSigInt);
+      process.on('SIGTERM', onSigTerm);
+      process.on('SIGHUP', onSigHup);
 
       // Only setup if stdin is a TTY (user can interact)
       if (!process.stdin?.isTTY) {
@@ -195,7 +209,7 @@ export async function runNonInteractive(
       ) => {
         // Detect Ctrl+C: either ctrl+c key combo or raw character code 3
         if ((key && key.ctrl && key.name === 'c') || str === '\u0003') {
-          triggerAbort();
+          triggerAbort('SIGINT');
         }
       };
 
@@ -203,8 +217,9 @@ export async function runNonInteractive(
     };
 
     const cleanupCancellation = () => {
-      process.off('SIGINT', triggerAbort);
-      process.off('SIGTERM', triggerAbort);
+      process.off('SIGINT', onSigInt);
+      process.off('SIGTERM', onSigTerm);
+      process.off('SIGHUP', onSigHup);
       process.stdout.off('error', handleStdoutError);
 
       // Clear any pending cancel message timer
@@ -508,13 +523,51 @@ export async function runNonInteractive(
 
         if (toolCallRequests.length > 0) {
           if (abortController.signal.aborted) {
-            throw new FatalCancellationError('Operation cancelled.');
+            const cancelledToolCalls = toolCallRequests.map((req) =>
+              createCancelledToolCall(req),
+            );
+            try {
+              const currentModel =
+                geminiClient.getCurrentSequenceModel() ?? config.getModel();
+              geminiClient
+                .getChat()
+                .recordCompletedToolCalls(currentModel, cancelledToolCalls);
+            } catch {
+              // Ignore recording errors during abort
+            }
+            throw new FatalCancellationError(
+              'Operation cancelled.',
+              abortExitCode,
+            );
           }
           textOutput.ensureTrailingNewline();
-          const completedToolCalls = await scheduler.schedule(
-            toolCallRequests,
-            abortController.signal,
-          );
+          let completedToolCalls: CompletedToolCall[];
+          try {
+            completedToolCalls = await scheduler.schedule(
+              toolCallRequests,
+              abortController.signal,
+            );
+          } catch (scheduleError) {
+            if (abortController.signal.aborted) {
+              const cancelledToolCalls = toolCallRequests.map((req) =>
+                createCancelledToolCall(req),
+              );
+              try {
+                const currentModel =
+                  geminiClient.getCurrentSequenceModel() ?? config.getModel();
+                geminiClient
+                  .getChat()
+                  .recordCompletedToolCalls(currentModel, cancelledToolCalls);
+              } catch {
+                // Ignore recording errors during abort
+              }
+              throw new FatalCancellationError(
+                'Operation cancelled.',
+                abortExitCode,
+              );
+            }
+            throw scheduleError;
+          }
           const toolResponseParts: Part[] = [];
 
           for (const completedToolCall of completedToolCalls) {
@@ -616,6 +669,13 @@ export async function runNonInteractive(
             return;
           }
 
+          if (abortController.signal.aborted) {
+            throw new FatalCancellationError(
+              'Operation cancelled.',
+              abortExitCode,
+            );
+          }
+
           currentMessages = [{ role: 'user', parts: toolResponseParts }];
         } else {
           // Emit final result event for streaming JSON
@@ -665,7 +725,10 @@ export async function runNonInteractive(
       abortController.signal.aborted ||
       isFatalCancellationError(errorToHandle)
     ) {
-      handleCancellationError(config);
+      const exitCode = isFatalCancellationError(errorToHandle)
+        ? errorToHandle.exitCode
+        : abortExitCode;
+      handleCancellationError(config, exitCode);
     }
 
     if (errorToHandle) {

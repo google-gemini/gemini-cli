@@ -599,32 +599,113 @@ describe('convertSessionToClientHistory', () => {
     ]);
   });
 
-  it('should safely skip user messages with undefined content', () => {
-    const messages = [
+  it('should synthesize interrupted functionResponse when tool call was interrupted before completion', () => {
+    const messages: ConversationRecord['messages'] = [
       {
         id: 'msg1',
         type: 'user',
         timestamp: '2024-01-01T10:00:00Z',
-        content: undefined,
+        content: 'Run bash work.sh',
       },
       {
         id: 'msg2',
-        type: 'user',
+        type: 'gemini',
         timestamp: '2024-01-01T10:01:00Z',
-        content: 'Valid query',
+        content: '',
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'run_shell_command',
+            args: { command: 'bash work.sh' },
+            status: CoreToolCallStatus.Scheduled,
+            timestamp: '2024-01-01T10:01:05Z',
+          },
+        ],
       },
-    ] as unknown as ConversationRecord['messages'];
+    ];
 
     const history = convertSessionToClientHistory(messages);
 
-    expect(history).toEqual([
+    expect(history).toHaveLength(3);
+    expect(history[0].content).toEqual({
+      role: 'user',
+      parts: [{ text: 'Run bash work.sh' }],
+    });
+    expect(history[1].content.role).toBe('model');
+    expect(history[1].content.parts?.[0]?.functionCall).toEqual({
+      id: 'call_1',
+      name: 'run_shell_command',
+      args: { command: 'bash work.sh' },
+    });
+    expect(history[2].content.role).toBe('user');
+    const responseObj =
+      history[2].content.parts?.[0]?.functionResponse?.response;
+    expect(responseObj?.['output']).toContain('interrupted');
+  });
+
+  it('should resolve completed tool call result across split messages and avoid duplicate turns', () => {
+    const messages: ConversationRecord['messages'] = [
+      {
+        id: 'msg1',
+        type: 'user',
+        timestamp: '2024-01-01T10:00:00Z',
+        content: 'Run bash work.sh',
+      },
       {
         id: 'msg2',
-        content: {
-          role: 'user',
-          parts: [{ text: 'Valid query' }],
-        },
+        type: 'gemini',
+        timestamp: '2024-01-01T10:01:00Z',
+        content: '',
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'run_shell_command',
+            args: { command: 'bash work.sh' },
+            status: CoreToolCallStatus.Scheduled,
+            timestamp: '2024-01-01T10:01:05Z',
+          },
+        ],
       },
-    ]);
+      {
+        id: 'msg3',
+        type: 'info',
+        timestamp: '2024-01-01T10:01:06Z',
+        content: 'Hook message',
+      },
+      {
+        id: 'msg4',
+        type: 'gemini',
+        timestamp: '2024-01-01T10:01:10Z',
+        content: '',
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'run_shell_command',
+            args: { command: 'bash work.sh' },
+            status: CoreToolCallStatus.Success,
+            result: 'paid',
+            timestamp: '2024-01-01T10:01:10Z',
+          },
+        ],
+      },
+    ];
+
+    const history = convertSessionToClientHistory(messages);
+
+    expect(history).toHaveLength(3);
+    expect(history[0].content).toEqual({
+      role: 'user',
+      parts: [{ text: 'Run bash work.sh' }],
+    });
+    expect(history[1].content.role).toBe('model');
+    expect(history[1].content.parts?.[0]?.functionCall).toEqual({
+      id: 'call_1',
+      name: 'run_shell_command',
+      args: { command: 'bash work.sh' },
+    });
+    expect(history[2].content.role).toBe('user');
+    const responseObj =
+      history[2].content.parts?.[0]?.functionResponse?.response;
+    expect(responseObj?.['output']).toBe('paid');
   });
 });

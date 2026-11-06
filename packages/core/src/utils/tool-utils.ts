@@ -18,9 +18,54 @@ import levenshtein from 'fast-levenshtein';
 import type {
   ToolCallRequestInfo,
   ToolCallResponseInfo,
+  CompletedToolCall,
 } from '../scheduler/types.js';
+import { CoreToolCallStatus } from '../scheduler/types.js';
+import { ToolErrorType } from '../tools/tool-error.js';
 import type { Part } from '@google/genai';
 import { MAX_STORED_TOOL_OUTPUT_BYTES } from './constants.js';
+
+export const CANCELLED_TOOL_ERROR_MESSAGE =
+  '[Operation Cancelled] Reason: User cancelled operation';
+
+// Synthesizes a cancelled CompletedToolCall with a filler functionResponse
+export function createCancelledToolCall(
+  request: ToolCallRequestInfo,
+  tool?: AnyDeclarativeTool,
+  invocation?: AnyToolInvocation,
+): CompletedToolCall {
+  const fallbackToolName = request.name.trim() || 'generic_tool';
+  return {
+    status: CoreToolCallStatus.Cancelled,
+    request,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    tool: (tool ?? {
+      name: fallbackToolName,
+      displayName: fallbackToolName,
+    }) as AnyDeclarativeTool,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    invocation: (invocation ?? {
+      getDescription: () => fallbackToolName,
+    }) as AnyToolInvocation,
+    response: {
+      callId: request.callId,
+      responseParts: [
+        {
+          functionResponse: {
+            id: request.callId,
+            name: request.name,
+            response: {
+              error: CANCELLED_TOOL_ERROR_MESSAGE,
+            },
+          },
+        },
+      ],
+      resultDisplay: undefined,
+      error: new Error(CANCELLED_TOOL_ERROR_MESSAGE),
+      errorType: ToolErrorType.UNHANDLED_EXCEPTION,
+    },
+  };
+}
 
 /**
  * Determines whether a tool call request can be executed in parallel with

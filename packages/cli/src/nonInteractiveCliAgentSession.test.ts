@@ -1327,6 +1327,10 @@ describe('runNonInteractive', () => {
         'SIGTERM',
         expect.any(Function),
       );
+      expect(processOffSpy).toHaveBeenCalledWith(
+        'SIGHUP',
+        expect.any(Function),
+      );
     } finally {
       Object.defineProperty(process.stdin, 'isTTY', {
         value: originalIsTTY,

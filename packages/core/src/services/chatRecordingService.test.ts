@@ -838,6 +838,61 @@ describe('ChatRecordingService', () => {
       expect(geminiMsg.toolCalls).toHaveLength(1);
       expect(geminiMsg.toolCalls![0].agentId).toBe('test-agent-id');
     });
+
+    it('should update earlier gemini message when intermediate messages (e.g. info) are present', async () => {
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: '',
+        model: 'gemini-pro',
+      });
+
+      const callId = 'tool-scheduled-1';
+      chatRecordingService.recordToolCalls('gemini-pro', [
+        {
+          id: callId,
+          name: 'run_shell_command',
+          args: { command: 'echo test' },
+          status: CoreToolCallStatus.Scheduled,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+
+      // Simulate a hook recording an info message while tool executes
+      chatRecordingService.recordMessage({
+        type: 'info',
+        content: 'System message from BeforeTool hook',
+        model: undefined,
+      });
+
+      // Now record completed tool call with result
+      chatRecordingService.recordToolCalls('gemini-pro', [
+        {
+          id: callId,
+          name: 'run_shell_command',
+          args: { command: 'echo test' },
+          status: CoreToolCallStatus.Success,
+          result: [{ text: 'test output' }],
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = (await loadConversationRecord(
+        sessionFile,
+      )) as ConversationRecord;
+
+      // Messages should still be 2 (gemini and info), NOT 3
+      expect(conversation.messages).toHaveLength(2);
+      expect(conversation.messages[0].type).toBe('gemini');
+      expect(conversation.messages[1].type).toBe('info');
+
+      const geminiMsg = conversation.messages[0] as MessageRecord & {
+        type: 'gemini';
+      };
+      expect(geminiMsg.toolCalls).toHaveLength(1);
+      expect(geminiMsg.toolCalls![0].status).toBe(CoreToolCallStatus.Success);
+      expect(geminiMsg.toolCalls![0].result).toBeDefined();
+    });
   });
 
   describe('deleteSession', () => {
