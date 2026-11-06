@@ -668,6 +668,9 @@ describe('sandboxUtils', () => {
       expect(
         isCredentialOrSensitivePath('/home/user/.gemini/keybindings.json'),
       ).toBe(false);
+      expect(isCredentialOrSensitivePath('/home/user/.gemini/theme.json')).toBe(
+        false,
+      );
       expect(isCredentialOrSensitivePath('/home/user/.gemini/commands')).toBe(
         false,
       );

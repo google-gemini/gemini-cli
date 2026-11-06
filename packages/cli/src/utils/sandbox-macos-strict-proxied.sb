@@ -12,6 +12,7 @@
     ;; Only allow reading essential dotfiles/directories under HOME, not the entire HOME
     (literal (string-append (param "HOME_DIR") "/.gemini/settings.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/keybindings.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/theme.json"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (literal (string-append (param "HOME_DIR") "/.gitconfig"))
