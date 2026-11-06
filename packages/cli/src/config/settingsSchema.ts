@@ -1087,6 +1087,19 @@ const SETTINGS_SCHEMA = {
           'Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.',
         showInDialog: true,
       },
+      requestTimeoutMs: {
+        type: 'number',
+        label: 'Request Timeout (ms)',
+        category: 'Model',
+        requiresRestart: true,
+        default: undefined as number | undefined,
+        description: oneLine`
+          How long to wait, in milliseconds, for the API to start responding
+          before a request is aborted and retried. Defaults to 60000. Raise this
+          if long-thinking requests are timing out.
+        `,
+        showInDialog: false,
+      },
       summarizeToolOutput: {
         type: 'object',
         label: 'Summarize Tool Output',
