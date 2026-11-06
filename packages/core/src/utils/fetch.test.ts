@@ -71,6 +71,25 @@ describe('fetch utils', () => {
     vi.restoreAllMocks();
   });
 
+  // Runs before any test calls setGlobalProxy, so the global dispatcher is an Agent.
+  describe('updateGlobalFetchTimeouts', () => {
+    it('should give the global dispatcher a 15-minute body timeout and keep 5 minutes for the safe agent', () => {
+      updateGlobalFetchTimeouts(45773134);
+
+      // Streamed model responses go through the global dispatcher.
+      expect(Agent).toHaveBeenCalledWith({
+        headersTimeout: 45773134,
+        bodyTimeout: 900000,
+      });
+      // web_fetch keeps its 5-minute body timeout.
+      expect(Agent).toHaveBeenCalledWith({
+        headersTimeout: 45773134,
+        bodyTimeout: 300000,
+        connect: expect.any(Function),
+      });
+    });
+  });
+
   describe('isAddressPrivate', () => {
     it('should identify private IPv4 addresses', () => {
       expect(isAddressPrivate('10.0.0.1')).toBe(true);
@@ -275,7 +294,7 @@ describe('fetch utils', () => {
         httpsProxy: 'http://proxy.example.com',
         noProxy: 'localhost,127.0.0.1',
         headersTimeout: 45773134,
-        bodyTimeout: 300000,
+        bodyTimeout: 900000,
       });
       expect(setGlobalDispatcher).toHaveBeenCalled();
     });
