@@ -124,15 +124,17 @@ export function calculateHistoryByteSize(history: readonly Content[]): number {
         }
         if (part.functionResponse?.parts) {
           for (const nestedPart of part.functionResponse.parts) {
-            if (
-              'text' in nestedPart &&
-              typeof nestedPart.text === 'string' &&
-              nestedPart.text
-            ) {
-              bytes += Buffer.byteLength(nestedPart.text, 'utf8');
-            }
-            if (nestedPart.inlineData?.data) {
-              bytes += Buffer.byteLength(nestedPart.inlineData.data, 'utf8');
+            if (nestedPart && typeof nestedPart === 'object') {
+              if (
+                'text' in nestedPart &&
+                typeof nestedPart.text === 'string' &&
+                nestedPart.text
+              ) {
+                bytes += Buffer.byteLength(nestedPart.text, 'utf8');
+              }
+              if (nestedPart.inlineData?.data) {
+                bytes += Buffer.byteLength(nestedPart.inlineData.data, 'utf8');
+              }
             }
           }
         }

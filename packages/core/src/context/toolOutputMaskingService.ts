@@ -198,7 +198,7 @@ export class ToolOutputMaskingService {
         part.functionResponse.parts?.reduce(
           (sum, p) =>
             sum +
-            (p.inlineData?.data
+            (p?.inlineData?.data
               ? Buffer.byteLength(p.inlineData.data, 'utf8')
               : 0),
           0,
