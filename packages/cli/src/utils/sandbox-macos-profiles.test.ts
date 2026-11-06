@@ -184,12 +184,15 @@ describe('macOS Seatbelt non-sensitive configuration read access', () => {
   describe.each(RESTRICTIVE_AND_STRICT_PROFILES)('%s', (profile) => {
     const rules = readRules(profile);
 
-    it('allows reading settings.json and keybindings.json configuration files', () => {
+    it('allows reading settings.json, keybindings.json, and theme.json configuration files', () => {
       expect(rules).toContain(
         '(literal (string-append (param "HOME_DIR") "/.gemini/settings.json"))',
       );
       expect(rules).toContain(
         '(literal (string-append (param "HOME_DIR") "/.gemini/keybindings.json"))',
+      );
+      expect(rules).toContain(
+        '(literal (string-append (param "HOME_DIR") "/.gemini/theme.json"))',
       );
     });
   });
@@ -281,6 +284,9 @@ describe('BUILTIN_SEATBELT_PROFILE_CONTENTS consistency', () => {
           );
           expect(embeddedContent).toContain(
             '(literal (string-append (param "HOME_DIR") "/.gemini/keybindings.json"))',
+          );
+          expect(embeddedContent).toContain(
+            '(literal (string-append (param "HOME_DIR") "/.gemini/theme.json"))',
           );
         }
       });
