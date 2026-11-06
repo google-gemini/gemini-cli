@@ -1942,6 +1942,9 @@ export function isInvalidArgumentError(errorMessage: string): boolean {
  * alongside bookkeeping keys) and no other payload.
  */
 function isEmptyTextPart(part: Part): boolean {
+  if (!part) {
+    return true;
+  }
   if (part.text !== undefined && part.text !== '') {
     return false;
   }
@@ -1961,7 +1964,7 @@ function isEmptyTextPart(part: Part): boolean {
  */
 function hasNonThoughtContent(content: Content): boolean {
   return (content.parts ?? []).some(
-    (part) => !part.thought && !isEmptyTextPart(part),
+    (part) => part && !part.thought && !isEmptyTextPart(part),
   );
 }
 
@@ -2153,7 +2156,7 @@ export function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
         turn.content.role === 'model' &&
         !isSyntheticBinaryAckTurn(turn.content) &&
         prev?.content.role === 'user' &&
-        prev.content.parts?.some((p) => !!p.functionResponse)
+        (prev.content.parts ?? []).some((p) => !!p?.functionResponse)
       ) {
         result.push({
           ...turn,

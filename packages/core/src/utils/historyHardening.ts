@@ -88,6 +88,9 @@ function isInternalThought(part: Part): boolean {
  * alongside bookkeeping keys) and no active payload.
  */
 export function isEmptyTextOnlyPart(part: Part): boolean {
+  if (!part) {
+    return true;
+  }
   if (part.text !== undefined && part.text !== '') {
     return false;
   }
@@ -154,7 +157,7 @@ function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
       const prev = result.at(-1);
       if (
         prev?.content.role === 'user' &&
-        prev.content.parts?.some((p) => !!p.functionResponse)
+        (prev.content.parts ?? []).some((p) => !!p?.functionResponse)
       ) {
         result.push({
           id: turn.id,
@@ -473,7 +476,7 @@ export function scrubHistory(history: HistoryTurn[]): HistoryTurn[] {
       if (
         turn.content.role === 'model' &&
         prev?.content.role === 'user' &&
-        prev.content.parts?.some((p) => !!p.functionResponse) &&
+        (prev.content.parts ?? []).some((p) => !!p?.functionResponse) &&
         !isSyntheticBinaryAckTurn(turn.content)
       ) {
         result.push({
@@ -528,7 +531,7 @@ export function scrubContents(contents: Content[]): Content[] {
       if (
         content.role === 'model' &&
         prev?.role === 'user' &&
-        prev.parts?.some((p) => !!p.functionResponse) &&
+        (prev.parts ?? []).some((p) => !!p?.functionResponse) &&
         !isSyntheticBinaryAckTurn(content)
       ) {
         result.push({

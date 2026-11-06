@@ -10,6 +10,7 @@ import {
   SYNTHETIC_THOUGHT_SIGNATURE,
   INTERRUPTED_RESPONSE_PLACEHOLDER,
   SYNTHETIC_BINARY_ACK_TEXT,
+  isEmptyTextOnlyPart,
   scrubContents,
   scrubHistory,
 } from './historyHardening.js';
@@ -728,5 +729,74 @@ describe('scrubHistory', () => {
     expect(scrubbed).toHaveLength(1);
     expect(scrubbed[0].role).toBe('user');
     expect(scrubbed[0].parts).toHaveLength(2);
+  });
+
+  it('handles nullish Part entries safely across isEmptyTextOnlyPart, hardenHistory, scrubHistory, and scrubContents', () => {
+    expect(isEmptyTextOnlyPart(undefined as unknown as Part)).toBe(true);
+    expect(isEmptyTextOnlyPart(null as unknown as Part)).toBe(true);
+
+    const history: HistoryTurn[] = [
+      { id: 'u1', content: { role: 'user', parts: [{ text: 'Check' }] } },
+      {
+        id: 'm1',
+        content: {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'c1',
+                name: 'read_file',
+                args: { file_path: 'a.ts' },
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: 'fr1',
+        content: {
+          role: 'user',
+          parts: [
+            undefined as unknown as Part,
+            {
+              functionResponse: {
+                id: 'c1',
+                name: 'read_file',
+                response: { output: 'ok' },
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: 'm2',
+        content: {
+          role: 'model',
+          parts: [
+            null as unknown as Part,
+            { text: 'Thinking...', thought: true } as Part,
+          ],
+        },
+      },
+      { id: 'u2', content: { role: 'user', parts: [{ text: 'Next' }] } },
+    ];
+
+    const hardened = hardenHistory(history);
+    expect(hardened[3].content).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
+
+    const scrubbedHist = scrubHistory(history);
+    expect(scrubbedHist[3].content).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
+
+    const scrubbedRaw = scrubContents(history.map((h) => h.content));
+    expect(scrubbedRaw[3]).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
   });
 });

@@ -6818,6 +6818,71 @@ describe('GeminiChat', () => {
       ]);
     });
 
+    it('handles nullish Part entries and missing parts arrays safely in ensureTerminalUserTurn and stripThoughts', () => {
+      const contentsWithSparseParts: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there' }] },
+        {
+          role: 'user',
+          parts: [
+            undefined as unknown as Part,
+            null as unknown as Part,
+            { text: 'Internal thought only', thought: true } as Part,
+          ],
+        },
+      ];
+      expect(ensureTerminalUserTurn(contentsWithSparseParts)).toEqual([
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there' }] },
+        { role: 'user', parts: [{ text: CONTINUE_PROMPT_TEXT }] },
+      ]);
+
+      const contentsWithoutParts: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there' }] },
+        { role: 'user' },
+      ];
+      expect(ensureTerminalUserTurn(contentsWithoutParts)).toEqual([
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there' }] },
+        { role: 'user', parts: [{ text: CONTINUE_PROMPT_TEXT }] },
+      ]);
+
+      const stripped = stripThoughts([
+        {
+          id: 'fr1',
+          content: {
+            role: 'user',
+            parts: [
+              undefined as unknown as Part,
+              {
+                functionResponse: {
+                  id: 'call_1',
+                  name: 'read_file',
+                  response: { output: 'ok' },
+                },
+              },
+            ],
+          },
+        },
+        {
+          id: 'm1',
+          content: {
+            role: 'model',
+            parts: [
+              null as unknown as Part,
+              { text: 'Thinking...', thought: true } as Part,
+            ],
+          },
+        },
+      ]);
+      expect(stripped).toHaveLength(2);
+      expect(stripped[1].content).toEqual({
+        role: 'model',
+        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+      });
+    });
+
     it('preserves durable repair of pre-existing broken history when the next sendMessageStream fails and rolls back', async () => {
       chat.setHistory([
         { id: 'u1', content: { role: 'user', parts: [{ text: 'Run tool' }] } },

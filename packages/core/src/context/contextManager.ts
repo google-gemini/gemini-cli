@@ -233,11 +233,12 @@ export class ContextManager {
     }
 
     const firstPending = pendingHistory[0];
-    const lastRenderedHasToolResponse =
-      effectiveLastRendered?.content.parts?.some((p) => !!p.functionResponse) ??
-      false;
-    const firstPendingHasToolResponse =
-      firstPending?.content.parts?.some((p) => !!p.functionResponse) ?? false;
+    const lastRenderedHasToolResponse = (
+      effectiveLastRendered?.content.parts ?? []
+    ).some((p) => !!p?.functionResponse);
+    const firstPendingHasToolResponse = (
+      firstPending?.content.parts ?? []
+    ).some((p) => !!p?.functionResponse);
 
     const needsBoundaryBridge =
       effectiveLastRendered?.content.role === 'user' &&
