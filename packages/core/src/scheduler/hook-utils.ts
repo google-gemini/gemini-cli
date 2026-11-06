@@ -45,6 +45,7 @@ export async function evaluateBeforeToolHook(
     toolInput,
     mcpContext,
     request.originalRequestName,
+    request.callId,
   );
 
   if (!beforeOutput) {

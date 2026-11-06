@@ -75,6 +75,7 @@ export async function executeToolWithHooks(
   config?: Config,
   originalRequestName?: string,
   skipBeforeHook?: boolean,
+  toolCallId?: string,
 ): Promise<ToolResult> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const toolInput = (invocation.params || {}) as Record<string, unknown>;
@@ -91,6 +92,7 @@ export async function executeToolWithHooks(
       toolInput,
       mcpContext,
       originalRequestName,
+      toolCallId,
     );
 
     // Check if hook requested to stop entire agent execution
@@ -189,6 +191,7 @@ export async function executeToolWithHooks(
       },
       mcpContext,
       originalRequestName,
+      toolCallId,
     );
 
     // Check if hook requested to stop entire agent execution

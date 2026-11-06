@@ -384,6 +384,7 @@ export class HookSystem {
     toolInput: Record<string, unknown>,
     mcpContext?: McpToolContext,
     originalRequestName?: string,
+    toolCallId?: string,
   ): Promise<DefaultHookOutput | undefined> {
     try {
       const result = await this.hookEventHandler.fireBeforeToolEvent(
@@ -391,6 +392,7 @@ export class HookSystem {
         toolInput,
         mcpContext,
         originalRequestName,
+        toolCallId,
       );
       return result.finalOutput;
     } catch (error) {
@@ -409,6 +411,7 @@ export class HookSystem {
     },
     mcpContext?: McpToolContext,
     originalRequestName?: string,
+    toolCallId?: string,
   ): Promise<DefaultHookOutput | undefined> {
     try {
       const result = await this.hookEventHandler.fireAfterToolEvent(
@@ -417,6 +420,7 @@ export class HookSystem {
         toolResponse as Record<string, unknown>,
         mcpContext,
         originalRequestName,
+        toolCallId,
       );
       return result.finalOutput;
     } catch (error) {

@@ -146,9 +146,15 @@ describe('HookEventHandler', () => {
         mockAggregated,
       );
 
-      const result = await hookEventHandler.fireBeforeToolEvent('EditTool', {
-        file: 'test.txt',
-      });
+      const result = await hookEventHandler.fireBeforeToolEvent(
+        'EditTool',
+        {
+          file: 'test.txt',
+        },
+        undefined,
+        undefined,
+        'call-before-123',
+      );
 
       expect(mockHookPlanner.createExecutionPlan).toHaveBeenCalledWith(
         HookEventName.BeforeTool,
@@ -162,6 +168,7 @@ describe('HookEventHandler', () => {
           session_id: 'test-session',
           cwd: '/test/project',
           hook_event_name: 'BeforeTool',
+          tool_call_id: 'call-before-123',
           tool_name: 'EditTool',
           tool_input: { file: 'test.txt' },
         }),
@@ -436,6 +443,9 @@ describe('HookEventHandler', () => {
         'EditTool',
         toolInput,
         toolResponse,
+        undefined,
+        undefined,
+        'call-after-456',
       );
 
       expect(mockHookRunner.executeHooksParallel).toHaveBeenCalledWith(
@@ -443,6 +453,7 @@ describe('HookEventHandler', () => {
         HookEventName.AfterTool,
         expect.objectContaining({
           tool_name: 'EditTool',
+          tool_call_id: 'call-after-456',
           tool_input: toolInput,
           tool_response: toolResponse,
         }),
