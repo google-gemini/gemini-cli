@@ -465,6 +465,9 @@ describe('GH-28537 / b/561554750 Memory Leak Regression Tests', () => {
     it('bounds total joined response output when a tool returns an array of sub-64KB parts (read_many_files pattern)', async () => {
       const config = makeFakeConfig();
       vi.spyOn(config, 'isContextManagementEnabled').mockReturnValue(false);
+      vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue(
+        os.tmpdir(),
+      );
       const executor = new ToolExecutor(config);
 
       // 20 parts of 50 KB each: each individual element is < MAX_STORED_TOOL_OUTPUT_BYTES (64 KB),
@@ -512,6 +515,15 @@ describe('GH-28537 / b/561554750 Memory Leak Regression Tests', () => {
         expect(Buffer.byteLength(response.output, 'utf8')).toBeLessThanOrEqual(
           MAX_STORED_TOOL_OUTPUT_BYTES,
         );
+        expect(result.response.outputFile).toBeDefined();
+        if (result.response.outputFile) {
+          const savedDiskContent = fs.readFileSync(
+            result.response.outputFile,
+            'utf8',
+          );
+          expect(savedDiskContent).toContain('--- file-0.json ---');
+          expect(savedDiskContent).toContain('--- file-19.json ---');
+        }
       }
     });
 

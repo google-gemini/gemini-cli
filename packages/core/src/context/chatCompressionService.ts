@@ -124,6 +124,13 @@ export function calculateHistoryByteSize(history: readonly Content[]): number {
         }
         if (part.functionResponse?.parts) {
           for (const nestedPart of part.functionResponse.parts) {
+            if (
+              'text' in nestedPart &&
+              typeof nestedPart.text === 'string' &&
+              nestedPart.text
+            ) {
+              bytes += Buffer.byteLength(nestedPart.text, 'utf8');
+            }
             if (nestedPart.inlineData?.data) {
               bytes += Buffer.byteLength(nestedPart.inlineData.data, 'utf8');
             }
@@ -178,6 +185,9 @@ export function collapseOlderFunctionResponses(
   let remainingExemptBytes = MAX_EXEMPT_RETRIEVAL_HISTORY_BYTES;
   const preservedExemptTurns = new Set<number>();
   for (let i = cutoffToolIndex - 1; i >= 0; i--) {
+    if (remainingExemptBytes <= 0) {
+      break;
+    }
     const turn = history[i];
     if (turn.role !== 'user' || !turn.parts) {
       continue;
@@ -196,6 +206,7 @@ export function collapseOlderFunctionResponses(
       remainingExemptBytes -= turnBytes;
     } else {
       remainingExemptBytes = 0;
+      break;
     }
   }
 

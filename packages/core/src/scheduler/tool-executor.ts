@@ -358,6 +358,30 @@ export class ToolExecutor {
         );
       }
     } else if (Array.isArray(finalContent)) {
+      const textParts: string[] = [];
+      let totalBytes = 0;
+      for (const part of finalContent) {
+        const text =
+          typeof part === 'string'
+            ? part
+            : typeof part === 'object' &&
+                part !== null &&
+                'text' in part &&
+                typeof part.text === 'string'
+              ? part.text
+              : undefined;
+        if (text !== undefined) {
+          if (textParts.length > 0) {
+            totalBytes += 1;
+          }
+          textParts.push(text);
+          totalBytes += Buffer.byteLength(text, 'utf8');
+        }
+      }
+      if (totalBytes > MAX_STORED_TOOL_OUTPUT_BYTES) {
+        await ensureOutputFile(textParts.join('\n'));
+      }
+
       let remainingBytes = MAX_STORED_TOOL_OUTPUT_BYTES;
       let budgetExhausted = false;
       const processedParts: PartUnion[] = [];
