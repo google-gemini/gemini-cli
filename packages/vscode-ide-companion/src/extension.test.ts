@@ -176,7 +176,7 @@ describe('activate', () => {
       async ({ ide }) => {
         vi.mocked(detectIdeFromEnv).mockReturnValue(ide);
         vi.mocked(context.globalState.get).mockReturnValue(undefined);
-        vi.spyOn(global, 'fetch').mockResolvedValue({
+        const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
           ok: true,
           json: async () => ({
             results: [
@@ -196,6 +196,7 @@ describe('activate', () => {
 
         await activate(context);
 
+        expect(fetchSpy).not.toHaveBeenCalled();
         expect(showInformationMessageMock).not.toHaveBeenCalled();
       },
     );

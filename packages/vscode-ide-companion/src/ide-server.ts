@@ -23,7 +23,7 @@ import { randomUUID } from 'node:crypto';
 import { type Server as HTTPServer } from 'node:http';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import { tmpdir } from '@google/gemini-cli-core';
+import { tmpdir } from '@google/gemini-cli-core/src/utils/paths.js';
 import type { z } from 'zod';
 import type { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
