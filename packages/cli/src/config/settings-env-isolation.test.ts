@@ -235,4 +235,102 @@ describe('Environment Isolation', () => {
 
     expect(process.env['GEMINI_API_KEY']).toBeUndefined();
   });
+
+  describe('workspace trust and ~/.gemini/.env', () => {
+    const homeGeminiEnv = path.join(mockHome, GEMINI_DIR, '.env');
+    const projectEnv = path.join(mockWorkspace, '.env');
+    const homeContent =
+      'GOOGLE_CLOUD_PROJECT=home-project;$(id)\nOTHER_VAR=secret';
+    const trust = (isTrusted: boolean) => () => ({
+      isTrusted,
+      source: 'file' as const,
+    });
+
+    function mockEnvFiles(files: Record<string, string>) {
+      vi.mocked(fs.existsSync).mockImplementation((p) =>
+        Object.hasOwn(files, p.toString()),
+      );
+      vi.mocked(fs.readFileSync).mockImplementation(
+        (p) => files[p.toString()] ?? '',
+      );
+    }
+
+    beforeEach(() => {
+      delete process.env['GOOGLE_CLOUD_PROJECT'];
+    });
+
+    it.each([
+      { where: 'under home', cwd: path.join(mockHome, 'project') },
+      { where: 'outside home', cwd: mockWorkspace },
+    ])(
+      'should load allowlisted, sanitized vars from ~/.gemini/.env when untrusted and cwd is $where',
+      ({ cwd }) => {
+        mockEnvFiles({ [homeGeminiEnv]: homeContent });
+
+        loadEnvironment({} as Settings, cwd, trust(false));
+
+        expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('home-projectid');
+        expect(process.env['OTHER_VAR']).toBeUndefined();
+      },
+    );
+
+    it('should prefer ~/.gemini/.env over ~/.env when untrusted and cwd is under home', () => {
+      mockEnvFiles({
+        [homeGeminiEnv]: 'GOOGLE_CLOUD_PROJECT=home-gemini',
+        [path.join(mockHome, '.env')]: 'GOOGLE_CLOUD_PROJECT=home-dotenv',
+      });
+
+      loadEnvironment(
+        {} as Settings,
+        path.join(mockHome, 'project'),
+        trust(false),
+      );
+
+      expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('home-gemini');
+    });
+
+    it('should still prefer a project .env over ~/.gemini/.env when untrusted', () => {
+      mockEnvFiles({
+        [homeGeminiEnv]: homeContent,
+        [projectEnv]: 'GOOGLE_CLOUD_PROJECT=workspace-project',
+      });
+
+      loadEnvironment({} as Settings, mockWorkspace, trust(false));
+
+      expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('workspace-project');
+    });
+
+    it('should never load a project .gemini/.env when untrusted', () => {
+      mockEnvFiles({
+        [homeGeminiEnv]: homeContent,
+        [path.join(mockWorkspace, GEMINI_DIR, '.env')]:
+          'GOOGLE_CLOUD_PROJECT=workspace-gemini',
+      });
+
+      loadEnvironment({} as Settings, mockWorkspace, trust(false));
+
+      expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('home-projectid');
+    });
+
+    it('should load ~/.gemini/.env unfiltered when trusted', () => {
+      mockEnvFiles({ [homeGeminiEnv]: homeContent });
+
+      loadEnvironment({} as Settings, mockWorkspace, trust(true));
+
+      expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('home-project;$(id)');
+      expect(process.env['OTHER_VAR']).toBe('secret');
+    });
+
+    it('should still prefer a project .env over ~/.gemini/.env when trusted', () => {
+      mockEnvFiles({
+        [homeGeminiEnv]: homeContent,
+        [projectEnv]: 'GOOGLE_CLOUD_PROJECT=workspace-project',
+      });
+
+      loadEnvironment({} as Settings, mockWorkspace, trust(true));
+
+      expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('workspace-project');
+      expect(process.env['OTHER_VAR']).toBeUndefined();
+    });
+  });
 });
