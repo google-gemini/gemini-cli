@@ -4018,4 +4018,10 @@ describe('nested interactive session and invalid config subcommand guards', () =
       expect.stringContaining('/model'),
     );
   });
+
+  it('should allow single-quoted multi-word natural language prompts starting with "set model"', async () => {
+    process.argv = ['node', 'script.js', 'set model in django'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.query).toBe('set model in django');
+  });
 });

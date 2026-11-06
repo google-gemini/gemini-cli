@@ -558,6 +558,9 @@ export async function parseArguments(
 
   const firstQueryToken = rawQueryTokens[0]?.toLowerCase();
   const secondQueryToken = rawQueryTokens[1]?.toLowerCase();
+  const isQuotedPrompt = process.argv.some(
+    (arg) => arg.trim() === trimmedQuery,
+  );
   const isInvalidConfigSubcommand =
     !result['isCommand'] &&
     ((firstQueryToken === 'config' &&
@@ -578,7 +581,8 @@ export async function parseArguments(
         secondQueryToken !== undefined &&
         ['set', 'get', 'list', 'default-model', 'model'].includes(
           secondQueryToken,
-        )));
+        ))) &&
+    !(isQuotedPrompt && rawQueryTokens.length > 3);
 
   const isInNestedShell =
     process.env[GEMINI_CLI_IN_SHELL_ENV_VAR] === '1' ||
