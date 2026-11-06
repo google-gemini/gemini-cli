@@ -884,28 +884,18 @@ describe('loadCliConfig', () => {
   });
 
   describe('Proxy configuration', () => {
-    const originalProxyEnv: { [key: string]: string | undefined } = {};
     const proxyEnvVars = [
       'HTTP_PROXY',
       'HTTPS_PROXY',
+      'ALL_PROXY',
       'http_proxy',
       'https_proxy',
+      'all_proxy',
     ];
 
     beforeEach(() => {
       for (const key of proxyEnvVars) {
-        originalProxyEnv[key] = process.env[key];
-        delete process.env[key];
-      }
-    });
-
-    afterEach(() => {
-      for (const key of proxyEnvVars) {
-        if (originalProxyEnv[key]) {
-          process.env[key] = originalProxyEnv[key];
-        } else {
-          delete process.env[key];
-        }
+        vi.stubEnv(key, '');
       }
     });
 
@@ -943,6 +933,20 @@ describe('loadCliConfig', () => {
       {
         input: {
           env_name: 'HTTP_PROXY',
+          proxy_url,
+        },
+        expected: proxy_url,
+      },
+      {
+        input: {
+          env_name: 'ALL_PROXY',
+          proxy_url,
+        },
+        expected: proxy_url,
+      },
+      {
+        input: {
+          env_name: 'all_proxy',
           proxy_url,
         },
         expected: proxy_url,

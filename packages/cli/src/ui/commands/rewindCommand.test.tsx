@@ -381,4 +381,43 @@ describe('rewindCommand', () => {
       content: 'Nothing to rewind to.',
     });
   });
+
+  it('prefers getConversationAsync and rewindToAsync when available to avoid blocking UI thread', async () => {
+    const asyncConversation = {
+      messages: [{ id: 'msg-1', type: 'user', content: 'async hello' }],
+      sessionId: 'async-session',
+    };
+    const mockGetConversationAsync = vi
+      .fn()
+      .mockResolvedValue(asyncConversation);
+    const mockRewindToAsync = vi.fn().mockResolvedValue({ messages: [] });
+
+    mockGetChatRecordingService.mockReturnValue({
+      getConversation: mockGetConversation,
+      getConversationAsync: mockGetConversationAsync,
+      rewindTo: mockRewindTo,
+      rewindToAsync: mockRewindToAsync,
+      recordMessage: mockRecordMessage,
+    });
+
+    const result = (await rewindCommand.action!(
+      mockContext,
+      '',
+    )) as OpenCustomDialogActionReturn;
+
+    expect(mockGetConversationAsync).toHaveBeenCalledOnce();
+    expect(mockGetConversation).not.toHaveBeenCalled();
+
+    const component = result.component as ReactElement<RewindViewerProps>;
+    await component.props.onRewind(
+      'msg-1',
+      'Updated prompt',
+      RewindOutcome.RewindOnly,
+    );
+
+    await waitFor(() => {
+      expect(mockRewindToAsync).toHaveBeenCalledWith('msg-1');
+      expect(mockRewindTo).not.toHaveBeenCalled();
+    });
+  });
 });

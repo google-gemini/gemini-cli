@@ -10,9 +10,11 @@ import { render } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useGitBranchName } from './useGitBranchName.js';
 import { fs, vol } from 'memfs';
+import { EventEmitter } from 'node:events';
 import * as fsPromises from 'node:fs/promises';
 import path from 'node:path'; // For mocking fs
 import {
+  debugLogger,
   spawnAsync as mockSpawnAsync,
   getAbsoluteGitDir as mockGetAbsoluteGitDir,
 } from '@google/gemini-cli-core';
@@ -46,6 +48,13 @@ vi.mock('node:fs/promises', async () => {
 const CWD = '/test/project';
 const GIT_DIR = path.join(CWD, '.git');
 const GIT_HEAD_PATH = path.join(GIT_DIR, 'HEAD');
+
+/**
+ * Creates a fake `fs.FSWatcher`. Like the real one, it is an EventEmitter, so
+ * tests can simulate errors that `fs.watch` reports asynchronously.
+ */
+const createMockWatcher = () =>
+  Object.assign(new EventEmitter(), { close: vi.fn() });
 
 describe('useGitBranchName', () => {
   let deferredSpawn: Array<{
@@ -202,7 +211,7 @@ describe('useGitBranchName', () => {
       callback: (eventType: string, filename: string | null) => void,
     ) => {
       watchCallback = callback;
-      return { close: vi.fn() };
+      return createMockWatcher();
     }) as unknown as typeof fs.watch);
 
     const { result } = await renderGitBranchNameHook(CWD);
@@ -285,12 +294,54 @@ describe('useGitBranchName', () => {
     expect(result.current).toBe('main');
   });
 
+  it('should handle asynchronous watcher errors without crashing', async () => {
+    // Regression test for https://github.com/google-gemini/gemini-cli/issues/28598.
+    // Under the macOS Seatbelt sandbox, FSEvents is unavailable and fs.watch
+    // reports EMFILE asynchronously via an 'error' event instead of throwing,
+    // so a try/catch around fs.watch cannot catch it. An 'error' event with no
+    // listener is rethrown by EventEmitter, crashing the CLI.
+    vi.spyOn(fsPromises, 'access').mockResolvedValue(undefined);
+    const debugSpy = vi
+      .spyOn(debugLogger, 'debug')
+      .mockImplementation(() => {});
+    const mockWatcher = createMockWatcher();
+    const watchSpy = vi
+      .spyOn(fs, 'watch')
+      .mockReturnValue(mockWatcher as unknown as ReturnType<typeof fs.watch>);
+
+    const { result } = await renderGitBranchNameHook(CWD);
+
+    await resolveInitialSpawns('main');
+
+    expect(result.current).toBe('main');
+
+    await waitFor(() => {
+      expect(watchSpy).toHaveBeenCalledWith(GIT_DIR, expect.any(Function));
+    });
+
+    const emfileError = Object.assign(
+      new Error('EMFILE: too many open files, watch'),
+      { code: 'EMFILE', errno: -24, syscall: 'watch' },
+    );
+
+    await act(async () => {
+      mockWatcher.emit('error', emfileError);
+      await vi.advanceTimersByTimeAsync(1);
+    });
+
+    // The failed watcher is closed and the failure is only logged for debugging.
+    expect(mockWatcher.close).toHaveBeenCalled();
+    expect(debugSpy).toHaveBeenCalledWith(expect.any(String), emfileError);
+    // The last known branch name is kept; it just stops updating automatically.
+    expect(result.current).toBe('main');
+  });
+
   it('should cleanup watcher on unmount', async () => {
     vi.spyOn(fsPromises, 'access').mockResolvedValue(undefined);
-    const closeMock = vi.fn();
-    const watchMock = vi.spyOn(fs, 'watch').mockReturnValue({
-      close: closeMock,
-    } as unknown as ReturnType<typeof fs.watch>);
+    const mockWatcher = createMockWatcher();
+    const watchMock = vi
+      .spyOn(fs, 'watch')
+      .mockReturnValue(mockWatcher as unknown as ReturnType<typeof fs.watch>);
 
     const { unmount } = await renderGitBranchNameHook(CWD);
 
@@ -302,6 +353,6 @@ describe('useGitBranchName', () => {
     });
 
     unmount();
-    expect(closeMock).toHaveBeenCalled();
+    expect(mockWatcher.close).toHaveBeenCalled();
   });
 });

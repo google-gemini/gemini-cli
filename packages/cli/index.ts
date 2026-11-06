@@ -131,6 +131,9 @@ async function run() {
       '@google/gemini-cli-core'
     );
     const { runExitCleanup } = await import('./src/utils/cleanup.js');
+    const { formatCliError, isCliDebugEnabled } = await import(
+      './src/utils/formatError.js'
+    );
 
     main().catch(async (error: unknown) => {
       // Set a timeout to force exit if cleanup hangs
@@ -158,12 +161,12 @@ async function run() {
         process.exit(error.exitCode);
       }
 
-      writeToStderr('An unexpected critical error occurred:');
-      if (error instanceof Error) {
-        writeToStderr(error.stack + '\n');
-      } else {
-        writeToStderr(String(error) + '\n');
-      }
+      writeToStderr(
+        formatCliError(error, {
+          debug: isCliDebugEnabled(),
+          prefix: 'An unexpected critical error occurred: ',
+        }) + '\n',
+      );
       process.exit(1);
     });
   }

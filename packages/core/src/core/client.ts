@@ -44,7 +44,12 @@ import type {
 } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
-import { ChatCompressionService } from '../context/chatCompressionService.js';
+import {
+  ChatCompressionService,
+  calculateHistoryByteSize,
+  COLLAPSE_HISTORY_BYTE_THRESHOLD,
+  collapseOlderFunctionResponses,
+} from '../context/chatCompressionService.js';
 import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
 import type { ContextManager } from '../context/contextManager.js';
 import type { HistoryTurn } from './agentChatHistory.js';
@@ -701,9 +706,12 @@ export class GeminiClient {
             ? pendingApiHistory[0]
             : rawPendingRequest;
 
-        // Late-bind the prompt: Append the active request to the managed history
-        // only for the purpose of the upcoming API call.
-        apiHistoryOverride = [...apiHistory, finalPendingContent];
+        // Late-bind the prompt: Append all hardened pending turns (including any
+        // trailing sentinel user turn) to the managed history for the API call.
+        apiHistoryOverride =
+          pendingApiHistory.length > 0
+            ? [...apiHistory, ...pendingApiHistory]
+            : [...apiHistory, finalPendingContent];
 
         this.getChat().setHistory(newHistory);
 
@@ -1226,6 +1234,7 @@ export class GeminiClient {
             error: error instanceof Error ? error.message : String(error),
             model: getDisplayString(currentAttemptModel),
             status: getErrorStatus(error),
+            sessionId: this.config.getSessionId?.(),
           });
         },
       });
@@ -1279,10 +1288,12 @@ export class GeminiClient {
         this.hasFailedCompressionAttempt || !force;
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
-        // capture current session data before resetting
+        // capture current session data before resetting using non-blocking async I/O
         const currentRecordingService =
           this.getChat().getChatRecordingService();
-        const conversation = currentRecordingService.getConversation();
+        const conversation = await (currentRecordingService.getConversationAsync
+          ? currentRecordingService.getConversationAsync()
+          : currentRecordingService.getConversation());
         const filePath = currentRecordingService.getConversationFilePath();
 
         let resumedData: ResumedSessionData | undefined;
@@ -1313,12 +1324,30 @@ export class GeminiClient {
    * Masks bulky tool outputs to save context window space.
    */
   private async tryMaskToolOutputs(history: readonly Content[]): Promise<void> {
+    const chat = this.getChat();
     const result = await this.toolOutputMaskingService.mask(
       history,
       this.config,
     );
-    if (result.maskedCount > 0) {
-      this.getChat().setHistory(result.newHistory);
+    let updatedHistory: readonly Content[] =
+      result.maskedCount > 0 ? result.newHistory : history;
+    if (
+      calculateHistoryByteSize(updatedHistory) >=
+      COLLAPSE_HISTORY_BYTE_THRESHOLD
+    ) {
+      updatedHistory = collapseOlderFunctionResponses([...updatedHistory]);
+    }
+    if (updatedHistory !== history) {
+      const existingTurns = chat.getHistoryTurns?.(false);
+      if (existingTurns) {
+        const turns = updatedHistory.map((c, idx) => ({
+          id: existingTurns[idx]?.id ?? randomUUID(),
+          content: c,
+        }));
+        chat.setHistory(turns);
+      } else {
+        chat.setHistory([...updatedHistory]);
+      }
     }
   }
 

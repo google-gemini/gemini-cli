@@ -2391,5 +2391,102 @@ describe('ChatRecordingService', () => {
         { text: `${longPrefix}1${longSuffix}` },
       ]);
     });
+
+    it('should detect single-byte mutations inside >= 4096-char strings using word-chunked digest', async () => {
+      await chatRecordingService.initialize();
+
+      const prefix = 'X'.repeat(3000);
+      const suffix = 'Y'.repeat(3000);
+      const parts: Part[] = [{ text: `${prefix}A${suffix}` }];
+      const msgId = chatRecordingService.recordMessage({
+        type: 'user',
+        content: parts,
+        model: 'gemini-pro',
+      });
+
+      const history: HistoryTurn[] = [
+        { id: msgId, content: { role: 'user', parts } },
+      ];
+
+      parts[0].text = `${prefix}B${suffix}`;
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const loaded = await loadConversationRecord(sessionFile);
+      expect(loaded!.messages[0].content).toEqual([
+        { text: `${prefix}B${suffix}` },
+      ]);
+    });
+
+    it('should avoid synchronous readFileSync on compression/pruning when evicted messages exist and target window is cached, and support async getConversationAsync/rewindToAsync', async () => {
+      await chatRecordingService.initialize();
+
+      const totalMessages = MAX_HISTORY_MESSAGES + 20;
+      const history: HistoryTurn[] = [];
+
+      for (let i = 0; i < totalMessages; i++) {
+        const isUser = i % 2 === 0;
+        const text = `Turn ${i}`;
+        const id = chatRecordingService.recordMessage({
+          type: isUser ? 'user' : 'gemini',
+          content: text,
+          model: 'gemini-pro',
+        });
+        history.push({
+          id,
+          content: { role: isUser ? 'user' : 'model', parts: [{ text }] },
+        });
+      }
+
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      vi.mocked(fs.readFileSync).mockClear();
+
+      // Simulate context compression keeping a new summary turn + the most recent 10 turns
+      // (all 10 recent turns are already inside cachedConversation.messages).
+      const compressedHistory: HistoryTurn[] = [
+        {
+          id: 'summary-turn',
+          content: { role: 'user', parts: [{ text: 'Summary of old turns' }] },
+        },
+        {
+          id: 'summary-ack',
+          content: { role: 'model', parts: [{ text: 'Understood.' }] },
+        },
+        ...history.slice(-10),
+      ];
+
+      chatRecordingService.updateMessagesFromHistory(compressedHistory);
+      expect(fs.readFileSync).not.toHaveBeenCalled();
+
+      // Rebuild > MAX_HISTORY_MESSAGES to verify getConversationAsync and rewindToAsync avoid readFileSync
+      const expandedHistory = [...compressedHistory];
+      for (let i = 0; i < MAX_HISTORY_MESSAGES + 10; i++) {
+        const isUser = i % 2 === 0;
+        const text = `Post-compression ${i}`;
+        const id = chatRecordingService.recordMessage({
+          type: isUser ? 'user' : 'gemini',
+          content: text,
+          model: 'gemini-pro',
+        });
+        expandedHistory.push({
+          id,
+          content: { role: isUser ? 'user' : 'model', parts: [{ text }] },
+        });
+      }
+      chatRecordingService.updateMessagesFromHistory(expandedHistory);
+
+      vi.mocked(fs.readFileSync).mockClear();
+
+      const asyncFull = await chatRecordingService.getConversationAsync();
+      expect(asyncFull?.messages.length).toBe(expandedHistory.length);
+      expect(fs.readFileSync).not.toHaveBeenCalled();
+
+      const rewoundAsync = await chatRecordingService.rewindToAsync(
+        expandedHistory[5].id,
+      );
+      expect(rewoundAsync?.messages).toHaveLength(5);
+      expect(fs.readFileSync).not.toHaveBeenCalled();
+    });
   });
 });

@@ -185,6 +185,25 @@ describe('<Footer />', () => {
       unmount();
     });
 
+    it('should not tildeify sibling directories that share a prefix with home', async () => {
+      const root = path.parse(process.cwd()).root;
+      const siblingDir = path.join(root, 'Users', 'tester', 'project');
+      const siblingConfig = {
+        ...mockConfigPlain,
+        getTargetDir: () => siblingDir,
+      } as unknown as Config;
+
+      const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: siblingConfig,
+        width: 120,
+        uiState: { sessionStats: mockSessionStats },
+      });
+      const output = lastFrame();
+      expect(output).toContain(siblingDir);
+      expect(output).not.toContain('~er');
+      unmount();
+    });
+
     it('should not truncate high-priority items on narrow terminals (regression)', async () => {
       const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
         config: mockConfig,

@@ -39,6 +39,7 @@ import {
   geminiPartsToContentParts,
   displayContentToString,
   debugLogger,
+  normalizeError,
   THINKING_ONLY_COMPRESS_SUGGESTION,
   MAX_TOKENS_EXCEEDED_SUGGESTION,
   SAFETY_BLOCKED_MESSAGE,
@@ -400,68 +401,74 @@ export async function runNonInteractive({
           typeof errorMeta?.['errorName'] === 'string'
             ? errorMeta['errorName']
             : undefined;
+        const rawError = errorMeta?.['rawError'];
+        const normalized = normalizeError(
+          rawError ?? {
+            message: event.message,
+            status: errorMeta?.['status'],
+            code: errorMeta?.['code'],
+          },
+        );
+        const code =
+          normalized.code ??
+          (typeof normalized.status === 'string'
+            ? normalized.status
+            : undefined);
 
         let errToThrow: Error;
         switch (name) {
           case 'FatalAuthenticationError':
-            errToThrow = new FatalAuthenticationError(event.message);
+            errToThrow = new FatalAuthenticationError(normalized.message);
             break;
           case 'FatalInputError':
-            errToThrow = new FatalInputError(event.message);
+            errToThrow = new FatalInputError(normalized.message);
             break;
           case 'FatalSandboxError':
-            errToThrow = new FatalSandboxError(event.message);
+            errToThrow = new FatalSandboxError(normalized.message);
             break;
           case 'FatalConfigError':
-            errToThrow = new FatalConfigError(event.message);
+            errToThrow = new FatalConfigError(normalized.message);
             break;
           case 'FatalTurnLimitedError':
-            errToThrow = new FatalTurnLimitedError(event.message);
+            errToThrow = new FatalTurnLimitedError(normalized.message);
             break;
           case 'FatalToolExecutionError':
-            errToThrow = new FatalToolExecutionError(event.message);
+            errToThrow = new FatalToolExecutionError(normalized.message);
             break;
           case 'FatalCancellationError':
-            errToThrow = new FatalCancellationError(event.message);
+            errToThrow = new FatalCancellationError(normalized.message);
             break;
           case 'FatalError':
             errToThrow = new FatalError(
-              event.message,
+              normalized.message,
               typeof errorMeta?.['exitCode'] === 'number'
                 ? errorMeta['exitCode']
                 : 1,
             );
             break;
           default:
-            errToThrow = new Error(event.message);
-            if (name) {
-              Object.defineProperty(errToThrow, 'name', {
-                value: name,
-                enumerable: true,
-              });
-            }
+            errToThrow = Object.assign(
+              new Error(
+                normalized.message,
+                rawError !== undefined ? { cause: rawError } : undefined,
+              ),
+              name ? { name } : {},
+            );
             break;
         }
 
-        if (errorMeta?.['exitCode'] !== undefined) {
-          Object.defineProperty(errToThrow, 'exitCode', {
-            value: errorMeta['exitCode'],
-            enumerable: true,
-          });
-        }
-        if (errorMeta?.['code'] !== undefined) {
-          Object.defineProperty(errToThrow, 'code', {
-            value: errorMeta['code'],
-            enumerable: true,
-          });
-        }
-        if (errorMeta?.['status'] !== undefined) {
-          Object.defineProperty(errToThrow, 'status', {
-            value: errorMeta['status'],
-            enumerable: true,
-          });
-        }
-        return errToThrow;
+        return Object.assign(errToThrow, {
+          ...(errorMeta?.['exitCode'] !== undefined
+            ? { exitCode: errorMeta['exitCode'] }
+            : {}),
+          ...(typeof normalized.status === 'number'
+            ? { status: normalized.status }
+            : {}),
+          ...(code !== undefined ? { code } : {}),
+          ...(normalized.details !== undefined
+            ? { details: normalized.details }
+            : {}),
+        });
       };
 
       // Consume AgentEvents for output formatting

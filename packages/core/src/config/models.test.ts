@@ -449,6 +449,56 @@ describe('supportsMultimodalFunctionResponse', () => {
     expect(supportsMultimodalFunctionResponse('some-other-model')).toBe(false);
     expect(supportsMultimodalFunctionResponse('')).toBe(false);
   });
+
+  it('should return false when config indicates no access to preview models and a preview or auto model is resolved', () => {
+    const noPreviewLegacyConfig = {
+      getExperimentalDynamicModelConfiguration: () => false,
+      getHasAccessToPreviewModel: () => false,
+      modelConfigService,
+    } as unknown as Config;
+    const noPreviewDynamicConfig = {
+      getExperimentalDynamicModelConfiguration: () => true,
+      getHasAccessToPreviewModel: () => false,
+      modelConfigService,
+    } as unknown as Config;
+
+    expect(
+      supportsMultimodalFunctionResponse(
+        GEMINI_MODEL_ALIAS_AUTO,
+        noPreviewLegacyConfig,
+      ),
+    ).toBe(false);
+    expect(
+      supportsMultimodalFunctionResponse(
+        GEMINI_MODEL_ALIAS_AUTO,
+        noPreviewDynamicConfig,
+      ),
+    ).toBe(false);
+    expect(
+      supportsMultimodalFunctionResponse(
+        PREVIEW_GEMINI_MODEL,
+        noPreviewLegacyConfig,
+      ),
+    ).toBe(false);
+    expect(
+      supportsMultimodalFunctionResponse(
+        PREVIEW_GEMINI_MODEL,
+        noPreviewDynamicConfig,
+      ),
+    ).toBe(false);
+  });
+
+  it('should fall back to gemini-3 prefix check when dynamic config has no model definition for a gemini-3 variant', () => {
+    expect(
+      supportsMultimodalFunctionResponse('gemini-3-flash', dynamicConfig),
+    ).toBe(true);
+    expect(
+      supportsMultimodalFunctionResponse('gemini-3.0-pro', dynamicConfig),
+    ).toBe(true);
+    expect(
+      supportsMultimodalFunctionResponse('gemini-2.5-pro', dynamicConfig),
+    ).toBe(false);
+  });
 });
 
 describe('resolveModel', () => {
