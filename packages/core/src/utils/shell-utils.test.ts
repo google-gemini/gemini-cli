@@ -24,6 +24,7 @@ import {
   normalizeCommand,
   hasRedirection,
   resolveExecutable,
+  isInteractiveGeminiCommand,
 } from './shell-utils.js';
 import path from 'node:path';
 
@@ -674,5 +675,40 @@ describe('resolveExecutable', () => {
     mockPlatform.mockReturnValue('linux');
 
     expect(resolveExecutable('anything')).toBeUndefined();
+  });
+});
+
+describe('isInteractiveGeminiCommand', () => {
+  it('should detect bare interactive gemini and gemini config commands', () => {
+    expect(isInteractiveGeminiCommand('gemini')).toBe(true);
+    expect(
+      isInteractiveGeminiCommand(
+        'gemini config set default-model gemini-2.5 -y',
+      ),
+    ).toBe(true);
+    expect(isInteractiveGeminiCommand('gemini -m gemini-2.5-pro')).toBe(true);
+    expect(isInteractiveGeminiCommand('gemini -i "hello"')).toBe(true);
+    expect(isInteractiveGeminiCommand('echo hi && gemini config list')).toBe(
+      true,
+    );
+    expect(isInteractiveGeminiCommand('bash -c "gemini"')).toBe(true);
+  });
+
+  it('should allow non-interactive flags and subcommands', () => {
+    expect(isInteractiveGeminiCommand('gemini --version')).toBe(false);
+    expect(isInteractiveGeminiCommand('gemini -v')).toBe(false);
+    expect(isInteractiveGeminiCommand('gemini --help')).toBe(false);
+    expect(isInteractiveGeminiCommand('gemini -h')).toBe(false);
+    expect(isInteractiveGeminiCommand('gemini -p "summarize file"')).toBe(
+      false,
+    );
+    expect(isInteractiveGeminiCommand('gemini --prompt="summarize file"')).toBe(
+      false,
+    );
+    expect(isInteractiveGeminiCommand('gemini --list-models')).toBe(false);
+    expect(isInteractiveGeminiCommand('gemini skills list')).toBe(false);
+    expect(isInteractiveGeminiCommand('gemini models list')).toBe(false);
+    expect(isInteractiveGeminiCommand('gemini mcp list')).toBe(false);
+    expect(isInteractiveGeminiCommand('git status')).toBe(false);
   });
 });

@@ -3891,3 +3891,107 @@ describe('loadCliConfig acpMode and clientName', () => {
     expect(config.getClientName()).toBe('tui');
   });
 });
+
+describe('nested interactive session and invalid config subcommand guards', () => {
+  beforeEach(() => {
+    vi.stubEnv('GEMINI_CLI_IN_SHELL', '');
+    vi.stubEnv('GEMINI_CLI_NESTED_SESSION', '');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should abort with exit code 1 when starting a nested interactive session via GEMINI_CLI_IN_SHELL=1', async () => {
+    vi.stubEnv('GEMINI_CLI_IN_SHELL', '1');
+    process.argv = ['node', 'script.js'];
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(mockExit).toHaveBeenCalledWith(1);
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      'Error: Starting a nested interactive Gemini CLI session inside Gemini CLI Shell Mode is not supported. To switch models or update settings, exit Shell Mode (!) and use /model or /settings.',
+    );
+  });
+
+  it('should abort with exit code 1 when invoking gemini config set inside GEMINI_CLI_IN_SHELL=1', async () => {
+    vi.stubEnv('GEMINI_CLI_IN_SHELL', '1');
+    process.argv = [
+      'node',
+      'script.js',
+      'config',
+      'set',
+      'default-model',
+      'gemini-2.5',
+      '-y',
+    ];
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(mockExit).toHaveBeenCalledWith(1);
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      'Error: Starting a nested interactive Gemini CLI session inside Gemini CLI Shell Mode is not supported. To switch models or update settings, exit Shell Mode (!) and use /model or /settings.',
+    );
+  });
+
+  it('should allow --version and --help when GEMINI_CLI_IN_SHELL=1', async () => {
+    vi.stubEnv('GEMINI_CLI_IN_SHELL', '1');
+    process.argv = ['node', 'script.js', '--version'];
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit 0');
+    });
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit 0',
+    );
+    expect(mockExit).toHaveBeenCalledWith(0);
+  });
+
+  it('should allow explicit headless -p prompt and subcommands when GEMINI_CLI_IN_SHELL=1', async () => {
+    vi.stubEnv('GEMINI_CLI_IN_SHELL', '1');
+    process.argv = ['node', 'script.js', '-p', 'summarize this'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.prompt).toBe('summarize this');
+  });
+
+  it('should reject invalid gemini config subcommand with exit code 1 outside nested shell', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      'config',
+      'set',
+      'default-model',
+      'gemini-2.5',
+      '-y',
+    ];
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(mockExit).toHaveBeenCalledWith(1);
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('/model'),
+    );
+  });
+});

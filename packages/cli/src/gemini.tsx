@@ -37,6 +37,9 @@ import {
   Storage,
   getProjectHash,
   loadConversationRecord,
+  GEMINI_CLI_IN_SHELL_ENV_VAR,
+  GEMINI_CLI_NESTED_SESSION_ENV_VAR,
+  NESTED_INTERACTIVE_SESSION_ERROR,
   type MessageRecord,
 } from '@google/gemini-cli-core';
 
@@ -573,6 +576,25 @@ export async function main() {
   }
 
   // Check for invalid input combinations early to prevent crashes
+  if (
+    process.env[GEMINI_CLI_IN_SHELL_ENV_VAR] === '1' ||
+    process.env[GEMINI_CLI_NESTED_SESSION_ENV_VAR] === '1'
+  ) {
+    const isAllowedNonInteractive =
+      Boolean(argv.isCommand) ||
+      Boolean(argv.listModels) ||
+      Boolean(argv.listExtensions) ||
+      Boolean(argv.listSessions) ||
+      Boolean(argv.deleteSession) ||
+      (Boolean(argv.prompt) && !argv.promptInteractive);
+
+    if (!isAllowedNonInteractive) {
+      writeToStderr(`${NESTED_INTERACTIVE_SESSION_ERROR}\n`);
+      await runExitCleanup();
+      process.exit(1);
+    }
+  }
+
   if (argv.promptInteractive && !process.stdin.isTTY) {
     writeToStderr(
       'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.\n',

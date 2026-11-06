@@ -43,6 +43,9 @@ import {
   getProjectRootForWorktree,
   isGeminiWorktree,
   getSafeGitEnv,
+  GEMINI_CLI_IN_SHELL_ENV_VAR,
+  GEMINI_CLI_NESTED_SESSION_ENV_VAR,
+  NESTED_INTERACTIVE_SESSION_ERROR,
   type WorktreeSettings,
   type HookDefinition,
   type HookEventName,
@@ -543,11 +546,62 @@ export async function parseArguments(
 
   // Normalize query args: handle both quoted "@path file" and unquoted @path file
   const queryArg = result['query'];
+  const rawQueryTokens = Array.isArray(queryArg)
+    ? queryArg.map((token) => String(token))
+    : typeof queryArg === 'string' && queryArg.trim().length > 0
+      ? queryArg.trim().split(/\s+/)
+      : [];
   let q: string | undefined;
   if (Array.isArray(queryArg)) {
     q = queryArg.join(' ');
   } else if (typeof queryArg === 'string') {
     q = queryArg;
+  }
+
+  const firstQueryToken = rawQueryTokens[0]?.toLowerCase();
+  const secondQueryToken = rawQueryTokens[1]?.toLowerCase();
+  const isInvalidConfigSubcommand =
+    !result['isCommand'] &&
+    (firstQueryToken === 'config' ||
+      ((firstQueryToken === 'set' || firstQueryToken === 'model') &&
+        secondQueryToken !== undefined &&
+        ['set', 'get', 'list', 'default-model', 'model'].includes(
+          secondQueryToken,
+        )));
+
+  const isInNestedShell =
+    process.env[GEMINI_CLI_IN_SHELL_ENV_VAR] === '1' ||
+    process.env[GEMINI_CLI_NESTED_SESSION_ENV_VAR] === '1';
+
+  if (isInNestedShell) {
+    const isAllowedNonInteractive =
+      Boolean(result['isCommand']) ||
+      Boolean(result['listModels']) ||
+      Boolean(result['list-models']) ||
+      Boolean(result['listExtensions']) ||
+      Boolean(result['list-extensions']) ||
+      Boolean(result['listSessions']) ||
+      Boolean(result['list-sessions']) ||
+      Boolean(result['deleteSession']) ||
+      Boolean(result['delete-session']) ||
+      (Boolean(result['prompt']) &&
+        !result['promptInteractive'] &&
+        !result['prompt-interactive'] &&
+        !isInvalidConfigSubcommand);
+
+    if (!isAllowedNonInteractive) {
+      debugLogger.error(NESTED_INTERACTIVE_SESSION_ERROR);
+      await runExitCleanup();
+      process.exit(1);
+    }
+  }
+
+  if (isInvalidConfigSubcommand) {
+    debugLogger.error(
+      `Error: Unknown command "${rawQueryTokens[0]}". To switch models or update settings, use built-in slash commands (/model, /settings).`,
+    );
+    await runExitCleanup();
+    process.exit(1);
   }
 
   // -p/--prompt forces non-interactive mode; positional args default to interactive in TTY
