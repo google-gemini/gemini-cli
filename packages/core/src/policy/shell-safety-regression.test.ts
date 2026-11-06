@@ -17,11 +17,16 @@ describe('PolicyEngine - Shell Safety Regression Suite', () => {
     await initializeShellParsers();
   });
 
-  const setupEngine = (allowedCommands: string[]) => {
+  const setupEngine = (
+    allowedCommands: string[],
+    options?: { allowCommandSubstitution?: boolean },
+  ) => {
+    const allowCommandSubstitution = options?.allowCommandSubstitution ?? false;
     const rules = allowedCommands.map((cmd) => ({
       toolName: 'run_shell_command',
       decision: PolicyDecision.ALLOW,
       argsPattern: new RegExp(buildArgsPatterns(undefined, cmd)[0]!),
+      allowCommandSubstitution,
       priority: 10,
     }));
 
@@ -105,7 +110,7 @@ describe('PolicyEngine - Shell Safety Regression Suite', () => {
   });
 
   it('should block unauthorized command in nested substitution', async () => {
-    engine = setupEngine(['echo', 'cat']);
+    engine = setupEngine(['echo', 'cat'], { allowCommandSubstitution: true });
     const result = await engine.check(
       { name: 'run_shell_command', args: { command: 'echo $(cat $(ls))' } },
       undefined,
@@ -113,8 +118,19 @@ describe('PolicyEngine - Shell Safety Regression Suite', () => {
     expect(result.decision).toBe(PolicyDecision.ASK_USER);
   });
 
-  it('should allow authorized command in nested substitution', async () => {
+  it('should block command substitution if not explicitly allowed', async () => {
     engine = setupEngine(['echo', 'cat', 'ls']);
+    const result = await engine.check(
+      { name: 'run_shell_command', args: { command: 'echo $(cat $(ls))' } },
+      undefined,
+    );
+    expect(result.decision).toBe(PolicyDecision.ASK_USER);
+  });
+
+  it('should allow authorized command in nested substitution when allowCommandSubstitution is true', async () => {
+    engine = setupEngine(['echo', 'cat', 'ls'], {
+      allowCommandSubstitution: true,
+    });
     const result = await engine.check(
       { name: 'run_shell_command', args: { command: 'echo $(cat $(ls))' } },
       undefined,

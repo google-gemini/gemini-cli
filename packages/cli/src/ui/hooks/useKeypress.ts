@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   useKeypressContext,
   type KeypressHandler,
@@ -30,15 +30,21 @@ export function useKeypress(
   }: { isActive: boolean; priority?: KeypressPriority | boolean },
 ) {
   const { subscribe, unsubscribe } = useKeypressContext();
+  const onKeypressRef = useRef(onKeypress);
+
+  useEffect(() => {
+    onKeypressRef.current = onKeypress;
+  }, [onKeypress]);
 
   useEffect(() => {
     if (!isActive) {
       return;
     }
 
-    subscribe(onKeypress, priority);
+    const handler: KeypressHandler = (key) => onKeypressRef.current(key);
+    subscribe(handler, priority);
     return () => {
-      unsubscribe(onKeypress);
+      unsubscribe(handler);
     };
-  }, [isActive, onKeypress, subscribe, unsubscribe, priority]);
+  }, [isActive, subscribe, unsubscribe, priority]);
 }

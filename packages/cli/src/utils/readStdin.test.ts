@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { PassThrough } from 'node:stream';
 import { vi, describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { readStdin } from './readStdin.js';
 import { debugLogger } from '@google/gemini-cli-core';
@@ -14,19 +15,24 @@ vi.mock('@google/gemini-cli-core', () => ({
   },
 }));
 
-// Mock process.stdin
-const mockStdin = {
-  setEncoding: vi.fn(),
-  read: vi.fn(),
-  on: vi.fn(),
-  removeListener: vi.fn(),
-  destroy: vi.fn(),
-  listeners: vi.fn().mockReturnValue([]),
-  listenerCount: vi.fn().mockReturnValue(0),
-};
+interface MockStdin {
+  isTTY?: boolean;
+  destroyed?: boolean;
+  readableEnded?: boolean;
+  setEncoding: ReturnType<typeof vi.fn>;
+  read: ReturnType<typeof vi.fn>;
+  on: ReturnType<typeof vi.fn>;
+  removeListener: ReturnType<typeof vi.fn>;
+  unpipe: ReturnType<typeof vi.fn>;
+  pause: ReturnType<typeof vi.fn>;
+  destroy: ReturnType<typeof vi.fn>;
+  listeners: ReturnType<typeof vi.fn>;
+  listenerCount: ReturnType<typeof vi.fn>;
+}
 
 describe('readStdin', () => {
   let originalStdin: typeof process.stdin;
+  let mockStdin: MockStdin;
   let onReadableHandler: () => void;
   let onEndHandler: () => void;
   let onErrorHandler: (err: Error) => void;
@@ -34,6 +40,21 @@ describe('readStdin', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     originalStdin = process.stdin;
+
+    mockStdin = {
+      isTTY: false,
+      destroyed: false,
+      readableEnded: false,
+      setEncoding: vi.fn(),
+      read: vi.fn().mockReturnValue(null),
+      on: vi.fn(),
+      removeListener: vi.fn(),
+      unpipe: vi.fn(),
+      pause: vi.fn(),
+      destroy: vi.fn(),
+      listeners: vi.fn().mockReturnValue([]),
+      listenerCount: vi.fn().mockReturnValue(0),
+    };
 
     // Replace process.stdin with our mock
     Object.defineProperty(process, 'stdin', {
@@ -50,11 +71,10 @@ describe('readStdin', () => {
         if (event === 'error') onErrorHandler = handler as (err: Error) => void;
       },
     );
-    mockStdin.listeners.mockReturnValue([]);
-    mockStdin.listenerCount.mockReturnValue(0);
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     Object.defineProperty(process, 'stdin', {
       value: originalStdin,
@@ -80,6 +100,19 @@ describe('readStdin', () => {
     await expect(promise).resolves.toBe('I love Gemini!');
   });
 
+  it('should handle Buffer chunks from stdin', async () => {
+    mockStdin.read
+      .mockReturnValueOnce(Buffer.from('Hello ', 'utf8'))
+      .mockReturnValueOnce(Buffer.from('world!', 'utf8'))
+      .mockReturnValueOnce(null);
+
+    const promise = readStdin();
+    onReadableHandler();
+    onEndHandler();
+
+    await expect(promise).resolves.toBe('Hello world!');
+  });
+
   it('should handle empty stdin input', async () => {
     mockStdin.read.mockReturnValue(null);
 
@@ -91,53 +124,176 @@ describe('readStdin', () => {
     await expect(promise).resolves.toBe('');
   });
 
-  // Emulate terminals where stdin is not TTY (eg: git bash)
-  it('should timeout and resolve with empty string when no input is available', async () => {
+  it('should immediately resolve with empty string when stdin is a TTY', async () => {
+    mockStdin.isTTY = true;
+
+    await expect(readStdin()).resolves.toBe('');
+    expect(mockStdin.setEncoding).not.toHaveBeenCalled();
+    expect(mockStdin.on).not.toHaveBeenCalled();
+  });
+
+  it('should immediately resolve with empty string when stdin is already ended or destroyed', async () => {
+    mockStdin.readableEnded = true;
+    await expect(readStdin()).resolves.toBe('');
+
+    mockStdin.readableEnded = false;
+    mockStdin.destroyed = true;
+    await expect(readStdin()).resolves.toBe('');
+
+    expect(mockStdin.on).not.toHaveBeenCalled();
+  });
+
+  it('should wait for slow piped input arriving after 500ms instead of resolving empty', async () => {
+    vi.useFakeTimers();
+
+    let settled = false;
+    const promise = readStdin().then((value) => {
+      settled = true;
+      return value;
+    });
+
+    // Advance past the former 500ms cutoff (e.g. `sleep 0.8` pipe)
+    await vi.advanceTimersByTimeAsync(800);
+    expect(settled).toBe(false);
+
+    mockStdin.read
+      .mockReturnValueOnce('delayed ')
+      .mockReturnValueOnce('context')
+      .mockReturnValueOnce(null);
+
+    onReadableHandler();
+    onEndHandler();
+
+    await expect(promise).resolves.toBe('delayed context');
+    expect(debugLogger.warn).not.toHaveBeenCalled();
+  });
+
+  it('should accumulate slow multi-chunk piped input even when total duration exceeds 1000ms', async () => {
     vi.useFakeTimers();
 
     const promise = readStdin();
 
-    // Fast-forward past the timeout (to run test faster)
-    vi.advanceTimersByTime(500);
-
-    await expect(promise).resolves.toBe('');
-
-    vi.useRealTimers();
-  });
-
-  it('should clear timeout once when data is received and resolve with data', async () => {
-    const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
-    mockStdin.read
-      .mockReturnValueOnce('chunk1')
-      .mockReturnValueOnce('chunk2')
-      .mockReturnValueOnce(null);
-
-    const promise = readStdin();
-
-    // Trigger readable event
+    await vi.advanceTimersByTimeAsync(800);
+    mockStdin.read.mockReturnValueOnce('chunk1-').mockReturnValueOnce(null);
     onReadableHandler();
 
-    expect(clearTimeoutSpy).toHaveBeenCalledOnce();
+    // Once the first chunk arrives, the initial 1000ms timer is cleared
+    await vi.advanceTimersByTimeAsync(5000);
+    mockStdin.read.mockReturnValueOnce('chunk2').mockReturnValueOnce(null);
+    onReadableHandler();
 
-    // Trigger end to resolve
     onEndHandler();
 
-    await expect(promise).resolves.toBe('chunk1chunk2');
+    await expect(promise).resolves.toBe('chunk1-chunk2');
   });
 
-  it('should truncate input if it exceeds MAX_STDIN_SIZE', async () => {
+  it('should timeout and resolve with empty string if no input arrives within 1000ms in non-TTY environments', async () => {
+    vi.useFakeTimers();
+
+    let settled = false;
+    const promise = readStdin().then((value) => {
+      settled = true;
+      return value;
+    });
+    const initialErrorHandler = onErrorHandler;
+
+    await vi.advanceTimersByTimeAsync(999);
+    expect(settled).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(promise).resolves.toBe('');
+    expect(mockStdin.removeListener).toHaveBeenCalledWith(
+      'readable',
+      onReadableHandler,
+    );
+    expect(mockStdin.removeListener).toHaveBeenCalledWith('end', onEndHandler);
+    expect(mockStdin.removeListener).toHaveBeenCalledWith(
+      'error',
+      initialErrorHandler,
+    );
+    expect(mockStdin.destroy).not.toHaveBeenCalled();
+  });
+
+  it('should truncate oversize multi-byte Buffer chunks without splitting UTF-8 characters', async () => {
+    const MAX_STDIN_SIZE = 8 * 1024 * 1024;
+    const charCount = Math.floor(MAX_STDIN_SIZE / 3) + 5;
+    const multiByteBuf = Buffer.from('한'.repeat(charCount), 'utf8');
+
+    mockStdin.read.mockReturnValueOnce(multiByteBuf).mockReturnValueOnce(null);
+
+    const promise = readStdin();
+    onReadableHandler();
+
+    const result = await promise;
+    const resultBytes = Buffer.byteLength(result, 'utf8');
+    expect(resultBytes).toBe(Math.floor(MAX_STDIN_SIZE / 3) * 3);
+    expect(result).not.toContain('\uFFFD');
+    expect(mockStdin.destroy).not.toHaveBeenCalled();
+  });
+
+  it('should truncate input if it exceeds MAX_STDIN_SIZE and pause+unpipe without destroying stdin', async () => {
+    vi.useFakeTimers();
     const MAX_STDIN_SIZE = 8 * 1024 * 1024;
     const largeChunk = 'a'.repeat(MAX_STDIN_SIZE + 100);
     mockStdin.read.mockReturnValueOnce(largeChunk).mockReturnValueOnce(null);
 
     const promise = readStdin();
+    await vi.advanceTimersByTimeAsync(800);
     onReadableHandler();
 
     await expect(promise).resolves.toBe('a'.repeat(MAX_STDIN_SIZE));
     expect(debugLogger.warn).toHaveBeenCalledWith(
       `Warning: stdin input truncated to ${MAX_STDIN_SIZE} bytes.`,
     );
-    expect(mockStdin.destroy).toHaveBeenCalled();
+    expect(mockStdin.unpipe).toHaveBeenCalledOnce();
+    expect(mockStdin.pause).toHaveBeenCalledOnce();
+    expect(mockStdin.destroy).not.toHaveBeenCalled();
+  });
+
+  it('should truncate cleanly when exact MAX_STDIN_SIZE is followed by another chunk', async () => {
+    const MAX_STDIN_SIZE = 8 * 1024 * 1024;
+    mockStdin.read
+      .mockReturnValueOnce('b'.repeat(MAX_STDIN_SIZE))
+      .mockReturnValueOnce('extra')
+      .mockReturnValueOnce(null);
+
+    const promise = readStdin();
+    onReadableHandler();
+
+    await expect(promise).resolves.toBe('b'.repeat(MAX_STDIN_SIZE));
+    expect(debugLogger.warn).toHaveBeenCalledWith(
+      `Warning: stdin input truncated to ${MAX_STDIN_SIZE} bytes.`,
+    );
+    expect(mockStdin.unpipe).toHaveBeenCalledOnce();
+    expect(mockStdin.pause).toHaveBeenCalledOnce();
+    expect(mockStdin.destroy).not.toHaveBeenCalled();
+  });
+
+  it('should preserve process.stdin for reuse after oversize truncation on a real stream', async () => {
+    const MAX_STDIN_SIZE = 8 * 1024 * 1024;
+    const realStream = new PassThrough() as PassThrough & { isTTY?: boolean };
+    realStream.isTTY = false;
+
+    Object.defineProperty(process, 'stdin', {
+      value: realStream,
+      writable: true,
+      configurable: true,
+    });
+
+    const firstPromise = readStdin();
+    realStream.write('x'.repeat(MAX_STDIN_SIZE + 1024));
+
+    const firstResult = await firstPromise;
+    expect(firstResult.length).toBe(MAX_STDIN_SIZE);
+    expect(realStream.destroyed).toBe(false);
+    expect(realStream.isPaused()).toBe(true);
+
+    // Reuse the same process.stdin stream for subsequent reads
+    const secondPromise = readStdin();
+    realStream.write('follow-up input');
+    realStream.end();
+
+    await expect(secondPromise).resolves.toBe('follow-up input');
   });
 
   it('should truncate multi-byte characters at byte boundary', async () => {

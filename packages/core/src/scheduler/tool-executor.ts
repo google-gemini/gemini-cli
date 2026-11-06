@@ -119,7 +119,12 @@ export class ToolExecutor {
             signal,
             tool,
             liveOutputCallback,
-            { shellExecutionConfig, setExecutionIdCallback },
+            {
+              shellExecutionConfig,
+              setExecutionIdCallback,
+              isClientInitiated: request.isClientInitiated,
+              isUserConfirmed: request.isUserConfirmed ?? false,
+            },
             this.config,
             request.originalRequestName,
             true, // skipBeforeHook

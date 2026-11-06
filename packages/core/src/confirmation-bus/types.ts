@@ -154,6 +154,7 @@ export interface UpdatePolicy {
   commandPrefix?: string | string[];
   mcpName?: string;
   allowRedirection?: boolean;
+  allowCommandSubstitution?: boolean;
   modes?: ApprovalMode[];
 }
 

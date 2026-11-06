@@ -312,4 +312,48 @@ describe('applySubstitutions', () => {
     );
     expect(result).toBe('A plain prompt with no variables.');
   });
+
+  it('should preserve $ replacement patterns literally in ${AgentSkills}', () => {
+    const dollarSkills =
+      "Skill costs $$5, matches $&, prefix $`, suffix $', group $1";
+    const result = applySubstitutions(
+      'Prefix ${AgentSkills} Suffix',
+      mockConfig,
+      dollarSkills,
+    );
+    expect(result).toBe(`Prefix ${dollarSkills} Suffix`);
+  });
+
+  it('should preserve $ replacement patterns literally in ${SubAgents}', async () => {
+    const snippets = await import('./snippets.js');
+    const dollarSubAgents =
+      "Agent costs $$5, matches $&, prefix $`, suffix $', group $1";
+    vi.mocked(snippets.renderSubAgents).mockReturnValueOnce(dollarSubAgents);
+
+    const result = applySubstitutions(
+      'Prefix ${SubAgents} Suffix',
+      mockConfig,
+      '',
+      true,
+    );
+    expect(result).toBe(`Prefix ${dollarSubAgents} Suffix`);
+  });
+
+  it('should preserve $ replacement patterns literally in ${AvailableTools} and tool-specific variables', () => {
+    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry = {
+      getAllToolNames: vi
+        .fn()
+        .mockReturnValue(['dollar_$$_tool', 'match_$&_tool', "quote_$'_tool"]),
+      getAllTools: vi.fn().mockReturnValue([]),
+    } as unknown as ToolRegistry;
+
+    const result = applySubstitutions(
+      'Tools:\n${AvailableTools}\nSpecific: ${dollar_$$_tool_ToolName} and ${match_$&_tool_ToolName}\nEnd',
+      mockConfig,
+      '',
+    );
+    expect(result).toBe(
+      "Tools:\n- dollar_$$_tool\n- match_$&_tool\n- quote_$'_tool\nSpecific: dollar_$$_tool and match_$&_tool\nEnd",
+    );
+  });
 });
