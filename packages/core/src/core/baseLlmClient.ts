@@ -397,6 +397,7 @@ export class BaseLlmClient {
             error: errorType,
             model: modelName,
             status: getErrorStatus(error),
+            sessionId: this.config.getSessionId?.(),
           });
 
           logNetworkRetryAttempt(

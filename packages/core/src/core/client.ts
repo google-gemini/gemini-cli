@@ -1234,6 +1234,7 @@ export class GeminiClient {
             error: error instanceof Error ? error.message : String(error),
             model: getDisplayString(currentAttemptModel),
             status: getErrorStatus(error),
+            sessionId: this.config.getSessionId?.(),
           });
         },
       });

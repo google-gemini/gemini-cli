@@ -11,6 +11,7 @@ import {
   coreEvents,
   CoreEvent,
   type ApprovalModeChangedPayload,
+  type RetryAttemptPayload,
   logToolCall,
   convertToFunctionResponse,
   ToolConfirmationOutcome,
@@ -84,6 +85,7 @@ export class Session {
       CoreEvent.ApprovalModeChanged,
       this.handleApprovalModeChanged,
     );
+    coreEvents.on(CoreEvent.RetryAttempt, this.handleRetryAttempt);
 
     // Subscribe to tool confirmation requests to handle policy checks (e.g. auto-allowing safe shell commands)
     this.context.config
@@ -188,11 +190,27 @@ export class Session {
     }
   };
 
+  private handleRetryAttempt = (payload: RetryAttemptPayload) => {
+    if (payload.sessionId === this.id) {
+      const delaySec = Math.max(1, Math.round(payload.delayMs / 1000));
+      this.sendUpdate({
+        sessionUpdate: 'agent_thought_chunk',
+        content: {
+          type: 'text',
+          text: `[Retry ${payload.attempt}/${payload.maxAttempts}] ${payload.error || 'Request failed'}. Retrying in ${delaySec}s...`,
+        },
+      }).catch((err) => {
+        debugLogger.error(`Failed to send retry session update: ${err}`);
+      });
+    }
+  };
+
   async dispose(): Promise<void> {
     coreEvents.off(
       CoreEvent.ApprovalModeChanged,
       this.handleApprovalModeChanged,
     );
+    coreEvents.off(CoreEvent.RetryAttempt, this.handleRetryAttempt);
     this.disposeController.abort();
     if (this.context.config?.dispose) {
       try {

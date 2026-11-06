@@ -377,13 +377,23 @@ export async function retryWithBackoff<T>(
       ) {
         // Fall back to automatic retry for capacity exhaustion in unattended/non-interactive mode,
         // or allow up to 3 silent retries in interactive mode before prompting the fallback dialog.
+        const hasShortDelay =
+          classifiedError instanceof TerminalQuotaError &&
+          classifiedError.retryDelayMs !== undefined &&
+          classifiedError.retryDelayMs <= maxDelayMs;
+
         const isCapacityExceeded =
           classifiedError instanceof TerminalQuotaError &&
-          (classifiedError.reason === 'MODEL_CAPACITY_EXHAUSTED' ||
-            classifiedError.reason === 'MODEL_CAPACITY_EXCEEDED' ||
-            /exhausted your capacity|capacity exceeded|MODEL_CAPACITY_EXHAUSTED/i.test(
-              classifiedError.message,
-            ));
+          (classifiedError.reason === 'QUOTA_EXHAUSTED' ||
+          /quota will reset after/i.test(classifiedError.message)
+            ? hasShortDelay
+            : (classifiedError.reason === 'MODEL_CAPACITY_EXHAUSTED' ||
+                classifiedError.reason === 'MODEL_CAPACITY_EXCEEDED' ||
+                /capacity exceeded|MODEL_CAPACITY_EXHAUSTED|exhausted your capacity/i.test(
+                  classifiedError.message,
+                )) &&
+              (classifiedError.retryDelayMs === undefined ||
+                classifiedError.retryDelayMs <= maxDelayMs));
 
         let useSilentRetry = false;
         let silentDelayMs: number | undefined;
@@ -394,19 +404,30 @@ export async function retryWithBackoff<T>(
         ) {
           if (!onPersistent429) {
             // Unattended mode: always retry up to standard maxAttempts
-            useSilentRetry = true;
-            silentDelayMs = classifiedError.retryDelayMs;
+            if (
+              classifiedError.retryDelayMs === undefined ||
+              classifiedError.retryDelayMs <= maxDelayMs
+            ) {
+              useSilentRetry = true;
+              silentDelayMs = classifiedError.retryDelayMs;
+            }
           } else {
             // Interactive mode: allow up to 3 silent retries with progressive backoff before calling fallback handler
             capacityAttempts++;
             if (capacityAttempts < MAX_SILENT_CAPACITY_ATTEMPTS) {
-              useSilentRetry = true;
-              silentDelayMs =
-                classifiedError.retryDelayMs !== undefined
-                  ? classifiedError.retryDelayMs
-                  : capacityAttempts === 1
-                    ? 1000
-                    : 3000; // 1s on attempt 1, 3s on attempt 2
+              if (
+                classifiedError.retryDelayMs === undefined ||
+                classifiedError.retryDelayMs <= maxDelayMs
+              ) {
+                useSilentRetry = true;
+                silentDelayMs =
+                  classifiedError.retryDelayMs !== undefined
+                    ? classifiedError.retryDelayMs
+                    : Math.min(
+                        maxDelayMs,
+                        capacityAttempts === 1 ? 1000 : 3000,
+                      ); // 1s on attempt 1, 3s on attempt 2 (capped by maxDelayMs)
+              }
             }
           }
         }
@@ -505,10 +526,13 @@ export async function retryWithBackoff<T>(
           classifiedError instanceof RetryableQuotaError &&
           classifiedError.retryDelayMs !== undefined
         ) {
+          if (classifiedError.retryDelayMs > maxDelayMs) {
+            throw enrichQuotaError(classifiedError, authType);
+          }
           currentDelay = Math.max(currentDelay, classifiedError.retryDelayMs);
           // Positive jitter up to +20% while respecting server minimum delay
           const jitter = currentDelay * 0.2 * Math.random();
-          const delayWithJitter = currentDelay + jitter;
+          const delayWithJitter = Math.min(maxDelayMs, currentDelay + jitter);
           debugLogger.warn(
             `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${Math.round(delayWithJitter)}ms...`,
           );
