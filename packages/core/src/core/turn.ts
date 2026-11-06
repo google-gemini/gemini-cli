@@ -250,10 +250,12 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiAgentExecutionStoppedEvent
   | ServerGeminiAgentExecutionBlockedEvent;
 
+// Shared by all turns: a new Turn is created for every model request, so a
+// per-turn counter would let two turns in the same millisecond reuse a call ID.
+let syntheticCallIdCounter = 0;
+
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
-  private callCounter = 0;
-
   readonly pendingToolCalls: ToolCallRequestInfo[] = [];
   private debugResponses: GenerateContentResponse[] = [];
   private pendingCitations = new Set<string>();
@@ -474,8 +476,8 @@ export class Turn {
     const rawCallId =
       fnCall.id ??
       (this.chat.context.config.isContextManagementEnabled()
-        ? `synth_${this.prompt_id}_${Date.now()}_${this.callCounter++}`
-        : `${name}_${Date.now()}_${this.callCounter++}`);
+        ? `synth_${this.prompt_id}_${Date.now()}_${syntheticCallIdCounter++}`
+        : `${name}_${Date.now()}_${syntheticCallIdCounter++}`);
 
     const callId = rawCallId.startsWith(`${name}__`)
       ? rawCallId

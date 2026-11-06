@@ -54,6 +54,7 @@ import { CoreToolCallStatus } from '../scheduler/types.js';
 import type { Part } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { getProjectHash } from '../utils/paths.js';
+import { convertSessionToClientHistory } from '../utils/sessionUtils.js';
 import type { HistoryTurn } from '../core/agentChatHistory.js';
 
 vi.mock('../utils/paths.js');
@@ -1786,6 +1787,133 @@ describe('ChatRecordingService', () => {
       expect(result).toHaveLength(2);
       expect(result[0].text).toBe('Prefix metadata or text');
       expect(result[1].functionResponse!.id).toBe(callId);
+    });
+
+    const readFileResponse = (id: string, output: string): Part => ({
+      functionResponse: { id, name: 'read_file', response: { output } },
+    });
+
+    it("should store only each call's own parts when parallel calls share a response turn", async () => {
+      const modelMsgId = chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: '',
+        model: 'gemini-pro',
+      });
+      const image: Part = {
+        inlineData: { mimeType: 'image/png', data: 'base64...' },
+      };
+      chatRecordingService.recordToolCalls('gemini-pro', [
+        {
+          id: 'call-a',
+          name: 'read_file',
+          args: {},
+          result: [readFileResponse('call-a', 'a'), image],
+          status: CoreToolCallStatus.Success,
+          timestamp: new Date().toISOString(),
+        },
+        {
+          id: 'call-b',
+          name: 'read_file',
+          args: {},
+          result: [readFileResponse('call-b', 'b')],
+          status: CoreToolCallStatus.Success,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+
+      // Both responses are masked in the shared user turn.
+      chatRecordingService.updateMessagesFromHistory([
+        { id: modelMsgId, content: { role: 'model', parts: [] } },
+        {
+          id: 'user-id',
+          content: {
+            role: 'user',
+            parts: [
+              readFileResponse('call-a', '<masked a>'),
+              image,
+              readFileResponse('call-b', '<masked b>'),
+            ],
+          },
+        },
+      ]);
+
+      const conversation = (await loadConversationRecord(
+        chatRecordingService.getConversationFilePath()!,
+      )) as ConversationRecord;
+      const geminiMsg = conversation.messages[0] as MessageRecord & {
+        type: 'gemini';
+      };
+      expect(geminiMsg.toolCalls!.map((tc) => tc.result)).toEqual([
+        [readFileResponse('call-a', '<masked a>'), image],
+        [readFileResponse('call-b', '<masked b>')],
+      ]);
+    });
+
+    it('should repair sibling results stored on parallel calls and send each response once after resume', async () => {
+      // Earlier versions stored the whole response turn on each parallel call.
+      const responseParts = [
+        readFileResponse('call-a', 'a'),
+        readFileResponse('call-b', 'b'),
+      ];
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'read both files',
+        model: 'gemini-pro',
+      });
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: '',
+        model: 'gemini-pro',
+      });
+      chatRecordingService.recordToolCalls(
+        'gemini-pro',
+        ['call-a', 'call-b'].map((id) => ({
+          id,
+          name: 'read_file',
+          args: {},
+          result: responseParts,
+          status: CoreToolCallStatus.Success,
+          timestamp: new Date().toISOString(),
+        })),
+      );
+      chatRecordingService.recordSyntheticMessage('user', responseParts);
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'done',
+        model: 'gemini-pro',
+      });
+
+      // Resume twice, syncing the rebuilt history like GeminiChat.initialize.
+      const filePath = chatRecordingService.getConversationFilePath()!;
+      for (let i = 0; i < 2; i++) {
+        const conversation = (await loadConversationRecord(
+          filePath,
+        )) as ConversationRecord;
+        const resumed = new ChatRecordingService(mockConfig);
+        await resumed.initialize({ conversation, filePath });
+        resumed.updateMessagesFromHistory(
+          convertSessionToClientHistory(conversation.messages),
+        );
+      }
+
+      const conversation = (await loadConversationRecord(
+        filePath,
+      )) as ConversationRecord;
+      const toolCallMsg = conversation.messages.find(
+        (m) => m.type === 'gemini' && m.toolCalls,
+      ) as MessageRecord & { type: 'gemini' };
+      expect(toolCallMsg.toolCalls!.map((tc) => tc.result)).toEqual([
+        [responseParts[0]],
+        [responseParts[1]],
+      ]);
+      const sentResponseIds = convertSessionToClientHistory(
+        conversation.messages,
+      ).flatMap((turn) =>
+        (turn.content.parts ?? []).flatMap(
+          (part) => part.functionResponse?.id ?? [],
+        ),
+      );
+      expect(sentResponseIds).toEqual(['call-a', 'call-b']);
     });
 
     it('should not write to disk when no tool calls match', async () => {
