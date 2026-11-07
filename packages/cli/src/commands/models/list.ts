@@ -9,6 +9,7 @@ import {
   type Config,
   tokenLimit,
   DEFAULT_TOKEN_LIMIT,
+  getAuthTypeFromEnv,
 } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
@@ -115,6 +116,12 @@ export async function handleList(
   initializeOutputListenersAndFlush(config);
 
   await config.storage.initialize();
+
+  const authType =
+    settings.merged.security?.auth?.selectedType ?? getAuthTypeFromEnv();
+  if (authType && !settings.merged.security?.auth?.useExternal) {
+    await config.refreshAuth(authType);
+  }
 
   const models = getModelListings(config, settings);
 
