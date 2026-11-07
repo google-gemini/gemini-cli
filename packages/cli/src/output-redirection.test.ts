@@ -53,6 +53,53 @@ describe('Output Redirection', () => {
     expect(writeToStdout).not.toHaveBeenCalled();
   });
 
+  it('should redirect buffered stdout to stderr when ACP mode is enabled', () => {
+    const mockConfig = {
+      getOutputFormat: () => 'text',
+      getAcpMode: () => true,
+    } as unknown as Config;
+
+    // Simulate buffered output
+    coreEvents.emitOutput(false, 'informational message');
+    coreEvents.emitOutput(true, 'error message');
+
+    // Initialize listeners and flush
+    initializeOutputListenersAndFlush(mockConfig);
+
+    // Verify informational message was forced to stderr
+    expect(writeToStderr).toHaveBeenCalledWith(
+      'informational message',
+      undefined,
+    );
+    expect(writeToStderr).toHaveBeenCalledWith('error message', undefined);
+    expect(writeToStdout).not.toHaveBeenCalled();
+  });
+
+  it('should redirect subsequent stdout writes to stderr when ACP mode is enabled', () => {
+    const mockConfig = {
+      getOutputFormat: () => 'text',
+      getAcpMode: () => true,
+    } as unknown as Config;
+
+    // Initialize listeners
+    initializeOutputListenersAndFlush(mockConfig);
+
+    // Emit output while running
+    coreEvents.emitOutput(false, 'runtime stdout message');
+    coreEvents.emitOutput(true, 'runtime stderr message');
+
+    // Verify both went to stderr
+    expect(writeToStderr).toHaveBeenCalledWith(
+      'runtime stdout message',
+      undefined,
+    );
+    expect(writeToStderr).toHaveBeenCalledWith(
+      'runtime stderr message',
+      undefined,
+    );
+    expect(writeToStdout).not.toHaveBeenCalled();
+  });
+
   it('should NOT redirect buffered stdout to stderr when output format is NOT json', () => {
     const mockConfig = {
       getOutputFormat: () => 'text',
