@@ -162,8 +162,8 @@ export function toPermissionOptions(
         break;
       case 'exec':
         if (
-          confirmation.untrustedFlags?.length ||
-          confirmation.modifiedBuildFiles?.length
+          (confirmation.untrustedFlags?.length ?? 0) > 0 ||
+          (confirmation.modifiedBuildFiles?.length ?? 0) > 0
         ) {
           break;
         }

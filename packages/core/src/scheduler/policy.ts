@@ -223,8 +223,8 @@ async function handleStandardPolicyUpdate(
     // the untrusted flags and reset the modified build files.
     if (
       confirmationDetails?.type === 'exec' &&
-      (confirmationDetails.untrustedFlags?.length ||
-        confirmationDetails.modifiedBuildFiles?.length)
+      ((confirmationDetails.untrustedFlags?.length ?? 0) > 0 ||
+        (confirmationDetails.modifiedBuildFiles?.length ?? 0) > 0)
     ) {
       return;
     }
