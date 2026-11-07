@@ -103,6 +103,16 @@ describe('GitIgnoreParser', () => {
         parser.isIgnored('ignored-at-root/should-not-work.txt', false),
       ).toBe(true);
     });
+
+    it('should apply nested negations under a parent dir/** pattern', async () => {
+      await createTestFile('.gitignore', 'logs/**');
+      await createTestFile('logs/.gitignore', '!keep.txt');
+
+      expect(parser.isIgnored('logs', true)).toBe(false);
+      expect(parser.isIgnored('logs/keep.txt', false)).toBe(false);
+      expect(parser.isIgnored('logs/drop.txt', false)).toBe(true);
+      expect(parser.isIgnored('logs/sub/keep.txt', false)).toBe(true);
+    });
   });
 
   describe('Advanced Pattern Matching', () => {

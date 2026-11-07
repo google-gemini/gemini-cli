@@ -255,6 +255,16 @@ describe('ignorePathUtils', () => {
       ]);
     });
 
+    it('should not expand directories whose nested ignore file has negations', () => {
+      expect(
+        expandWildcardDirectoryPatterns(
+          ['logs/**', 'dist/**'],
+          undefined,
+          (dir) => dir === 'logs',
+        ),
+      ).toEqual(['logs/**', 'dist/**', '/dist/']);
+    });
+
     it('should not expand root wildcard pattern (/**)', () => {
       expect(expandWildcardDirectoryPatterns(['/**'])).toEqual(['/**']);
     });
