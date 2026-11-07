@@ -495,29 +495,42 @@ export class CodeAssistServer implements ContentGenerator {
       });
 
       let bufferedLines: string[] = [];
+
+      const parseChunk: (text: string) => T = JSON.parse;
+
+      function* flushBuffer(): Generator<T> {
+        if (bufferedLines.length === 0) {
+          return;
+        }
+        const chunk = bufferedLines.join('\n');
+        bufferedLines = []; // Reset the buffer before yielding
+        let parsed: T;
+        try {
+          parsed = parseChunk(chunk);
+        } catch {
+          if (server.config) {
+            logInvalidChunk(
+              server.config,
+              // Don't include the chunk content in the log for security/privacy reasons.
+              new InvalidChunkEvent('Malformed JSON chunk'),
+            );
+          }
+          return;
+        }
+        yield parsed;
+      }
+
       for await (const line of rl) {
         if (line.startsWith('data: ')) {
           bufferedLines.push(line.slice(6).trim());
         } else if (line === '') {
-          if (bufferedLines.length === 0) {
-            continue; // no data to yield
-          }
-          const chunk = bufferedLines.join('\n');
-          try {
-            yield JSON.parse(chunk);
-          } catch {
-            if (server.config) {
-              logInvalidChunk(
-                server.config,
-                // Don't include the chunk content in the log for security/privacy reasons.
-                new InvalidChunkEvent('Malformed JSON chunk'),
-              );
-            }
-          }
-          bufferedLines = []; // Reset the buffer after yielding
+          yield* flushBuffer();
         }
         // Ignore other lines like comments or id fields
       }
+
+      // Flush any remaining buffered event if the stream ended without a trailing blank line.
+      yield* flushBuffer();
     })(this);
   }
 

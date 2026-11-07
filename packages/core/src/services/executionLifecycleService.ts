@@ -507,15 +507,21 @@ export class ExecutionLifecycleService {
     this.settleExecution(executionId, result);
   }
 
-  static background(executionId: number): void {
+  /**
+   * Transitions an active execution to the background and resolves its initial result.
+   *
+   * @param executionId The ID of the execution to move to the background.
+   * @returns true if the execution was active and successfully transitioned to the background; false otherwise.
+   */
+  static background(executionId: number): boolean {
     const resolve = this.activeResolvers.get(executionId);
     if (!resolve) {
-      return;
+      return false;
     }
 
     const execution = this.activeExecutions.get(executionId);
     if (!execution) {
-      return;
+      return false;
     }
 
     const output = execution.getBackgroundOutput?.() ?? execution.output;
@@ -549,6 +555,7 @@ export class ExecutionLifecycleService {
     for (const listener of this.backgroundStartListeners) {
       listener(info);
     }
+    return true;
   }
 
   static subscribe(

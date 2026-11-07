@@ -94,6 +94,11 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         ...(args as Parameters<typeof process.stdout.write>),
       ),
     ),
+    writeToStderr: vi.fn((...args) =>
+      process.stderr.write(
+        ...(args as Parameters<typeof process.stderr.write>),
+      ),
+    ),
     patchStdio: vi.fn(() => () => {}),
     createWorkingStdio: vi.fn(() => ({
       stdout: {
@@ -1244,6 +1249,11 @@ describe('gemini.tsx main function exit codes', () => {
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 
     originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
   });
 
   afterEach(() => {
@@ -1252,8 +1262,12 @@ describe('gemini.tsx main function exit codes', () => {
     } else {
       delete process.env['GEMINI_CLI_NO_RELAUNCH'];
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (process.stdin as any).isTTY = originalIsTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalIsTTY,
+      configurable: true,
+      writable: true,
+    });
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -1351,6 +1365,95 @@ describe('gemini.tsx main function exit codes', () => {
       expect(e).toBeInstanceOf(MockProcessExitError);
       expect((e as MockProcessExitError).code).toBe(41);
     }
+  });
+
+  it('does not dump raw GaxiosError via debugLogger.error during pre-sandbox auth failure', async () => {
+    const gaxiosError = Object.assign(
+      new Error('Request failed with status code 403'),
+      {
+        config: {
+          headers: { Authorization: 'Bearer secret-token' },
+          errorRedactor: () => ({}),
+          retryConfig: { retry: 3 },
+        },
+        response: {
+          status: 403,
+          data: {
+            error: {
+              code: 403,
+              message: 'Permission denied on project test-invalid-project.',
+              status: 'PERMISSION_DENIED',
+            },
+          },
+        },
+      },
+    );
+
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+
+    // 1. Sandbox setup failure: emits clean single-line stderr message and exits 41
+    vi.stubEnv('SANDBOX', '');
+    vi.mocked(loadSandboxConfig).mockResolvedValue(
+      createMockSandboxConfig({
+        command: 'docker',
+        image: 'test-image',
+      }),
+    );
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        refreshAuth: vi.fn().mockRejectedValue(gaxiosError),
+        getRemoteAdminSettings: vi.fn().mockReturnValue(undefined),
+        isInteractive: vi.fn().mockReturnValue(false),
+      }),
+    );
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          security: { auth: { selectedType: 'google', useExternal: false } },
+        },
+      }),
+    );
+    vi.mocked(parseArguments).mockResolvedValue({} as CliArgs);
+
+    await expect(main()).rejects.toMatchObject({
+      name: 'MockProcessExitError',
+      code: 41,
+    });
+    expect(debugErrorSpy).not.toHaveBeenCalledWith(
+      'Error authenticating:',
+      expect.anything(),
+    );
+    expect(process.stderr.write).toHaveBeenCalledWith(
+      'Error: Permission denied on project test-invalid-project. (Status: 403)\n',
+    );
+
+    // 2. Non-sandbox headless failure: rejects cleanly for top-level formatter without intermediate dump
+    debugErrorSpy.mockClear();
+    vi.mocked(process.stderr.write).mockClear();
+    vi.mocked(loadSandboxConfig).mockResolvedValue(undefined);
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        refreshAuth: vi.fn().mockRejectedValue(gaxiosError),
+        getRemoteAdminSettings: vi.fn().mockReturnValue(undefined),
+        isInteractive: vi.fn().mockReturnValue(false),
+        getQuestion: vi.fn().mockReturnValue('ping'),
+        getSandbox: vi.fn().mockReturnValue(undefined),
+      }),
+    );
+
+    await expect(main()).rejects.toBe(gaxiosError);
+    expect(debugErrorSpy).not.toHaveBeenCalledWith(
+      'Error authenticating:',
+      expect.anything(),
+    );
+    const stderrOutput = vi
+      .mocked(process.stderr.write)
+      .mock.calls.map(([chunk]) => String(chunk))
+      .join('');
+    expect(stderrOutput).not.toContain('errorRedactor');
+    expect(stderrOutput).not.toContain('retryConfig');
   });
 
   it('should exit with 42 for session resume failure', async () => {
@@ -1518,8 +1621,16 @@ describe('project hooks loading based on trust', () => {
   let loadCliConfig: Mock;
   let loadSettings: Mock;
   let parseArguments: Mock;
+  let originalIsTTY: boolean | undefined;
 
   beforeEach(async () => {
+    originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
+
     // Dynamically import and get the mocked functions
     const configModule = await import('./config/config.js');
     loadCliConfig = vi.mocked(configModule.loadCliConfig);
@@ -1553,6 +1664,11 @@ describe('project hooks loading based on trust', () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalIsTTY,
+      configurable: true,
+      writable: true,
+    });
     vi.restoreAllMocks();
   });
 

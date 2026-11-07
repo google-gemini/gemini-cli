@@ -22,6 +22,8 @@ import {
   FatalConfigError,
   FatalTurnLimitedError,
   FatalToolExecutionError,
+  normalizeError,
+  safeSerializeErrorValue,
 } from './errors.js';
 
 describe('getErrorMessage', () => {
@@ -527,5 +529,187 @@ describe('getErrorType', () => {
       }
     }
     expect(getErrorType(new _AbortError2('test'))).toBe('AbortError');
+  });
+});
+
+describe('normalizeError', () => {
+  it('handles null and undefined payloads defensively', () => {
+    expect(normalizeError(null)).toEqual({
+      message: 'Unknown error occurred (empty payload)',
+      originalError: null,
+    });
+    expect(normalizeError(undefined)).toEqual({
+      message: 'Unknown error occurred (empty payload)',
+      originalError: undefined,
+    });
+  });
+
+  it('handles primitive string, number, and boolean throws', () => {
+    expect(normalizeError('Out of memory')).toEqual({
+      message: 'Out of memory',
+      originalError: 'Out of memory',
+    });
+    expect(normalizeError(503)).toEqual({
+      message: '503',
+      originalError: 503,
+    });
+    expect(normalizeError(false)).toEqual({
+      message: 'false',
+      originalError: false,
+    });
+    expect(normalizeError('')).toEqual({
+      message: 'Unknown error occurred (empty payload)',
+      originalError: '',
+    });
+  });
+
+  it('normalizes StructuredError plain objects with numeric status', () => {
+    const structured = { message: 'Model not found', status: 404 };
+    expect(normalizeError(structured)).toEqual({
+      message: 'Model not found',
+      status: 404,
+      code: undefined,
+      details: undefined,
+      originalError: structured,
+    });
+  });
+
+  it('extracts clean message, status, code, and details from Gaxios / Google Cloud API errors', () => {
+    const gaxiosError = Object.assign(
+      new Error('Request failed with status code 403'),
+      {
+        code: '403',
+        config: {
+          url: 'https://internal-endpoint.example.com/v1/projects/p',
+          headers: { Authorization: 'Bearer secret-token' },
+        },
+        response: {
+          status: 403,
+          data: {
+            error: {
+              code: 403,
+              message: 'Permission denied on resource project my-project.',
+              status: 'PERMISSION_DENIED',
+              details: [
+                {
+                  '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+                  reason: 'IAM_PERMISSION_DENIED',
+                },
+              ],
+            },
+          },
+        },
+      },
+    );
+
+    const normalized = normalizeError(gaxiosError);
+    expect(normalized.message).toBe(
+      'Permission denied on resource project my-project.',
+    );
+    expect(normalized.status).toBe(403);
+    expect(normalized.code).toBe('403');
+    expect(normalized.details).toEqual([
+      {
+        '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+        reason: 'IAM_PERMISSION_DENIED',
+      },
+    ]);
+    expect(normalized.originalError).toBe(gaxiosError);
+  });
+
+  it('extracts OAuth2 error_description envelopes from HTTP responses', () => {
+    const oauthError = Object.assign(new Error('Request failed'), {
+      response: {
+        status: 400,
+        data: {
+          error: 'invalid_grant',
+          error_description: 'Token has been expired or revoked.',
+        },
+      },
+    });
+
+    const normalized = normalizeError(oauthError);
+    expect(normalized.message).toBe(
+      'invalid_grant: Token has been expired or revoked.',
+    );
+    expect(normalized.status).toBe(400);
+    expect(normalized.code).toBe('invalid_grant');
+  });
+
+  it('extracts JSON-RPC nested error payloads', () => {
+    const rpcError = {
+      jsonrpc: '2.0',
+      id: 1,
+      error: {
+        code: -32601,
+        message: 'Method not found',
+        data: { method: 'tools/call' },
+      },
+    };
+
+    const normalized = normalizeError(rpcError);
+    expect(normalized.message).toBe('Method not found');
+    expect(normalized.status).toBe(-32601);
+    expect(normalized.code).toBe(-32601);
+    expect(normalized.details).toEqual({ method: 'tools/call' });
+  });
+
+  it('enriches generic fetch failed errors with ES2022 cause details', () => {
+    const cause = Object.assign(
+      new Error('connect ECONNREFUSED 127.0.0.1:8080'),
+      { code: 'ECONNREFUSED' },
+    );
+    const fetchErr = new TypeError('fetch failed', { cause });
+
+    const normalized = normalizeError(fetchErr);
+    expect(normalized.message).toBe(
+      'fetch failed: connect ECONNREFUSED 127.0.0.1:8080',
+    );
+    expect(normalized.code).toBe('ECONNREFUSED');
+    expect(normalized.status).toBe('ECONNREFUSED');
+  });
+
+  it('handles circular reference objects without throwing or returning [object Object]', () => {
+    const circular: Record<string, unknown> = {};
+    circular['self'] = circular;
+
+    const normalized = normalizeError(circular);
+    expect(normalized.message).toBe('{"self":"[Circular]"}');
+    expect(normalized.message).not.toContain('[object Object]');
+  });
+
+  it('handles empty plain objects without returning [object Object]', () => {
+    const normalized = normalizeError({});
+    expect(normalized.message).toBe('Unknown error occurred (empty object)');
+  });
+});
+
+describe('safeSerializeErrorValue', () => {
+  it('redacts sensitive headers and omits raw socket/agent handles while preserving shared non-circular objects', () => {
+    const sharedMeta = { region: 'us-central1' };
+    const transportObj: Record<string, unknown> = {
+      config: {
+        headers: {
+          Authorization: 'Bearer super-secret',
+          'x-goog-api-key': 'secret-api-key',
+          'Content-Type': 'application/json',
+        },
+        metaA: sharedMeta,
+        metaB: sharedMeta,
+      },
+      agent: { sockets: {} },
+      socket: { destroyed: false },
+    };
+    transportObj['self'] = transportObj;
+
+    const serialized = JSON.parse(safeSerializeErrorValue(transportObj));
+    expect(serialized.config.headers.Authorization).toBe('[REDACTED]');
+    expect(serialized.config.headers['x-goog-api-key']).toBe('[REDACTED]');
+    expect(serialized.config.headers['Content-Type']).toBe('application/json');
+    expect(serialized.config.metaA).toEqual({ region: 'us-central1' });
+    expect(serialized.config.metaB).toEqual({ region: 'us-central1' });
+    expect(serialized.agent).toBeUndefined();
+    expect(serialized.socket).toBeUndefined();
+    expect(serialized.self).toBe('[Circular]');
   });
 });

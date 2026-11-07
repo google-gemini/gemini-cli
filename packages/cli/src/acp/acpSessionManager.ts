@@ -281,9 +281,11 @@ export class AcpSessionManager {
       };
 
       // Stream history back to client
-      session.streamHistory(messages).catch((err) => {
+      try {
+        await session.streamHistory(messages);
+      } catch (err) {
         debugLogger.error(`Error streaming history: ${err}`);
-      });
+      }
 
       setTimeout(() => {
         session?.sendAvailableCommands().catch((err) => {

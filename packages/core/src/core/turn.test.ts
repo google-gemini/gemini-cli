@@ -744,22 +744,31 @@ describe('Turn', () => {
       ]);
     });
 
-    it('should drop pending tool calls from a failed attempt when a retry occurs', async () => {
+    it('should reset debugResponses, pendingToolCalls, and getResponseText upon Retry', async () => {
       const mockResponseStream = (async function* () {
         yield {
           type: StreamEventType.CHUNK,
           value: {
-            functionCalls: [
-              { id: 'failed-call', name: 'tool1', args: { attempt: 1 } },
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: 'Partial text from abandoned attempt' }],
+                },
+              },
             ],
+            functionCalls: [{ name: 'abandoned_tool', args: {} }],
           } as unknown as GenerateContentResponse,
         };
         yield { type: StreamEventType.RETRY };
         yield {
           type: StreamEventType.CHUNK,
           value: {
-            functionCalls: [
-              { id: 'retried-call', name: 'tool1', args: { attempt: 2 } },
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: 'Clean response from retried attempt' }],
+                },
+              },
             ],
           } as unknown as GenerateContentResponse,
         };
@@ -775,14 +784,32 @@ describe('Turn', () => {
         events.push(event);
       }
 
-      expect(events.map((event) => event.type)).toEqual([
-        GeminiEventType.ToolCallRequest,
-        GeminiEventType.Retry,
-        GeminiEventType.ToolCallRequest,
+      expect(events).toEqual([
+        {
+          type: GeminiEventType.Content,
+          value: 'Partial text from abandoned attempt',
+          traceId: undefined,
+        },
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: expect.objectContaining({ name: 'abandoned_tool' }),
+        },
+        { type: GeminiEventType.Retry },
+        {
+          type: GeminiEventType.Content,
+          value: 'Clean response from retried attempt',
+          traceId: undefined,
+        },
       ]);
-      // Only the calls of the attempt that entered history stay pending.
-      expect(turn.pendingToolCalls).toHaveLength(1);
-      expect(turn.pendingToolCalls[0].callId).toBe('tool1__retried-call');
+
+      // Turn.getResponseText() must NOT contain the abandoned attempt's text
+      expect(turn.getResponseText()).toBe(
+        'Clean response from retried attempt',
+      );
+      // Turn.pendingToolCalls must NOT contain the abandoned attempt's tool call
+      expect(turn.pendingToolCalls).toHaveLength(0);
+      // Turn.getDebugResponses() must only contain the response from the retried attempt
+      expect(turn.getDebugResponses()).toHaveLength(1);
     });
 
     it.each([

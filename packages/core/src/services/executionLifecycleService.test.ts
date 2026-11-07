@@ -772,4 +772,39 @@ describe('ExecutionLifecycleService', () => {
       expect(result.output).toBe('partial output');
     });
   });
+
+  describe('background() return value', () => {
+    it('returns true on successful background transition and false on subsequent or invalid calls', async () => {
+      const handle = ExecutionLifecycleService.createExecution();
+      if (handle.pid === undefined) {
+        throw new Error('Expected execution ID.');
+      }
+
+      // First call should succeed and return true
+      const firstResult = ExecutionLifecycleService.background(handle.pid);
+      expect(firstResult).toBe(true);
+
+      const backgroundResult = await handle.result;
+      expect(backgroundResult.backgrounded).toBe(true);
+
+      // Calling background again on an already-backgrounded execution returns false
+      const secondResult = ExecutionLifecycleService.background(handle.pid);
+      expect(secondResult).toBe(false);
+
+      // Calling background on an unknown ID returns false
+      expect(ExecutionLifecycleService.background(999999)).toBe(false);
+    });
+
+    it('returns false when called on an already settled execution', async () => {
+      const handle = ExecutionLifecycleService.createExecution();
+      if (handle.pid === undefined) {
+        throw new Error('Expected execution ID.');
+      }
+
+      ExecutionLifecycleService.completeExecution(handle.pid, { exitCode: 0 });
+      await handle.result;
+
+      expect(ExecutionLifecycleService.background(handle.pid)).toBe(false);
+    });
+  });
 });

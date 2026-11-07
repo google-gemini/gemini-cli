@@ -1040,12 +1040,15 @@ export async function loadCliConfig(
       process.env['HTTPS_PROXY'] ||
       process.env['https_proxy'] ||
       process.env['HTTP_PROXY'] ||
-      process.env['http_proxy'],
+      process.env['http_proxy'] ||
+      process.env['ALL_PROXY'] ||
+      process.env['all_proxy'],
     cwd,
     fileDiscoveryService: fileService,
     bugCommand: settings.advanced?.bugCommand,
     model: resolvedModel,
     maxSessionTurns: settings.model?.maxSessionTurns,
+    requestTimeoutMs: settings.model?.requestTimeoutMs,
 
     listExtensions: argv.listExtensions || false,
     listSessions: argv.listSessions || false,

@@ -921,7 +921,7 @@ describe('ToolExecutor', () => {
         expect(output).toContain('[Tool output truncated to conserve memory');
         expect(output).toContain('/tmp/truncated_output.txt');
         expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
-          largeText,
+          `${normalText}\n${largeText}`,
           'multiPartTool',
           'call-part-array',
           expect.any(String),

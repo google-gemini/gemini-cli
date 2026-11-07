@@ -103,6 +103,27 @@ describe('settings-validation', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should enforce minimum constraint on model.requestTimeoutMs', () => {
+      expect(
+        validateSettings({ model: { requestTimeoutMs: 60000 } }).success,
+      ).toBe(true);
+      expect(validateSettings({ model: { requestTimeoutMs: 1 } }).success).toBe(
+        true,
+      );
+
+      const zeroResult = validateSettings({ model: { requestTimeoutMs: 0 } });
+      expect(zeroResult.success).toBe(false);
+      expect(zeroResult.error?.issues[0]?.path).toEqual([
+        'model',
+        'requestTimeoutMs',
+      ]);
+
+      const negativeResult = validateSettings({
+        model: { requestTimeoutMs: -500 },
+      });
+      expect(negativeResult.success).toBe(false);
+    });
+
     it('should accept unknown top-level keys (for migration compatibility)', () => {
       const settingsWithUnknownKey = {
         unknownKey: 'some value',
@@ -325,6 +346,50 @@ describe('settings-validation', () => {
 
       const result = validateSettings(validSettings);
       expect(result.success).toBe(true);
+    });
+
+    it('should accept customThemes with ui.active and ui.focus color overrides', () => {
+      const validSettings = {
+        ui: {
+          theme: 'CustomFocusTheme',
+          customThemes: {
+            CustomFocusTheme: {
+              type: 'custom',
+              name: 'CustomFocusTheme',
+              ui: {
+                comment: '#928374',
+                symbol: '#8ec07c',
+                active: '#83a598',
+                focus: '#b8bb26',
+                gradient: ['#cc241d', '#d65d0e', '#d79921'],
+              },
+            },
+          },
+        },
+      };
+
+      const result = validateSettings(validSettings);
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject unrecognized keys in customThemes.ui', () => {
+      const invalidSettings = {
+        ui: {
+          customThemes: {
+            InvalidUiTheme: {
+              type: 'custom',
+              name: 'InvalidUiTheme',
+              ui: {
+                active: '#83a598',
+                unknownKey: '#ffffff',
+              },
+            },
+          },
+        },
+      };
+
+      const result = validateSettings(invalidSettings);
+      expect(result.success).toBe(false);
     });
 
     describe('type casting', () => {

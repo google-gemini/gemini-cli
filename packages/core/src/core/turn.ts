@@ -299,9 +299,12 @@ export class Turn {
 
         // Handle the new RETRY event
         if (streamEvent.type === 'retry') {
-          // Tool calls streamed by the failed attempt never enter history, so
-          // drop them here before the retry attempt emits its own.
+          this.debugResponses = [];
+          this.cachedResponseText = undefined;
           this.pendingToolCalls.length = 0;
+          this.pendingCitations.clear();
+          this.finishReason = undefined;
+          this.hasLoggedRagTrace = false;
           yield { type: GeminiEventType.Retry };
           continue; // Skip to the next event in the stream
         }

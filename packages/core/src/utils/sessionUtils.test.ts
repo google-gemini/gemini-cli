@@ -627,4 +627,8 @@ describe('convertSessionToClientHistory', () => {
       },
     ]);
   });
+
+  it('returns an empty array when messages is undefined', () => {
+    expect(convertSessionToClientHistory(undefined)).toEqual([]);
+  });
 });

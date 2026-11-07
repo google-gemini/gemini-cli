@@ -399,6 +399,40 @@ describe('WriteFileTool', () => {
       );
     });
 
+    it('should set aggressiveUnescape to false for gemini-3-flash when dynamic model config is enabled', async () => {
+      const filePath = path.join(rootDir, 'gemini3_flash_file.txt');
+      const proposedContent = 'const str = "line1\\nline2";';
+      const abortSignal = new AbortController().signal;
+
+      const mockGemini3FlashConfig = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
+        ...mockConfig,
+        getActiveModel: () => 'gemini-3-flash',
+        getExperimentalDynamicModelConfiguration: () => true,
+        modelConfigService: {
+          resolveModelId: (m: string) => m,
+          getModelDefinition: () => undefined,
+        },
+      } as unknown as Config;
+
+      mockEnsureCorrectFileContent.mockResolvedValue(proposedContent);
+
+      await getCorrectedFileContent(
+        mockGemini3FlashConfig,
+        filePath,
+        proposedContent,
+        abortSignal,
+      );
+
+      expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
+        proposedContent,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        true,
+        false, // aggressiveUnescape
+      );
+    });
+
     it('should call ensureCorrectFileContent for an existing file', async () => {
       const filePath = path.join(rootDir, 'existing_corrected_file.txt');
       const originalContent = 'Original existing content.';
