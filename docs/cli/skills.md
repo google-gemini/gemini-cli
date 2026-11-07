@@ -21,7 +21,9 @@ resource access.
     tiers and injects the name and description of all enabled skills into the
     system prompt.
 2.  **Activation**: When Gemini identifies a task matching a skill's
-    description, it calls the `activate_skill` tool.
+    description, it calls the `activate_skill` tool. You can also activate a
+    skill yourself by typing `/<skill-name>` (see
+    [Activating a skill manually](#activating-a-skill-manually)).
 3.  **Consent**: You will see a confirmation prompt in the UI detailing the
     skill's name, purpose, and the directory path it will gain access to.
 4.  **Injection**: Upon your approval:
@@ -77,6 +79,20 @@ complex workflows.
 
 To see all available skills in your current session, use the `/skills list`
 command.
+
+## Activating a skill manually
+
+Every enabled extension, user, and workspace skill is also available as a slash
+command, so you don't have to rely on Gemini picking it up from your prompt.
+Type `/` in an interactive session to see your skills in the completion menu
+alongside the built-in commands. Spaces in a skill's name are replaced with
+hyphens. Built-in skills are not available as slash commands.
+
+- `/<skill-name> <task>`: Activates the skill and sends `<task>` as your prompt.
+  For example, if you have a workspace skill named `release-notes`, run
+  `/release-notes draft notes for the changes since v1.2.0`.
+- `/<skill-name>`: Activates the skill on its own. Gemini continues the task
+  already in progress using the skill, or asks what you want to use it for.
 
 ## Managing skills
 
