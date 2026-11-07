@@ -220,16 +220,20 @@ function updateFingerprintIfChanged(
  * Parts before the first functionResponse go to the first call, so each part
  * is stored on exactly one call.
  */
-function splitPartsByCallId(parts: readonly Part[]): Map<string, Part[]> {
+export function splitPartsByCallId(
+  parts: readonly Part[],
+): Map<string, Part[]> {
   const partsByCallId = new Map<string, Part[]>();
   let current: Part[] = [];
   let seenResponse = false;
   for (const part of parts) {
     if (part.functionResponse) {
-      if (seenResponse) current = [];
-      seenResponse = true;
       const callId = part.functionResponse.id;
+      // A response without an id, or a repeated id, stays in the current group
+      // so its siblings are not dropped.
       if (callId && !partsByCallId.has(callId)) {
+        if (seenResponse) current = [];
+        seenResponse = true;
         partsByCallId.set(callId, current);
       }
     }

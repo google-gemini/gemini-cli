@@ -44,6 +44,7 @@ import {
   hasResumableConversationContent,
   isResumableMessageRecord,
   loadConversationRecord,
+  splitPartsByCallId,
   MAX_HISTORY_MESSAGES,
   type ConversationRecord,
   type ToolCallRecord,
@@ -2519,5 +2520,30 @@ describe('ChatRecordingService', () => {
         { text: `${longPrefix}1${longSuffix}` },
       ]);
     });
+  });
+});
+
+describe('splitPartsByCallId', () => {
+  const img = { inlineData: { mimeType: 'image/png', data: 'x' } };
+
+  it('keeps parts after a functionResponse with a missing id', () => {
+    const parts: Part[] = [
+      { functionResponse: { id: 'a', name: 't', response: {} } },
+      { functionResponse: { name: 't', response: {} } },
+      img,
+      { text: 'tail' },
+    ];
+    const map = splitPartsByCallId(parts);
+    expect([...map.keys()]).toEqual(['a']);
+    expect(map.get('a')).toEqual(parts);
+  });
+
+  it('keeps parts after a functionResponse with a duplicate id', () => {
+    const first = { functionResponse: { id: 'a', name: 't', response: {} } };
+    const dup = { functionResponse: { id: 'a', name: 't', response: {} } };
+    const second = { functionResponse: { id: 'b', name: 't', response: {} } };
+    const map = splitPartsByCallId([first, img, dup, { text: 'dup' }, second]);
+    expect(map.get('a')).toEqual([first, img, dup, { text: 'dup' }]);
+    expect(map.get('b')).toEqual([second]);
   });
 });
