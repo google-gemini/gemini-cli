@@ -12,7 +12,6 @@ on:
       - '!**/*.test.tsx'
   workflow_dispatch:
 
-# Prevents multiple runs for the same PR simultaneously (saves tokens)
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
   cancel-in-progress: true
@@ -26,102 +25,98 @@ jobs:
   detect-changes:
     name: 'Detect Steering Changes'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    # Security: pull_request_target allows secrets, so we must gate carefully.
-    # Detection should not run code from the fork.
     if: "github.repository == 'google-gemini/gemini-cli' && github.event.pull_request.draft == false"
     outputs:
       SHOULD_RUN: '${{ steps.detect.outputs.SHOULD_RUN }}'
       STEERING_DETECTED: '${{ steps.detect.outputs.STEERING_DETECTED }}'
     steps:
       - name: 'Checkout'
-        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955'
         with:
-          # Check out the trusted code from main for detection
           fetch-depth: 0
           persist-credentials: false
 
       - name: 'Detect Steering Changes'
         id: 'detect'
         env:
-          # Use the PR's head SHA for comparison without checking it out
           PR_HEAD_SHA: '${{ github.event.pull_request.head.sha }}'
+          PR_NUMBER: '${{ github.event.pull_request.number }}'
         run: |
-          # Fetch the fork's PR branch for analysis
-          git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-head
-
-          # Run the trusted script from main
+          set -euo pipefail
+          git fetch "origin pull/${PR_NUMBER}/head:pr-head"
           SHOULD_RUN=$(node scripts/changed_prompt.js)
           STEERING_DETECTED=$(node scripts/changed_prompt.js --steering-only)
-          echo "SHOULD_RUN=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
-          echo "STEERING_DETECTED=$STEERING_DETECTED" >> "$GITHUB_OUTPUT"
+          echo "SHOULD_RUN=${SHOULD_RUN}" >> "$GITHUB_OUTPUT"
+          echo "STEERING_DETECTED=${STEERING_DETECTED}" >> "$GITHUB_OUTPUT"
 
       - name: 'Notify Approval Required'
         if: "steps.detect.outputs.SHOULD_RUN == 'true'"
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          REPO: '${{ github.repository }}'
+          RUN_ID: '${{ github.run_id }}'
+          PR_NUMBER: '${{ github.event.pull_request.number }}'
         run: |
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          COMMENT_BODY="### 🛑 Action Required: Evaluation Approval
+          set -euo pipefail
+          RUN_URL="https://github.com/${REPO}/actions/runs/${RUN_ID}"
+          COMMENT_BODY=$(cat <<EOF
+          ### 🛑 Action Required: Evaluation Approval
 
           Steering changes have been detected in this PR. To prevent regressions, a maintainer must approve the evaluation run before this PR can be merged.
 
           **Maintainers:**
-          1. Go to the [**Workflow Run Summary**]($RUN_URL).
+          1. Go to the [**Workflow Run Summary**](${RUN_URL}).
           2. Click the yellow **'Review deployments'** button.
           3. Select the **'eval-gate'** environment and click **'Approve'**.
 
           Once approved, the evaluation results will be posted here automatically.
 
-          <!-- eval-approval-notification -->"
+          <!-- eval-approval-notification -->
+          EOF
+          )
 
-          # Check if comment already exists to avoid spamming
-          COMMENT_ID=$(gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[] | select(.body | contains("<!-- eval-approval-notification -->")) | .url' | grep -oE "[0-9]+$" | head -n 1)
+          COMMENT_ID=$(gh pr view "${PR_NUMBER}" --json comments --jq '.comments[] | select(.body | contains("<!-- eval-approval-notification -->")) | .url' | grep -oE "[0-9]+$" | head -n 1 || true)
 
-          if [ -z "$COMMENT_ID" ]; then
-            gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT_BODY"
+          if [ -z "${COMMENT_ID}" ]; then
+            gh pr comment "${PR_NUMBER}" --body "${COMMENT_BODY}"
           else
-            echo "Updating existing notification comment $COMMENT_ID..."
-            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" -F body="$COMMENT_BODY"
+            echo "Updating existing notification comment ${COMMENT_ID}..."
+            gh api -X PATCH "repos/${REPO}/issues/comments/${COMMENT_ID}" -F body="${COMMENT_BODY}"
           fi
 
   pr-evaluation:
     name: 'Evaluate Steering & Regressions'
     needs: 'detect-changes'
     if: "needs.detect-changes.outputs.SHOULD_RUN == 'true'"
-    # Manual approval gate via environment
     environment: 'eval-gate'
     runs-on: 'gemini-cli-ubuntu-16-core'
     env:
-      # CENTRALIZED MODEL LIST
       MODEL_LIST: 'gemini-3-flash-preview'
 
     steps:
       - name: 'Checkout'
-        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955'
         with:
-          # Check out the fork's PR code for the actual evaluation
-          # This only runs AFTER manual approval
           ref: '${{ github.event.pull_request.head.sha }}'
           fetch-depth: 0
           persist-credentials: false
 
       - name: 'Remove Approval Notification'
-        # Run even if other steps fail, to ensure we clean up the "Action Required" message
         if: 'always()'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          REPO: '${{ github.repository }}'
           PR_NUMBER: '${{ github.event.pull_request.number }}'
         run: |
-          echo "Debug: PR_NUMBER is '$PR_NUMBER'"
-          # Search for the notification comment by its hidden tag
-          COMMENT_ID=$(gh pr view "$PR_NUMBER" --json comments --jq '.comments[] | select(.body | contains("<!-- eval-approval-notification -->")) | .url' | grep -oE "[0-9]+$" | head -n 1)
-          if [ -n "$COMMENT_ID" ]; then
-            echo "Removing notification comment $COMMENT_ID now that run is approved..."
-            gh api -X DELETE "repos/${{ github.repository }}/issues/comments/$COMMENT_ID"
+          set -euo pipefail
+          COMMENT_ID=$(gh pr view "${PR_NUMBER}" --json comments --jq '.comments[] | select(.body | contains("<!-- eval-approval-notification -->")) | .url' | grep -oE "[0-9]+$" | head -n 1 || true)
+          if [ -n "${COMMENT_ID}" ]; then
+            echo "Removing notification comment ${COMMENT_ID}..."
+            gh api -X DELETE "repos/${REPO}/issues/comments/${COMMENT_ID}"
           fi
 
       - name: 'Set up Node.js'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4.4.0
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
@@ -137,16 +132,18 @@ jobs:
         id: 'analysis'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          REPO: '${{ github.repository }}'
+          ACTOR: '${{ github.actor }}'
+          BASE_REF: '${{ github.base_ref }}'
         run: |
-          # Check for behavioral eval changes
-          EVAL_CHANGES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "^evals/" || true)
-          if [ -z "$EVAL_CHANGES" ]; then
+          set -euo pipefail
+          EVAL_CHANGES=$(git diff --name-only "origin/${BASE_REF}...HEAD" | grep '^evals/' || true)
+          if [ -z "${EVAL_CHANGES}" ]; then
             echo "MISSING_EVALS=true" >> "$GITHUB_OUTPUT"
           fi
 
-          # Check if user is a maintainer
-          USER_PERMISSION=$(gh api repos/${{ github.repository }}/collaborators/${{ github.actor }}/permission --jq '.permission')
-          if [[ "$USER_PERMISSION" == "admin" || "$USER_PERMISSION" == "write" ]]; then
+          USER_PERMISSION=$(gh api "repos/${REPO}/collaborators/${ACTOR}/permission" --jq '.permission')
+          if [[ "${USER_PERMISSION}" == "admin" || "${USER_PERMISSION}" == "write" ]]; then
             echo "IS_MAINTAINER=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -156,10 +153,8 @@ jobs:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           MODEL_LIST: '${{ env.MODEL_LIST }}'
         run: |
-          # Run the regression check loop. The script saves the report to a file.
+          set -euo pipefail
           node scripts/run_eval_regression.js
-
-          # Use the generated report file if it exists
           if [[ -f eval_regression_report.md ]]; then
             echo "REPORT_FILE=eval_regression_report.md" >> "$GITHUB_ENV"
           fi
@@ -168,25 +163,30 @@ jobs:
         if: "always() && (needs.detect-changes.outputs.STEERING_DETECTED == 'true' || env.REPORT_FILE != '')"
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          REPO: '${{ github.repository }}'
+          PR_NUMBER: '${{ github.event.pull_request.number }}'
+          STEERING_DETECTED: '${{ needs.detect-changes.outputs.STEERING_DETECTED }}'
+          MISSING_EVALS: '${{ steps.analysis.outputs.MISSING_EVALS }}'
+          IS_MAINTAINER: '${{ steps.analysis.outputs.IS_MAINTAINER }}'
         run: |
-          # 1. Build the full comment body
+          set -euo pipefail
           {
             if [[ -f eval_regression_report.md ]]; then
               cat eval_regression_report.md
               echo ""
             fi
 
-            if [[ "${{ needs.detect-changes.outputs.STEERING_DETECTED }}" == "true" ]]; then
+            if [[ "${STEERING_DETECTED}" == "true" ]]; then
               echo "### 🧠 Model Steering Guidance"
               echo ""
               echo "This PR modifies files that affect the model's behavior (prompts, tools, or instructions)."
               echo ""
 
-              if [[ "${{ steps.analysis.outputs.MISSING_EVALS }}" == "true" ]]; then
-                echo "- ⚠️ **Consider adding Evals:** No behavioral evaluations (\`evals/*.eval.ts\`) were added or updated in this PR. Consider [adding a test case](https://github.com/google-gemini/gemini-cli/blob/main/evals/README.md#creating-an-evaluation) to verify the new behavior and prevent regressions."
+              if [[ "${MISSING_EVALS}" == "true" ]]; then
+                echo "- ⚠️ **Consider adding Evals:** No behavioral evaluations (\`evals/*.eval.ts\`) were added or updated in this PR. Consider adding a test case."
               fi
 
-              if [[ "${{ steps.analysis.outputs.IS_MAINTAINER }}" == "true" ]]; then
+              if [[ "${IS_MAINTAINER}" == "true" ]]; then
                 echo "- 🚀 **Maintainer Reminder:** Please ensure that these changes do not regress results on benchmark evals before merging."
               fi
             fi
@@ -197,15 +197,12 @@ jobs:
             echo "<!-- eval-pr-report -->"
           } > full_comment.md
 
-          # 2. Find if a comment with our unique tag already exists
-          # We extract the numeric ID from the URL to ensure compatibility with the REST API
-          COMMENT_ID=$(gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[] | select(.body | contains("<!-- eval-pr-report -->")) | .url' | grep -oE "[0-9]+$" | head -n 1)
+          COMMENT_ID=$(gh pr view "${PR_NUMBER}" --json comments --jq '.comments[] | select(.body | contains("<!-- eval-pr-report -->")) | .url' | grep -oE "[0-9]+$" | head -n 1 || true)
 
-          # 3. Update or Create the comment
-          if [ -n "$COMMENT_ID" ]; then
-            echo "Updating existing comment $COMMENT_ID via API..."
-            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" -F body=@full_comment.md
+          if [ -n "${COMMENT_ID}" ]; then
+            echo "Updating existing comment ${COMMENT_ID}..."
+            gh api -X PATCH "repos/${REPO}/issues/comments/${COMMENT_ID}" -F body=@full_comment.md
           else
             echo "Creating new PR comment..."
-            gh pr comment ${{ github.event.pull_request.number }} --body-file full_comment.md
+            gh pr comment "${PR_NUMBER}" --body-file full_comment.md
           fi
