@@ -20,7 +20,7 @@ const shouldRun =
 describe.runIf(shouldRun)(
   'ShellExecutionService PTY fd leak integration',
   () => {
-    it('does not leak slave fds across rapid PTY executions', async () => {
+    it('does not leak master or slave fds across rapid PTY executions', async () => {
       const getOpenFdCount = (): number => {
         try {
           return fsSync.readdirSync('/dev/fd').length;
@@ -29,11 +29,32 @@ describe.runIf(shouldRun)(
         }
       };
 
+      const getOpenCharDeviceFdCount = (): number => {
+        try {
+          return fsSync.readdirSync('/dev/fd').filter((entry) => {
+            const fd = Number(entry);
+            if (!Number.isInteger(fd) || fd < 0) {
+              return false;
+            }
+            try {
+              return fsSync.fstatSync(fd).isCharacterDevice();
+            } catch {
+              return false;
+            }
+          }).length;
+        } catch {
+          return 0;
+        }
+      };
+
       const baselineSamples: number[] = [];
+      const baselineCharDeviceSamples: number[] = [];
       for (let i = 0; i < PTY_BASELINE_FD_PROBE_COUNT; i++) {
         baselineSamples.push(getOpenFdCount());
+        baselineCharDeviceSamples.push(getOpenCharDeviceFdCount());
       }
       const baseline = Math.max(...baselineSamples);
+      const baselineCharDevices = Math.max(...baselineCharDeviceSamples);
 
       for (let i = 0; i < PTY_ITERATIONS; i++) {
         const handle = await ShellExecutionService.execute(
@@ -56,7 +77,9 @@ describe.runIf(shouldRun)(
       }
 
       const finalCount = getOpenFdCount();
+      const finalCharDevices = getOpenCharDeviceFdCount();
       expect(finalCount - baseline).toBeLessThan(PTY_ITERATIONS);
+      expect(finalCharDevices).toBeLessThanOrEqual(baselineCharDevices);
     }, 120000);
   },
 );

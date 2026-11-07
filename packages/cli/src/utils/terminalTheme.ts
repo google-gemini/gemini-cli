@@ -38,7 +38,8 @@ export async function setupTerminalAndTheme(
     );
   }
 
-  // Load custom themes from settings
+  // Load custom themes from standalone theme.json files and settings
+  themeManager.loadUserThemes?.();
   themeManager.loadCustomThemes(settings.merged.ui.customThemes);
 
   if (settings.merged.ui.theme) {

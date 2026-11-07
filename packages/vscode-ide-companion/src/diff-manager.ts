@@ -55,6 +55,7 @@ export class DiffManager {
   readonly onDidChange = this.onDidChangeEmitter.event;
   private diffDocuments = new Map<string, DiffInfo>();
   private readonly subscriptions: vscode.Disposable[] = [];
+  private isDiffVisible = false;
 
   constructor(
     private readonly log: (message: string) => void,
@@ -74,6 +75,7 @@ export class DiffManager {
     for (const subscription of this.subscriptions) {
       subscription.dispose();
     }
+    this.onDidChangeEmitter.dispose();
   }
 
   /**
@@ -97,11 +99,7 @@ export class DiffManager {
     });
 
     const diffTitle = `${path.basename(filePath)} ↔ Modified`;
-    await vscode.commands.executeCommand(
-      'setContext',
-      'gemini.diff.isVisible',
-      true,
-    );
+    await this.setDiffVisible(true);
 
     let leftDocUri;
     try {
@@ -203,9 +201,21 @@ export class DiffManager {
     );
   }
 
+  private async setDiffVisible(isVisible: boolean) {
+    if (this.isDiffVisible === isVisible) {
+      return;
+    }
+    this.isDiffVisible = isVisible;
+    await vscode.commands.executeCommand(
+      'setContext',
+      'gemini.diff.isVisible',
+      isVisible,
+    );
+  }
+
   private async onActiveEditorChange(editor: vscode.TextEditor | undefined) {
     let isVisible = false;
-    if (editor) {
+    if (editor && this.diffDocuments.size > 0) {
       isVisible = this.diffDocuments.has(editor.document.uri.toString());
       if (!isVisible) {
         for (const document of this.diffDocuments.values()) {
@@ -216,11 +226,7 @@ export class DiffManager {
         }
       }
     }
-    await vscode.commands.executeCommand(
-      'setContext',
-      'gemini.diff.isVisible',
-      isVisible,
-    );
+    await this.setDiffVisible(isVisible);
   }
 
   private addDiffDocument(uri: vscode.Uri, diffInfo: DiffInfo) {
@@ -229,11 +235,7 @@ export class DiffManager {
 
   private async closeDiffEditor(rightDocUri: vscode.Uri) {
     const diffInfo = this.diffDocuments.get(rightDocUri.toString());
-    await vscode.commands.executeCommand(
-      'setContext',
-      'gemini.diff.isVisible',
-      false,
-    );
+    await this.setDiffVisible(false);
 
     if (diffInfo) {
       this.diffDocuments.delete(rightDocUri.toString());

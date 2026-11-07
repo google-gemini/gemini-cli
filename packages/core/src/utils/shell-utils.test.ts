@@ -23,6 +23,7 @@ import {
   stripShellWrapper,
   normalizeCommand,
   hasRedirection,
+  detectCommandSubstitution,
   resolveExecutable,
 } from './shell-utils.js';
 import path from 'node:path';
@@ -389,6 +390,85 @@ describe('stripShellWrapper', () => {
     ).toEqual('Get-ChildItem');
   });
 
+  it('should strip PowerShell wrappers with -NonInteractive, -NoLogo, and Windows paths', () => {
+    expect(
+      stripShellWrapper(
+        'powershell.exe -NoProfile -NonInteractive -Command "git log -n 10 --oneline"',
+      ),
+    ).toEqual('git log -n 10 --oneline');
+    expect(
+      stripShellWrapper(
+        'pwsh.exe -NonInteractive -NoProfile -NoLogo -c "Get-ChildItem"',
+      ),
+    ).toEqual('Get-ChildItem');
+    expect(
+      stripShellWrapper(
+        'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -NonInteractive -Command "git diff main...HEAD --stat"',
+      ),
+    ).toEqual('git diff main...HEAD --stat');
+    expect(
+      stripShellWrapper(
+        '"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -NoProfile -NonInteractive -Command "Get-Location"',
+      ),
+    ).toEqual('Get-Location');
+  });
+
+  it('should unescape C-argv escaped quotes inside outer PowerShell -Command "..." without corrupting compound commands', () => {
+    expect(
+      stripShellWrapper('powershell -Command "node -e \\"console.log(1)\\""'),
+    ).toEqual('node -e "console.log(1)"');
+    expect(
+      stripShellWrapper(
+        'powershell.exe -NoProfile -NonInteractive -Command "node -e \\"console.log(\\\\\\"hello (world)\\\\\\")\\""',
+      ),
+    ).toEqual('node -e "console.log(\\"hello (world)\\")"');
+    expect(stripShellWrapper('powershell -Command "echo a"; whoami')).toEqual(
+      '"echo a"; whoami',
+    );
+    expect(stripShellWrapper('powershell -Command "echo a"; echo "b"')).toEqual(
+      'powershell -Command "echo a"; echo "b"',
+    );
+    expect(
+      stripShellWrapper('cmd.exe /c "echo a" & whoami & echo "b"'),
+    ).toEqual('cmd.exe /c "echo a" & whoami & echo "b"');
+    expect(
+      stripShellWrapper(
+        'cmd.exe /c "powershell.exe -NoProfile -NonInteractive -Command \\"echo $(whoami)\\""',
+      ),
+    ).toEqual('echo $(whoami)');
+    expect(stripShellWrapper('powershell -Command "echo `$(whoami)"')).toEqual(
+      'echo $(whoami)',
+    );
+    // Refuse to unwrap when unwrapping would hide outer-shell substitution inside single quotes or escaped backticks
+    expect(
+      stripShellWrapper('powershell -Command "echo \'$(whoami)\'"'),
+    ).toEqual('powershell -Command "echo \'$(whoami)\'"');
+    expect(
+      stripShellWrapper('powershell -Command "echo \'``$(whoami)\'"'),
+    ).toEqual('powershell -Command "echo \'``$(whoami)\'"');
+    expect(stripShellWrapper('powershell -Command "echo ``$(whoami)"')).toEqual(
+      'echo `$(whoami)',
+    );
+    expect(stripShellWrapper('bash -c "echo \'$(whoami)\'"')).toEqual(
+      'bash -c "echo \'$(whoami)\'"',
+    );
+    expect(stripShellWrapper('bash -c "echo \\\\$(whoami)"')).toEqual(
+      'bash -c "echo \\\\$(whoami)"',
+    );
+    // Even backslashes before quote in cmd.exe /c close the quote rather than escaping it
+    expect(
+      stripShellWrapper('cmd.exe /c "echo \\\\"& whoami & echo \\""'),
+    ).toEqual('cmd.exe /c "echo \\\\"& whoami & echo \\""');
+    // Even backslashes before doubled quotes ("") or closing quote in cmd.exe /c and PowerShell are halved
+    expect(stripShellWrapper('cmd.exe /c "echo foo\\\\""bar"')).toEqual(
+      'echo foo\\"bar',
+    );
+    expect(stripShellWrapper('cmd.exe /c "echo C:\\\\"')).toEqual('echo C:\\');
+    expect(stripShellWrapper('powershell -Command "echo C:\\\\"')).toEqual(
+      'echo C:\\',
+    );
+  });
+
   it('should not strip anything if no wrapper is present', () => {
     expect(stripShellWrapper('ls -l')).toEqual('ls -l');
   });
@@ -516,7 +596,11 @@ describe('getShellConfiguration', () => {
         });
         const config = getShellConfiguration();
         expect(config.executable).toBe(pwshPath);
-        expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+        expect(config.argsPrefix).toEqual([
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+        ]);
         expect(config.shell).toBe('powershell');
       },
     );
@@ -674,5 +758,156 @@ describe('resolveExecutable', () => {
     mockPlatform.mockReturnValue('linux');
 
     expect(resolveExecutable('anything')).toBeUndefined();
+  });
+});
+
+describe('detectCommandSubstitution (PowerShell)', () => {
+  beforeEach(() => {
+    mockPlatform.mockReturnValue('win32');
+    vi.stubEnv('ComSpec', 'powershell.exe');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should allow PowerShell instance and static method calls', () => {
+    expect(detectCommandSubstitution('$str.Trim()')).toBe(false);
+    expect(
+      detectCommandSubstitution("[System.IO.Path]::GetFullPath('foo')"),
+    ).toBe(false);
+    expect(
+      detectCommandSubstitution(
+        "Get-ChildItem | Where-Object { $_.Name.EndsWith('.ts') }",
+      ),
+    ).toBe(false);
+    expect(detectCommandSubstitution('$arr[0].ToString()')).toBe(false);
+  });
+
+  it('should allow PowerShell conditionals, compound boolean parens, and param blocks', () => {
+    expect(
+      detectCommandSubstitution(
+        'if (($a -eq 1) -and ($b -eq 2)) { Write-Host ok }',
+      ),
+    ).toBe(false);
+    expect(detectCommandSubstitution('if (-not ($x)) { Write-Host ok }')).toBe(
+      false,
+    );
+    expect(detectCommandSubstitution('while (($i -lt 10)) { $i++ }')).toBe(
+      false,
+    );
+    expect(
+      detectCommandSubstitution('for ($i = 0; $i -lt 10; $i++) { $i }'),
+    ).toBe(false);
+    expect(
+      detectCommandSubstitution('& { param($x, [string]$y) Write-Host $x }'),
+    ).toBe(false);
+    expect(
+      detectCommandSubstitution(
+        'function Test-Helper($x, [int]$y) { $x + $y }',
+      ),
+    ).toBe(false);
+  });
+
+  it('should allow Windows paths with parens, braced variables, comments, and here-strings without substitution', () => {
+    expect(
+      detectCommandSubstitution('dir "C:\\Program Files (x86)\\Git"'),
+    ).toBe(false);
+    expect(
+      detectCommandSubstitution("dir 'C:\\Program Files (x86)\\Git'"),
+    ).toBe(false);
+    expect(detectCommandSubstitution('echo ${env:ProgramFiles(x86)}')).toBe(
+      false,
+    );
+    expect(detectCommandSubstitution("git status # don't fail (check)")).toBe(
+      false,
+    );
+    expect(
+      detectCommandSubstitution('git status <# block (comment) $(safe) #>'),
+    ).toBe(false);
+    expect(detectCommandSubstitution('echo "hello ""(world)"""')).toBe(false);
+    expect(detectCommandSubstitution("echo 'hello ''$(safe)'''")).toBe(false);
+    expect(detectCommandSubstitution("@'\n$(not_expanded)\n(safe)\n'@")).toBe(
+      false,
+    );
+    expect(detectCommandSubstitution('@"\nplain (parens) text\n"@')).toBe(
+      false,
+    );
+    expect(detectCommandSubstitution('$sum = ($a + $b) * 2')).toBe(false);
+  });
+
+  it('should detect genuine PowerShell command substitutions and security edge cases', () => {
+    expect(detectCommandSubstitution('echo $(whoami)')).toBe(true);
+    expect(detectCommandSubstitution('echo "$(whoami)"')).toBe(true);
+    expect(detectCommandSubstitution('@"\n$(whoami)\n"@')).toBe(true);
+    expect(detectCommandSubstitution('echo @(whoami)')).toBe(true);
+    expect(detectCommandSubstitution('echo (whoami)')).toBe(true);
+    expect(detectCommandSubstitution('cmd.exe(whoami)')).toBe(true);
+    expect(detectCommandSubstitution("$str.Replace((whoami), 'a')")).toBe(true);
+    expect(detectCommandSubstitution('echo ($a | Invoke-Expression)')).toBe(
+      true,
+    );
+    // In PowerShell, backslash does not escape quotes, so \" closes the string!
+    expect(detectCommandSubstitution('echo "foo\\" @(whoami)"')).toBe(true);
+    expect(detectCommandSubstitution('echo "foo\\" (whoami)"')).toBe(true);
+    expect(detectCommandSubstitution('echo "\\$(whoami)"')).toBe(true);
+    expect(detectCommandSubstitution("# don't\necho $(whoami)")).toBe(true);
+    // Security hardening: assignments in parens, scriptblock .Invoke(), mid-token here-strings/comments, CR newlines, Unicode quotes
+    expect(detectCommandSubstitution('echo ($x = whoami)')).toBe(true);
+    expect(detectCommandSubstitution('if ($x = (whoami)) { }')).toBe(true);
+    expect(detectCommandSubstitution('echo ((whoami))')).toBe(true);
+    expect(detectCommandSubstitution('{ whoami }.Invoke()')).toBe(true);
+    expect(detectCommandSubstitution('echo foo@"\n$(whoami)\n"@')).toBe(true);
+    expect(detectCommandSubstitution("echo foo@'\n'$(whoami)\n'@")).toBe(true);
+    expect(detectCommandSubstitution('echo foo<# $(whoami) #>')).toBe(true);
+    expect(detectCommandSubstitution("@'\n'@; $(whoami)")).toBe(true);
+    expect(detectCommandSubstitution("@'\n\r'@; $(whoami)")).toBe(true);
+    expect(detectCommandSubstitution("echo 'hello\u2019 $(whoami) '")).toBe(
+      true,
+    );
+    expect(detectCommandSubstitution('echo \u201c$(whoami)\u201d')).toBe(true);
+    // Parameter defaults, assignments in conditions, pipelines in conditions, and comment-spoofed parens executing commands
+    expect(detectCommandSubstitution('if ($a | (whoami)) { }')).toBe(true);
+    expect(
+      detectCommandSubstitution('for ($i = (whoami); $i -lt 1; $i++) { }'),
+    ).toBe(true);
+    expect(detectCommandSubstitution('& { param($x = (whoami)) }')).toBe(true);
+    expect(detectCommandSubstitution('echo ($a <# ) #> ; whoami)')).toBe(true);
+    expect(detectCommandSubstitution('if foo (whoami) { }')).toBe(true);
+    expect(
+      detectCommandSubstitution(
+        stripShellWrapper('powershell -Command "echo \'$(whoami)\'"'),
+      ),
+    ).toBe(true);
+    expect(
+      detectCommandSubstitution(
+        stripShellWrapper('powershell -Command "echo `$(whoami)"'),
+      ),
+    ).toBe(true);
+    expect(
+      detectCommandSubstitution(
+        stripShellWrapper('powershell -Command "echo ``$(whoami)"'),
+      ),
+    ).toBe(true);
+  });
+
+  it('should run in linear time without ReDoS on large adversarial inputs', () => {
+    const start = performance.now();
+    expect(
+      detectCommandSubstitution('('.repeat(25_000) + '$a' + ')'.repeat(25_000)),
+    ).toBe(false);
+    expect(
+      detectCommandSubstitution(
+        '($a + '.repeat(10_000) + '$b' + ')'.repeat(10_000),
+      ),
+    ).toBe(false);
+    expect(detectCommandSubstitution(';if a'.repeat(10_000) + '(')).toBe(true);
+    expect(detectCommandSubstitution('$a.b'.repeat(10_000) + '()')).toBe(false);
+    expect(
+      stripShellWrapper(
+        'powershell.exe ' + '-NoProfile '.repeat(5_000) + 'git status',
+      ),
+    ).toContain('git status');
+    expect(performance.now() - start).toBeLessThan(1000);
   });
 });

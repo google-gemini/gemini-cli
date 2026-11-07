@@ -680,12 +680,19 @@ export function supportsMultimodalFunctionResponse(
   model: string,
   config?: ModelCapabilityContext,
 ): boolean {
-  const resolved = resolveModel(model, false, false, true, config);
+  const hasAccessToPreview = config?.getHasAccessToPreviewModel?.() ?? true;
+  const resolved = resolveModel(
+    model,
+    false,
+    false,
+    hasAccessToPreview,
+    config,
+  );
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
-    return (
-      config.modelConfigService.getModelDefinition(resolved)?.features
-        ?.multimodalToolUse === true
-    );
+    const definition = config.modelConfigService.getModelDefinition(resolved);
+    if (definition?.features?.multimodalToolUse !== undefined) {
+      return definition.features.multimodalToolUse;
+    }
   }
   return /^gemini-3(\.|-|$)/.test(resolved);
 }

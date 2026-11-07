@@ -49,6 +49,9 @@ export const useThemeCommand = (
       return;
     }
 
+    // Refresh standalone user theme files in case external palette tools updated them.
+    themeManager.loadUserThemes?.();
+
     // Ensure we have an up to date terminal background color when opening the
     // theme dialog as the user may have just changed it before opening the
     // dialog.
@@ -99,6 +102,7 @@ export const useThemeCommand = (
           return;
         }
         loadedSettings.setValue(scope, 'ui.theme', themeName); // Update the merged settings
+        themeManager.loadUserThemes?.();
         if (loadedSettings.merged.ui.customThemes) {
           themeManager.loadCustomThemes(loadedSettings.merged.ui.customThemes);
         }

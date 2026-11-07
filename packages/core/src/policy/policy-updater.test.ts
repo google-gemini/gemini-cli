@@ -27,6 +27,7 @@ vi.mock('../utils/shell-utils.js', () => ({
   getCommandRoots: vi.fn(),
   stripShellWrapper: vi.fn(),
   hasRedirection: vi.fn(),
+  detectCommandSubstitution: vi.fn(),
 }));
 interface ParsedPolicy {
   rule?: Array<{
@@ -267,6 +268,7 @@ describe('ShellToolInvocation Policy Update', () => {
       (c: string) => c,
     );
     vi.mocked(shellUtils.hasRedirection).mockReturnValue(false);
+    vi.mocked(shellUtils.detectCommandSubstitution).mockReturnValue(false);
   });
 
   it('should extract multiple root commands for chained commands', () => {
@@ -328,6 +330,28 @@ describe('ShellToolInvocation Policy Update', () => {
     expect(options!.allowRedirection).toBe(true);
     expect(shellUtils.hasRedirection).toHaveBeenCalledWith(
       'echo "hello" > file.txt',
+    );
+  });
+
+  it('should include allowCommandSubstitution if command has command substitution', () => {
+    vi.mocked(shellUtils.getCommandRoots).mockReturnValue(['echo', 'git']);
+    vi.mocked(shellUtils.detectCommandSubstitution).mockReturnValue(true);
+
+    const invocation = new ShellToolInvocation(
+      mockConfig,
+      { command: 'echo $(git status)' },
+      mockMessageBus,
+      'run_shell_command',
+      'Shell',
+    );
+
+    const options = (
+      invocation as unknown as TestableShellToolInvocation
+    ).getPolicyUpdateOptions(ToolConfirmationOutcome.ProceedAlways);
+    expect(options!.commandPrefix).toEqual(['echo', 'git']);
+    expect(options!.allowCommandSubstitution).toBe(true);
+    expect(shellUtils.detectCommandSubstitution).toHaveBeenCalledWith(
+      'echo $(git status)',
     );
   });
 });

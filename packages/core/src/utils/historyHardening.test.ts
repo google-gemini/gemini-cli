@@ -8,6 +8,9 @@ import { describe, it, expect } from 'vitest';
 import {
   hardenHistory,
   SYNTHETIC_THOUGHT_SIGNATURE,
+  INTERRUPTED_RESPONSE_PLACEHOLDER,
+  SYNTHETIC_BINARY_ACK_TEXT,
+  isEmptyTextOnlyPart,
   scrubContents,
   scrubHistory,
 } from './historyHardening.js';
@@ -618,5 +621,182 @@ describe('scrubHistory', () => {
         },
       },
     ]);
+  });
+
+  it('replaces a thought-only model turn following a functionResponse with INTERRUPTED_RESPONSE_PLACEHOLDER instead of fusing user turns', () => {
+    const history: HistoryTurn[] = [
+      { id: '1', content: { role: 'user', parts: [{ text: 'Check status' }] } },
+      {
+        id: '2',
+        content: {
+          role: 'model',
+          parts: [
+            {
+              functionCall: { id: 'c1', name: 'check_tool', args: {} },
+              thoughtSignature: 'sig',
+            },
+          ],
+        },
+      },
+      {
+        id: '3',
+        content: {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'c1',
+                name: 'check_tool',
+                response: { ok: true },
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: '4',
+        content: {
+          role: 'model',
+          parts: [{ text: 'Interrupted thinking...', thought: true } as Part],
+        },
+      },
+      {
+        id: '5',
+        content: {
+          role: 'user',
+          parts: [{ text: 'Continue with next step' }],
+        },
+      },
+    ];
+
+    const scrubbed = scrubHistory(history);
+    expect(scrubbed).toHaveLength(5);
+    expect(scrubbed[3].content).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
+    expect(scrubbed[4].content).toEqual({
+      role: 'user',
+      parts: [{ text: 'Continue with next step' }],
+    });
+
+    const hardened = hardenHistory(history);
+    expect(hardened).toHaveLength(5);
+    expect(hardened[3].content).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
+
+    const scrubbedRaw = scrubContents(history.map((h) => h.content));
+    expect(scrubbedRaw).toHaveLength(5);
+    expect(scrubbedRaw[3]).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
+  });
+
+  it('still drops synthetic binary acknowledgment thought turns so functionResponse and inlineData coalesce', () => {
+    const contents: Content[] = [
+      {
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              id: 'c1',
+              name: 'read_file',
+              response: { output: 'ok' },
+            },
+          },
+        ],
+      },
+      {
+        role: 'model',
+        parts: [
+          {
+            text: SYNTHETIC_BINARY_ACK_TEXT,
+            thought: true,
+            thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+          } as Part,
+        ],
+      },
+      {
+        role: 'user',
+        parts: [{ inlineData: { mimeType: 'image/png', data: 'abc' } }],
+      },
+    ];
+
+    const scrubbed = scrubContents(contents);
+    expect(scrubbed).toHaveLength(1);
+    expect(scrubbed[0].role).toBe('user');
+    expect(scrubbed[0].parts).toHaveLength(2);
+  });
+
+  it('handles nullish Part entries safely across isEmptyTextOnlyPart, hardenHistory, scrubHistory, and scrubContents', () => {
+    expect(isEmptyTextOnlyPart(undefined as unknown as Part)).toBe(true);
+    expect(isEmptyTextOnlyPart(null as unknown as Part)).toBe(true);
+
+    const history: HistoryTurn[] = [
+      { id: 'u1', content: { role: 'user', parts: [{ text: 'Check' }] } },
+      {
+        id: 'm1',
+        content: {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'c1',
+                name: 'read_file',
+                args: { file_path: 'a.ts' },
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: 'fr1',
+        content: {
+          role: 'user',
+          parts: [
+            undefined as unknown as Part,
+            {
+              functionResponse: {
+                id: 'c1',
+                name: 'read_file',
+                response: { output: 'ok' },
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: 'm2',
+        content: {
+          role: 'model',
+          parts: [
+            null as unknown as Part,
+            { text: 'Thinking...', thought: true } as Part,
+          ],
+        },
+      },
+      { id: 'u2', content: { role: 'user', parts: [{ text: 'Next' }] } },
+    ];
+
+    const hardened = hardenHistory(history);
+    expect(hardened[3].content).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
+
+    const scrubbedHist = scrubHistory(history);
+    expect(scrubbedHist[3].content).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
+
+    const scrubbedRaw = scrubContents(history.map((h) => h.content));
+    expect(scrubbedRaw[3]).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
   });
 });

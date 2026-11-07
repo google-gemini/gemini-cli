@@ -152,6 +152,8 @@ describe('NumericalClassifierStrategy', () => {
     expect(generateJsonCall).toMatchObject({
       modelConfigKey: { model: mockResolvedConfig.model },
       promptId: 'test-prompt-id',
+      abortSignal: mockContext.signal,
+      maxAttempts: 2,
     });
 
     // Verify user content parts

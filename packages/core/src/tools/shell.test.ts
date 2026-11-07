@@ -2157,5 +2157,168 @@ EOF`;
       });
       expect(result.returnDisplay).not.toContain('Blocked');
     });
+
+    it('should allow PowerShell method calls, compound conditions, and wrapped -NonInteractive commands', async () => {
+      mockPlatform.mockReturnValue('win32');
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: 'ok',
+          rawOutput: Buffer.from('ok'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+
+      const commands = [
+        '$str.Trim()',
+        "[System.IO.Path]::GetFullPath('foo')",
+        "Get-ChildItem | Where-Object { $_.Name.EndsWith('.ts') }",
+        'if (($a -eq 1) -and ($b -eq 2)) { Write-Host ok }',
+        'if (-not ($x)) { Write-Host ok }',
+        'dir "C:\\Program Files (x86)\\Git"',
+        'node -e "console.log(`"hello (world)`")"',
+        'powershell.exe -NoProfile -NonInteractive -Command "node -e \\"console.log(\'hello (world)\')\\""',
+      ];
+
+      for (const command of commands) {
+        const tool = new ShellTool(mockConfig, createMockMessageBus());
+        const invocation = tool.build({ command });
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
+        expect(result.returnDisplay).not.toContain('Blocked');
+      }
+    });
+
+    it('should allow command substitution when PolicyEngine allows all commands', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: 'clean',
+          rawOutput: Buffer.from('clean'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const configWithAllowPolicy = Object.assign(Object.create(mockConfig), {
+        getPolicyEngine: () => ({
+          check: vi.fn().mockResolvedValue({ decision: 'allow' }),
+        }),
+      }) as Config;
+
+      const tool = new ShellTool(configWithAllowPolicy, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo $(git status)' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should block command substitution when PolicyEngine requires confirmation and user has not confirmed', async () => {
+      const configWithAskPolicy = Object.assign(Object.create(mockConfig), {
+        getPolicyEngine: () => ({
+          check: vi.fn().mockResolvedValue({ decision: 'ask_user' }),
+        }),
+      }) as Config;
+
+      const tool = new ShellTool(configWithAskPolicy, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo $(whoami)' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toContain('Blocked');
+    });
+
+    it('should allow command substitution after explicit user confirmation or in YOLO mode', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: 'user',
+          rawOutput: Buffer.from('user'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+
+      // 1. Confirmed via scheduler ExecuteOptions.isUserConfirmed
+      const configWithAskPolicy = Object.assign(Object.create(mockConfig), {
+        getPolicyEngine: () => ({
+          check: vi.fn().mockResolvedValue({ decision: 'ask_user' }),
+        }),
+      }) as Config;
+      const tool = new ShellTool(configWithAskPolicy, createMockMessageBus());
+      const confirmedInvocation = tool.build({ command: 'echo $(whoami)' });
+      const confirmedResult = await confirmedInvocation.execute({
+        abortSignal: new AbortController().signal,
+        isUserConfirmed: true,
+      });
+      expect(confirmedResult.returnDisplay).not.toContain('Blocked');
+
+      // 2. YOLO mode fallback when PolicyEngine is not attached
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.YOLO);
+      const yoloTool = new ShellTool(mockConfig, createMockMessageBus());
+      const yoloInvocation = yoloTool.build({ command: 'echo $(whoami)' });
+      const yoloResult = await yoloInvocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(yoloResult.returnDisplay).not.toContain('Blocked');
+
+      // 3. Nested wrapper with command substitution is still blocked when unconfirmed
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+        ApprovalMode.DEFAULT,
+      );
+      const nestedTool = new ShellTool(
+        configWithAskPolicy,
+        createMockMessageBus(),
+      );
+      const nestedInvocation = nestedTool.build({
+        command:
+          'cmd.exe /c "powershell.exe -NoProfile -NonInteractive -Command \\"echo $(whoami)\\""',
+      });
+      const nestedResult = await nestedInvocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(nestedResult.returnDisplay).toContain('Blocked');
+
+      // 4. Tainted / prompt-injected flags block substitution even if PolicyEngine allows
+      const configWithAllowPolicy = Object.assign(Object.create(mockConfig), {
+        getPolicyEngine: () => ({
+          check: vi.fn().mockResolvedValue({ decision: 'allow' }),
+        }),
+      }) as Config;
+      const taintTool = new ShellTool(
+        configWithAllowPolicy,
+        createMockMessageBus(),
+      );
+      const taintedInvocation = taintTool.build({
+        command: 'echo --evil-flag $(git status)',
+      });
+      vi.spyOn(
+        taintedInvocation as unknown as {
+          hasTaintedOrBuildFileRisk: () => boolean;
+        },
+        'hasTaintedOrBuildFileRisk',
+      ).mockReturnValue(true);
+      const taintedResult = await taintedInvocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(taintedResult.returnDisplay).toContain('Blocked');
+    });
   });
 });

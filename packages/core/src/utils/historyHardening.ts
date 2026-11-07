@@ -11,6 +11,17 @@ import { deriveStableId } from './cryptoUtils.js';
 
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 
+/**
+ * Stands in for a model turn that never arrived (or only emitted internal
+ * thoughts) because the stream was interrupted after a tool response was
+ * committed to history.
+ */
+export const INTERRUPTED_RESPONSE_PLACEHOLDER =
+  '[The previous response was interrupted before it completed.]';
+
+export const SYNTHETIC_BINARY_ACK_TEXT =
+  'Binary content received. Proceeding with analysis.';
+
 export interface HardeningOptions {
   sentinels?: {
     continuation?: string;
@@ -73,26 +84,100 @@ function isInternalThought(part: Part): boolean {
 }
 
 /**
+ * Returns true when a part carries only an empty `text` string (optionally
+ * alongside bookkeeping keys) and no active payload.
+ */
+export function isEmptyTextOnlyPart(part: Part): boolean {
+  if (!part) {
+    return true;
+  }
+  if (part.text !== undefined && part.text !== '') {
+    return false;
+  }
+  return !Object.keys(part).some(
+    (key) =>
+      key !== 'text' &&
+      key !== 'thought' &&
+      key !== 'callIndex' &&
+      key !== 'thoughtSignature',
+  );
+}
+
+/**
+ * Returns true when `content` contains at least one part that survives thought
+ * stripping and empty-part filtering.
+ */
+export function hasNonThoughtParts(content: Content): boolean {
+  return (content.parts ?? []).some(
+    (p) => !!p && !isInternalThought(p) && !isEmptyTextOnlyPart(p),
+  );
+}
+
+/**
+ * Identifies the synthetic model turn injected by `GeminiChat` when expanding
+ * legacy binary tool outputs into `[functionResponse, ack, inlineData]`.
+ */
+export function isSyntheticBinaryAckTurn(content: Content): boolean {
+  return (
+    content.role === 'model' &&
+    content.parts?.length === 1 &&
+    Boolean((content.parts[0] as ThoughtPart | undefined)?.thought) &&
+    content.parts[0]?.text === SYNTHETIC_BINARY_ACK_TEXT
+  );
+}
+
+/**
  * Removes parts that represent thoughts (where part.thought === true).
- * Empty turns resulting from thought removal are handled in subsequent coalescing passes.
+ * Empty turns resulting from thought removal are handled in subsequent coalescing passes,
+ * except for interrupted model turns immediately following a tool response.
  */
 function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
-  return history.map((turn) => {
-    if (!turn.content.parts) return turn;
-    const hasThought = turn.content.parts.some(isInternalThought);
-    if (!hasThought) return turn;
+  const result: HistoryTurn[] = [];
+  for (const turn of history) {
+    if (!turn.content.parts) {
+      result.push(turn);
+      continue;
+    }
+    const hasThoughtOrEmpty = turn.content.parts.some(
+      (p) => !p || isInternalThought(p) || isEmptyTextOnlyPart(p),
+    );
+    if (!hasThoughtOrEmpty) {
+      result.push(turn);
+      continue;
+    }
 
     const nonThoughtParts = turn.content.parts.filter(
-      (p) => p && !isInternalThought(p),
+      (p) => p && !isInternalThought(p) && !isEmptyTextOnlyPart(p),
     );
-    return {
+    if (
+      nonThoughtParts.length === 0 &&
+      turn.content.role === 'model' &&
+      !isSyntheticBinaryAckTurn(turn.content)
+    ) {
+      const prev = result.at(-1);
+      if (
+        prev?.content.role === 'user' &&
+        (prev.content.parts ?? []).some((p) => !!p?.functionResponse)
+      ) {
+        result.push({
+          id: turn.id,
+          content: {
+            ...turn.content,
+            parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+          },
+        });
+        continue;
+      }
+    }
+    result.push({
       id: turn.id,
       content: {
         ...turn.content,
         parts: nonThoughtParts,
       },
-    };
-  });
+    });
+  }
+  return result;
 }
 
 /**
@@ -384,9 +469,26 @@ export function scrubHistory(history: HistoryTurn[]): HistoryTurn[] {
   const result: HistoryTurn[] = [];
   for (const turn of history) {
     const nonThoughtParts = (turn.content.parts ?? []).filter(
-      (p) => p && !isInternalThought(p),
+      (p) => p && !isInternalThought(p) && !isEmptyTextOnlyPart(p),
     );
-    if (nonThoughtParts.length === 0) continue; // Skip turns that became empty
+    if (nonThoughtParts.length === 0) {
+      const prev = result.at(-1);
+      if (
+        turn.content.role === 'model' &&
+        prev?.content.role === 'user' &&
+        (prev.content.parts ?? []).some((p) => !!p?.functionResponse) &&
+        !isSyntheticBinaryAckTurn(turn.content)
+      ) {
+        result.push({
+          id: turn.id,
+          content: {
+            role: 'model',
+            parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+          },
+        });
+      }
+      continue; // Skip turns that became empty
+    }
 
     const scrubbedParts = nonThoughtParts.map((p) => scrubPart(p));
 
@@ -422,9 +524,23 @@ export function scrubContents(contents: Content[]): Content[] {
   const result: Content[] = [];
   for (const content of contents) {
     const nonThoughtParts = (content.parts ?? []).filter(
-      (p) => p && !isInternalThought(p),
+      (p) => p && !isInternalThought(p) && !isEmptyTextOnlyPart(p),
     );
-    if (nonThoughtParts.length === 0) continue; // Skip turns that became empty after thought stripping
+    if (nonThoughtParts.length === 0) {
+      const prev = result.at(-1);
+      if (
+        content.role === 'model' &&
+        prev?.role === 'user' &&
+        (prev.parts ?? []).some((p) => !!p?.functionResponse) &&
+        !isSyntheticBinaryAckTurn(content)
+      ) {
+        result.push({
+          role: 'model',
+          parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+        });
+      }
+      continue; // Skip turns that became empty after thought stripping
+    }
 
     const scrubbedParts = nonThoughtParts.map((p) => scrubPart(p));
 

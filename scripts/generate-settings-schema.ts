@@ -40,6 +40,7 @@ interface JsonSchema {
   type?: string | string[];
   enum?: JsonPrimitive[];
   default?: JsonValue;
+  minimum?: number;
   properties?: Record<string, JsonSchema>;
   items?: JsonSchema;
   additionalProperties?: boolean | JsonSchema;
@@ -180,8 +181,14 @@ function buildSchemaForType(
   switch (source.type) {
     case 'boolean':
     case 'string':
-    case 'number':
       return { type: source.type };
+    case 'number':
+      return {
+        type: source.type,
+        ...(isSettingDefinition(source) && source.minimum !== undefined
+          ? { minimum: source.minimum }
+          : {}),
+      };
     case 'enum':
       return buildEnumSchema(source.options);
     case 'array': {
