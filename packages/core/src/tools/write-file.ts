@@ -427,6 +427,10 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       abortSignal,
     );
 
+    if (abortSignal.aborted) {
+      throw new Error('Write aborted');
+    }
+
     if (correctedContentResult.error) {
       const errDetails = correctedContentResult.error;
       const errorMsg = errDetails.code
@@ -472,6 +476,9 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         finalContent = finalContent.replace(/\r?\n/g, '\r\n');
       }
 
+      if (abortSignal.aborted) {
+        throw new Error('Write aborted');
+      }
       await this.config
         .getFileSystemService()
         .writeTextFile(this.resolvedPath, finalContent);
@@ -583,6 +590,9 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         returnDisplay: displayResult,
       };
     } catch (error) {
+      if (abortSignal.aborted) {
+        throw error;
+      }
       // Capture detailed error information for debugging
       let errorMsg: string;
       let errorType = ToolErrorType.FILE_WRITE_FAILURE;

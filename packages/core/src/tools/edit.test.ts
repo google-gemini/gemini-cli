@@ -33,6 +33,10 @@ vi.mock('../utils/editor.js', () => ({
   openDiff: mockOpenDiff,
 }));
 
+vi.mock('node:fs/promises', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:fs/promises')>()),
+}));
+
 vi.mock('./jit-context.js', () => ({
   discoverJitContext: vi.fn().mockResolvedValue(''),
   appendJitContext: vi.fn().mockImplementation((content, context) => {
@@ -65,6 +69,7 @@ import {
 import path from 'node:path';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import fs from 'node:fs';
+import * as fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import { ApprovalMode } from '../policy/types.js';
 import { type Config } from '../config/config.js';
@@ -738,6 +743,61 @@ function doIt() {
     beforeEach(() => {
       filePath = path.join(rootDir, testFile);
     });
+
+    it.each([
+      { fileExists: true, cancelDuring: 'read' },
+      { fileExists: false, cancelDuring: 'read' },
+      { fileExists: true, cancelDuring: 'directory access' },
+      { fileExists: false, cancelDuring: 'directory access' },
+    ])(
+      'does not write after cancellation during $cancelDuring (existing file: $fileExists)',
+      async ({ fileExists, cancelDuring }) => {
+        const originalContent = 'original content';
+        if (fileExists) {
+          fs.writeFileSync(filePath, originalContent, 'utf8');
+        }
+        const controller = new AbortController();
+        if (cancelDuring === 'read') {
+          const readTextFile =
+            fileSystemService.readTextFile.bind(fileSystemService);
+          vi.spyOn(fileSystemService, 'readTextFile').mockImplementationOnce(
+            async (target) => {
+              try {
+                return await readTextFile(target);
+              } finally {
+                controller.abort();
+              }
+            },
+          );
+        } else {
+          const access = fsPromises.access;
+          vi.spyOn(fsPromises, 'access').mockImplementationOnce(
+            async (target) => {
+              await access(target);
+              controller.abort();
+            },
+          );
+        }
+
+        const result = await tool
+          .build({
+            file_path: filePath,
+            instruction: 'Replace the content',
+            old_string: fileExists ? originalContent : '',
+            new_string: 'replacement content',
+          })
+          .execute({ abortSignal: controller.signal })
+          .catch((error: unknown) => error);
+
+        expect(controller.signal.aborted).toBe(true);
+        if (fileExists) {
+          expect(fs.readFileSync(filePath, 'utf8')).toBe(originalContent);
+        } else {
+          expect(fs.existsSync(filePath)).toBe(false);
+        }
+        expect(result).toEqual(new Error('Edit aborted'));
+      },
+    );
 
     it('should reject when calculateEdit fails after an abort signal', async () => {
       const params: EditToolParams = {

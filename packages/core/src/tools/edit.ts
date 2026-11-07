@@ -981,6 +981,10 @@ class EditToolInvocation
       };
     }
 
+    if (signal.aborted) {
+      throw new Error('Edit aborted');
+    }
+
     if (editData.error) {
       return {
         llmContent: editData.error.raw,
@@ -1003,6 +1007,9 @@ class EditToolInvocation
 
       if (useCRLF) {
         finalContent = finalContent.replace(/\r?\n/g, '\r\n');
+      }
+      if (signal.aborted) {
+        throw new Error('Edit aborted');
       }
       await this.config
         .getFileSystemService()
@@ -1131,6 +1138,9 @@ ${snippet}`);
         returnDisplay: displayResult,
       };
     } catch (error) {
+      if (signal.aborted) {
+        throw error;
+      }
       const errorMsg = error instanceof Error ? error.message : String(error);
       return {
         llmContent: `Error executing edit: ${errorMsg}`,
