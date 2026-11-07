@@ -256,7 +256,12 @@ describe('Environment Isolation', () => {
     }
 
     beforeEach(() => {
-      delete process.env['GOOGLE_CLOUD_PROJECT'];
+      // undefined removes the var; the loader skips keys that are merely empty
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', undefined);
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
     });
 
     it.each([
