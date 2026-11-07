@@ -4,7 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  vi,
+  type MockInstance,
+} from 'vitest';
+import os from 'node:os';
+import path from 'node:path';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
 import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 import {
@@ -334,5 +344,89 @@ describe('Background Tools', () => {
     expect(result.llmContent).not.toContain('line1');
 
     fs.unlinkSync(logPath);
+  });
+
+  describe('read cancellation', () => {
+    const pid = 987655;
+    let fixtureDir: string;
+    let logAccess: MockInstance<typeof fs.promises.access>;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'background-cancel-'));
+      const logPath = path.join(fixtureDir, 'output.log');
+      fs.writeFileSync(logPath, 'fixture output\n');
+      vi.spyOn(ShellExecutionService, 'getLogFilePath').mockReturnValue(
+        logPath,
+      );
+      vi.spyOn(
+        ShellExecutionService,
+        'listBackgroundProcesses',
+      ).mockReturnValue([{ pid, command: 'fixture', status: 'running' }]);
+      logAccess = vi.spyOn(fs.promises, 'access');
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+    });
+
+    it.each([0, 10_000])(
+      'rejects an already-aborted read with delay %i',
+      async (delay_ms) => {
+        const controller = new AbortController();
+        controller.abort();
+        const outcome = readTool
+          .build({ pid, delay_ms })
+          .execute({ abortSignal: controller.signal })
+          .then(
+            () => undefined,
+            (error: unknown) => error,
+          );
+        await vi.runAllTimersAsync();
+        expect(await outcome).toMatchObject({ name: 'AbortError' });
+        expect(logAccess).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+      },
+    );
+
+    it('cancels during the delay without waiting for its deadline or reading the log', async () => {
+      const controller = new AbortController();
+      let settled = false;
+      const outcome = readTool
+        .build({ pid, delay_ms: 10_000 })
+        .execute({ abortSignal: controller.signal })
+        .then(
+          () => {
+            settled = true;
+            return undefined;
+          },
+          (error: unknown) => {
+            settled = true;
+            return error;
+          },
+        );
+      await vi.advanceTimersByTimeAsync(20);
+      controller.abort();
+      await vi.advanceTimersByTimeAsync(0);
+      const settledAfterAbort = settled;
+      await vi.runAllTimersAsync();
+      const error = await outcome;
+      expect(settledAfterAbort).toBe(true);
+      expect(error).toMatchObject({ name: 'AbortError' });
+      expect(logAccess).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('still reads output after an uncancelled delay', async () => {
+      const pending = readTool
+        .build({ pid, delay_ms: 100 })
+        .execute({ abortSignal: new AbortController().signal });
+      await vi.advanceTimersByTimeAsync(99);
+      expect(logAccess).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect((await pending).llmContent).toContain('fixture output');
+    });
   });
 });
