@@ -20,7 +20,7 @@ interface ErrorReportData {
  * Error reports can include the full chat history, so they are kept under the
  * user's own Gemini directory rather than the shared system temp directory.
  */
-function getDefaultReportingDir(): string {
+export function getErrorReportsDir(): string {
   return path.join(Storage.getGlobalTempDir(), 'error-reports');
 }
 
@@ -44,7 +44,7 @@ export async function reportError(
   baseMessage: string,
   context?: Content[] | Record<string, unknown> | unknown[],
   type = 'general',
-  reportingDir = getDefaultReportingDir(), // for testing
+  reportingDir = getErrorReportsDir(), // for testing
 ): Promise<void> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const reportFileName = `gemini-client-error-${type}-${timestamp}.json`;
