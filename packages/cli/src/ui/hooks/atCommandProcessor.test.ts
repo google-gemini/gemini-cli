@@ -2007,6 +2007,8 @@ describe('handleAtCommand', () => {
       'keys/webserver.key',
       'config/.env.webserver',
       'config/webserver.env',
+      // Backslash-separated: path.basename on POSIX does not split on `\`.
+      'config/some\\dir\\.env.webserver',
     ])(
       'does not attach %s when the glob fallback matches it',
       async (relativePath) => {

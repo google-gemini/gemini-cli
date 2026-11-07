@@ -255,7 +255,7 @@ async function isSensitiveFile(filePath: string): Promise<boolean> {
   const segments = filePath.toLowerCase().split(/[\\/]/);
   if (
     segments.some((segment) => SENSITIVE_DIRECTORY_NAMES.has(segment)) ||
-    SENSITIVE_FILE_NAME_REGEX.test(path.basename(filePath).toLowerCase())
+    SENSITIVE_FILE_NAME_REGEX.test(segments[segments.length - 1] || '')
   ) {
     return true;
   }
