@@ -695,10 +695,18 @@ export class AgentRegistry {
 
     // GeminiChat resolves each request by model name, not by this alias, so
     // apply the agent's settings to its scope, whatever model it runs on.
-    this.config.modelConfigService.registerRuntimeScopeOverride(
-      definition.name,
-      { generateContentConfig: agentModelConfig.generateContentConfig },
-    );
+    // Re-registration (e.g. on reload) replaces the scope, so drop a stale one
+    // when the agent no longer sets generateContentConfig.
+    if (agentModelConfig.generateContentConfig) {
+      this.config.modelConfigService.registerRuntimeScopeOverride(
+        definition.name,
+        { generateContentConfig: agentModelConfig.generateContentConfig },
+      );
+    } else {
+      this.config.modelConfigService.unregisterRuntimeScopeOverride(
+        definition.name,
+      );
+    }
   }
 
   /**

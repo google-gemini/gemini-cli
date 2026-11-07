@@ -762,6 +762,48 @@ describe('ModelConfigService', () => {
       expect(resolve(service)).toEqual({ temperature: 0.2, topK: 64 });
     });
 
+    it('should not mutate the registered override when swapping thinking fields', () => {
+      const service = new ModelConfigService({
+        ...config,
+        aliases: {
+          base: {
+            modelConfig: {
+              model: 'gemini-pro',
+              generateContentConfig: {
+                thinkingConfig: { thinkingLevel: 'HIGH' },
+              },
+            },
+          },
+        },
+      });
+      const overrideConfig = {
+        generateContentConfig: { thinkingConfig: { thinkingBudget: 100 } },
+      };
+      service.registerRuntimeScopeOverride('my-agent', overrideConfig);
+
+      for (let i = 0; i < 2; i++) {
+        expect(
+          service.getResolvedConfig({
+            model: 'base',
+            overrideScope: 'my-agent',
+          }).generateContentConfig.thinkingConfig,
+        ).toEqual({ thinkingBudget: 100 });
+      }
+      expect(overrideConfig).toEqual({
+        generateContentConfig: { thinkingConfig: { thinkingBudget: 100 } },
+      });
+    });
+
+    it('should remove a scope override on unregister', () => {
+      const service = new ModelConfigService(config);
+      service.registerRuntimeScopeOverride('my-agent', {
+        generateContentConfig: { temperature: 0.1 },
+      });
+      service.unregisterRuntimeScopeOverride('my-agent');
+
+      expect(resolve(service).temperature).toBe(1);
+    });
+
     it('should not be removed by clearRuntimeOverrides', () => {
       const service = new ModelConfigService(config);
       service.registerRuntimeScopeOverride('my-agent', {

@@ -386,6 +386,11 @@ export class ModelConfigService {
     });
   }
 
+  /** Removes the scope override registered for `overrideScope`, if any. */
+  unregisterRuntimeScopeOverride(overrideScope: string): void {
+    this.runtimeScopeOverrides.delete(overrideScope);
+  }
+
   clearRuntimeOverrides(): void {
     this.runtimeOverrides.length = 0;
   }
@@ -646,8 +651,9 @@ export class ModelConfigService {
     // The API rejects a request that sets both thinkingLevel and
     // thinkingBudget, so the one the override sets replaces the inherited one.
     const overrideThinking = override.generateContentConfig?.thinkingConfig;
-    const thinkingConfig = generateContentConfig.thinkingConfig;
-    if (overrideThinking && thinkingConfig) {
+    if (overrideThinking && generateContentConfig.thinkingConfig) {
+      // Clone: deepMerge can return the override's own nested object.
+      const thinkingConfig = { ...generateContentConfig.thinkingConfig };
       if (
         overrideThinking.thinkingBudget !== undefined &&
         overrideThinking.thinkingLevel === undefined
@@ -659,6 +665,7 @@ export class ModelConfigService {
       ) {
         delete thinkingConfig.thinkingBudget;
       }
+      generateContentConfig.thinkingConfig = thinkingConfig;
     }
     return {
       model: override.model ?? base.model,
