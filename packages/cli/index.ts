@@ -7,10 +7,10 @@
  */
 
 import { spawn } from 'node:child_process';
+import { realpath } from 'node:fs/promises';
 import os from 'node:os';
 import { isAbsolute, resolve } from 'node:path';
 import v8 from 'node:v8';
-import { resolveToRealPath } from '@google/gemini-cli-core';
 import {
   RELAUNCH_EXIT_CODE,
   getSpawnConfig,
@@ -95,7 +95,7 @@ async function run() {
 
       child.on(
         'message',
-        (msg: {
+        async (msg: {
           type?: string;
           settings?: unknown;
           authType?: string;
@@ -114,7 +114,7 @@ async function run() {
             msg.path.length > 0
           ) {
             try {
-              const resolvedWorktreePath = resolveToRealPath(msg.path);
+              const resolvedWorktreePath = await realpath(resolve(msg.path));
               process.chdir(resolvedWorktreePath);
               selectedWorktreePath = resolvedWorktreePath;
               process.env['GEMINI_CLI_WORKTREE_HANDLED'] = '1';
