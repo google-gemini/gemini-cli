@@ -189,6 +189,56 @@ describe('ThemeManager', () => {
 
       consoleWarnSpy.mockRestore();
     });
+
+    it('should not load a theme from a sibling directory sharing the home prefix', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(mockTheme));
+      const consoleWarnSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+
+      const result = themeManager.setActiveTheme(
+        '/home/user-sibling/my-theme.json',
+      );
+
+      expect(result).toBe(false);
+      expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('is outside your home directory'),
+      );
+
+      consoleWarnSpy.mockRestore();
+    });
+
+    it.each(['win32', 'darwin'] as const)(
+      'should load a theme when path casing differs from homedir on %s',
+      (platform) => {
+        vi.spyOn(process, 'platform', 'get').mockReturnValue(platform);
+        vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+        vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(mockTheme));
+
+        const result = themeManager.setActiveTheme('/HOME/USER/my-theme.json');
+
+        expect(result).toBe(true);
+        expect(themeManager.getActiveTheme().name).toBe('My File Theme');
+      },
+    );
+
+    it('should load a theme when homedir is a symlink', () => {
+      vi.mocked(os.homedir).mockReturnValue('/var/home/user');
+      vi.spyOn(fs, 'realpathSync').mockImplementation((p) =>
+        String(p).replace(/^\/var\/home\/user/, '/private/var/home/user'),
+      );
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(mockTheme));
+
+      const result = themeManager.setActiveTheme(
+        '/var/home/user/my-theme.json',
+      );
+
+      expect(result).toBe(true);
+      expect(themeManager.getActiveTheme().name).toBe('My File Theme');
+    });
   });
 
   describe('extension themes', () => {
