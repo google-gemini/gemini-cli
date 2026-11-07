@@ -223,29 +223,74 @@ function nonKeyboardEventFilter(
 }
 
 /**
+ * Checks if a keypress immediately preceding an Enter key represents an IME composition commit.
+ *
+ * Considers a sequence an IME commit only if it consists of exactly one non-ASCII code point
+ * and arrives within a rapid 2-event burst (the character followed by Enter).
+ * Multi-character chunks or longer bursts are treated as bracketless pastes.
+ */
+export function isImeCommit(
+  lastSequence: string | undefined,
+  rapidCount: number,
+): boolean {
+  if (!lastSequence) return false;
+  const codePoints = Array.from(lastSequence);
+  if (codePoints.length !== 1) return false;
+
+  const code = codePoints[0].codePointAt(0) ?? 0;
+  const isNonAscii = code > 127;
+
+  return isNonAscii && rapidCount <= 2;
+}
+
+/**
  * Converts return keys pressed quickly after insertable keys into a shift+return
  *
  * This is to accommodate older terminals that paste text without bracketing.
  */
-function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
+export function bufferFastReturn(
+  keypressHandler: KeypressHandler,
+): KeypressHandler {
   let lastKeyTime = 0;
+  let rapidCount = 0;
+  let lastSequence: string | undefined = undefined;
+
   return (key: Key) => {
     const now = Date.now();
+
+    if (now - lastKeyTime > FAST_RETURN_TIMEOUT) {
+      rapidCount = 0;
+    }
+
+    if (key.insertable || key.name === 'enter') {
+      rapidCount++;
+    }
+
     if (key.name === 'enter' && now - lastKeyTime <= FAST_RETURN_TIMEOUT) {
-      keypressHandler({
-        ...key,
-        name: 'enter',
-        shift: true, // to make it a newline, not a submission
-        alt: false,
-        ctrl: false,
-        cmd: false,
-        sequence: '\r',
-        insertable: true,
-      });
+      if (!isImeCommit(lastSequence, rapidCount)) {
+        keypressHandler({
+          ...key,
+          name: 'enter',
+          shift: true, // to make it a newline, not a submission
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          sequence: '\r',
+          insertable: true,
+        });
+      } else {
+        keypressHandler(key);
+      }
     } else {
       keypressHandler(key);
     }
-    lastKeyTime = key.insertable ? now : 0;
+
+    if (key.insertable) {
+      lastSequence = key.sequence;
+      lastKeyTime = now;
+    } else {
+      lastKeyTime = 0;
+    }
   };
 }
 
