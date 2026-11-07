@@ -347,6 +347,8 @@ describe('commandSafety', () => {
     it.each([
       // Recursive or forced removals.
       ['rm -rf x', true],
+      ['/bin/rm -rf x', true],
+      ['/usr/bin/rm -r x', true],
       ['rm -fr x', true],
       ['rm -f x', true],
       ['rm -r x', true],
@@ -367,6 +369,7 @@ describe('commandSafety', () => {
       ['rm x', false],
       ['rm file', false],
       ['rm -i x', false],
+      ['/bin/rm x', false],
       ['rm -v x', false],
       ['rm -d x', false],
       ['rm --verbose x', false],

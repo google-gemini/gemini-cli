@@ -827,7 +827,8 @@ export function isDangerousCommand(
     }
   }
 
-  if (cmd === 'rm') {
+  const cmdBase = cmd.split(/[\\/]/).pop();
+  if (cmdBase === 'rm' || cmdBase === 'rm.exe') {
     return isRecursiveOrForcedRm(args.slice(1));
   }
 
