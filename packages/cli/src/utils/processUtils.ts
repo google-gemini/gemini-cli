@@ -103,6 +103,18 @@ export function _resetRelaunchStateForTesting(): void {
   isRelaunching = false;
 }
 
+const initialProcessSend = process.send;
+
+export function isIPCAvailable(): boolean {
+  return (
+    typeof process.send === 'function' &&
+    (!process.env['VITEST'] ||
+      process.env['GEMINI_CLI_NO_RELAUNCH'] === 'true' ||
+      process.send !== initialProcessSend ||
+      'mock' in process.send)
+  );
+}
+
 export async function relaunchApp(options?: {
   overrideAuthType?: string;
 }): Promise<void> {
@@ -110,7 +122,7 @@ export async function relaunchApp(options?: {
   isRelaunching = true;
   await waitForUpdateCompletion();
 
-  if (process.send && !process.env['VITEST'] && options?.overrideAuthType) {
+  if (isIPCAvailable() && options?.overrideAuthType) {
     await new Promise<void>((resolve) => {
       let resolved = false;
       const done = () => {

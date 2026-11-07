@@ -14,6 +14,8 @@ import {
   type MockInstance,
 } from 'vitest';
 import { EventEmitter } from 'node:events';
+import { isAbsolute } from 'node:path';
+import { resolveToRealPath } from '@google/gemini-cli-core';
 import { FORWARDED_SIGNALS, RELAUNCH_EXIT_CODE } from './processUtils.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 
@@ -381,6 +383,147 @@ describe('relaunchAppInChildProcess', () => {
       mockChild.emit('close', 0);
 
       await expect(relaunchPromise).rejects.toThrow('PROCESS_EXIT_CALLED');
+    });
+
+    it('should retain selected worktree directory and GEMINI_CLI_WORKTREE_HANDLED across multiple auth restarts while preserving auth/admin lifetimes', async () => {
+      vi.stubEnv('GEMINI_CLI_AUTH_OVERRIDE', '');
+      vi.stubEnv('GEMINI_CLI_WORKTREE_HANDLED', '');
+      process.argv = ['/usr/bin/node', 'packages/cli/index.js', '--worktree'];
+
+      const chdirSpy = vi
+        .spyOn(process, 'chdir')
+        .mockImplementation(() => undefined);
+      const selectedPath = resolveToRealPath(
+        '/mock/project/.gemini/worktrees/keep-this-worktree',
+      );
+      const capturedSpawns: Array<{
+        args: string[];
+        cwd?: string;
+        env: NodeJS.ProcessEnv;
+      }> = [];
+      let spawnCount = 0;
+
+      mockedSpawn.mockImplementation((_cmd, args, opts) => {
+        spawnCount++;
+        const spawnOpts = opts as { cwd?: string; env?: NodeJS.ProcessEnv };
+        capturedSpawns.push({
+          args: [...(args as string[])],
+          cwd: spawnOpts?.cwd,
+          env: { ...spawnOpts?.env },
+        });
+        const child = createMockChildProcess(0, false);
+        setImmediate(() => {
+          if (spawnCount === 1) {
+            child.emit('message', {
+              type: 'worktree-selected',
+              path: selectedPath,
+            });
+            child.emit('message', {
+              type: 'admin-settings-update',
+              settings: { strictMode: true },
+            });
+            child.emit('message', {
+              type: 'auth-selected-type',
+              authType: 'login_with_google',
+            });
+            child.emit('close', RELAUNCH_EXIT_CODE);
+          } else if (spawnCount === 2) {
+            // Second auth restart without setting a new auth override
+            child.emit('close', RELAUNCH_EXIT_CODE);
+          } else {
+            child.emit('close', 0);
+          }
+        });
+        return child;
+      });
+
+      try {
+        await expect(relaunchAppInChildProcess([], [])).rejects.toThrow(
+          'PROCESS_EXIT_CALLED',
+        );
+
+        expect(spawnCount).toBe(3);
+        expect(chdirSpy).toHaveBeenCalledWith(selectedPath);
+        expect(isAbsolute(process.argv[1] ?? '')).toBe(true);
+
+        // Child #2 (after Auth Restart #1): spawns in worktree, has GEMINI_CLI_WORKTREE_HANDLED=1 and one-time GEMINI_CLI_AUTH_OVERRIDE
+        expect(capturedSpawns[1]?.cwd).toBe(selectedPath);
+        expect(capturedSpawns[1]?.args).toContain(process.argv[1]);
+        expect(capturedSpawns[1]?.env['GEMINI_CLI_WORKTREE_HANDLED']).toBe('1');
+        expect(capturedSpawns[1]?.env['GEMINI_CLI_AUTH_OVERRIDE']).toBe(
+          'login_with_google',
+        );
+        const secondChild = mockedSpawn.mock.results[1]?.value as ChildProcess;
+        expect(secondChild.send).toHaveBeenCalledWith({
+          type: 'admin-settings',
+          settings: { strictMode: true },
+        });
+
+        // Child #3 (after Auth Restart #2): stays in worktree with GEMINI_CLI_WORKTREE_HANDLED=1, one-time auth override cleared, admin settings preserved
+        expect(capturedSpawns[2]?.cwd).toBe(selectedPath);
+        expect(capturedSpawns[2]?.env['GEMINI_CLI_WORKTREE_HANDLED']).toBe('1');
+        expect(
+          capturedSpawns[2]?.env['GEMINI_CLI_AUTH_OVERRIDE'],
+        ).toBeUndefined();
+        const thirdChild = mockedSpawn.mock.results[2]?.value as ChildProcess;
+        expect(thirdChild.send).toHaveBeenCalledWith({
+          type: 'admin-settings',
+          settings: { strictMode: true },
+        });
+      } finally {
+        chdirSpy.mockRestore();
+      }
+    });
+
+    it('should not update worktree state or spawn cwd if process.chdir fails for an invalid worktree path', async () => {
+      vi.stubEnv('GEMINI_CLI_WORKTREE_HANDLED', '');
+
+      const invalidPath = resolveToRealPath('/mock/invalid/worktree');
+      const chdirSpy = vi.spyOn(process, 'chdir').mockImplementation(() => {
+        throw new Error('ENOENT: no such file or directory');
+      });
+      const capturedSpawns: Array<{
+        cwd?: string;
+        env: NodeJS.ProcessEnv;
+      }> = [];
+      let spawnCount = 0;
+
+      mockedSpawn.mockImplementation((_cmd, _args, opts) => {
+        spawnCount++;
+        const spawnOpts = opts as { cwd?: string; env?: NodeJS.ProcessEnv };
+        capturedSpawns.push({
+          cwd: spawnOpts?.cwd,
+          env: { ...spawnOpts?.env },
+        });
+        const child = createMockChildProcess(0, false);
+        setImmediate(() => {
+          if (spawnCount === 1) {
+            child.emit('message', {
+              type: 'worktree-selected',
+              path: invalidPath,
+            });
+            child.emit('close', RELAUNCH_EXIT_CODE);
+          } else {
+            child.emit('close', 0);
+          }
+        });
+        return child;
+      });
+
+      try {
+        await expect(relaunchAppInChildProcess([], [])).rejects.toThrow(
+          'PROCESS_EXIT_CALLED',
+        );
+
+        expect(spawnCount).toBe(2);
+        expect(chdirSpy).toHaveBeenCalledWith(invalidPath);
+        expect(capturedSpawns[1]?.cwd).toBeUndefined();
+        expect(
+          capturedSpawns[1]?.env['GEMINI_CLI_WORKTREE_HANDLED'],
+        ).toBeFalsy();
+      } finally {
+        chdirSpy.mockRestore();
+      }
     });
 
     it('should forward all signals on POSIX platforms and skip SIGINT/SIGQUIT on Windows', async () => {

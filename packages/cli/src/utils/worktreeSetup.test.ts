@@ -121,4 +121,106 @@ describe('setupWorktree', () => {
 
     mockExit.mockRestore();
   });
+
+  it('should notify supervisor of selected worktree via IPC with callback', async () => {
+    const originalSend = process.send;
+    const sendMock = vi.fn((_msg: unknown, cb?: () => void) => {
+      if (cb) cb();
+      return true;
+    });
+    Object.defineProperty(process, 'send', {
+      value: sendMock,
+      configurable: true,
+      writable: true,
+    });
+
+    try {
+      const result = await setupWorktree('my-feature');
+
+      expect(sendMock).toHaveBeenCalledWith(
+        {
+          type: 'worktree-selected',
+          path: '/mock/project/.gemini/worktrees/my-feature',
+        },
+        expect.any(Function),
+      );
+      expect(result).toEqual({
+        name: 'my-feature',
+        path: '/mock/project/.gemini/worktrees/my-feature',
+        baseSha: 'base-sha',
+      });
+    } finally {
+      Object.defineProperty(process, 'send', {
+        value: originalSend,
+        configurable: true,
+        writable: true,
+      });
+    }
+  });
+
+  it('should resolve after bounded timeout if process.send callback is never called', async () => {
+    vi.useFakeTimers();
+    const originalSend = process.send;
+    const sendMock = vi.fn(() => false);
+    Object.defineProperty(process, 'send', {
+      value: sendMock,
+      configurable: true,
+      writable: true,
+    });
+
+    try {
+      const setupPromise = setupWorktree('my-feature');
+      await vi.advanceTimersByTimeAsync(500);
+      const result = await setupPromise;
+
+      expect(sendMock).toHaveBeenCalledWith(
+        {
+          type: 'worktree-selected',
+          path: '/mock/project/.gemini/worktrees/my-feature',
+        },
+        expect.any(Function),
+      );
+      expect(result).toEqual({
+        name: 'my-feature',
+        path: '/mock/project/.gemini/worktrees/my-feature',
+        baseSha: 'base-sha',
+      });
+    } finally {
+      Object.defineProperty(process, 'send', {
+        value: originalSend,
+        configurable: true,
+        writable: true,
+      });
+      vi.useRealTimers();
+    }
+  });
+
+  it('should resolve cleanly if process.send throws synchronously', async () => {
+    const originalSend = process.send;
+    const sendMock = vi.fn(() => {
+      throw new Error('IPC channel closed');
+    });
+    Object.defineProperty(process, 'send', {
+      value: sendMock,
+      configurable: true,
+      writable: true,
+    });
+
+    try {
+      const result = await setupWorktree('my-feature');
+
+      expect(sendMock).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({
+        name: 'my-feature',
+        path: '/mock/project/.gemini/worktrees/my-feature',
+        baseSha: 'base-sha',
+      });
+    } finally {
+      Object.defineProperty(process, 'send', {
+        value: originalSend,
+        configurable: true,
+        writable: true,
+      });
+    }
+  });
 });
