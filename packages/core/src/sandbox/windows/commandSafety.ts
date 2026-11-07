@@ -14,6 +14,10 @@ import {
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
 import { isSubpath, resolveToRealPath } from '../../utils/paths.js';
+import {
+  isDangerousGitCommand,
+  isKnownSafeGitCommand,
+} from '../utils/commandSafety.js';
 
 /**
  * Determines if a command is strictly approved for execution on Windows.
@@ -293,15 +297,26 @@ export function isKnownSafeCommand(
     return true;
   }
 
-  // We allow git on Windows if it's read-only, using the same logic as POSIX
+  // We allow git on Windows if it's read-only, using the same logic as POSIX.
   if (cmd === 'git') {
-    // For simplicity in this branch, we'll allow standard git read operations
-    // In a full implementation, we'd port the sub-command validation too.
-    const sub = args[1]?.toLowerCase();
-    return ['status', 'log', 'diff', 'show', 'branch'].includes(sub);
+    return !hasShellEscapeOrExpansion(args) && isKnownSafeGitCommand(args);
   }
 
   return false;
+}
+
+/**
+ * Checks if any argument contains characters that the Windows shell rewrites
+ * before invoking native commands, so the parsed argument cannot be trusted:
+ * - PowerShell escape (backtick): --out`put reaches git as --output.
+ * - cmd.exe escape (caret): --out^put reaches git as --output. The strict
+ *   Windows sandbox runs commands through `cmd.exe /c`.
+ * - cmd.exe variable expansion: --out%PATH:~0,0%put expands to --output, and
+ *   delayed expansion (!VAR!) behaves the same when enabled. A lone `%` (as in
+ *   `--format=%H`) is not expanded and stays allowed.
+ */
+function hasShellEscapeOrExpansion(args: string[]): boolean {
+  return args.some((arg) => /[`^!]|%[^%\s]+%/.test(arg));
 }
 
 /**
@@ -316,6 +331,10 @@ export function isDangerousCommand(
   let cmd = args[0].toLowerCase();
   if (cmd.endsWith('.exe')) {
     cmd = cmd.slice(0, -4);
+  }
+
+  if (cmd === 'git') {
+    return hasShellEscapeOrExpansion(args) || isDangerousGitCommand(args);
   }
 
   const dangerous = new Set([

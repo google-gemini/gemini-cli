@@ -342,4 +342,66 @@ describe('commandSafety', () => {
       expect(isDangerousCommand(['ln', 'target', 'link'])).toBe(false);
     });
   });
+
+  describe('git command safety', () => {
+    it('should consider read-only git commands safe', () => {
+      expect(isKnownSafeCommand(['git', 'status'])).toBe(true);
+      expect(isKnownSafeCommand(['git', 'log', '--oneline'])).toBe(true);
+      expect(isKnownSafeCommand(['git', 'branch', '--show-current'])).toBe(
+        true,
+      );
+    });
+
+    it('should not consider git commands with unsafe flags safe', () => {
+      expect(isKnownSafeCommand(['git', 'diff', '--output=/tmp/out'])).toBe(
+        false,
+      );
+      expect(isKnownSafeCommand(['git', '-c', 'core.pager=sh', 'log'])).toBe(
+        false,
+      );
+      expect(isKnownSafeCommand(['git', 'branch', '-D', 'main'])).toBe(false);
+    });
+
+    it('should flag git commands with unsafe flags as dangerous', () => {
+      expect(isDangerousCommand(['git', 'diff', '--output=/tmp/out'])).toBe(
+        true,
+      );
+      expect(isDangerousCommand(['git', '-c', 'core.pager=sh', 'log'])).toBe(
+        true,
+      );
+      expect(isDangerousCommand(['git', 'branch', '-D', 'main'])).toBe(true);
+      expect(isDangerousCommand(['git', 'status'])).toBe(false);
+    });
+
+    it('should not consider git commands with global options safe', () => {
+      expect(isKnownSafeCommand(['git', '--exec-path=/tmp/evil', 'log'])).toBe(
+        false,
+      );
+      expect(isKnownSafeCommand(['git', '--git-dir=/tmp/x/.git', 'log'])).toBe(
+        false,
+      );
+      expect(isKnownSafeCommand(['git', '-C', '/tmp', 'status'])).toBe(false);
+      expect(isDangerousCommand(['git', '--exec-path=/tmp/evil', 'log'])).toBe(
+        true,
+      );
+      expect(isDangerousCommand(['git', '--exec-path', '/tmp', 'commit'])).toBe(
+        true,
+      );
+    });
+
+    it('should reject abbreviated unsafe flags and --no-index', () => {
+      expect(isKnownSafeCommand(['git', 'diff', '--outp=/tmp/out'])).toBe(
+        false,
+      );
+      expect(isKnownSafeCommand(['git', 'log', '--ext-d'])).toBe(false);
+      expect(
+        isKnownSafeCommand(['git', 'diff', '--no-index', '/etc/passwd', 'x']),
+      ).toBe(false);
+      expect(isKnownSafeCommand(['git', 'diff', '--no-ext-diff'])).toBe(true);
+      expect(isDangerousCommand(['git', 'diff', '--outp=/tmp/out'])).toBe(true);
+      expect(isDangerousCommand(['git', 'diff', '--no-index', 'a', 'b'])).toBe(
+        true,
+      );
+    });
+  });
 });
