@@ -15,6 +15,7 @@ import {
 } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { isAbsolute } from 'node:path';
+import { resolveToRealPath } from '@google/gemini-cli-core';
 import { FORWARDED_SIGNALS, RELAUNCH_EXIT_CODE } from './processUtils.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 
@@ -392,7 +393,9 @@ describe('relaunchAppInChildProcess', () => {
       const chdirSpy = vi
         .spyOn(process, 'chdir')
         .mockImplementation(() => undefined);
-      const selectedPath = '/mock/project/.gemini/worktrees/keep-this-worktree';
+      const selectedPath = resolveToRealPath(
+        '/mock/project/.gemini/worktrees/keep-this-worktree',
+      );
       const capturedSpawns: Array<{
         args: string[];
         cwd?: string;
@@ -475,6 +478,7 @@ describe('relaunchAppInChildProcess', () => {
     it('should not update worktree state or spawn cwd if process.chdir fails for an invalid worktree path', async () => {
       vi.stubEnv('GEMINI_CLI_WORKTREE_HANDLED', '');
 
+      const invalidPath = resolveToRealPath('/mock/invalid/worktree');
       const chdirSpy = vi.spyOn(process, 'chdir').mockImplementation(() => {
         throw new Error('ENOENT: no such file or directory');
       });
@@ -496,7 +500,7 @@ describe('relaunchAppInChildProcess', () => {
           if (spawnCount === 1) {
             child.emit('message', {
               type: 'worktree-selected',
-              path: '/nonexistent/invalid/worktree',
+              path: invalidPath,
             });
             child.emit('close', RELAUNCH_EXIT_CODE);
           } else {
@@ -512,7 +516,7 @@ describe('relaunchAppInChildProcess', () => {
         );
 
         expect(spawnCount).toBe(2);
-        expect(chdirSpy).toHaveBeenCalledWith('/nonexistent/invalid/worktree');
+        expect(chdirSpy).toHaveBeenCalledWith(invalidPath);
         expect(capturedSpawns[1]?.cwd).toBeUndefined();
         expect(
           capturedSpawns[1]?.env['GEMINI_CLI_WORKTREE_HANDLED'],

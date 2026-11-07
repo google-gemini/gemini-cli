@@ -16,6 +16,7 @@ import {
 } from './processUtils.js';
 import {
   writeToStderr,
+  resolveToRealPath,
   type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 
@@ -100,12 +101,13 @@ export async function relaunchAppInChildProcess(
           msg.path.length > 0
         ) {
           try {
-            process.chdir(msg.path);
-            selectedWorktreePath = msg.path;
+            const resolvedWorktreePath = resolveToRealPath(msg.path);
+            process.chdir(resolvedWorktreePath);
+            selectedWorktreePath = resolvedWorktreePath;
             process.env['GEMINI_CLI_WORKTREE_HANDLED'] = '1';
             newEnv['GEMINI_CLI_WORKTREE_HANDLED'] = '1';
           } catch {
-            // Ignore chdir errors if path is inaccessible
+            // Ignore chdir or path validation errors if path is inaccessible
           }
         }
       },
