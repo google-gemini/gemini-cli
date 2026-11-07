@@ -895,6 +895,14 @@ export async function main() {
     }
 
     if (config.getAcpMode()) {
+      // ACP mode returns before the interactive paths install output
+      // listeners, so every patched stdio write (hook warnings, library
+      // output) stays buffered until the process exits — and is lost
+      // entirely on SIGKILL or a crash (#30128). Install and flush before
+      // the protocol takes over: stderr becomes visible live, and stdout is
+      // reserved for the protocol stream, so buffered stdout output drains
+      // to stderr instead of corrupting JSON-RPC frames.
+      initializeOutputListenersAndFlush(config, { stdoutToStderr: true });
       return runAcpClient(config, settings, argv);
     }
 
@@ -1026,13 +1034,16 @@ export async function main() {
   }
 }
 
-export function initializeOutputListenersAndFlush(config?: Config) {
+export function initializeOutputListenersAndFlush(
+  config?: Config,
+  options?: { stdoutToStderr?: boolean },
+) {
   // If there are no listeners for output, make sure we flush so output is not
   // lost.
   if (coreEvents.listenerCount(CoreEvent.Output) === 0) {
     // In non-interactive mode, ensure we drain any buffered output or logs to stderr
     coreEvents.on(CoreEvent.Output, (payload: OutputPayload) => {
-      if (payload.isStderr) {
+      if (payload.isStderr || options?.stdoutToStderr) {
         writeToStderr(payload.chunk, payload.encoding);
       } else {
         writeToStdout(payload.chunk, payload.encoding);
@@ -1057,7 +1068,10 @@ export function initializeOutputListenersAndFlush(config?: Config) {
   }
 
   const outputFormat = config?.getOutputFormat();
-  const forceToStderr = outputFormat === 'json';
+  // stdoutToStderr callers (ACP) reserve stdout for their protocol stream, so
+  // buffered non-stderr output must drain to stderr exactly like JSON mode.
+  const forceToStderr =
+    outputFormat === 'json' || options?.stdoutToStderr === true;
 
   coreEvents.drainBacklogs(
     <K extends keyof CoreEvents>(event: K, args: CoreEvents[K]) => {

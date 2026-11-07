@@ -19,6 +19,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     writeToStdout: vi.fn(),
+    writeToStderr: vi.fn(),
     patchStdio: vi.fn(() => () => {}),
     createWorkingStdio: vi.fn(() => ({
       stdout: {
@@ -359,6 +360,74 @@ describe('gemini.tsx main function cleanup', () => {
       .mocked(registerCleanup)
       .mock.calls.map((call) => call[0]);
     expect(registeredFunctions).not.toContain(capturedCleanup!);
+  });
+
+  it('installs output listeners before entering ACP mode so stderr is not buffered until exit (#30128)', async () => {
+    const { coreEvents, CoreEvent } = await import('@google/gemini-cli-core');
+    const { ConsolePatcher } = await import('./ui/utils/ConsolePatcher.js');
+    const { loadCliConfig, parseArguments } = await import(
+      './config/config.js'
+    );
+    const { loadSettings } = await import('./config/settings.js');
+
+    vi.mocked(ConsolePatcher).mockImplementation(
+      () =>
+        ({
+          patch: vi.fn(),
+          cleanup: vi.fn(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      acp: true,
+      startupMessages: [],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    vi.mocked(loadSettings).mockReturnValue({
+      merged: {
+        tools: { allowed: [], exclude: [] },
+        advanced: { dnsResolutionOrder: 'ipv4first' },
+        security: { auth: { selectedType: 'google' } },
+        ui: { theme: 'default' },
+      },
+      workspace: { settings: {} },
+      errors: [],
+      subscribe: vi.fn(),
+      getSnapshot: vi.fn(),
+      setValue: vi.fn(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      buildMockConfig({
+        getAcpMode: () => true,
+      }),
+    );
+
+    // Patched stdio writes during the ACP session must reach the real
+    // stderr immediately (not only when the exit cleanup flushes), and
+    // stdout writes must be redirected there too: stdout carries the
+    // JSON-RPC protocol stream, so stray output would corrupt it.
+    const { writeToStderr, writeToStdout } = await import(
+      '@google/gemini-cli-core'
+    );
+    vi.mocked(writeToStderr).mockClear();
+    vi.mocked(writeToStdout).mockClear();
+    // Earlier cases in this file install output listeners on the shared
+    // singleton and never remove them; a non-zero count would make main()
+    // skip installing the ACP listener this case exercises.
+    coreEvents.removeAllListeners(CoreEvent.Output);
+    await main();
+    coreEvents.emitOutput(true, 'hook-warned-live\n');
+    expect(writeToStderr).toHaveBeenCalledWith('hook-warned-live\n', undefined);
+    coreEvents.emitOutput(false, 'library-stdout-noise\n');
+    expect(writeToStderr).toHaveBeenCalledWith(
+      'library-stdout-noise\n',
+      undefined,
+    );
+    expect(writeToStdout).not.toHaveBeenCalled();
   });
 
   it('should register ConsolePatcher cleanup in non-ACP mode', async () => {
