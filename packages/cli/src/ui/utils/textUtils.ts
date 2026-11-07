@@ -246,6 +246,145 @@ export const getCachedStringWidth = (str: string): number => {
 
 const regex = ansiRegex();
 
+/**
+ * Narrow OSC 8 hyperlink preservation for the CLI's own Google sign-in
+ * message (see issue #29430).
+ *
+ * The TUI normally neutralises every ANSI/OSC sequence in displayed text:
+ * HistoryItemDisplay escapes them via escapeAnsiCtrlCodes, and RenderInline
+ * strips them via stripUnsafeCharacters. That is the right default — model
+ * and tool output must never be able to inject a clickable link — but it
+ * also breaks the one link the CLI itself generates during web sign-in,
+ * whose whole point is to survive terminal wrapping.
+ *
+ * The exception below is deliberately tiny. A hyperlink is preserved only
+ * when ALL of the following hold:
+ * - it has no OSC 8 parameters (the `8;;` form only),
+ * - its visible label is exactly "Open authentication page" (the label the
+ *   sign-in flow itself uses, so an injected link cannot masquerade as
+ *   something else),
+ * - its target parses as https://accounts.google.com/o/oauth2/v2/auth with
+ *   no userinfo and no fragment,
+ * - response_type=code, and
+ * - redirect_uri is a loopback callback (http://127.0.0.1:<port>/oauth2callback).
+ *
+ * Why that shape is safe to click even if it appeared in untrusted text:
+ * the redirect can only go to the user's own loopback interface, the
+ * callback server rejects any state that does not match the sign-in flow's
+ * random state, and an authorization code is bound to the OAuth client
+ * that requested it, so a code issued for a different client cannot be
+ * exchanged by this CLI. Every other ANSI/OSC sequence — including OSC 8
+ * links to any other domain, to this endpoint with a non-loopback
+ * redirect, or with a different label — is escaped/stripped exactly as
+ * before.
+ *
+ * Preservation is implemented by masking: allowlisted sequences are
+ * temporarily replaced with a private-use placeholder (U+E000, which
+ * neither ansi-regex nor the strippers touch) before sanitising, then
+ * restored afterwards. If the input already contains the placeholder
+ * character, masking is skipped entirely and the text is sanitised as
+ * before, so a crafted placeholder can never smuggle a link through.
+ */
+const AUTH_LINK_LABEL = 'Open authentication page';
+const AUTH_LINK_SENTINEL = '\uE000';
+const AUTH_LINK_PLACEHOLDER_PREFIX = `${AUTH_LINK_SENTINEL}AUTHLINK`;
+
+// Matches one complete OSC 8 hyperlink: ESC ] 8 ; params ; target ST label
+// ESC ] 8 ;; ST, where ST is ESC \ or BEL.
+const OSC8_HYPERLINK_REGEX =
+  // eslint-disable-next-line no-control-regex
+  /\u001b\]8;([^;]*);([^\u001b\u0007]*?)(?:\u001b\\|\u0007)([^\u001b]*?)\u001b\]8;;(?:\u001b\\|\u0007)/g;
+
+function isAllowlistedAuthTarget(target: string): boolean {
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u0020\u007f]/.test(target)) {
+    return false;
+  }
+  let url: URL;
+  try {
+    url = new URL(target);
+  } catch {
+    return false;
+  }
+  if (
+    url.protocol !== 'https:' ||
+    url.hostname !== 'accounts.google.com' ||
+    url.pathname !== '/o/oauth2/v2/auth' ||
+    url.username !== '' ||
+    url.password !== '' ||
+    url.hash !== '' ||
+    url.searchParams.get('response_type') !== 'code'
+  ) {
+    return false;
+  }
+  const redirectUri = url.searchParams.get('redirect_uri');
+  if (!redirectUri) {
+    return false;
+  }
+  let redirect: URL;
+  try {
+    redirect = new URL(redirectUri);
+  } catch {
+    return false;
+  }
+  return (
+    redirect.protocol === 'http:' &&
+    redirect.hostname === '127.0.0.1' &&
+    redirect.port !== '' &&
+    redirect.pathname === '/oauth2callback' &&
+    redirect.search === '' &&
+    redirect.hash === '' &&
+    redirect.username === '' &&
+    redirect.password === ''
+  );
+}
+
+export interface MaskedAuthLinks {
+  text: string;
+  links: string[];
+}
+
+export function maskAllowlistedAuthHyperlinks(str: string): MaskedAuthLinks {
+  if (str.includes(AUTH_LINK_SENTINEL)) {
+    return { text: str, links: [] };
+  }
+  const links: string[] = [];
+  OSC8_HYPERLINK_REGEX.lastIndex = 0;
+  const text = str.replace(
+    OSC8_HYPERLINK_REGEX,
+    (match, params: string, target: string, label: string) => {
+      if (
+        params !== '' ||
+        label !== AUTH_LINK_LABEL ||
+        !isAllowlistedAuthTarget(target)
+      ) {
+        return match;
+      }
+      const index = links.push(match) - 1;
+      return `${AUTH_LINK_PLACEHOLDER_PREFIX}${index}${AUTH_LINK_SENTINEL}`;
+    },
+  );
+  return { text, links };
+}
+
+export function restoreMaskedAuthHyperlinks(
+  str: string,
+  links: string[],
+): string {
+  if (links.length === 0) {
+    return str;
+  }
+  let result = str;
+  for (let i = 0; i < links.length; i++) {
+    const placeholder = `${AUTH_LINK_PLACEHOLDER_PREFIX}${i}${AUTH_LINK_SENTINEL}`;
+    const link = links[i];
+    if (link !== undefined) {
+      result = result.split(placeholder).join(link);
+    }
+  }
+  return result;
+}
+
 /* Recursively traverses a JSON-like structure (objects, arrays, primitives)
  * and escapes all ANSI control characters found in any string values.
  *
@@ -263,15 +402,20 @@ const regex = ansiRegex();
  */
 export function escapeAnsiCtrlCodes<T>(obj: T): T {
   if (typeof obj === 'string') {
-    if (obj.search(regex) === -1) {
-      return obj; // No changes return original string
+    const { text: masked, links } = maskAllowlistedAuthHyperlinks(obj);
+    if (masked.search(regex) === -1) {
+      // No changes: return the original string (restoring any masked
+      // allowlisted links, which are unchanged by definition).
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return restoreMaskedAuthHyperlinks(masked, links) as T;
     }
 
     regex.lastIndex = 0; // needed for global regex
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return obj.replace(regex, (match) =>
+    const escaped = masked.replace(regex, (match) =>
       JSON.stringify(match).slice(1, -1),
-    ) as T;
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return restoreMaskedAuthHyperlinks(escaped, links) as T;
   }
 
   if (obj === null || typeof obj !== 'object') {

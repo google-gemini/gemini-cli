@@ -18,6 +18,8 @@ import {
   setAmbiguousCharactersWide,
   areAmbiguousCharactersWide,
   normalizeEscapedNewlines,
+  maskAllowlistedAuthHyperlinks,
+  restoreMaskedAuthHyperlinks,
 } from './textUtils.js';
 
 vi.mock('ink', async (importOriginal) => {
@@ -687,6 +689,78 @@ describe('textUtils', () => {
         expect(sanitized.g).toBe(null);
         expect(sanitized.h()).toBe('\u001b[35mpurple\u001b[0m');
       });
+    });
+  });
+
+  describe('allowlisted auth hyperlinks (issue #29430)', () => {
+    const AUTH_URL =
+      'https://accounts.google.com/o/oauth2/v2/auth?response_type=code' +
+      '&redirect_uri=http%3A%2F%2F127.0.0.1%3A34567%2Foauth2callback' +
+      '&access_type=offline&state=abc';
+    const AUTH_LINK = `\u001b]8;;${AUTH_URL}\u001b\\Open authentication page\u001b]8;;\u001b\\`;
+    const osc8Link = (target: string, label = 'Open authentication page') =>
+      `\u001b]8;;${target}\u001b\\${label}\u001b]8;;\u001b\\`;
+
+    it('preserves the CLI sign-in link through escapeAnsiCtrlCodes', () => {
+      expect(escapeAnsiCtrlCodes(AUTH_LINK)).toBe(AUTH_LINK);
+    });
+
+    it('preserves the sign-in link while escaping other ANSI codes', () => {
+      const input = `\u001b[31mred\u001b[0m ${AUTH_LINK}`;
+      const result = escapeAnsiCtrlCodes(input);
+      expect(result).toContain(AUTH_LINK);
+      expect(result).toContain('\\u001b[31mred\\u001b[0m');
+    });
+
+    it('preserves the BEL-terminated form of the sign-in link', () => {
+      const belLink = `\u001b]8;;${AUTH_URL}\u0007Open authentication page\u001b]8;;\u0007`;
+      expect(escapeAnsiCtrlCodes(belLink)).toBe(belLink);
+    });
+
+    it('still escapes OSC 8 links to non-allowlisted domains', () => {
+      const evil = osc8Link('https://evil.example/login');
+      const result = escapeAnsiCtrlCodes(evil);
+      expect(result).not.toContain('\u001b]8;;https://evil.example');
+      expect(result).toContain('\\u001b]8');
+    });
+
+    it('still escapes the auth endpoint with a non-loopback redirect', () => {
+      const target =
+        'https://accounts.google.com/o/oauth2/v2/auth?response_type=code' +
+        '&redirect_uri=https%3A%2F%2Fevil.example%2Fcallback';
+      const result = escapeAnsiCtrlCodes(osc8Link(target));
+      expect(result).not.toContain('\u001b]8;;https://accounts.google.com');
+    });
+
+    it('still escapes the auth endpoint with a different label', () => {
+      const result = escapeAnsiCtrlCodes(osc8Link(AUTH_URL, 'Click here'));
+      expect(result).not.toContain('\u001b]8;;https://accounts.google.com');
+      expect(result).toContain('Click here');
+    });
+
+    it('still escapes OSC 8 links with parameters', () => {
+      const withParams = `\u001b]8;id=foo;${AUTH_URL}\u001b\\Open authentication page\u001b]8;;\u001b\\`;
+      const result = escapeAnsiCtrlCodes(withParams);
+      expect(result).not.toContain('\u001b]8;id=foo;');
+    });
+
+    it('mask/restore round-trips an allowlisted link and ignores others', () => {
+      const masked = maskAllowlistedAuthHyperlinks(`prefix ${AUTH_LINK}`);
+      expect(masked.links).toHaveLength(1);
+      expect(masked.text).not.toContain('\u001b]8');
+      expect(restoreMaskedAuthHyperlinks(masked.text, masked.links)).toBe(
+        `prefix ${AUTH_LINK}`,
+      );
+      const other = maskAllowlistedAuthHyperlinks(
+        osc8Link('https://evil.example/login'),
+      );
+      expect(other.links).toHaveLength(0);
+    });
+
+    it('stripUnsafeCharacters on its own still strips OSC 8 sequences', () => {
+      // Preservation is done by masking in RenderInline/escapeAnsiCtrlCodes,
+      // not by loosening stripUnsafeCharacters for its other callers.
+      expect(stripUnsafeCharacters(AUTH_LINK)).toBe('Open authentication page');
     });
   });
 

@@ -26,6 +26,8 @@ import {
   clearOauthClientCache,
   authEvents,
   readOAuthCredsWithRetry,
+  wrapAuthUrlAsHyperlink,
+  formatAuthUrlMessage,
 } from './oauth2.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
 import * as fs from 'node:fs';
@@ -1981,5 +1983,47 @@ describe('oauth2', () => {
       );
       expect(attempts).toBe(3);
     });
+  });
+});
+
+describe('auth URL hyperlink (issue #29430)', () => {
+  const authUrl =
+    'https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=example&redirect_uri=http%3A%2F%2F127.0.0.1%3A1234%2Foauth2callback&scope=email&state=abc';
+
+  it('preserves the full URL, including query params, in the hyperlink target', () => {
+    const wrapped = wrapAuthUrlAsHyperlink(authUrl);
+    expect(wrapped).toBe(
+      `\u001b]8;;${authUrl}\u001b\\Open authentication page\u001b]8;;\u001b\\`,
+    );
+    // The visible label is short; the full URL only appears as the target.
+    expect(wrapped).not.toContain(`page${authUrl}`);
+  });
+
+  it('includes the plain URL as a fallback in the auth message', () => {
+    const message = formatAuthUrlMessage(authUrl);
+    expect(message).toContain('Otherwise navigate to:');
+    expect(message).toContain(`Or copy this link:\n${authUrl}`);
+    expect(message).toContain(`\u001b]8;;${authUrl}\u001b\\`);
+  });
+
+  it('does not double-wrap an already OSC 8-wrapped URL', () => {
+    const alreadyWrapped = wrapAuthUrlAsHyperlink(authUrl);
+    expect(wrapAuthUrlAsHyperlink(alreadyWrapped)).toBe(alreadyWrapped);
+    expect(alreadyWrapped.split('\u001b]8').length - 1).toBe(2);
+    expect(formatAuthUrlMessage(alreadyWrapped)).toContain(alreadyWrapped);
+  });
+
+  it('returns unusual URLs unchanged instead of wrapping them unsafely', () => {
+    expect(wrapAuthUrlAsHyperlink('')).toBe('');
+    expect(wrapAuthUrlAsHyperlink('https://example.com/a\nb')).toBe(
+      'https://example.com/a\nb',
+    );
+    expect(wrapAuthUrlAsHyperlink('https://example.com/a b')).toBe(
+      'https://example.com/a b',
+    );
+  });
+
+  it('still builds a message for an empty URL without throwing', () => {
+    expect(formatAuthUrlMessage('')).toContain('Otherwise navigate to:');
   });
 });
