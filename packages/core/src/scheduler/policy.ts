@@ -218,6 +218,17 @@ async function handleStandardPolicyUpdate(
     outcome === ToolConfirmationOutcome.ProceedAlways ||
     outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
   ) {
+    // Tainted shell commands may only be approved once. The tool's own taint
+    // check can't be relied on here because onConfirm has already acknowledged
+    // the untrusted flags and reset the modified build files.
+    if (
+      confirmationDetails?.type === 'exec' &&
+      (confirmationDetails.untrustedFlags?.length ||
+        confirmationDetails.modifiedBuildFiles?.length)
+    ) {
+      return;
+    }
+
     const options: PolicyUpdateOptions =
       toolInvocation?.getPolicyUpdateOptions?.(outcome) || {};
 
