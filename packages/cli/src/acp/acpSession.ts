@@ -38,6 +38,7 @@ import {
   MessageBusType,
   PolicyDecision,
   type ToolConfirmationRequest,
+  type ToolCallConfirmationDetails,
   resolveAtCommandPath,
   type ResolvedAtCommandPath,
   tokenLimit,
@@ -750,6 +751,11 @@ export class Session {
         await invocation.shouldConfirmExecute(abortSignal);
 
       if (confirmationDetails) {
+        await this.context.config.getHookSystem()?.fireToolNotificationEvent({
+          ...confirmationDetails,
+          onConfirm: async () => {},
+        } as ToolCallConfirmationDetails);
+
         const content: acp.ToolCallContent[] = [];
 
         if (confirmationDetails.type === 'edit') {
