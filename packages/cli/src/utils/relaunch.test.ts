@@ -14,6 +14,7 @@ import {
   type MockInstance,
 } from 'vitest';
 import { EventEmitter } from 'node:events';
+import { isAbsolute } from 'node:path';
 import { FORWARDED_SIGNALS, RELAUNCH_EXIT_CODE } from './processUtils.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 
@@ -440,7 +441,7 @@ describe('relaunchAppInChildProcess', () => {
 
         expect(spawnCount).toBe(3);
         expect(chdirSpy).toHaveBeenCalledWith(selectedPath);
-        expect(process.argv[1]?.startsWith('/')).toBe(true);
+        expect(isAbsolute(process.argv[1] ?? '')).toBe(true);
 
         // Child #2 (after Auth Restart #1): spawns in worktree, has GEMINI_CLI_WORKTREE_HANDLED=1 and one-time GEMINI_CLI_AUTH_OVERRIDE
         expect(capturedSpawns[1]?.cwd).toBe(selectedPath);

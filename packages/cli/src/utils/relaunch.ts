@@ -5,7 +5,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { resolve } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 import {
   RELAUNCH_EXIT_CODE,
   getSpawnConfig,
@@ -48,7 +48,7 @@ export async function relaunchAppInChildProcess(
     return;
   }
 
-  if (!isSeaEnvironment() && process.argv[1]) {
+  if (!isSeaEnvironment() && process.argv[1] && !isAbsolute(process.argv[1])) {
     process.argv[1] = resolve(process.argv[1]);
   }
 

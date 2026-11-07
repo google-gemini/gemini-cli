@@ -8,7 +8,7 @@
 
 import { spawn } from 'node:child_process';
 import os from 'node:os';
-import { resolve } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 import v8 from 'node:v8';
 import {
   RELAUNCH_EXIT_CODE,
@@ -60,7 +60,11 @@ async function run() {
     // --- Lightweight Parent Process / Daemon ---
     // We avoid importing heavy dependencies here to save ~1.5s of startup time.
 
-    if (!isSeaEnvironment() && process.argv[1]) {
+    if (
+      !isSeaEnvironment() &&
+      process.argv[1] &&
+      !isAbsolute(process.argv[1])
+    ) {
       process.argv[1] = resolve(process.argv[1]);
     }
 
