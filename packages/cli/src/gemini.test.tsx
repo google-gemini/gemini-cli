@@ -31,6 +31,7 @@ import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { terminalCapabilityManager } from './ui/utils/terminalCapabilityManager.js';
 import { start_sandbox } from './utils/sandbox.js';
+import { resolveFolderTrustForSandbox } from './utils/sandboxFolderTrust.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import os from 'node:os';
 import v8 from 'node:v8';
@@ -247,6 +248,10 @@ import * as readStdinModule from './utils/readStdin.js';
 vi.mock('./utils/sandbox.js', () => ({
   sandbox_command: vi.fn(() => ''), // Default to no sandbox command
   start_sandbox: vi.fn(() => Promise.resolve()), // Mock as an async function that resolves
+}));
+
+vi.mock('./utils/sandboxFolderTrust.js', () => ({
+  resolveFolderTrustForSandbox: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('./utils/relaunch.js', () => ({
@@ -781,6 +786,61 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     expect(start_sandbox).toHaveBeenCalled();
     expect(processExitSpy).toHaveBeenCalledWith(0);
+    processExitSpy.mockRestore();
+  });
+
+  it('should resolve folder trust before starting the Seatbelt sandbox', async () => {
+    vi.stubEnv('SANDBOX', '');
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
+    vi.mocked(start_sandbox).mockClear();
+    vi.mocked(resolveFolderTrustForSandbox).mockClear();
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      promptInteractive: false,
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    const mockSettings = createMockSettings({
+      merged: {
+        advanced: {},
+        security: { auth: { selectedType: 'google' } },
+        ui: {},
+      },
+      workspace: { settings: {} },
+      setValue: vi.fn(),
+      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+    });
+    vi.mocked(loadSettings).mockReturnValue(mockSettings);
+
+    const sandboxConfig = createMockSandboxConfig({ command: 'sandbox-exec' });
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => false,
+        getQuestion: () => '',
+        getSandbox: () => sandboxConfig,
+      }),
+    );
+    vi.mocked(loadSandboxConfig).mockResolvedValue(sandboxConfig);
+
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    expect(resolveFolderTrustForSandbox).toHaveBeenCalledWith({
+      sandboxCommand: 'sandbox-exec',
+      settings: mockSettings,
+      interactive: false,
+    });
+    expect(start_sandbox).toHaveBeenCalled();
+    expect(
+      vi.mocked(resolveFolderTrustForSandbox).mock.invocationCallOrder[0],
+    ).toBeLessThan(vi.mocked(start_sandbox).mock.invocationCallOrder[0]);
     processExitSpy.mockRestore();
   });
 
