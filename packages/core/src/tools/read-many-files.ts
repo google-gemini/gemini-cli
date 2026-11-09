@@ -138,8 +138,6 @@ export function isAssetExplicitlyRequested(
   const normalizedPath = relativePath.replace(/\\/g, '/').replace(/^\.\//, '');
   const normalizedFilePath = filePath.replace(/\\/g, '/');
   const fileName = path.posix.basename(normalizedFilePath);
-  const fileExt = path.posix.extname(normalizedFilePath);
-  const stem = fileName.slice(0, fileName.length - fileExt.length);
 
   return include.some((pattern) => {
     const normalizedPattern = pattern.replace(/\\/g, '/').replace(/^\.\//, '');
@@ -164,47 +162,16 @@ export function isAssetExplicitlyRequested(
 
     // 2. Check if the pattern terminal segment explicitly targets this asset
     const lastSegment = normalizedPattern.split('/').pop() ?? '';
-    if (!lastSegment || lastSegment === '*' || lastSegment === '**') {
+    if (
+      !lastSegment ||
+      lastSegment === '*' ||
+      lastSegment === '**' ||
+      lastSegment === '*.*'
+    ) {
       return false;
     }
 
-    const lowerLast = lastSegment.toLowerCase();
-    const lowerExt = fileExt.toLowerCase();
-
-    // Explicit extension match (e.g. *.png, logo.png, *.{png,jpg})
-    let hasExplicitExtension = false;
-    if (lowerExt.length > 0) {
-      if (lowerLast.includes(lowerExt)) {
-        hasExplicitExtension = true;
-      } else {
-        const extWithoutDot = lowerExt.slice(1);
-        const braceMatches = lastSegment.match(/\{([^}]+)\}/g);
-        if (braceMatches) {
-          for (const b of braceMatches) {
-            const items = b
-              .slice(1, -1)
-              .split(',')
-              .map((s) => s.trim().toLowerCase().replace(/^\./, ''));
-            if (items.includes(extWithoutDot)) {
-              hasExplicitExtension = true;
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    // Explicit stem match (e.g. logo.*, report-final.pdf, Logo)
-    const lastSegmentStem = lastSegment.includes('.')
-      ? lastSegment.slice(0, lastSegment.lastIndexOf('.'))
-      : lastSegment;
-
-    const hasExplicitStem =
-      stem.length > 0 &&
-      (lastSegmentStem.toLowerCase() === stem.toLowerCase() ||
-        lowerLast === fileName.toLowerCase());
-
-    return hasExplicitExtension || hasExplicitStem;
+    return true;
   });
 }
 

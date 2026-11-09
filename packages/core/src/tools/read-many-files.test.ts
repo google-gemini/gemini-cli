@@ -1268,6 +1268,44 @@ Content of file[1]
       ).toBe(true);
     });
 
+    it('should support explicit wildcard patterns like logo-* or image-*.png and reject generic *.*', () => {
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/logo-*'],
+          'assets/logo-header.png',
+          '/root/assets/logo-header.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/logo-*.*'],
+          'assets/logo-header.png',
+          '/root/assets/logo-header.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['image-*.png'],
+          'image-01.png',
+          '/root/image-01.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['*.*'],
+          'document.pdf',
+          '/root/document.pdf',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['reports/*.*'],
+          'reports/summary.pdf',
+          '/root/reports/summary.pdf',
+        ),
+      ).toBe(false);
+    });
+
     it('should use and populate matcherCache when provided', () => {
       const cache = new LRUCache<string, (target: string) => boolean>(10);
       expect(cache.size).toBe(0);
