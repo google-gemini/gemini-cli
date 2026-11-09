@@ -2488,5 +2488,75 @@ describe('ChatRecordingService', () => {
       expect(rewoundAsync?.messages).toHaveLength(5);
       expect(fs.readFileSync).not.toHaveBeenCalled();
     });
+
+    it('should update pre-persisted scheduled tool calls in place even when an info message is recorded in between', async () => {
+      await chatRecordingService.initialize();
+
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Run work.sh',
+        model: 'gemini-pro',
+      });
+
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'Running bash work.sh',
+        model: 'gemini-pro',
+      });
+
+      chatRecordingService.recordToolCalls('gemini-pro', [
+        {
+          id: 'call-1',
+          name: 'run_shell_command',
+          args: { command: 'bash work.sh' },
+          status: CoreToolCallStatus.Scheduled,
+          timestamp: '2026-11-09T03:57:28.250Z',
+          result: null,
+        },
+      ]);
+
+      // Record an intermediate info message while the tool is running
+      chatRecordingService.recordMessage({
+        type: 'info',
+        content: 'Cancelling...',
+        model: 'gemini-pro',
+      });
+
+      // Now update the tool call to Cancelled
+      chatRecordingService.recordToolCalls('gemini-pro', [
+        {
+          id: 'call-1',
+          name: 'run_shell_command',
+          args: { command: 'bash work.sh' },
+          status: CoreToolCallStatus.Cancelled,
+          timestamp: '2026-11-09T03:57:29.383Z',
+          result: [
+            {
+              functionResponse: {
+                id: 'call-1',
+                name: 'run_shell_command',
+                response: { error: '[Operation Cancelled]' },
+              },
+            },
+          ],
+        },
+      ]);
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const loaded = await loadConversationRecord(sessionFile);
+      const geminiMessages = loaded!.messages.filter(
+        (m) => m.type === 'gemini',
+      );
+      expect(geminiMessages).toHaveLength(1);
+      expect(
+        geminiMessages[0].type === 'gemini' && geminiMessages[0].toolCalls,
+      ).toEqual([
+        expect.objectContaining({
+          id: 'call-1',
+          name: 'run_shell_command',
+          status: CoreToolCallStatus.Cancelled,
+        }),
+      ]);
+    });
   });
 });
