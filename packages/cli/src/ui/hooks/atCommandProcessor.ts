@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { PartListUnion, PartUnion } from '@google/genai';
 import type { AnyToolInvocation, Config } from '@google/gemini-cli-core';
@@ -233,6 +234,40 @@ interface IgnoredFile {
   reason: 'git' | 'gemini' | 'both';
 }
 
+// Credential directories whose files the glob fallback must never pick.
+const SENSITIVE_DIRECTORY_NAMES = new Set([
+  '.ssh',
+  '.gnupg',
+  '.aws',
+  '.azure',
+  '.kube',
+]);
+
+// Private keys (id_rsa, id_ed25519_sk, *.pem, ...) and .env files.
+const SENSITIVE_FILE_NAME_REGEX =
+  /^id_(rsa|dsa|ecdsa|ed25519)|^\.env|\.(env|pem|key|p12|pfx|ppk)$/;
+
+/**
+ * Returns true if a file found by the fuzzy glob fallback looks like a secret.
+ * Such files are only attached when the user references their exact path.
+ */
+async function isSensitiveFile(filePath: string): Promise<boolean> {
+  const segments = filePath.toLowerCase().split(/[\\/]/);
+  if (
+    segments.some((segment) => SENSITIVE_DIRECTORY_NAMES.has(segment)) ||
+    SENSITIVE_FILE_NAME_REGEX.test(segments[segments.length - 1] || '')
+  ) {
+    return true;
+  }
+  try {
+    // Owner-only files (e.g. 0600) are usually secrets such as SSH keys.
+    // Windows always reports group and other bits, so this never matches there.
+    return ((await fs.stat(filePath)).mode & 0o077) === 0;
+  } catch {
+    return true; // Fail closed: never attach a match we cannot inspect.
+  }
+}
+
 /**
  * Resolves file paths from @ commands, handling globs, recursion, and ignores.
  */
@@ -354,15 +389,29 @@ async function resolveFilePaths(
               !globResult.llmContent.startsWith('No files found') &&
               !globResult.llmContent.startsWith('Error:')
             ) {
-              const lines = globResult.llmContent.split('\n');
-              if (lines.length > 1 && lines[1]) {
-                const rawMatch = lines[1].trim();
-                let firstMatchAbsolute: string;
-                try {
-                  firstMatchAbsolute = resolveToRealPath(rawMatch);
-                } catch {
-                  firstMatchAbsolute = rawMatch;
+              let firstMatchAbsolute: string | undefined;
+              // The first line is a summary; each following line is a match.
+              for (const line of globResult.llmContent.split('\n').slice(1)) {
+                const rawMatch = line.trim();
+                if (!rawMatch) {
+                  continue;
                 }
+                let matchAbsolute: string;
+                try {
+                  matchAbsolute = resolveToRealPath(rawMatch);
+                } catch {
+                  matchAbsolute = rawMatch;
+                }
+                if (await isSensitiveFile(matchAbsolute)) {
+                  onDebugMessage(
+                    `Glob search for ${pathName} skipped sensitive file ${matchAbsolute}. Use its exact @path to include it.`,
+                  );
+                  continue;
+                }
+                firstMatchAbsolute = matchAbsolute;
+                break;
+              }
+              if (firstMatchAbsolute) {
                 const pathSpec = path.relative(dir, firstMatchAbsolute);
                 resolvedFiles.push({
                   part,
@@ -731,7 +780,11 @@ export async function handleAtCommand({
     onDebugMessage(
       'No valid file paths, resources, or agents found in @ commands.',
     );
-    return { processedQuery: [{ text: query }] };
+    return {
+      processedQuery: [
+        { text: escapePastedAtSymbols ? unescapeLiteralAt(query) : query },
+      ],
+    };
   }
 
   const initialQueryText = constructInitialQuery(commandParts, resolvedFiles);

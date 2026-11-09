@@ -366,9 +366,9 @@
         },
         "escapePastedAtSymbols": {
           "title": "Escape Pasted @ Symbols",
-          "description": "When enabled, @ symbols in pasted text are escaped to prevent unintended @path expansion.",
-          "markdownDescription": "When enabled, @ symbols in pasted text are escaped to prevent unintended @path expansion.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+          "description": "When enabled, @ symbols in pasted text are escaped to prevent unintended @path expansion. Type @path manually to include a file.",
+          "markdownDescription": "When enabled, @ symbols in pasted text are escaped to prevent unintended @path expansion. Type @path manually to include a file.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "showShortcutsHint": {

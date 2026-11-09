@@ -1961,6 +1961,109 @@ describe('handleAtCommand', () => {
       });
     },
   );
+
+  describe('pasted shell transcripts and sensitive files (#26730)', () => {
+    const transcript = '[dave@webserver ~]$ ssh-add -l';
+
+    async function createSecret(relativePath: string, mode: number) {
+      const secretPath = await createTestFile(
+        path.join(testRootDir, relativePath),
+        'PRIVATE KEY',
+      );
+      await fsPromises.chmod(secretPath, mode);
+      return secretPath;
+    }
+
+    function runAtCommand(query: string, escapePastedAtSymbols?: boolean) {
+      return handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 800,
+        signal: abortController.signal,
+        escapePastedAtSymbols,
+      });
+    }
+
+    it('keeps @ symbols escaped on paste as plain text and attaches nothing', async () => {
+      await createSecret('.ssh/webserver', 0o600);
+      const pasted = escapeAtSymbols(transcript);
+
+      const result = await runAtCommand(`${pasted}\nwhy does this fail?`, true);
+
+      expect(result).toEqual({
+        processedQuery: [{ text: `${transcript}\nwhy does this fail?` }],
+      });
+      expect(mockAddItem).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      '.ssh/webserver',
+      '.gnupg/webserver',
+      '.aws/webserver',
+      'keys/id_ed25519_webserver',
+      'keys/webserver.pem',
+      'keys/webserver.key',
+      'config/.env.webserver',
+      'config/webserver.env',
+      // Backslash-separated: path.basename on POSIX does not split on `\`.
+      'config/some\\dir\\.env.webserver',
+    ])(
+      'does not attach %s when the glob fallback matches it',
+      async (relativePath) => {
+        // Group-readable, so only the location or name marks it as sensitive.
+        await createSecret(relativePath, 0o644);
+
+        const result = await runAtCommand(transcript);
+
+        expect(result).toEqual({ processedQuery: [{ text: transcript }] });
+        expect(mockAddItem).not.toHaveBeenCalled();
+        expect(mockOnDebugMessage).toHaveBeenCalledWith(
+          expect.stringContaining('skipped sensitive file'),
+        );
+      },
+    );
+
+    it.skipIf(process.platform === 'win32')(
+      'does not attach an owner-only (0600) file when the glob fallback matches it',
+      async () => {
+        await createSecret('notes/webserver.txt', 0o600);
+
+        const result = await runAtCommand(transcript);
+
+        expect(result).toEqual({ processedQuery: [{ text: transcript }] });
+        expect(mockAddItem).not.toHaveBeenCalled();
+      },
+    );
+
+    it('attaches the first non-sensitive glob match instead of a sensitive one', async () => {
+      const notesPath = await createTestFile(
+        path.join(testRootDir, 'notes', 'webserver.md'),
+        'deploy notes',
+      );
+      await fsPromises.chmod(notesPath, 0o644);
+      // Make the key the newest match so the glob tool lists it first.
+      const anHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      await fsPromises.utimes(notesPath, anHourAgo, anHourAgo);
+      await createSecret('.ssh/webserver', 0o600);
+
+      const result = await runAtCommand('summarize @webserver');
+
+      expect(result.processedQuery).toContainEqual({ text: 'deploy notes' });
+      expect(result.processedQuery).not.toContainEqual({
+        text: 'PRIVATE KEY',
+      });
+    });
+
+    it('still attaches a sensitive file referenced by its exact @path', async () => {
+      await createSecret('.ssh/webserver', 0o600);
+
+      const result = await runAtCommand('check @.ssh/webserver');
+
+      expect(result.processedQuery).toContainEqual({ text: 'PRIVATE KEY' });
+    });
+  });
 });
 
 describe('escapeAtSymbols', () => {

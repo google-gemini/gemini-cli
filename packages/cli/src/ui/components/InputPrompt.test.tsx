@@ -1054,6 +1054,49 @@ describe('InputPrompt', () => {
       unmount();
     });
 
+    it('should escape @ symbols in clipboard text by default (#26730)', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+      vi.mocked(clipboardy.read).mockResolvedValue(
+        '[dave@webserver ~]$ ssh-add -l',
+      );
+
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.insert).toHaveBeenCalledWith(
+          '[dave\\@webserver ~]$ ssh-add -l',
+          expect.objectContaining({ paste: true }),
+        );
+      });
+      unmount();
+    });
+
+    it('should escape @ symbols in bracketed terminal paste by default (#26730)', async () => {
+      const { stdin, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x1B[200~[dave@webserver ~]$ ssh-add -l\x1B[201~');
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.handleInput).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'paste',
+            sequence: '[dave\\@webserver ~]$ ssh-add -l',
+          }),
+        );
+      });
+      unmount();
+    });
+
     it('should use OSC 52 when useOSC52Paste setting is enabled', async () => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
       const settings = createMockSettings({
