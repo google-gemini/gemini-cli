@@ -18,6 +18,7 @@ import {
   ReadManyFilesTool,
   isAssetExplicitlyRequested,
 } from './read-many-files.js';
+import { LRUCache } from 'mnemonist';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import path from 'node:path';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
@@ -1265,6 +1266,31 @@ Content of file[1]
           'C:\\workspace\\assets\\logo.png',
         ),
       ).toBe(true);
+    });
+
+    it('should use and populate matcherCache when provided', () => {
+      const cache = new LRUCache<string, (target: string) => boolean>(10);
+      expect(cache.size).toBe(0);
+
+      const res1 = isAssetExplicitlyRequested(
+        ['assets/*.png'],
+        'assets/logo.png',
+        '/root/assets/logo.png',
+        cache,
+      );
+      expect(res1).toBe(true);
+      expect(cache.size).toBe(1);
+      expect(cache.has('assets/*.png')).toBe(true);
+
+      const res2 = isAssetExplicitlyRequested(
+        ['assets/*.png'],
+        'other/doc.png',
+        '/root/other/doc.png',
+        cache,
+      );
+      expect(res2).toBe(false);
+      // Size remains 1 because pattern was already compiled and cached
+      expect(cache.size).toBe(1);
     });
   });
 });
