@@ -279,8 +279,8 @@ export function convertSessionToClientHistory(
             } else if (!isAlreadyRecorded) {
               functionResponseParts.push({
                 functionResponse: {
-                  id: toolCall.id,
-                  name: toolCall.name,
+                  id: toolCall.id ?? '',
+                  name: toolCall.name?.trim() || 'generic_tool',
                   response: {
                     output:
                       'Command execution was interrupted or cancelled before completion. It may have executed partially or completed — check system state before running again.',

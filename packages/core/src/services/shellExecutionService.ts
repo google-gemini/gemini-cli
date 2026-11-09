@@ -2181,16 +2181,17 @@ export class ShellExecutionService {
     const terminationPromises: Array<Promise<void>> = [];
 
     for (const [pid, entry] of this.activeChildProcesses.entries()) {
-      if (entry.process?.pid) {
+      const proc = entry.process;
+      if (proc?.pid) {
         terminationPromises.push(
           killProcessGroup({
-            pid: entry.process.pid,
+            pid: proc.pid,
             escalate: true,
             isExited: () =>
               !this.activeChildProcesses.has(pid) ||
-              entry.process.killed ||
-              entry.process.exitCode !== null ||
-              entry.process.signalCode !== null,
+              proc.killed ||
+              proc.exitCode !== null ||
+              proc.signalCode !== null,
           }).catch(() => {}),
         );
       }
