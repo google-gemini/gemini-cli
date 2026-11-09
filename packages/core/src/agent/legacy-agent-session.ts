@@ -273,6 +273,17 @@ export class LegacyAgentProtocol implements AgentProtocol {
       );
 
       if (this._abortController.signal.aborted) {
+        try {
+          const currentModel =
+            this._client.getCurrentSequenceModel() ?? this._config.getModel();
+          this._client
+            .getChat()
+            .recordCompletedToolCalls(currentModel, completedToolCalls);
+        } catch (error) {
+          debugLogger.error(
+            `Error recording completed tool call information: ${error}`,
+          );
+        }
         this._finishStream('aborted');
         return;
       }

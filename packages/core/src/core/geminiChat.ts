@@ -38,7 +38,11 @@ import {
 } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
-import type { CompletedToolCall } from '../scheduler/types.js';
+import {
+  CoreToolCallStatus,
+  type CompletedToolCall,
+} from '../scheduler/types.js';
+import type { ToolCallRecord } from '../services/chatRecordingTypes.js';
 import { isAbortError } from '../utils/errors.js';
 import {
   logContentRetry,
@@ -1848,6 +1852,36 @@ export class GeminiChat {
         'gemini',
         consolidatedParts,
       );
+    }
+
+    // Persist scheduled tool calls immediately so the session retains a record
+    // if the process is terminated while tool execution is in flight.
+    if (hasToolCall) {
+      const scheduledToolCalls: ToolCallRecord[] = [];
+      let fallbackIndex = 0;
+      for (const part of consolidatedParts) {
+        if (part.functionCall) {
+          const fc = part.functionCall;
+          if (!fc.id) {
+            fc.id = `call_${Date.now()}_${fallbackIndex++}`;
+          }
+          scheduledToolCalls.push({
+            id: fc.id,
+            name: fc.name?.trim() || 'generic_tool',
+            args:
+              typeof fc.args === 'object' &&
+              fc.args !== null &&
+              !Array.isArray(fc.args)
+                ? fc.args
+                : {},
+            status: CoreToolCallStatus.Scheduled,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+      if (scheduledToolCalls.length > 0) {
+        this.chatRecordingService.recordToolCalls(model, scheduledToolCalls);
+      }
     }
 
     this.agentHistory.push({

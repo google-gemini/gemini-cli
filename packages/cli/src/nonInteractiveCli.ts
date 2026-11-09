@@ -7,6 +7,7 @@
 import type {
   Config,
   ToolCallRequestInfo,
+  CompletedToolCall,
   ResumedSessionData,
   UserFeedbackPayload,
 } from '@google/gemini-cli-core';
@@ -147,10 +148,19 @@ export async function runNonInteractive(
       throw err;
     };
 
-    const triggerAbort = () => {
+    let abortExitCode = 130;
+    const triggerAbort = (signal?: NodeJS.Signals) => {
+      if (signal === 'SIGTERM') {
+        abortExitCode = 143;
+      } else if (signal === 'SIGHUP') {
+        abortExitCode = 129;
+      } else {
+        abortExitCode = 130;
+      }
+
       // If already aborting, force exit immediately on repeated signal
       if (isAborting) {
-        process.exit(130);
+        process.exit(abortExitCode);
       }
 
       isAborting = true;
@@ -166,9 +176,14 @@ export async function runNonInteractive(
       // and trigger handleCancellationError() which will exit with proper code
     };
 
+    const handleSigInt = () => triggerAbort('SIGINT');
+    const handleSigTerm = () => triggerAbort('SIGTERM');
+    const handleSigHup = () => triggerAbort('SIGHUP');
+
     const setupCancellation = () => {
-      process.on('SIGINT', triggerAbort);
-      process.on('SIGTERM', triggerAbort);
+      process.on('SIGINT', handleSigInt);
+      process.on('SIGTERM', handleSigTerm);
+      process.on('SIGHUP', handleSigHup);
 
       // Only setup if stdin is a TTY (user can interact)
       if (!process.stdin?.isTTY) {
@@ -196,7 +211,7 @@ export async function runNonInteractive(
       ) => {
         // Detect Ctrl+C: either ctrl+c key combo or raw character code 3
         if ((key && key.ctrl && key.name === 'c') || str === '\u0003') {
-          triggerAbort();
+          triggerAbort('SIGINT');
         }
       };
 
@@ -204,8 +219,9 @@ export async function runNonInteractive(
     };
 
     const cleanupCancellation = () => {
-      process.off('SIGINT', triggerAbort);
-      process.off('SIGTERM', triggerAbort);
+      process.off('SIGINT', handleSigInt);
+      process.off('SIGTERM', handleSigTerm);
+      process.off('SIGHUP', handleSigHup);
       process.stdout.off('error', handleStdoutError);
 
       // Clear any pending cancel message timer
@@ -360,7 +376,7 @@ export async function runNonInteractive(
         let responseText = '';
         for await (const event of responseStream) {
           if (abortController.signal.aborted) {
-            handleCancellationError(config);
+            handleCancellationError(config, abortExitCode);
           }
 
           if (event.type === GeminiEventType.Content) {
@@ -532,13 +548,27 @@ export async function runNonInteractive(
 
         if (toolCallRequests.length > 0) {
           if (abortController.signal.aborted) {
-            throw new FatalCancellationError('Operation cancelled.');
+            throw new FatalCancellationError(
+              'Operation cancelled.',
+              abortExitCode,
+            );
           }
           textOutput.ensureTrailingNewline();
-          const completedToolCalls = await scheduler.schedule(
-            toolCallRequests,
-            abortController.signal,
-          );
+          let completedToolCalls: CompletedToolCall[];
+          try {
+            completedToolCalls = await scheduler.schedule(
+              toolCallRequests,
+              abortController.signal,
+            );
+          } catch (scheduleError) {
+            if (abortController.signal.aborted) {
+              throw new FatalCancellationError(
+                'Operation cancelled.',
+                abortExitCode,
+              );
+            }
+            throw scheduleError;
+          }
           const toolResponseParts: Part[] = [];
 
           for (const completedToolCall of completedToolCalls) {
@@ -640,6 +670,13 @@ export async function runNonInteractive(
             return;
           }
 
+          if (abortController.signal.aborted) {
+            throw new FatalCancellationError(
+              'Operation cancelled.',
+              abortExitCode,
+            );
+          }
+
           currentMessages = [{ role: 'user', parts: toolResponseParts }];
         } else {
           // Emit final result event for streaming JSON
@@ -689,7 +726,10 @@ export async function runNonInteractive(
       abortController.signal.aborted ||
       isFatalCancellationError(errorToHandle)
     ) {
-      handleCancellationError(config);
+      const exitCode = isFatalCancellationError(errorToHandle)
+        ? errorToHandle.exitCode
+        : abortExitCode;
+      handleCancellationError(config, exitCode);
     }
 
     if (errorToHandle) {

@@ -631,4 +631,78 @@ describe('convertSessionToClientHistory', () => {
   it('returns an empty array when messages is undefined', () => {
     expect(convertSessionToClientHistory(undefined)).toEqual([]);
   });
+
+  it('synthesizes an interrupted functionResponse when a recorded tool call has no result', () => {
+    const messages: ConversationRecord['messages'] = [
+      {
+        id: 'msg1',
+        type: 'user',
+        timestamp: '2024-01-01T10:00:00Z',
+        content: 'Run bash work.sh',
+      },
+      {
+        id: 'msg2',
+        type: 'gemini',
+        timestamp: '2024-01-01T10:00:05Z',
+        content: 'I will run bash work.sh',
+        toolCalls: [
+          {
+            id: 'call-interrupted',
+            name: 'run_shell_command',
+            args: { command: 'bash work.sh' },
+            status: CoreToolCallStatus.Scheduled,
+            timestamp: '2024-01-01T10:00:05Z',
+            result: null,
+          },
+        ],
+      },
+    ];
+
+    const history = convertSessionToClientHistory(messages);
+
+    expect(history).toEqual([
+      {
+        id: 'msg1',
+        content: {
+          role: 'user',
+          parts: [{ text: 'Run bash work.sh' }],
+        },
+      },
+      {
+        id: 'msg2',
+        content: {
+          role: 'model',
+          parts: [
+            { text: 'I will run bash work.sh' },
+            {
+              functionCall: {
+                id: 'call-interrupted',
+                name: 'run_shell_command',
+                args: { command: 'bash work.sh' },
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: 'msg2_response',
+        content: {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'call-interrupted',
+                name: 'run_shell_command',
+                response: {
+                  output:
+                    'Command execution was interrupted or cancelled before completion. It may have executed partially or completed — check system state before running again.',
+                  error: 'Operation interrupted or cancelled.',
+                },
+              },
+            },
+          ],
+        },
+      },
+    ]);
+  });
 });

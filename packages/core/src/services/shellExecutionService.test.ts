@@ -2530,6 +2530,54 @@ describe('ShellExecutionService execution method selection', () => {
     expect(mockCpSpawn).toHaveBeenCalled();
     expect(result.executionMethod).toBe('child_process');
   });
+
+  it('cleanupAllActiveProcesses should terminate active child processes and PTYs', async () => {
+    mockPlatform.mockReturnValue('linux');
+    Object.assign(mockChildProcess, {
+      killed: false,
+      exitCode: null,
+      signalCode: null,
+    });
+    mockProcessKill.mockImplementation(
+      (pid: number, signal?: string | number) => {
+        if (signal === 0) {
+          throw Object.assign(new Error('ESRCH'), { code: 'ESRCH' });
+        }
+        if (pid === -54321 && signal === 'SIGTERM') {
+          Object.assign(mockChildProcess, { signalCode: 'SIGTERM' });
+        }
+        return true;
+      },
+    );
+
+    const abortController1 = new AbortController();
+    void ShellExecutionService.execute(
+      'sleep 10',
+      '/test/dir',
+      onOutputEventMock,
+      abortController1.signal,
+      false,
+      shellExecutionConfig,
+    );
+
+    const abortController2 = new AbortController();
+    void ShellExecutionService.execute(
+      'sleep 20',
+      '/test/dir',
+      onOutputEventMock,
+      abortController2.signal,
+      true,
+      shellExecutionConfig,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    await ShellExecutionService.cleanupAllActiveProcesses();
+
+    expect(mockProcessKill).toHaveBeenCalledWith(-54321, 'SIGTERM');
+    expect(mockProcessKill).not.toHaveBeenCalledWith(-54321, 'SIGKILL');
+    expect(mockPtyProcess.kill).toHaveBeenCalledWith('SIGTERM');
+  });
 });
 
 describe('ShellExecutionService environment variables', () => {

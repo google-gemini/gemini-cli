@@ -1483,6 +1483,7 @@ describe('runNonInteractive', () => {
 
       expect(streamSignal?.aborted).toBe(true);
       expect(mockSchedulerSchedule).not.toHaveBeenCalled();
+      expect(handleCancellationErrorSpy).toHaveBeenCalledWith(mockConfig, 130);
 
       handleCancellationErrorSpy.mockRestore();
     } finally {
@@ -1550,6 +1551,105 @@ describe('runNonInteractive', () => {
 
       expect(streamSignal?.aborted).toBe(true);
       expect(mockSchedulerSchedule).not.toHaveBeenCalled();
+      expect(handleCancellationErrorSpy).toHaveBeenCalledWith(mockConfig, 143);
+
+      handleCancellationErrorSpy.mockRestore();
+    } finally {
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalIsTTY,
+        configurable: true,
+      });
+    }
+  });
+
+  it('should record cancelled tool calls and exit with 143 when SIGTERM arrives during tool execution', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    try {
+      const processOnSpy = vi.spyOn(process, 'on');
+      const errors = await import('./utils/errors.js');
+      const handleCancellationErrorSpy = vi
+        .spyOn(errors, 'handleCancellationError')
+        .mockImplementation(() => {
+          throw new Error('Cancelled via SIGTERM during tool');
+        });
+
+      const toolCall: ToolCallRequestInfo = {
+        callId: 'call-sigterm-running',
+        name: 'run_shell_command',
+        args: { command: 'bash work.sh' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-sigterm-running',
+      };
+
+      mockGeminiClient.sendMessageStream.mockImplementation(() =>
+        (async function* () {
+          yield { type: GeminiEventType.ToolCallRequest, value: toolCall };
+        })(),
+      );
+
+      mockSchedulerSchedule.mockImplementation(
+        async (_requests: unknown, signal: AbortSignal) => {
+          await new Promise<void>((resolve) => {
+            signal.addEventListener('abort', () => resolve(), { once: true });
+          });
+          return [
+            {
+              status: CoreToolCallStatus.Cancelled,
+              request: toolCall,
+              response: {
+                callId: toolCall.callId,
+                responseParts: [],
+                resultDisplay: 'Command cancelled by user.',
+                error: undefined,
+                errorType: undefined,
+                contentLength: 0,
+              },
+            },
+          ];
+        },
+      );
+
+      const recordCompletedToolCalls = vi.fn();
+      (
+        mockGeminiClient as unknown as {
+          getChat: Mock;
+        }
+      ).getChat = vi.fn().mockReturnValue({ recordCompletedToolCalls });
+
+      const runPromise = runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Run work.sh',
+        prompt_id: 'prompt-sigterm-running',
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      const sigtermCall = processOnSpy.mock.calls.find(
+        (call) => call[0] === 'SIGTERM',
+      );
+      expect(sigtermCall).toBeDefined();
+      const sigtermHandler = sigtermCall?.[1] as (() => void) | undefined;
+      sigtermHandler?.();
+
+      await expect(runPromise).rejects.toThrow(
+        'Cancelled via SIGTERM during tool',
+      );
+
+      expect(recordCompletedToolCalls).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining([
+          expect.objectContaining({
+            status: CoreToolCallStatus.Cancelled,
+            request: toolCall,
+          }),
+        ]),
+      );
+      expect(handleCancellationErrorSpy).toHaveBeenCalledWith(mockConfig, 143);
 
       handleCancellationErrorSpy.mockRestore();
     } finally {

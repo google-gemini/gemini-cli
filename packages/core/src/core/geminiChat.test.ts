@@ -6944,5 +6944,60 @@ describe('GeminiChat', () => {
         parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
       });
     });
+
+    it('immediately persists Scheduled tool calls when the model stream completes with a functionCall', async () => {
+      const recordToolCallsSpy = vi.spyOn(
+        chat.getChatRecordingService(),
+        'recordToolCalls',
+      );
+
+      vi.mocked(
+        mockContentGenerator.generateContentStream,
+      ).mockResolvedValueOnce(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [
+                    { text: 'Running work.sh' },
+                    {
+                      functionCall: {
+                        id: 'call-work-sh',
+                        name: 'run_shell_command',
+                        args: { command: 'bash work.sh' },
+                      },
+                    },
+                  ],
+                },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-3-flash-preview' },
+        'Run work.sh',
+        'prompt-persist-scheduled',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      expect(recordToolCallsSpy).toHaveBeenCalledWith(expect.any(String), [
+        expect.objectContaining({
+          id: 'call-work-sh',
+          name: 'run_shell_command',
+          args: { command: 'bash work.sh' },
+          status: CoreToolCallStatus.Scheduled,
+        }),
+      ]);
+    });
   });
 });

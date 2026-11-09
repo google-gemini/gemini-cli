@@ -16,6 +16,9 @@ vi.mock('@google/gemini-cli-core', () => ({
   shutdownTelemetry: vi.fn(),
   isTelemetrySdkInitialized: vi.fn().mockReturnValue(false),
   ExitCodes: { SUCCESS: 0 },
+  ShellExecutionService: {
+    cleanupAllActiveProcesses: vi.fn().mockResolvedValue(undefined),
+  },
 }));
 
 vi.mock('node:fs', () => ({
@@ -34,6 +37,7 @@ import {
   setupSignalHandlers,
   setupTtyCheck,
 } from './cleanup.js';
+import { ShellExecutionService } from '@google/gemini-cli-core';
 
 describe('cleanup', () => {
   beforeEach(async () => {
@@ -148,6 +152,14 @@ describe('cleanup', () => {
     expect(callCount).toBe(1);
   });
 
+  it('should terminate active shell processes during runExitCleanup', async () => {
+    await runExitCleanup();
+
+    expect(
+      ShellExecutionService.cleanupAllActiveProcesses,
+    ).toHaveBeenCalledTimes(1);
+  });
+
   describe('sync cleanup', () => {
     it('should run registered sync functions', async () => {
       const syncFn = vi.fn();
@@ -229,7 +241,7 @@ describe('signal and TTY handling', () => {
       expect(processOnHandlers.has('SIGINT')).toBe(true);
     });
 
-    it('should gracefully shutdown when SIGHUP is received', async () => {
+    it('should gracefully shutdown with exit code 129 when SIGHUP is received', async () => {
       setupSignalHandlers();
 
       const sighupHandlers = processOnHandlers.get('SIGHUP') || [];
@@ -237,7 +249,7 @@ describe('signal and TTY handling', () => {
 
       await sighupHandlers[0]?.();
 
-      expect(process.exit).toHaveBeenCalledWith(0);
+      expect(process.exit).toHaveBeenCalledWith(129);
     });
 
     it('should register SIGTERM handler that can trigger shutdown', () => {

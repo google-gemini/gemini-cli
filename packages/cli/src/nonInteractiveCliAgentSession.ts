@@ -147,10 +147,19 @@ export async function runNonInteractive({
       throw err;
     };
 
-    const triggerAbort = () => {
+    let abortExitCode = 130;
+    const triggerAbort = (signal?: NodeJS.Signals) => {
+      if (signal === 'SIGTERM') {
+        abortExitCode = 143;
+      } else if (signal === 'SIGHUP') {
+        abortExitCode = 129;
+      } else {
+        abortExitCode = 130;
+      }
+
       // If already aborting, force exit immediately on repeated signal
       if (isAborting) {
-        process.exit(130);
+        process.exit(abortExitCode);
       }
 
       isAborting = true;
@@ -164,9 +173,14 @@ export async function runNonInteractive({
       abortController.abort();
     };
 
+    const onSigint = () => triggerAbort('SIGINT');
+    const onSigterm = () => triggerAbort('SIGTERM');
+    const onSighup = () => triggerAbort('SIGHUP');
+
     const setupCancellation = () => {
-      process.on('SIGINT', triggerAbort);
-      process.on('SIGTERM', triggerAbort);
+      process.on('SIGINT', onSigint);
+      process.on('SIGTERM', onSigterm);
+      process.on('SIGHUP', onSighup);
 
       // Only setup if stdin is a TTY (user can interact)
       if (!process.stdin?.isTTY) {
@@ -194,7 +208,7 @@ export async function runNonInteractive({
       ) => {
         // Detect Ctrl+C: either ctrl+c key combo or raw character code 3
         if ((key && key.ctrl && key.name === 'c') || str === '\u0003') {
-          triggerAbort();
+          triggerAbort('SIGINT');
         }
       };
 
@@ -202,8 +216,9 @@ export async function runNonInteractive({
     };
 
     const cleanupCancellation = () => {
-      process.off('SIGINT', triggerAbort);
-      process.off('SIGTERM', triggerAbort);
+      process.off('SIGINT', onSigint);
+      process.off('SIGTERM', onSigterm);
+      process.off('SIGHUP', onSighup);
       process.stdout.off('error', handleStdoutError);
 
       // Clear any pending cancel message timer
@@ -342,7 +357,7 @@ export async function runNonInteractive({
       };
       abortController.signal.addEventListener('abort', abortSession);
       if (abortController.signal.aborted) {
-        throw new FatalCancellationError('Operation cancelled.');
+        throw new FatalCancellationError('Operation cancelled.', abortExitCode);
       }
 
       // Start the agentic loop (runs in background)
@@ -436,7 +451,10 @@ export async function runNonInteractive({
             errToThrow = new FatalToolExecutionError(normalized.message);
             break;
           case 'FatalCancellationError':
-            errToThrow = new FatalCancellationError(normalized.message);
+            errToThrow = new FatalCancellationError(
+              normalized.message,
+              abortExitCode,
+            );
             break;
           case 'FatalError':
             errToThrow = new FatalError(
@@ -739,7 +757,10 @@ export async function runNonInteractive({
       abortController.signal.aborted ||
       isFatalCancellationError(errorToHandle)
     ) {
-      handleCancellationError(config);
+      const exitCode = isFatalCancellationError(errorToHandle)
+        ? errorToHandle.exitCode
+        : abortExitCode;
+      handleCancellationError(config, exitCode);
     }
 
     if (errorToHandle) {
