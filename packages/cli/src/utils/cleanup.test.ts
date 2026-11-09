@@ -126,6 +126,28 @@ describe('cleanup', () => {
     expect(successFn).toHaveBeenCalledTimes(1);
   });
 
+  it('should be idempotent and not re-run cleanup functions if already completed', async () => {
+    const cleanupFn = vi.fn();
+    registerCleanup(cleanupFn);
+
+    await runExitCleanup();
+    expect(cleanupFn).toHaveBeenCalledTimes(1);
+
+    await runExitCleanup();
+    expect(cleanupFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('should deduplicate concurrent calls to runExitCleanup', async () => {
+    let callCount = 0;
+    registerCleanup(async () => {
+      callCount++;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    await Promise.all([runExitCleanup(), runExitCleanup()]);
+    expect(callCount).toBe(1);
+  });
+
   describe('sync cleanup', () => {
     it('should run registered sync functions', async () => {
       const syncFn = vi.fn();

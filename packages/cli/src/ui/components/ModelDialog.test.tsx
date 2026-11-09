@@ -21,6 +21,8 @@ import {
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_FLASH_LITE_MODEL,
   AuthType,
+  ModelConfigService,
+  DEFAULT_MODEL_CONFIGS,
 } from '@google/gemini-cli-core';
 import type { Config, ModelSlashCommandEvent } from '@google/gemini-cli-core';
 
@@ -135,6 +137,22 @@ describe('<ModelDialog />', () => {
     const { lastFrame, unmount } = await renderComponent();
     expect(lastFrame()).toContain('Select Model');
     expect(lastFrame()).toContain('Remember model for future sessions: false');
+    expect(lastFrame()).toContain('Auto');
+    expect(lastFrame()).toContain('Manual');
+    unmount();
+  });
+
+  it('shows Auto in main view when dynamicModelConfiguration is enabled and user has no preview access', async () => {
+    mockGetHasAccessToPreviewModel.mockReturnValue(false);
+    const modelConfigService = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
+    const dynamicConfig = {
+      ...mockConfig,
+      getExperimentalDynamicModelConfiguration: () => true,
+      getModelConfigService: () => modelConfigService,
+    } as unknown as Config;
+
+    const { lastFrame, unmount } = await renderComponent(dynamicConfig);
+    expect(lastFrame()).toContain('Select Model');
     expect(lastFrame()).toContain('Auto');
     expect(lastFrame()).toContain('Manual');
     unmount();

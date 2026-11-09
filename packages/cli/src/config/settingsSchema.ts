@@ -130,6 +130,10 @@ export interface SettingDefinition {
    * Optional reference identifier for generators that emit a `$ref`.
    */
   ref?: string;
+  /**
+   * Optional minimum value constraint for numeric settings.
+   */
+  minimum?: number;
 }
 
 export interface SettingsSchema {
@@ -1086,6 +1090,20 @@ const SETTINGS_SCHEMA = {
         description:
           'Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.',
         showInDialog: true,
+      },
+      requestTimeoutMs: {
+        type: 'number',
+        label: 'Request Timeout (ms)',
+        category: 'Model',
+        requiresRestart: true,
+        default: undefined as number | undefined,
+        minimum: 1,
+        description: oneLine`
+          How long to wait, in milliseconds, for the API to start responding
+          before a request is aborted and retried. Defaults to 60000. Raise this
+          if long-thinking requests are timing out.
+        `,
+        showInDialog: false,
       },
       summarizeToolOutput: {
         type: 'object',
@@ -3124,6 +3142,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
             description:
               'Whether the authorization server returns the "iss" parameter in the authorization response (RFC 9207). When true, callbacks without "iss" are rejected; when false, they are accepted. A provided "iss" is always validated. Overrides the "authorization_response_iss_parameter_supported" value discovered from server metadata.',
           },
+          allowPrivateNetwork: {
+            type: 'boolean',
+            description:
+              'Allow OAuth endpoints on private enterprise networks (RFC 1918, RFC 6598, RFC 4193, .internal, .local).',
+          },
         },
       },
       authProviderType: {
@@ -3196,6 +3219,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
             type: 'boolean',
             description:
               'Whether the authorization server returns the "iss" parameter in the authorization response (RFC 9207). When true, callbacks without "iss" are rejected; when false, they are accepted. A provided "iss" is always validated. Overrides the "authorization_response_iss_parameter_supported" value discovered from server metadata.',
+          },
+          allowPrivateNetwork: {
+            type: 'boolean',
+            description:
+              'Allow OAuth endpoints on private enterprise networks (RFC 1918, RFC 6598, RFC 4193, .internal, .local).',
           },
         },
       },
@@ -3379,6 +3407,8 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         properties: {
           comment: { type: 'string' },
           symbol: { type: 'string' },
+          active: { type: 'string' },
+          focus: { type: 'string' },
           gradient: {
             type: 'array',
             items: { type: 'string' },

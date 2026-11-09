@@ -1,6 +1,6 @@
-# Latest stable release: v0.64.0
+# Latest stable release: v0.67.0
 
-Released: October 13, 2026
+Released: November 4, 2026
 
 For most users, our latest stable release is the recommended release. Install
 the latest stable version with:
@@ -11,72 +11,101 @@ npm install -g @google/gemini-cli
 
 ## Highlights
 
-- **Atomic File Operations & State Recovery:** Serialized file tool operations
-  with atomic writes and introduced atomic CLI state persistence with automatic
-  recovery from backup on corruption.
-- **Chat Recording Optimization:** Implemented append-only delta patching and
-  bounded history windowing in ChatRecordingService to optimize memory and disk
-  efficiency during long-running sessions.
-- **CLI Input & Reference Resolution:** Added support for resolving `@file:line`
-  references, resolved CPU hangs and quote swallowing on `@` symbols within code
-  blocks, and prevented ghost text wrap hangs.
-- **Terminal UI & Interaction Stability:** Ensured Ctrl+C emergency aborts
-  reliably reach active cancellation handlers, made selection list confirmation
-  with Enter and Spacebar dependable, preserved scroll positions, and fixed
-  Windows ConPTY IME cursor forwarding.
+- **Model Discovery Command & Flag**: Added a new `models` command and
+  `--list-models` flag for model discovery directly from the CLI.
+- **Container Sandbox IDE Bridging**: Bridged the IDE companion into container
+  sandboxes over exec stdio to improve IDE integration in containerized
+  environments.
+- **Cancellation & Signal Resilience**: Improved termination signal and
+  cancellation handling by stopping continuation stream processing, halting
+  auto-nudges, and preventing subsequent tool execution in non-interactive mode.
+- **Terminal Rendering & Unicode Support**: Refined character width calculation
+  for terminals rendering ambiguous-width characters and corrected display width
+  for Thai and Lao SARA AM scripts.
+- **Filesystem & Security Safeguards**: Hardened atomic file writing to respect
+  read-only files and hard links, resolved relative file paths against the
+  active IDE workspace root, scoped untrusted flag checks to external output,
+  and included MCP server and tool metadata in permission requests.
 
 ## What's Changed
 
-- refactor(a2a-server): implement V1 to V2 settings migration logic by
-  @jvargassanchez-dot in
-  [#29450](https://github.com/google-gemini/gemini-cli/pull/29450)
-- fix(acp): bridge PromptResponse.usage and emit usage_update notifications
-  (#29389) by @elberthc-byte in
-  [#29549](https://github.com/google-gemini/gemini-cli/pull/29549)
-- Changelog for v0.63.0-preview.0 by @gemini-cli-robot in
-  [#29565](https://github.com/google-gemini/gemini-cli/pull/29565)
-- fix(cli): propagate resolved folder trust state in headless mode (#29031) by
-  @amelidev in [#29528](https://github.com/google-gemini/gemini-cli/pull/29528)
-- chore(release): bump version to 0.64.0-nightly.20260929.gd75234cae by
+- Changelog for v0.65.0 by @gemini-cli-robot in
+  [#29853](https://github.com/google-gemini/gemini-cli/pull/29853)
+- chore(release): bump version to 0.67.0-nightly.20261020.gb041de017 by
   @gemini-cli-robot in
-  [#29567](https://github.com/google-gemini/gemini-cli/pull/29567)
-- fix(cli): prevent CPU hang and quote swallowing on @ within code (#29434) by
+  [#29854](https://github.com/google-gemini/gemini-cli/pull/29854)
+- Changelog for v0.66.0-preview.0 by @gemini-cli-robot in
+  [#29852](https://github.com/google-gemini/gemini-cli/pull/29852)
+- feat(cli): bridge the IDE companion into container sandboxes over exec stdio
+  by @elberthc-byte in
+  [#29858](https://github.com/google-gemini/gemini-cli/pull/29858)
+- fix(core): prevent duplicate agent loading when workspace is home directory
+  (#27692) by @urielefrenvirtusa in
+  [#29847](https://github.com/google-gemini/gemini-cli/pull/29847)
+- fix(ide): exclude IDE settings and GEMINI.md files from open file con text by
+  @villahernandez-coder in
+  [#29848](https://github.com/google-gemini/gemini-cli/pull/29848)
+- fix(core): scope untrusted flag checks to external output and remember
+  approved flags by @luisfelipe-alt in
+  [#29833](https://github.com/google-gemini/gemini-cli/pull/29833)
+- fix(a2a-server): mount express.json() before A2A SDK route registration by
+  @jesussamuel-byte in
+  [#29850](https://github.com/google-gemini/gemini-cli/pull/29850)
+- fix(core): adhere to RFC 9110 token rules when splitting custom headers by
+  @diegogodinezr in
+  [#29865](https://github.com/google-gemini/gemini-cli/pull/29865)
+- fix(core): respect read-only files and hard links in atomic writeTextFile by
   @elberthc-byte in
-  [#29557](https://github.com/google-gemini/gemini-cli/pull/29557)
-- fix(core): serialize file tool operations and make writes atomic (#29078) by
-  @elberthc-byte in
-  [#29499](https://github.com/google-gemini/gemini-cli/pull/29499)
-- fix(core): implement append-only delta patching and bounded history windowing
-  in ChatRecordingService by @jvargassanchez-dot in
-  [#29568](https://github.com/google-gemini/gemini-cli/pull/29568)
-- fix(cli): persist state atomically and recover from backup on corruption by
+  [#29749](https://github.com/google-gemini/gemini-cli/pull/29749)
+- fix(a2a-server,core): preserve extended token usage metadata and align
+  per-turn reporting by @jvargassanchez-dot in
+  [#29834](https://github.com/google-gemini/gemini-cli/pull/29834)
+- fix(core): ensure all model turns with function calls receive thought
+  signatures by @amelidev in
+  [#29828](https://github.com/google-gemini/gemini-cli/pull/29828)
+- fix(cli): handle termination signals and prevent tool execution after
+  cancellation in non-interactive mode by @urielefrenvirtusa in
+  [#29849](https://github.com/google-gemini/gemini-cli/pull/29849)
+- fix(cli): preserve ${VAR} placeholders during deprecated settings migration by
+  @villahernandez-coder in
+  [#29867](https://github.com/google-gemini/gemini-cli/pull/29867)
+- fix(cli): stop continuation stream processing and auto-nudge after request
+  cancellation by @jesussamuel-byte in
+  [#29868](https://github.com/google-gemini/gemini-cli/pull/29868)
+- fix(cli): correct Thai and Lao SARA AM display width by @elberthc-byte in
+  [#29883](https://github.com/google-gemini/gemini-cli/pull/29883)
+- fix(core): resolve relative file paths against active IDE workspace root by
+  @villahernandez-coder in
+  [#29838](https://github.com/google-gemini/gemini-cli/pull/29838)
+- feat(cli): add models command and --list-models flag for model discovery by
   @urielefrenvirtusa in
-  [#29558](https://github.com/google-gemini/gemini-cli/pull/29558)
-- fix(cli): ensure Ctrl+C emergency abort reaches cancellation handler during
-  active operations by @urielefrenvirtusa in
-  [#29586](https://github.com/google-gemini/gemini-cli/pull/29586)
-- fix(cli): resolve @file:line references and prevent ghost text wrap hang by
+  [#29880](https://github.com/google-gemini/gemini-cli/pull/29880)
+- fix(cli): convert Claude hook timeout from seconds to milliseconds during
+  migration by @villahernandez-coder in
+  [#29899](https://github.com/google-gemini/gemini-cli/pull/29899)
+- fix(core): classify project spending cap errors as terminal quota errors by
   @jesussamuel-byte in
-  [#29581](https://github.com/google-gemini/gemini-cli/pull/29581)
-- fix(ui): ensure Windows ConPTY forwards IME cursor position by
-  @jesussamuel-byte in
-  [#29560](https://github.com/google-gemini/gemini-cli/pull/29560)
-- fix(cli): retry directory removal on Windows locking errors during extension
-  updates by @jesussamuel-byte in
-  [#29540](https://github.com/google-gemini/gemini-cli/pull/29540)
-- fix(acp): resolve session by exact id and handle listener cleanup on session
-  failure by @diegogodinezr in
-  [#29580](https://github.com/google-gemini/gemini-cli/pull/29580)
-- fix(cli): preserve scroll position and partition pending height budget by
-  @luisfelipe-alt in
-  [#29520](https://github.com/google-gemini/gemini-cli/pull/29520)
-- fix(cli): ensure Enter and Spacebar reliably confirm selection list options by
-  @ugorla-dev in
-  [#29502](https://github.com/google-gemini/gemini-cli/pull/29502)
-- fix(patch): cherry-pick 2ce1a69 to release/v0.64.0-preview.0-pr-29672 to patch
-  version v0.64.0-preview.0 and create version 0.64.0-preview.1 by
-  @gemini-cli-robot in
-  [#29696](https://github.com/google-gemini/gemini-cli/pull/29696)
+  [#29961](https://github.com/google-gemini/gemini-cli/pull/29961)
+- fix(acp): include MCP server and tool metadata in permission requests by
+  @duvanka-prasad in
+  [#29910](https://github.com/google-gemini/gemini-cli/pull/29910)
+- fix(cli): prevent parent command name insertion on /chat list autocomplete by
+  @urielefrenvirtusa in
+  [#29967](https://github.com/google-gemini/gemini-cli/pull/29967)
+- fix(cli): validate finite numbers in numeric settings editor by @diegogodinezr
+  in [#29968](https://github.com/google-gemini/gemini-cli/pull/29968)
+- fix(core): allow trusted system paths on Android (Termux) for ripgrep
+  resolution (#21836) by @amelidev in
+  [#29884](https://github.com/google-gemini/gemini-cli/pull/29884)
+- fix(core): normalize CRLF line endings before diffing in getDiffContextSnippet
+  by @jesussamuel-byte in
+  [#29966](https://github.com/google-gemini/gemini-cli/pull/29966)
+- fix(cli): handle terminals that render ambiguous-width characters as wide by
+  @elberthc-byte in
+  [#29905](https://github.com/google-gemini/gemini-cli/pull/29905)
+- fix(cli): prevent duplicate history and double telemetry in confirm_action
+  flow by @duvanka-prasad in
+  [#29974](https://github.com/google-gemini/gemini-cli/pull/29974)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.63.0...v0.64.0
+https://github.com/google-gemini/gemini-cli/compare/v0.66.0...v0.67.0

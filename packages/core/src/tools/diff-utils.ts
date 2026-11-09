@@ -18,7 +18,10 @@ export function getDiffContextSnippet(
     return newContent;
   }
 
-  const changes = Diff.diffLines(originalContent, newContent);
+  const normalizedOriginal = originalContent.replace(/\r\n/g, '\n');
+  const normalizedNew = newContent.replace(/\r\n/g, '\n');
+
+  const changes = Diff.diffLines(normalizedOriginal, normalizedNew);
   const newLines = newContent.split(/\r?\n/);
   const ranges: Array<{ start: number; end: number }> = [];
   let newLineIdx = 0;

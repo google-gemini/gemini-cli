@@ -61,6 +61,9 @@ export interface LLMResponse {
     promptTokenCount?: number;
     candidatesTokenCount?: number;
     totalTokenCount?: number;
+    cachedContentTokenCount?: number;
+    thoughtsTokenCount?: number;
+    toolUsePromptTokenCount?: number;
   };
 }
 
@@ -407,6 +410,19 @@ export class HookTranslatorGenAIv1 extends HookTranslator {
             candidatesTokenCount:
               sdkResponse.usageMetadata.candidatesTokenCount,
             totalTokenCount: sdkResponse.usageMetadata.totalTokenCount,
+            ...(sdkResponse.usageMetadata.cachedContentTokenCount !==
+              undefined && {
+              cachedContentTokenCount:
+                sdkResponse.usageMetadata.cachedContentTokenCount,
+            }),
+            ...(sdkResponse.usageMetadata.thoughtsTokenCount !== undefined && {
+              thoughtsTokenCount: sdkResponse.usageMetadata.thoughtsTokenCount,
+            }),
+            ...(sdkResponse.usageMetadata.toolUsePromptTokenCount !==
+              undefined && {
+              toolUsePromptTokenCount:
+                sdkResponse.usageMetadata.toolUsePromptTokenCount,
+            }),
           }
         : undefined,
     };

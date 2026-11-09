@@ -17,6 +17,20 @@ export function getGitHubToken(): string | undefined {
   return process.env['GITHUB_TOKEN'] || undefined;
 }
 
+export function isTrustedGitHubUrl(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url);
+    return (
+      parsedUrl.protocol === 'https:' &&
+      (parsedUrl.hostname === 'github.com' ||
+        parsedUrl.hostname.endsWith('.github.com'))
+    );
+  } catch {
+    // Do not treat invalid URLs as trusted GitHub hosts.
+    return false;
+  }
+}
+
 /**
  * DNS lookup for the HTTPS client. `validateUrlDestination` resolves the host
  * once before the request, but the client resolves it again when it connects,
@@ -27,7 +41,11 @@ export function getGitHubToken(): string | undefined {
  * Node's `LookupFunction` type allows `family` to be 'IPv4' | 'IPv6', which
  * `safeLookup` does not accept, so only a numeric family is forwarded.
  */
-const lookupPublicAddress: LookupFunction = (hostname, options, callback) =>
+export const lookupPublicAddress: LookupFunction = (
+  hostname,
+  options,
+  callback,
+) =>
   safeLookup(
     hostname,
     {
@@ -38,7 +56,9 @@ const lookupPublicAddress: LookupFunction = (hostname, options, callback) =>
   );
 
 // Status codes that tell the client to repeat the GET at the Location URL.
-const REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308]);
+export const REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308]);
+
+export const REQUEST_TIMEOUT_MS = 30000;
 
 export async function fetchJson<T>(
   url: string,
@@ -52,19 +72,8 @@ export async function fetchJson<T>(
     'User-Agent': 'gemini-cli',
   };
   const token = getGitHubToken();
-  if (token) {
-    try {
-      const parsedUrl = new URL(url);
-      if (
-        parsedUrl.protocol === 'https:' &&
-        (parsedUrl.hostname === 'github.com' ||
-          parsedUrl.hostname.endsWith('.github.com'))
-      ) {
-        headers.Authorization = `token ${token}`;
-      }
-    } catch {
-      // Do not attach token if URL is invalid
-    }
+  if (token && isTrustedGitHubUrl(url)) {
+    headers.Authorization = `token ${token}`;
   }
   return new Promise((resolve, reject) => {
     // A single failure can emit several lifecycle events (for example
@@ -98,7 +107,7 @@ export async function fetchJson<T>(
     const requestOptions = {
       headers,
       lookup: lookupPublicAddress,
-      timeout: 30000,
+      timeout: REQUEST_TIMEOUT_MS,
     };
     const req = https.get(url, requestOptions, (res) => {
       res.on('error', (error) =>
@@ -196,7 +205,9 @@ export async function fetchJson<T>(
     });
     req.on('error', (error) => failUnlessRedirecting(() => error));
     req.on('timeout', () => {
-      failUnlessRedirecting(() => new Error('Request timed out after 30000ms'));
+      failUnlessRedirecting(
+        () => new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`),
+      );
       // Always release the original socket. A redirect in flight runs on its
       // own request, so destroying this one does not affect it.
       req.destroy();

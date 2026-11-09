@@ -98,8 +98,10 @@ import { createPolicyUpdater } from './config/policy.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { runDeferredCommand } from './deferred.js';
+import { handleList as handleListModels } from './commands/models/list.js';
 import { cleanupBackgroundLogs } from './utils/logCleanup.js';
 import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
+import { formatCliError } from './utils/formatError.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -624,6 +626,7 @@ export async function main() {
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
   let initialAuthFailed = false;
+  let initialAuthError: unknown = undefined;
   if (!settings.merged.security.auth.useExternal && !argv.isCommand) {
     try {
       if (
@@ -660,8 +663,9 @@ export async function main() {
       // We allow the app to start, and the React-based ValidationDialog
       // will handle it.
       if (!(err instanceof ValidationRequiredError)) {
-        debugLogger.error('Error authenticating:', err);
+        debugLogger.debug('Error authenticating:', err);
         initialAuthFailed = true;
+        initialAuthError = err;
       }
     }
   }
@@ -681,6 +685,22 @@ export async function main() {
   // Run deferred command now that we have admin settings.
   await runDeferredCommand(settings.merged);
 
+  if (argv.listModels) {
+    const outputFormat = argv.outputFormat === 'json' ? 'json' : 'text';
+    try {
+      await handleListModels({ outputFormat, loadedSettings: settings, argv });
+      await runExitCleanup();
+      process.exit(ExitCodes.SUCCESS);
+    } catch (error) {
+      debugLogger.error('Failed to list models:', error);
+      process.stderr.write(
+        `Error: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_INPUT_ERROR);
+    }
+  }
+
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX'] && !argv.isCommand) {
     const memoryArgs = settings.merged.advanced.autoConfigureMemory
@@ -695,6 +715,9 @@ export async function main() {
 
     if (sandboxConfig) {
       if (initialAuthFailed) {
+        writeToStderr(
+          formatCliError(initialAuthError, { debug: isDebugMode }) + '\n',
+        );
         await runExitCleanup();
         process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
       }

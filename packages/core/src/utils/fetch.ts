@@ -325,6 +325,48 @@ export function isAddressPrivate(address: string): boolean {
 }
 
 /**
+ * Checks if a hostname or IP address belongs to an enterprise private network range
+ * (RFC 1918, RFC 6598 Carrier-Grade NAT, RFC 4193 IPv6 Unique Local, or .internal/.local domains)
+ * while excluding loopback, link-local, multicast, broadcast, unspecified, reserved, and benchmark ranges.
+ */
+export function isEnterprisePrivateAddress(addressOrHost: string): boolean {
+  const normalized = sanitizeHostname(addressOrHost).toLowerCase();
+
+  if (normalized.endsWith('.internal') || normalized.endsWith('.local')) {
+    return true;
+  }
+
+  if (normalized === 'localhost' || normalized.endsWith('.localhost')) {
+    return false;
+  }
+
+  try {
+    if (!ipaddr.isValid(normalized)) {
+      return false;
+    }
+
+    let addr: ipaddr.IPv4 | ipaddr.IPv6 = ipaddr.parse(normalized);
+
+    if (addr instanceof ipaddr.IPv6 && addr.isIPv4MappedAddress()) {
+      addr = addr.toIPv4Address();
+    }
+
+    if (isBenchmarkAddress(addr)) {
+      return false;
+    }
+
+    const range = addr.range();
+    return (
+      range === 'private' ||
+      range === 'carrierGradeNat' ||
+      range === 'uniqueLocal'
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Checks if a URL resolves to a private IP address.
  */
 export async function isPrivateIpAsync(url: string): Promise<boolean> {

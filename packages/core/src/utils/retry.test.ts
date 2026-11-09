@@ -587,6 +587,35 @@ describe('retryWithBackoff', () => {
       await expect(promise).resolves.toBe('success');
       expect(mockFn).toHaveBeenCalledTimes(2);
     });
+
+    it.each([
+      'ENETUNREACH',
+      'EHOSTUNREACH',
+      'ENETDOWN',
+      'EACCES',
+      'ERR_INVALID_URL',
+      'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+      'SELF_SIGNED_CERT_IN_CHAIN',
+      'ERR_TLS_CERT_ALTNAME_INVALID',
+    ])(
+      "should fail fast without retrying on 'fetch failed' caused by deterministic network/TLS error code (%s) even when retryFetchErrors is true",
+      async (code) => {
+        const cause = new Error(`Permanent failure: ${code}`);
+        (cause as any).code = code;
+        const fetchError = new TypeError('fetch failed', { cause });
+
+        const mockFn = vi.fn().mockRejectedValue(fetchError);
+
+        const promise = retryWithBackoff(mockFn, {
+          retryFetchErrors: true,
+          maxAttempts: 5,
+          initialDelayMs: 10,
+        });
+
+        await expect(promise).rejects.toThrow('fetch failed');
+        expect(mockFn).toHaveBeenCalledTimes(1);
+      },
+    );
   });
 
   describe('Flash model fallback for OAuth users', () => {

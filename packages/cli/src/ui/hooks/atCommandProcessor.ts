@@ -590,7 +590,7 @@ async function readLocalFiles(
           const match = fileContentRegex.exec(part);
           if (match) {
             const filePathSpecInContent = match[1];
-            const fileActualContent = match[2].trim();
+            const fileActualContent = match[2];
 
             // Find the display label for this path
             const resolvedFile = filesToRead.find(
@@ -616,7 +616,9 @@ async function readLocalFiles(
             parts.push({
               text: `\nContent from @${displayPath}:\n`,
             });
-            parts.push({ text: fileActualContent });
+            if (fileActualContent !== '') {
+              parts.push({ text: fileActualContent });
+            }
           } else {
             parts.push({ text: part });
           }

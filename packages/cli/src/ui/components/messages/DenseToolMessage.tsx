@@ -12,8 +12,6 @@ import {
   type FileDiff,
   type ListDirectoryResult,
   type ReadManyFilesResult,
-  isFileDiff,
-  hasSummary,
   isGrepResult,
   isListResult,
   isReadManyFilesResult,
@@ -23,6 +21,7 @@ import {
   type ToolResultDisplay,
   isTodoList,
 } from '../../types.js';
+import { getToolFileDiff, hasPayloadResult } from '../../hooks/toolMapping.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { ToolStatusIndicator } from './ToolShared.js';
 import { theme } from '../../semantic-colors.js';
@@ -58,19 +57,6 @@ interface ViewParts {
   // detailed output, e.g. diff or command output
   payload?: React.ReactNode;
 }
-
-interface PayloadResult {
-  summary: string;
-  payload: string;
-}
-
-const hasPayload = (res: unknown): res is PayloadResult => {
-  if (!hasSummary(res)) return false;
-  if (!('payload' in res)) return false;
-
-  const value = (res as { payload?: unknown }).payload;
-  return typeof value === 'string';
-};
 
 function getFileOpData(
   diff: FileDiff,
@@ -240,7 +226,7 @@ function getGenericSuccessData(
         → Todos updated
       </Text>
     );
-  } else if (hasPayload(resultDisplay)) {
+  } else if (hasPayloadResult(resultDisplay)) {
     summary = <Text color={theme.text.accent}>→ {resultDisplay.summary}</Text>;
     payload = (
       <Box marginLeft={2}>
@@ -296,21 +282,11 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
   const toggleRef = useRef<DOMElement>(null);
 
   // Unified File Data Extraction (Safely bridge resultDisplay and confirmationDetails)
-  const diff = useMemo((): FileDiff | undefined => {
-    if (isFileDiff(resultDisplay)) return resultDisplay;
-    if (confirmationDetails?.type === 'edit') {
-      const details = confirmationDetails;
-      return {
-        fileName: details.fileName,
-        fileDiff: details.fileDiff,
-        filePath: details.filePath,
-        originalContent: details.originalContent,
-        newContent: details.newContent,
-        diffStat: details.diffStat,
-      };
-    }
-    return undefined;
-  }, [resultDisplay, confirmationDetails]);
+  const diff = useMemo(
+    (): FileDiff | undefined =>
+      getToolFileDiff({ resultDisplay, confirmationDetails }),
+    [resultDisplay, confirmationDetails],
+  );
 
   const handleToggle = () => {
     const next = !isExpanded;

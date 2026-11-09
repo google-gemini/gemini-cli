@@ -8,8 +8,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { FakeContentGenerator } from '../core/fakeContentGenerator.js';
 import { Config } from '../config/config.js';
-import { RetryableQuotaError } from '../utils/googleQuotaErrors.js';
 import {
+  RetryableQuotaError,
+  TerminalQuotaError,
+} from '../utils/googleQuotaErrors.js';
+import {
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -590,5 +594,129 @@ describe('Auto Routing Fallback Integration', () => {
     // Verify session ID has been rotated
     expect(config.getSessionId()).not.toBe(originalSessionId);
     expect(config.getSessionId()).toBeDefined();
+  });
+
+  it('should fallback once to Flash on capacity error for manual gemini-3.1-pro-preview-customtools and restore Pro on next turn', async () => {
+    config = new Config({
+      sessionId: 'test-session-manual-pro-31',
+      targetDir: '/test',
+      debugMode: false,
+      cwd: '/test',
+      model: PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+    });
+
+    vi.spyOn(config, 'isInteractive').mockReturnValue(true);
+    vi.spyOn(config, 'getGemini31LaunchedSync').mockReturnValue(true);
+    vi.spyOn(config, 'getUseCustomToolModelSync').mockReturnValue(true);
+
+    client = new BaseLlmClient(fakeGenerator, config, AuthType.USE_GEMINI);
+
+    let attemptsProTurn1 = 0;
+    let attemptsFlashTurn1 = 0;
+
+    const capacityApiError = {
+      code: 429,
+      message: 'No capacity available for gemini-3.1-pro-preview-customtools',
+      details: [],
+    };
+
+    vi.spyOn(fakeGenerator, 'generateContent').mockImplementation(
+      async (params) => {
+        const modelId = normalizeModelId(params.model ?? '');
+        if (modelId === PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL) {
+          attemptsProTurn1++;
+          throw new TerminalQuotaError(
+            'No capacity available',
+            capacityApiError,
+            0,
+            'MODEL_CAPACITY_EXHAUSTED',
+          );
+        }
+        if (modelId === PREVIEW_GEMINI_FLASH_MODEL) {
+          attemptsFlashTurn1++;
+          return {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [{ text: 'Flash temporary fallback success' }],
+                },
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        }
+        throw new Error(`Unexpected model: ${params.model}`);
+      },
+    );
+
+    // Low error verbosity returns 'retry_once' for capacity exhaustion
+    config.setFallbackModelHandler(
+      async (): Promise<FallbackIntent | null> => 'retry_once',
+    );
+
+    const promise1 = client.generateContent({
+      modelConfigKey: {
+        model: PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+        isChatModel: true,
+      },
+      contents: [{ role: 'user', parts: [{ text: 'turn 1' }] }],
+      abortSignal: new AbortController().signal,
+      promptId: 'prompt-1',
+      role: LlmRole.MAIN,
+    });
+
+    await vi.runAllTimersAsync();
+    const result1 = await promise1;
+
+    expect(result1.candidates?.[0]?.content?.parts?.[0]?.text).toBe(
+      'Flash temporary fallback success',
+    );
+    expect(attemptsProTurn1).toBe(3); // 3 silent capacity attempts before handler
+    expect(attemptsFlashTurn1).toBe(1);
+    // Configured model remains gemini-3.1-pro-preview-customtools
+    expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
+
+    // Start next turn (or after cancel + turn reset): Pro must be restored!
+    config.resetTurn();
+    expect(config.getActiveModel()).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
+    expect(
+      config
+        .getModelAvailabilityService()
+        .snapshot(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL).available,
+    ).toBe(true);
+
+    vi.spyOn(fakeGenerator, 'generateContent').mockImplementation(
+      async (params) => {
+        const modelId = normalizeModelId(params.model ?? '');
+        if (modelId === PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL) {
+          return {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [{ text: 'Pro 3.1 customtools restored' }],
+                },
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        }
+        throw new Error(`Unexpected model on turn 2: ${params.model}`);
+      },
+    );
+
+    const result2 = await client.generateContent({
+      modelConfigKey: {
+        model: PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+        isChatModel: true,
+      },
+      contents: [{ role: 'user', parts: [{ text: 'turn 2' }] }],
+      abortSignal: new AbortController().signal,
+      promptId: 'prompt-2',
+      role: LlmRole.MAIN,
+    });
+
+    expect(result2.candidates?.[0]?.content?.parts?.[0]?.text).toBe(
+      'Pro 3.1 customtools restored',
+    );
   });
 });

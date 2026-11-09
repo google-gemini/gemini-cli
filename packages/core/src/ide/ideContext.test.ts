@@ -9,7 +9,7 @@ import {
   IDE_MAX_SELECTED_TEXT_LENGTH,
 } from './constants.js';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { IdeContextStore } from './ideContext.js';
+import { IdeContextStore, isExcludedIdeContextFile } from './ideContext.js';
 import {
   type IdeContext,
   FileSchema,
@@ -351,6 +351,86 @@ describe('ideContext', () => {
       ideContextStore.set(context);
       const openFiles = ideContextStore.get()?.workspaceState?.openFiles;
       expect(openFiles).toHaveLength(IDE_MAX_OPEN_FILES);
+    });
+
+    it('should filter out IDE settings and GEMINI.md files from openFiles', () => {
+      const context: IdeContext = {
+        workspaceState: {
+          openFiles: [
+            {
+              path: '/workspace/.vscode/settings.json',
+              timestamp: 400,
+              isActive: true,
+              selectedText: '"geminidoceassist.rule": "#AXEL"',
+            },
+            {
+              path: '/Users/user/Library/Application Support/Code/User/settings.json',
+              timestamp: 350,
+              isActive: false,
+            },
+            {
+              path: '/workspace/gemini.md',
+              timestamp: 300,
+              isActive: false,
+            },
+            {
+              path: '/workspace/src/main.ts',
+              timestamp: 200,
+              isActive: false,
+            },
+          ],
+        },
+      };
+
+      ideContextStore.set(context);
+      const openFiles = ideContextStore.get()?.workspaceState?.openFiles;
+      expect(openFiles).toEqual([
+        {
+          path: '/workspace/src/main.ts',
+          timestamp: 200,
+          isActive: false,
+          cursor: undefined,
+          selectedText: undefined,
+        },
+      ]);
+    });
+  });
+
+  describe('isExcludedIdeContextFile', () => {
+    it.each([
+      '/workspace/.vscode/settings.json',
+      '.vscode/settings.json',
+      'C:\\workspace\\.vscode\\settings.json',
+      '/workspace/.gemini/settings.json',
+      '/Users/user/Library/Application Support/Code/User/settings.json',
+      '/Users/user/Library/Application Support/Code - Insiders/User/settings.json',
+      '/home/user/.config/VSCodium/User/settings.json',
+      '/home/user/.config/Code/User/profiles/default/settings.json',
+      'C:\\Users\\user\\AppData\\Roaming\\Code\\User\\settings.json',
+      '/home/user/.vscode-server/data/Machine/settings.json',
+      '/home/user/.vscodium-server/data/Machine/settings.json',
+      '/Users/user/Library/Application Support/Cursor/User/settings.json',
+      '/home/user/.config/Windsurf/User/settings.json',
+      '/home/user/.cursor-server/data/Machine/settings.json',
+      '/workspace/GEMINI.md',
+      '/workspace/gemini.md',
+      '/Users/user/.gemini/GEMINI.md',
+      'gemini.md',
+      'C:\\workspace\\GEMINI.md',
+    ])('returns true for excluded path %s', (filePath) => {
+      expect(isExcludedIdeContextFile(filePath)).toBe(true);
+    });
+
+    it.each([
+      '',
+      '/workspace/src/index.ts',
+      '/workspace/src/settings.json',
+      '/workspace/src/user/settings.json',
+      '/workspace/src/machine/settings.json',
+      '/workspace/docs/gemini-guide.md',
+      'C:\\workspace\\src\\app.ts',
+    ])('returns false for regular project path %s', (filePath) => {
+      expect(isExcludedIdeContextFile(filePath)).toBe(false);
     });
   });
 

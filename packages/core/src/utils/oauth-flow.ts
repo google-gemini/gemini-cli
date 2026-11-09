@@ -625,6 +625,7 @@ export async function exchangeCodeForToken(
   codeVerifier: string,
   redirectPort: number,
   resource?: string,
+  options?: { allowPrivateNetwork?: boolean },
 ): Promise<OAuthTokenResponse> {
   const redirectUri = getRedirectUri(config, redirectPort);
 
@@ -653,6 +654,7 @@ export async function exchangeCodeForToken(
     : isLoopbackUrl(config.tokenUrl);
   const validatedTokenUrl = await validateOAuthEndpointUrl(config.tokenUrl, {
     allowLoopback,
+    allowPrivateNetwork: options?.allowPrivateNetwork,
   });
 
   const response = await fetch(validatedTokenUrl, {
@@ -685,6 +687,7 @@ export async function refreshAccessToken(
   refreshToken: string,
   tokenUrl: string,
   resource?: string,
+  options?: { allowPrivateNetwork?: boolean },
 ): Promise<OAuthTokenResponse> {
   const params = new URLSearchParams({
     grant_type: 'refresh_token',
@@ -713,6 +716,7 @@ export async function refreshAccessToken(
     : isLoopbackUrl(tokenUrl);
   const validatedTokenUrl = await validateOAuthEndpointUrl(tokenUrl, {
     allowLoopback,
+    allowPrivateNetwork: options?.allowPrivateNetwork,
   });
 
   const response = await fetch(validatedTokenUrl, {

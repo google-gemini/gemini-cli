@@ -13,6 +13,7 @@ import {
   parseCommandDetails,
   stripShellWrapper,
   hasRedirection,
+  detectCommandSubstitution,
   extractStringFromParseEntry,
 } from '../utils/shell-utils.js';
 import { parse as shellParse } from 'shell-quote';
@@ -359,6 +360,31 @@ export class PolicyEngine {
     return true;
   }
 
+  private shouldDowngradeForCommandSubstitution(
+    command: string,
+    allowCommandSubstitution?: boolean,
+    rule?: PolicyRule,
+  ): boolean {
+    if (allowCommandSubstitution ?? false) {
+      return false;
+    }
+    if (!detectCommandSubstitution(stripShellWrapper(command))) {
+      return false;
+    }
+
+    // Require explicit allowCommandSubstitution when matching a command-prefix rule.
+    if (rule?.argsPattern !== undefined) {
+      return true;
+    }
+
+    // Do not downgrade (do not ask user) if in YOLO mode for catch-all rules.
+    if (this.approvalMode === ApprovalMode.YOLO) {
+      return false;
+    }
+
+    return true;
+  }
+
   /**
    * Check if a shell command is allowed.
    */
@@ -533,6 +559,22 @@ export class PolicyEngine {
       }
     }
 
+    const hasTopLevelCommandSubstitutionDowngrade =
+      this.shouldDowngradeForCommandSubstitution(
+        command,
+        rule?.allowCommandSubstitution,
+        rule,
+      );
+    if (hasTopLevelCommandSubstitutionDowngrade) {
+      if (aggregateDecision === PolicyDecision.ALLOW) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for command substitution: ${command}`,
+        );
+        aggregateDecision = PolicyDecision.ASK_USER;
+        responsibleRule = undefined;
+      }
+    }
+
     let evaluatedSubCommands = 0;
     let allSubCommandsExplicitlyAllowed = true;
     let lastAllowedSubRule: PolicyRule | undefined;
@@ -602,14 +644,20 @@ export class PolicyEngine {
           aggregateDecision = PolicyDecision.ASK_USER;
         }
 
-        // Downgrade if sub-command has redirection
+        // Downgrade if sub-command has redirection or disallowed substitution
         if (
           subResult.decision === PolicyDecision.ALLOW &&
-          this.shouldDowngradeForRedirection(
+          (this.shouldDowngradeForRedirection(
             subCmd,
             subResult.rule?.allowRedirection ?? allowRedirection,
             subResult.rule,
-          )
+          ) ||
+            this.shouldDowngradeForCommandSubstitution(
+              subCmd,
+              subResult.rule?.allowCommandSubstitution ??
+                rule?.allowCommandSubstitution,
+              subResult.rule,
+            ))
         ) {
           allSubCommandsExplicitlyAllowed = false;
           if (aggregateDecision === PolicyDecision.ALLOW) {
@@ -657,6 +705,7 @@ export class PolicyEngine {
       aggregateDecision === PolicyDecision.ASK_USER &&
       !rule?.argsPattern &&
       !hasTopLevelRedirectionDowngrade &&
+      !hasTopLevelCommandSubstitutionDowngrade &&
       !hasTopLevelHeuristicDowngrade &&
       !isOutsideWorkspace &&
       !isUntrustedGit &&

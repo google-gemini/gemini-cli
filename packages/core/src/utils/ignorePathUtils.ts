@@ -21,8 +21,8 @@ export function getNormalizedRelativePath(
   if (!filePath || typeof filePath !== 'string') {
     return null;
   }
-
-  const absoluteFilePath = path.resolve(projectRoot, filePath);
+  const pathModule = process.platform === 'win32' ? path.win32 : path;
+  const absoluteFilePath = pathModule.resolve(projectRoot, filePath);
 
   // Ensure the path is within the project root
   if (!isWithinRoot(absoluteFilePath, projectRoot)) {
@@ -32,7 +32,7 @@ export function getNormalizedRelativePath(
   const canonicalRoot = canonicalizeMacosPath(projectRoot);
   const canonicalAbs = canonicalizeMacosPath(absoluteFilePath);
 
-  let relativePath = path.relative(canonicalRoot, canonicalAbs);
+  let relativePath = pathModule.relative(canonicalRoot, canonicalAbs);
 
   // Handle cross-platform root prefix discrepancies (e.g., macOS /var vs /private/var)
   if (process.platform === 'darwin' && relativePath.startsWith('..')) {

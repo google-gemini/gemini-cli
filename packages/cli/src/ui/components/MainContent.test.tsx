@@ -44,7 +44,7 @@ import {
   useUIState,
   type UIState,
 } from '../contexts/UIStateContext.js';
-import { type IndividualToolCallDisplay } from '../types.js';
+import { type HistoryItem, type IndividualToolCallDisplay } from '../types.js';
 import {
   type ConfirmingToolState,
   useConfirmingTool,
@@ -95,6 +95,16 @@ vi.mock('./AppHeader.js', () => ({
   ),
 }));
 
+// Pass-through spy so tests can observe which history items are (re)rendered.
+vi.mock('./HistoryItemDisplay.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./HistoryItemDisplay.js')>();
+  return {
+    ...actual,
+    HistoryItemDisplay: vi.fn(actual.HistoryItemDisplay),
+  };
+});
+
 const mockScrollableList = vi.fn();
 
 vi.mock('./shared/ScrollableList.js', async () => {
@@ -135,6 +145,7 @@ vi.mock('./shared/ScrollableList.js', async () => {
 
 import { theme } from '../semantic-colors.js';
 import { type BackgroundTask } from '../hooks/shellReducer.js';
+import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 
 describe('getToolGroupBorderAppearance', () => {
   const mockBackgroundTasks = new Map<number, BackgroundTask>();
@@ -1314,5 +1325,147 @@ describe('MainContent', () => {
     expect(keyExtractor({ type: 'header' }, 0)).toContain('-true-');
 
     unmount();
+  });
+
+  describe('static history refresh on terminal width change', () => {
+    const LINES_PER_MESSAGE = 8;
+
+    const createLongHistory = (count: number): HistoryItem[] =>
+      Array.from(
+        { length: count },
+        (_, index): HistoryItem => ({
+          id: index + 1,
+          type: index % 2 === 0 ? 'user' : 'gemini',
+          text: Array.from(
+            { length: LINES_PER_MESSAGE },
+            (_, line) => `message ${index + 1} line ${line + 1}`,
+          ).join('\n'),
+        }),
+      );
+
+    const renderedHistoryItemIds = () =>
+      new Set(
+        vi
+          .mocked(HistoryItemDisplay)
+          .mock.calls.map(([props]) => props.item.id),
+      );
+
+    // Renders MainContent in inline mode with UI state that the test can
+    // update the way AppContainer does on resize and on refreshStatic().
+    const renderInlineMainContent = async (history: HistoryItem[]) => {
+      let applyLayout: ((layout: Partial<UIState>) => void) | undefined;
+      const LayoutHarness = () => {
+        const outerState = useUIState();
+        const [layout, setLayout] = useState<Partial<UIState>>({});
+        applyLayout = (next) => setLayout((prev) => ({ ...prev, ...next }));
+        return (
+          <UIStateContext.Provider value={{ ...outerState, ...layout }}>
+            <MainContent />
+          </UIStateContext.Provider>
+        );
+      };
+
+      vi.mocked(HistoryItemDisplay).mockClear();
+      const { unmount } = await renderWithProviders(<LayoutHarness />, {
+        uiState: {
+          ...defaultMockUiState,
+          history,
+          terminalWidth: 100,
+          mainAreaWidth: 100,
+        } as Partial<UIState>,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+      });
+      if (!applyLayout) {
+        throw new Error('applyLayout was not initialized');
+      }
+      const applyLayoutSafe = applyLayout;
+      const updateLayout = (layout: Partial<UIState>) => {
+        act(() => {
+          applyLayoutSafe(layout);
+        });
+      };
+      return { updateLayout, unmount };
+    };
+
+    it('re-renders only a bounded trailing window of history when the static area remounts after a terminal width change', async () => {
+      // 40 multi-line items (~140 characters each) exceed the 1,000 character
+      // budget for re-printing history after a resize.
+      const history = createLongHistory(40);
+      const { updateLayout, unmount } = await renderInlineMainContent(history);
+
+      // The initial mount prints the full history.
+      expect(renderedHistoryItemIds().size).toBe(history.length);
+
+      // 1. The terminal width changes; <Static> does not re-render yet.
+      updateLayout({ terminalWidth: 80, mainAreaWidth: 80 });
+      vi.mocked(HistoryItemDisplay).mockClear();
+
+      // 2. The debounced refreshStatic() remounts the static history.
+      updateLayout({ historyRemountKey: 1 });
+
+      const rerenderedIds = renderedHistoryItemIds();
+      expect(rerenderedIds.has(history[history.length - 1].id)).toBe(true);
+      expect(rerenderedIds.has(history[0].id)).toBe(false);
+      expect(rerenderedIds.size).toBeLessThan(history.length);
+      unmount();
+    });
+
+    it('re-renders only the newest part of a long single response after a terminal width change', async () => {
+      // A long streamed response is stored as many history items after the
+      // prompt, so the whole session can be a single turn.
+      const history: HistoryItem[] = [
+        { id: 1, type: 'user', text: 'Write a long essay' },
+        ...Array.from(
+          { length: 30 },
+          (_, index): HistoryItem => ({
+            id: index + 2,
+            type: index === 0 ? 'gemini' : 'gemini_content',
+            text: `Paragraph ${index + 1}: ${'lorem ipsum '.repeat(20)}`,
+          }),
+        ),
+      ];
+      const { updateLayout, unmount } = await renderInlineMainContent(history);
+      updateLayout({ terminalWidth: 80, mainAreaWidth: 80 });
+      vi.mocked(HistoryItemDisplay).mockClear();
+
+      updateLayout({ historyRemountKey: 1 });
+
+      const rerenderedIds = renderedHistoryItemIds();
+      expect(rerenderedIds.has(history[history.length - 1].id)).toBe(true);
+      // Neither the prompt nor the start of the response is re-rendered.
+      expect(rerenderedIds.has(history[0].id)).toBe(false);
+      expect(rerenderedIds.has(history[1].id)).toBe(false);
+      unmount();
+    });
+
+    it('re-renders the full history when the static area remounts without a terminal width change', async () => {
+      const history = createLongHistory(40);
+      const { updateLayout, unmount } = await renderInlineMainContent(history);
+      vi.mocked(HistoryItemDisplay).mockClear();
+
+      // For example, a theme or Markdown toggle calling refreshStatic().
+      updateLayout({ historyRemountKey: 1 });
+
+      expect(renderedHistoryItemIds().size).toBe(history.length);
+      unmount();
+    });
+
+    it('prints history items appended after a bounded refresh', async () => {
+      const history = createLongHistory(40);
+      const { updateLayout, unmount } = await renderInlineMainContent(history);
+      updateLayout({ terminalWidth: 80, mainAreaWidth: 80 });
+      updateLayout({ historyRemountKey: 1 });
+      vi.mocked(HistoryItemDisplay).mockClear();
+
+      const nextPrompt: HistoryItem = {
+        id: history.length + 1,
+        type: 'user',
+        text: 'next prompt',
+      };
+      updateLayout({ history: [...history, nextPrompt] });
+
+      expect(renderedHistoryItemIds()).toEqual(new Set([nextPrompt.id]));
+      unmount();
+    });
   });
 });

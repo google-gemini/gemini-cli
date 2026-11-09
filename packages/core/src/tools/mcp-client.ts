@@ -57,7 +57,10 @@ import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import type { McpAuthProvider } from '../mcp/auth-provider.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
-import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
+import {
+  MCPOAuthProvider,
+  type MCPOAuthConfig,
+} from '../mcp/oauth-provider.js';
 import { DynamicStoredOAuthProvider } from '../mcp/stored-token-provider.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 
@@ -919,17 +922,24 @@ async function handleAutomaticOAuth(
     debugLogger.log(`🔐 '${mcpServerName}' requires OAuth authentication`);
 
     const serverUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
+    const discoveryOptions = {
+      allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
+    };
 
     // Try to discover OAuth config from the WWW-Authenticate header first
     let oauthConfig = await OAuthUtils.discoverOAuthFromWWWAuthenticate(
       wwwAuthenticate,
       serverUrl,
+      discoveryOptions,
     );
 
     if (!oauthConfig && hasNetworkTransport(mcpServerConfig)) {
       // Fallback: try to discover OAuth config from the base URL
       const baseUrl = OAuthUtils.extractBaseUrl(serverUrl!);
-      oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
+      oauthConfig = await OAuthUtils.discoverOAuthConfig(
+        baseUrl,
+        discoveryOptions,
+      );
     }
 
     if (!oauthConfig) {
@@ -945,7 +955,7 @@ async function handleAutomaticOAuth(
     // OAuth configuration discovered - proceed with authentication
 
     // Create OAuth configuration for authentication
-    const oauthAuthConfig = {
+    const oauthAuthConfig: MCPOAuthConfig = {
       enabled: true,
       authorizationUrl: oauthConfig.authorizationUrl,
       issuer: oauthConfig.issuer,
@@ -954,6 +964,7 @@ async function handleAutomaticOAuth(
       authorizationResponseIssParameterSupported:
         mcpServerConfig.oauth?.authorizationResponseIssParameterSupported ??
         oauthConfig.authorizationResponseIssParameterSupported,
+      allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
     };
 
     // Perform OAuth authentication
@@ -1656,15 +1667,19 @@ export function hasNetworkTransport(config: MCPServerConfig): boolean {
  * @param serverName The name of the MCP server
  * @returns The valid access token, or null if no token is stored
  */
-async function getStoredOAuthToken(serverName: string): Promise<string | null> {
+async function getStoredOAuthToken(
+  serverName: string,
+  oauthConfig?: MCPOAuthConfig,
+): Promise<string | null> {
   const tokenStorage = new MCPOAuthTokenStorage();
   const credentials = await tokenStorage.getCredentials(serverName);
   if (!credentials) return null;
 
   const authProvider = new MCPOAuthProvider(tokenStorage);
   return authProvider.getValidToken(serverName, {
+    ...oauthConfig,
     // Pass client ID if available
-    clientId: credentials.clientId,
+    clientId: oauthConfig?.clientId ?? credentials.clientId,
   });
 }
 
@@ -1720,8 +1735,12 @@ async function connectWithSSETransport(
 async function showAuthRequiredMessage(
   serverName: string,
   cliConfig: McpContext,
+  oauthConfig?: MCPOAuthConfig,
 ): Promise<never> {
-  const hasRejectedToken = !!(await getStoredOAuthToken(serverName));
+  const hasRejectedToken = !!(await getStoredOAuthToken(
+    serverName,
+    oauthConfig,
+  ));
 
   const message = hasRejectedToken
     ? `MCP server '${serverName}' rejected stored OAuth token. Please re-authenticate using: /mcp auth ${serverName}`
@@ -1953,7 +1972,7 @@ export async function connectToMcpServer(
         await connectWithSSETransport(
           mcpClient,
           mcpServerConfig,
-          await getStoredOAuthToken(mcpServerName),
+          await getStoredOAuthToken(mcpServerName, mcpServerConfig.oauth),
         );
 
         debugLogger.log(
@@ -1991,7 +2010,11 @@ export async function connectToMcpServer(
       const shouldTriggerOAuth = mcpServerConfig.oauth?.enabled;
 
       if (!shouldTriggerOAuth) {
-        await showAuthRequiredMessage(mcpServerName, cliConfig);
+        await showAuthRequiredMessage(
+          mcpServerName,
+          cliConfig,
+          mcpServerConfig.oauth,
+        );
       }
 
       // Try to extract www-authenticate header from the error
@@ -2061,7 +2084,10 @@ export async function connectToMcpServer(
         );
         if (oauthSuccess) {
           // Retry connection with OAuth token
-          const accessToken = await getStoredOAuthToken(mcpServerName);
+          const accessToken = await getStoredOAuthToken(
+            mcpServerName,
+            mcpServerConfig.oauth,
+          );
           if (!accessToken) {
             throw new Error(
               `Failed to get OAuth token for server '${mcpServerName}'`,
@@ -2088,7 +2114,11 @@ export async function connectToMcpServer(
         const shouldTryDiscovery = mcpServerConfig.oauth?.enabled;
 
         if (!shouldTryDiscovery) {
-          await showAuthRequiredMessage(mcpServerName, cliConfig);
+          await showAuthRequiredMessage(
+            mcpServerName,
+            cliConfig,
+            mcpServerConfig.oauth,
+          );
         }
 
         // For SSE/HTTP servers, try to discover OAuth configuration from the base URL
@@ -2101,16 +2131,22 @@ export async function connectToMcpServer(
             mcpServerConfig.httpUrl || mcpServerConfig.url!,
           );
           const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
+          const discoveryOptions = {
+            allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
+          };
 
           // Try to discover OAuth configuration from the base URL
-          const oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
+          const oauthConfig = await OAuthUtils.discoverOAuthConfig(
+            baseUrl,
+            discoveryOptions,
+          );
           if (oauthConfig) {
             debugLogger.log(
               `Discovered OAuth configuration from base URL for server '${mcpServerName}'`,
             );
 
             // Create OAuth configuration for authentication
-            const oauthAuthConfig = {
+            const oauthAuthConfig: MCPOAuthConfig = {
               enabled: true,
               authorizationUrl: oauthConfig.authorizationUrl,
               issuer: oauthConfig.issuer,
@@ -2120,6 +2156,7 @@ export async function connectToMcpServer(
                 mcpServerConfig.oauth
                   ?.authorizationResponseIssParameterSupported ??
                 oauthConfig.authorizationResponseIssParameterSupported,
+              allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
             };
 
             // Perform OAuth authentication
@@ -2139,7 +2176,10 @@ export async function connectToMcpServer(
             );
 
             // Retry connection with OAuth token
-            const accessToken = await getStoredOAuthToken(mcpServerName);
+            const accessToken = await getStoredOAuthToken(
+              mcpServerName,
+              mcpServerConfig.oauth,
+            );
             if (!accessToken) {
               throw new Error(
                 `Failed to get OAuth token for server '${mcpServerName}'`,

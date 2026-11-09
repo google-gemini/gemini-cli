@@ -551,6 +551,42 @@ describe('useCommandCompletion', () => {
       expect(result.current.textBuffer.text).toBe('@src/file1.txt ');
     });
 
+    it('should complete @/ path by replacing leading slash', async () => {
+      setupMocks({
+        atSuggestions: [{ label: 'package.json', value: 'package.json' }],
+      });
+
+      const { result } = await renderCommandCompletionHook('@/');
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('@package.json ');
+    });
+
+    it('should complete @/src path by replacing leading slash prefix', async () => {
+      setupMocks({
+        atSuggestions: [{ label: 'src/', value: 'src/' }],
+      });
+
+      const { result } = await renderCommandCompletionHook('@/src');
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('@src/');
+    });
+
     it('should insert canonical slash command text when suggestion provides insertValue', async () => {
       setupMocks({
         slashSuggestions: [

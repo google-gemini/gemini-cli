@@ -440,7 +440,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     auto: {
       displayName: 'Auto',
       tier: 'auto',
-      isPreview: true,
+      isPreview: false,
       isVisible: true,
       features: { thinking: true, multimodalToolUse: false },
     },
@@ -532,12 +532,6 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     'gemini-2.5-flash': {
       default: 'gemini-2.5-flash',
-      contexts: [
-        {
-          condition: { useLatestFlash: true },
-          target: LATEST_GEMINI_FLASH_MODEL,
-        },
-      ],
     },
     'gemini-3-pro-preview': {
       default: 'gemini-3-pro-preview',

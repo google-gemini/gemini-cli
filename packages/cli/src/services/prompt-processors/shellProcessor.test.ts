@@ -702,6 +702,48 @@ describe('ShellProcessor', () => {
         `Blocked command: "${expectedResolvedCommand}". Reason: Blocked by policy.`,
       );
     });
+
+    it('should preserve $ replacement patterns literally when no shell injections are present', async () => {
+      const processor = new ShellProcessor('test-command');
+      const dollarArgs = "costs $$5 and $& and $' and $` and $1";
+      context.invocation!.args = dollarArgs;
+      const prompt: PromptPipelineContent =
+        createPromptPipelineContent('say {{args}}');
+
+      const result = await processor.process(prompt, context);
+
+      expect(result).toEqual([{ text: `say ${dollarArgs}` }]);
+      expect(mockShellExecute).not.toHaveBeenCalled();
+    });
+
+    it('should preserve $ replacement patterns literally both outside and inside !{} blocks', async () => {
+      const processor = new ShellProcessor('test-command');
+      const dollarArgs = "costs $$5 and $& and $' and $` and $1";
+      context.invocation!.args = dollarArgs;
+      const prompt: PromptPipelineContent = createPromptPipelineContent(
+        'Before: {{args}} | Cmd: !{echo {{args}}} | After: {{args}}',
+      );
+      mockShellExecute.mockReturnValue({
+        result: Promise.resolve({ ...SUCCESS_RESULT, output: 'hello' }),
+      });
+
+      const result = await processor.process(prompt, context);
+
+      const expectedEscapedArgs = getExpectedEscapedArgForPlatform(dollarArgs);
+      const expectedCommand = `echo ${expectedEscapedArgs}`;
+
+      expect(mockShellExecute).toHaveBeenCalledWith(
+        expectedCommand,
+        expect.any(String),
+        expect.any(Function),
+        expect.any(Object),
+        false,
+        expect.any(Object),
+      );
+      expect(result).toEqual([
+        { text: `Before: ${dollarArgs} | Cmd: hello | After: ${dollarArgs}` },
+      ]);
+    });
   });
   describe('Real-World Escaping Scenarios', () => {
     it('should correctly handle multiline arguments', async () => {

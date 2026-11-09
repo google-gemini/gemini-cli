@@ -77,6 +77,7 @@ import {
   enterAlternateScreen,
   enableMouseEvents,
   disableLineWrapping,
+  shouldDisableLineWrapping,
   shouldEnterAlternateScreen,
   startupProfiler,
   SessionStartSource,
@@ -222,7 +223,30 @@ const SHELL_HEIGHT_PADDING = 10;
 
 const ENTER_SYNCHRONIZED_OUTPUT = '\x1b[?2026h';
 const EXIT_SYNCHRONIZED_OUTPUT = '\x1b[?2026l';
-const RESIZE_DEBOUNCE_MS = 100;
+
+/**
+ * Erases only the visible viewport and moves the cursor to the top-left corner.
+ *
+ * This intentionally avoids `ansiEscapes.clearTerminal`, which also emits
+ * `\x1b[3J` (Erase Saved Lines) and causes terminal emulators to purge their
+ * native scrollback history, wiping out earlier turns of the conversation.
+ *
+ * The viewport is erased in place (cursor home, then erase down) rather than
+ * with `\x1b[2J` (Erase in Display), which some terminal emulators (for
+ * example VTE-based ones) implement by moving the visible screen into the
+ * scrollback, leaving stale frames there on every refresh.
+ */
+const CLEAR_VIEWPORT = ansiEscapes.cursorTo(0, 0) + ansiEscapes.eraseDown;
+
+/**
+ * Delay after the last terminal width change before the static history is
+ * re-printed. Terminal emulators re-wrap previously printed rows while the
+ * window is resized and can push them into scrollback, so every intermediate
+ * refresh during a drag can leave a partial copy behind. A delay that spans
+ * the pauses of a quick back-and-forth drag produces a single refresh once
+ * resizing settles.
+ */
+const RESIZE_DEBOUNCE_MS = 300;
 const RESIZE_CORK_SAFETY_TIMEOUT_MS = 1000;
 
 /**
@@ -805,7 +829,8 @@ export const AppContainer = (props: AppContainerProps) => {
         isRefreshingStaticRef.current = true;
         stdout.write(ENTER_SYNCHRONIZED_OUTPUT);
       }
-      stdout.write(ansiEscapes.clearTerminal);
+      // Only clear the viewport so the terminal's scrollback is preserved.
+      stdout.write(CLEAR_VIEWPORT);
     }
     if (!isAlternateBuffer || config.getUseTerminalBuffer()) {
       setHistoryRemountKey((prev) => prev + 1);
@@ -850,9 +875,18 @@ export const AppContainer = (props: AppContainerProps) => {
       // enter it again to be safe.
       enterAlternateScreen();
       enableMouseEvents();
+    }
+    // External programs (editors, the manual OAuth flow) commonly restore
+    // auto-wrap; turn it off again wherever we rely on it being off.
+    if (
+      shouldDisableLineWrapping(
+        shouldUseAlternateScreen,
+        terminalCapabilityManager.areAmbiguousCharactersWide(),
+      )
+    ) {
       disableLineWrapping();
-      app.rerender();
-    } else if (config.getUseTerminalBuffer()) {
+    }
+    if (shouldUseAlternateScreen || config.getUseTerminalBuffer()) {
       app.rerender();
     }
     terminalCapabilityManager.enableSupportedModes();
@@ -1407,6 +1441,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         addItem: historyManager.addItem,
         onCancelSubmit,
         isShellFocused: embeddedShellFocused,
+        isEditorDialogOpen,
         logger,
       })
     : // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -1430,6 +1465,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         terminalHeight,
         embeddedShellFocused,
         consumePendingHints,
+        isEditorDialogOpen,
       );
 
   const {

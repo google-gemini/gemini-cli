@@ -140,6 +140,8 @@ export interface RetryAttemptPayload {
   delayMs: number;
   error?: string;
   model: string;
+  status?: number;
+  sessionId?: string;
 }
 
 /**

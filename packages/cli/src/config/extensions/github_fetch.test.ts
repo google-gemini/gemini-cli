@@ -13,7 +13,11 @@ import {
   PrivateIpError,
   validateUrlDestination,
 } from '@google/gemini-cli-core';
-import { fetchJson, getGitHubToken } from './github_fetch.js';
+import {
+  fetchJson,
+  getGitHubToken,
+  isTrustedGitHubUrl,
+} from './github_fetch.js';
 import type { ClientRequest, IncomingMessage } from 'node:http';
 
 vi.mock('node:https');
@@ -43,6 +47,20 @@ describe('getGitHubToken', () => {
     // getGitHubToken treats an empty value as unset.
     vi.stubEnv('GITHUB_TOKEN', '');
     expect(getGitHubToken()).toBeUndefined();
+  });
+});
+
+describe('isTrustedGitHubUrl', () => {
+  it.each([
+    ['https://github.com/owner/repo', true],
+    ['https://api.github.com/repos/owner/repo', true],
+    ['https://codeload.github.com/owner/repo/tar.gz/v1.0.0', true],
+    ['http://github.com/owner/repo', false],
+    ['https://objects.githubusercontent.com/asset.tar.gz', false],
+    ['https://evilgithub.com/owner/repo', false],
+    ['not-a-valid-url', false],
+  ])('should return %s -> %s', (url, expected) => {
+    expect(isTrustedGitHubUrl(url)).toBe(expected);
   });
 });
 

@@ -1,12 +1,3 @@
-> [!NOTE]
->
-> **Unpaid tier and Google One users:** Gemini CLI was replaced by Antigravity
-> CLI on June 18th, 2026. To learn more, see our
-> [blog post](https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli).
->
-> **Gemini CLI has not been optimized for Gemini 4 Argon.** To use Gemini 4
-> Argon, please use Antigravity.
-
 # Gemini CLI
 
 [![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
@@ -15,17 +6,26 @@
 [![License](https://img.shields.io/github/license/google-gemini/gemini-cli)](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE)
 [![View Code Wiki](https://assets.codewiki.google/readme-badge/static.svg)](https://codewiki.google/github.com/google-gemini/gemini-cli?utm_source=badge&utm_medium=github&utm_campaign=github.com/google-gemini/gemini-cli)
 
-> [!NOTE]
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> **Read before installing — Gemini CLI status & tool guide**
 >
-> Gemini CLI is not optimized for the latest Gemini models. For the best coding
-> experience with Gemini models use
-> [Antigravity CLI](https://antigravity.google/product/antigravity-cli)
+> - **Enterprise Code Assist only:** Designed for **Gemini Code Assist Standard / Enterprise** licenses and **Code Assist for GitHub** on Google Cloud (your access remains unchanged).
+> - **No free tier or Google AI plans:** Free individual access and **Google AI Pro / Ultra** (Google One) moved to [Antigravity CLI](https://antigravity.google/product/antigravity-cli) on June 18, 2026 ([transition post](https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli/)).
+> - **Not optimized for Gemini 4+:** Not tuned for the **Gemini 4** series (for example, [Gemini 4 Argon](https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-argon/)) or future releases in this or later generations.
+> - **Not for model benchmarks:** Don't use Gemini CLI to benchmark Gemini models—its harness isn't tuned for Gemini 4+ and produces unrepresentative scores.
+>
+> **Which Google CLI do you need?**
+>
+> | Tool | Best for | Links |
+> | :--- | :--- | :--- |
+> | **[Antigravity CLI](https://antigravity.google/product/antigravity-cli)** (`agy`) | Interactive multi-agent coding terminal. Use for **Gemini 4 Argon**+, free / **Google AI Pro & Ultra** accounts, or Google Cloud. | [Download](https://antigravity.google/download) · [Migrate](https://antigravity.google/docs/cli/gcli-migration) · [Argon post](https://antigravity.google/blog/gemini-4-argon-in-google-antigravity) |
+> | **[Gemini API CLI](https://github.com/google-gemini/gemini-api-cli)** (`gemini-api`) | Stateless API CLI *(not a coding harness)*. Gives agents (`agy`, Claude Code, Codex), scripts, and CI direct commands for Gemini models, media gen, file analysis, and managed agents. | [GitHub](https://github.com/google-gemini/gemini-api-cli) · [Releases](https://github.com/google-gemini/gemini-api-cli/releases) · [API docs](https://ai.google.dev/gemini-api/docs) |
+> | **Gemini CLI** (`gemini`, *this repo*) | Organizations with **Gemini Code Assist Standard / Enterprise** or **Code Assist for GitHub** on Google Cloud *(plus legacy paid API / Vertex keys)*. | [Docs](https://geminicli.com/docs/) |
 
-Gemini CLI is an open-source AI agent that brings the power of Gemini directly
-into your terminal. It provides lightweight access to Gemini, giving you the
-most direct path from your prompt to our model.
-
-Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
+Gemini CLI (`gemini`) is an open-source terminal agent maintained for enterprise
+Gemini Code Assist workflows on Google Cloud. Learn more in the
+[Gemini CLI documentation](https://geminicli.com/docs/).
 
 ## 📦 Installation
 
@@ -171,12 +171,6 @@ For Google Workspace accounts and other authentication methods, see the
 [authentication guide](https://www.geminicli.com/docs/get-started/authentication).
 
 ## 🚀 Getting Started
-
-> [!NOTE]
->
-> Gemini CLI is not optimized for the latest Gemini models. For the best coding
-> experience with Gemini models use
-> [Antigravity CLI](https://antigravity.google/product/antigravity-cli)
 
 ### Basic Usage
 

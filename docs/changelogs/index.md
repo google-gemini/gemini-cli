@@ -18,6 +18,67 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.67.0 - 2026-11-04
+
+- **Model Discovery Command:** Added a new `models` command and `--list-models`
+  flag for discovering available models directly from the CLI
+  ([#29880](https://github.com/google-gemini/gemini-cli/pull/29880) by
+  @urielefrenvirtusa).
+- **Container Sandbox IDE Bridging:** Enabled bridging the IDE companion into
+  container sandboxes over exec stdio to improve IDE integration in
+  containerized environments
+  ([#29858](https://github.com/google-gemini/gemini-cli/pull/29858) by
+  @elberthc-byte).
+- **Cancellation & Signal Resilience:** Improved termination signal handling and
+  prevented post-cancellation tool execution and continuation stream processing
+  ([#29849](https://github.com/google-gemini/gemini-cli/pull/29849) by
+  @urielefrenvirtusa,
+  [#29868](https://github.com/google-gemini/gemini-cli/pull/29868) by
+  @jesussamuel-byte).
+
+## Announcements: v0.66.0 - 2026-10-27
+
+- **Terminal UI Rendering & Flicker Prevention:** Implemented synchronized
+  output mode and isolated spinner rendering, eliminated buffer flickering, and
+  preserved terminal scrollback during viewport refreshes
+  ([#29725](https://github.com/google-gemini/gemini-cli/pull/29725) by
+  @diegogodinezr,
+  [#29695](https://github.com/google-gemini/gemini-cli/pull/29695) by
+  @ugorla-dev).
+- **Tool Scheduling & Process Lifecycle:** Emitted tool call groups directly
+  from the scheduler and forwarded process termination signals from bootstrap
+  parent to child processes
+  ([#29736](https://github.com/google-gemini/gemini-cli/pull/29736) by
+  @jesussamuel-byte,
+  [#29790](https://github.com/google-gemini/gemini-cli/pull/29790) by
+  @villahernandez-coder).
+- **Environment & MCP OAuth Security:** Supported opt-in private network
+  endpoints for MCP OAuth flows and preserved user-level git configuration while
+  suppressing interactive prompts
+  ([#29844](https://github.com/google-gemini/gemini-cli/pull/29844) by
+  @luisfelipe-alt,
+  [#29832](https://github.com/google-gemini/gemini-cli/pull/29832) by
+  @jesussamuel-byte).
+
+## Announcements: v0.65.0 - 2026-10-20
+
+- **Custom Telemetry Headers:** Added support for configuring custom OTLP
+  headers in telemetry configuration
+  ([#29641](https://github.com/google-gemini/gemini-cli/pull/29641) by
+  @jesussamuel-byte).
+- **Filesystem & Traversal Performance:** Optimized ignore pattern filtering
+  with subtree pruning and deferred recursive file reads for directory
+  references ([#29582](https://github.com/google-gemini/gemini-cli/pull/29582)
+  by @amelidev, [#29617](https://github.com/google-gemini/gemini-cli/pull/29617)
+  by @jvargassanchez-dot).
+- **Workspace Security & Session Resilience:** Enforced read-only workspace
+  settings in untrusted folders, resolved infinite OAuth retry loops, and
+  prevented session poisoning on rapid Ctrl+C interruptions
+  ([#29583](https://github.com/google-gemini/gemini-cli/pull/29583) by
+  @jvargassanchez-dot,
+  [#29655](https://github.com/google-gemini/gemini-cli/pull/29655) by
+  @villahernandez-coder).
+
 ## Announcements: v0.64.0 - 2026-10-13
 
 - **Atomic Operations & State Persistence:** Serialized file tool operations

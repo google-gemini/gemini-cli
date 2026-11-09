@@ -4,16 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import path from 'node:path';
 import type {
   HistoryItemStats,
   HistoryItemModelStats,
   HistoryItemToolStats,
+  HistoryItemHeatmapStats,
 } from '../types.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
 import {
   UserAccountManager,
   getG1CreditBalance,
+  aggregateUsageFromRecordings,
+  DEFAULT_HEATMAP_WINDOW_DAYS,
+  formatLocalDateKey,
+  resolveHeatmapDateArg,
 } from '@google/gemini-cli-core';
 import {
   type CommandContext,
@@ -81,14 +87,63 @@ async function defaultSessionView(context: CommandContext) {
   context.ui.addItem(statsItem);
 }
 
+async function heatmapView(context: CommandContext, rawArgs: string) {
+  const now = new Date();
+  const parsedDate = resolveHeatmapDateArg(rawArgs, now);
+  if (!parsedDate.ok) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: parsedDate.error,
+    });
+    return;
+  }
+
+  let chatsDir = '';
+  try {
+    const projectTempDir =
+      context.services.agentContext?.config?.storage?.getProjectTempDir();
+    if (projectTempDir) {
+      chatsDir = path.join(projectTempDir, 'chats');
+    }
+  } catch {
+    chatsDir = '';
+  }
+
+  const dataset = await aggregateUsageFromRecordings(
+    chatsDir,
+    DEFAULT_HEATMAP_WINDOW_DAYS,
+    now,
+  );
+
+  const heatmapItem: HistoryItemHeatmapStats = {
+    type: MessageType.HEATMAP_STATS,
+    dailyUsage: Object.fromEntries(dataset.dailyUsage),
+    totalWindowTokens: dataset.totalWindowTokens,
+    totalWindowSessions: dataset.totalWindowSessions,
+    totalWindowTurns: dataset.totalWindowTurns,
+    currentStreak: dataset.currentStreak,
+    longestStreak: dataset.longestStreak,
+    today: formatLocalDateKey(now),
+    selectedDate: parsedDate.date,
+  };
+
+  context.ui.addItem(heatmapItem);
+}
+
 export const statsCommand: SlashCommand = {
   name: 'stats',
   altNames: ['usage'],
-  description: 'Check session stats. Usage: /stats [session|model|tools]',
+  description:
+    'Check session stats. Usage: /stats [session|model|tools|heatmap]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   isSafeConcurrent: true,
-  action: async (context: CommandContext) => {
+  action: async (context: CommandContext, args?: string) => {
+    const trimmed = (args ?? '').trim();
+    if (trimmed === 'heatmap' || trimmed.startsWith('heatmap ')) {
+      await heatmapView(context, trimmed.slice('heatmap'.length));
+      return;
+    }
     await defaultSessionView(context);
   },
   subCommands: [
@@ -139,6 +194,22 @@ export const statsCommand: SlashCommand = {
         context.ui.addItem({
           type: MessageType.TOOL_STATS,
         } as HistoryItemToolStats);
+      },
+    },
+    {
+      name: 'heatmap',
+      description:
+        'Show calendar heatmap of daily token usage. Usage: /stats heatmap [today|yesterday|YYYY-MM-DD]',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      isSafeConcurrent: true,
+      showCompletionLoading: false,
+      completion: (_context: CommandContext, partialArg: string) => {
+        const prefix = partialArg.trim().toLowerCase();
+        return ['today', 'yesterday'].filter((opt) => opt.startsWith(prefix));
+      },
+      action: async (context: CommandContext, args: string) => {
+        await heatmapView(context, args);
       },
     },
   ],

@@ -448,6 +448,10 @@ Slash commands provide meta-level control over the CLI itself.
       counts and quota information.
   - **`tools`**:
     - **Description:** Show tool-specific usage statistics.
+  - **`heatmap`**:
+    - **Description:** Show a calendar heatmap of daily token usage across local
+      chat sessions, with an optional day breakdown.
+    - **Usage:** `/stats heatmap [today|yesterday|YYYY-MM-DD]`
 
 ### `/terminal-setup`
 
