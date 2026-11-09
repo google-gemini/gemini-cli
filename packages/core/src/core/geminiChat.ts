@@ -1862,8 +1862,11 @@ export class GeminiChat {
       for (const part of consolidatedParts) {
         if (part.functionCall) {
           const fc = part.functionCall;
+          if (!fc.id) {
+            fc.id = `call_${Date.now()}_${fallbackIndex++}`;
+          }
           scheduledToolCalls.push({
-            id: fc.id ?? `call_${Date.now()}_${fallbackIndex++}`,
+            id: fc.id,
             name: fc.name?.trim() || 'generic_tool',
             args:
               typeof fc.args === 'object' &&
