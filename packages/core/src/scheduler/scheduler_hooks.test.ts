@@ -57,6 +57,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
         blockedEnvironmentVariables: [],
       },
     }),
+    getToolCallTimeout: () => 0,
     storage: {
       getProjectTempDir: () => '/tmp',
     },

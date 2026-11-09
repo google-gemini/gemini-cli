@@ -16,6 +16,7 @@ import { makeFakeConfig } from '../test-utils/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { CoreToolCallStatus, type ScheduledToolCall } from './types.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
+import { Kind } from '../tools/tools.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import type { CallableTool, Part } from '@google/genai';
 import * as fileUtils from '../utils/fileUtils.js';
@@ -1002,10 +1003,14 @@ describe('ToolExecutor', () => {
   });
 
   describe('Tool Call Timeout', () => {
-    const makeScheduledCall = (callId: string): ScheduledToolCall => {
+    const makeScheduledCall = (
+      callId: string,
+      kind: Kind = Kind.Other,
+    ): ScheduledToolCall => {
       const mockTool = new MockTool({
         name: 'slowTool',
         description: 'Mock description',
+        kind,
       });
       const invocation = mockTool.build({});
       return {
@@ -1108,6 +1113,164 @@ describe('ToolExecutor', () => {
       });
 
       expect(result.status).toBe(CoreToolCallStatus.Cancelled);
+    });
+
+    it('reports user cancellation when the user aborts mid-execution', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.spyOn(config, 'getToolCallTimeout').mockReturnValue(1000);
+        mockAbortAwareExecution();
+
+        const controller = new AbortController();
+        const resultPromise = executor.execute({
+          call: makeScheduledCall('call-timeout-4'),
+          signal: controller.signal,
+          onUpdateToolCall: vi.fn(),
+        });
+
+        await vi.advanceTimersByTimeAsync(500);
+        controller.abort();
+        // Run past the deadline: the timer must not reclassify the result.
+        await vi.advanceTimersByTimeAsync(1000);
+        const result = await resultPromise;
+
+        expect(result.status).toBe(CoreToolCallStatus.Cancelled);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('reports a timeout when the tool resolves with partial output after being aborted', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.spyOn(config, 'getToolCallTimeout').mockReturnValue(1000);
+        // Mirrors the shell tool, which resolves (rather than rejects) with
+        // whatever output it captured once its signal fires.
+        vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockImplementation(
+          (
+            _invocation: unknown,
+            _toolName: unknown,
+            signal: AbortSignal,
+          ): Promise<ToolResult> =>
+            new Promise<ToolResult>((resolve) => {
+              signal.addEventListener(
+                'abort',
+                () =>
+                  resolve({
+                    llmContent: 'partial output',
+                    returnDisplay: 'partial output',
+                  }),
+                { once: true },
+              );
+            }),
+        );
+
+        const resultPromise = executor.execute({
+          call: makeScheduledCall('call-timeout-5'),
+          signal: new AbortController().signal,
+          onUpdateToolCall: vi.fn(),
+        });
+
+        await vi.advanceTimersByTimeAsync(1000);
+        const result = await resultPromise;
+
+        expect(result.status).toBe(CoreToolCallStatus.Error);
+        if (result.status === CoreToolCallStatus.Error) {
+          expect(result.response.errorType).toBe(
+            ToolErrorType.TOOL_CALL_TIMEOUT,
+          );
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not abort the tool signal or leave listeners behind after a normal completion', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.spyOn(config, 'getToolCallTimeout').mockReturnValue(1000);
+        vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+          llmContent: 'done',
+          returnDisplay: 'done',
+        } as ToolResult);
+
+        const parent = new AbortController();
+        const addSpy = vi.spyOn(parent.signal, 'addEventListener');
+        const removeSpy = vi.spyOn(parent.signal, 'removeEventListener');
+
+        const result = await executor.execute({
+          call: makeScheduledCall('call-timeout-6'),
+          signal: parent.signal,
+          onUpdateToolCall: vi.fn(),
+        });
+        expect(result.status).toBe(CoreToolCallStatus.Success);
+
+        const toolSignal = vi.mocked(coreToolHookTriggers.executeToolWithHooks)
+          .mock.calls[0][2];
+        expect(toolSignal).not.toBe(parent.signal);
+
+        // Tools that keep observing their signal after returning (e.g.
+        // background processes) must not see an abort once the call is done,
+        // including after the original deadline has passed.
+        expect(toolSignal.aborted).toBe(false);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(toolSignal.aborted).toBe(false);
+
+        // Every listener added to the caller's signal is removed again.
+        const added = addSpy.mock.calls.filter(([type]) => type === 'abort');
+        const removed = removeSpy.mock.calls.filter(
+          ([type]) => type === 'abort',
+        );
+        expect(added.length).toBeGreaterThan(0);
+        for (const [, listener] of added) {
+          expect(removed.some(([, l]) => l === listener)).toBe(true);
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not time out immediately when the timeout exceeds the maximum timer delay', async () => {
+      // Real timers on purpose: Node fires setTimeout after 1ms for delays
+      // above 2^31-1 ms, which fake timers do not reproduce.
+      vi.spyOn(config, 'getToolCallTimeout').mockReturnValue(1e10);
+      vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockImplementation(
+        () =>
+          new Promise<ToolResult>((resolve) =>
+            setTimeout(
+              () => resolve({ llmContent: 'done', returnDisplay: 'done' }),
+              50,
+            ),
+          ),
+      );
+
+      const result = await executor.execute({
+        call: makeScheduledCall('call-timeout-8'),
+        signal: new AbortController().signal,
+        onUpdateToolCall: vi.fn(),
+      });
+
+      expect(result.status).toBe(CoreToolCallStatus.Success);
+    });
+
+    it('does not apply the timeout to subagent invocations', async () => {
+      vi.spyOn(config, 'getToolCallTimeout').mockReturnValue(1000);
+      vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+        llmContent: 'done',
+        returnDisplay: 'done',
+      } as ToolResult);
+
+      const passedSignal = new AbortController().signal;
+      const result = await executor.execute({
+        call: makeScheduledCall('call-timeout-7', Kind.Agent),
+        signal: passedSignal,
+        onUpdateToolCall: vi.fn(),
+      });
+
+      expect(result.status).toBe(CoreToolCallStatus.Success);
+      const signalArg = vi.mocked(coreToolHookTriggers.executeToolWithHooks)
+        .mock.calls[0][2];
+      expect(signalArg).toBe(passedSignal);
     });
   });
 });

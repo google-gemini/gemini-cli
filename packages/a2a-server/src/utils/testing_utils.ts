@@ -110,6 +110,7 @@ export function createMockConfig(
         enableEnvironmentVariableRedaction: false,
       },
     }),
+    getToolCallTimeout: vi.fn().mockReturnValue(0),
     isContextManagementEnabled: vi.fn().mockReturnValue(false),
     getContextManagementConfig: vi.fn().mockReturnValue({ enabled: false }),
     getExperimentalGemma: vi.fn().mockReturnValue(false),

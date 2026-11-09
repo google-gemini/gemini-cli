@@ -1904,8 +1904,9 @@ their corresponding top-level category object in your `settings.json` file.
 
   - **Description:** Maximum time in seconds that a single tool call may run
     before it is aborted. Set to 0 (the default) or a negative value to disable.
-    Applies to all tool calls; for shell commands it works alongside
-    tools.shell.inactivityTimeout.
+    For shell commands it works alongside tools.shell.inactivityTimeout.
+    Subagents are bounded by their own maxTimeMinutes (see agents.overrides)
+    instead, but the tool calls they make are limited.
   - **Default:** `0`
   - **Requires restart:** Yes
 
