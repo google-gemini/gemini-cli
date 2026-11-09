@@ -340,15 +340,19 @@ jobs:
               return;
             }
 
-            const newAreaLabel = labelsToAdd[0];
+            const returnedLabel = String(labelsToAdd[0]).trim();
 
-            // Only a label from the list the model was given may be applied.
+            // Only a label from the list the model was given may be applied. The match ignores
+            // case, as in apply-issue-labels.cjs, and the repository's own casing is applied.
             const availableLabels = (process.env.AVAILABLE_LABELS || '')
               .split(',')
               .map((name) => name.trim())
               .filter((name) => name !== '');
-            if (!availableLabels.includes(newAreaLabel)) {
-              core.setFailed(`Model returned a label that is not in the available area/ list: ${newAreaLabel}`);
+            const newAreaLabel = availableLabels.find(
+              (name) => name.toLowerCase() === returnedLabel.toLowerCase(),
+            );
+            if (!newAreaLabel) {
+              core.setFailed(`Model returned a label that is not in the available area/ list: ${returnedLabel}`);
               return;
             }
 
