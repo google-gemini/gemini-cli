@@ -1243,7 +1243,6 @@ export class ChatRecordingService {
           ...this.newMessage('gemini' as const, ''),
           type: 'gemini' as const,
           toolCalls: enrichedToolCalls,
-          thoughts: this.queuedThoughts,
           model,
         };
         if (this.queuedThoughts.length > 0) {
