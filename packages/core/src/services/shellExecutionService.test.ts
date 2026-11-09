@@ -2533,10 +2533,18 @@ describe('ShellExecutionService execution method selection', () => {
 
   it('cleanupAllActiveProcesses should terminate active child processes and PTYs', async () => {
     mockPlatform.mockReturnValue('linux');
+    Object.assign(mockChildProcess, {
+      killed: false,
+      exitCode: null,
+      signalCode: null,
+    });
     mockProcessKill.mockImplementation(
-      (_pid: number, signal?: string | number) => {
+      (pid: number, signal?: string | number) => {
         if (signal === 0) {
           throw Object.assign(new Error('ESRCH'), { code: 'ESRCH' });
+        }
+        if (pid === -54321 && signal === 'SIGTERM') {
+          Object.assign(mockChildProcess, { signalCode: 'SIGTERM' });
         }
         return true;
       },
@@ -2567,6 +2575,7 @@ describe('ShellExecutionService execution method selection', () => {
     await ShellExecutionService.cleanupAllActiveProcesses();
 
     expect(mockProcessKill).toHaveBeenCalledWith(-54321, 'SIGTERM');
+    expect(mockProcessKill).not.toHaveBeenCalledWith(-54321, 'SIGKILL');
     expect(mockPtyProcess.kill).toHaveBeenCalledWith('SIGTERM');
   });
 });

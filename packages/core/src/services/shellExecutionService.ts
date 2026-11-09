@@ -2180,14 +2180,17 @@ export class ShellExecutionService {
   static async cleanupAllActiveProcesses(): Promise<void> {
     const terminationPromises: Array<Promise<void>> = [];
 
-    for (const [, entry] of this.activeChildProcesses.entries()) {
+    for (const [pid, entry] of this.activeChildProcesses.entries()) {
       if (entry.process?.pid) {
         terminationPromises.push(
           killProcessGroup({
             pid: entry.process.pid,
             escalate: true,
             isExited: () =>
-              entry.process.killed || entry.process.exitCode !== null,
+              !this.activeChildProcesses.has(pid) ||
+              entry.process.killed ||
+              entry.process.exitCode !== null ||
+              entry.process.signalCode !== null,
           }).catch(() => {}),
         );
       }
