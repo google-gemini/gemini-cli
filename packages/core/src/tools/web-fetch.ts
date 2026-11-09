@@ -396,13 +396,17 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     const errors: Array<{ url: string; message: string }> = [];
 
     for (const url of uniqueUrls) {
+      signal.throwIfAborted();
       try {
         const content = await this.executeFallbackForUrl(url, signal);
         successes.push({ url, content });
       } catch (e) {
+        signal.throwIfAborted();
         errors.push({ url, message: getErrorMessage(e) });
       }
     }
+
+    signal.throwIfAborted();
 
     // Change 2: Short-circuit on total failure
     if (successes.length === 0) {
@@ -500,6 +504,7 @@ ${aggregatedContent}
         returnDisplay: `Content for ${urls.length} URL(s) processed using fallback fetch.`,
       };
     } catch (e) {
+      signal.throwIfAborted();
       const errorMessage = `Error during fallback processing: ${getErrorMessage(e)}`;
       debugLogger.error(`[WebFetchTool] Fallback failed: ${errorMessage}`);
       return {
@@ -770,6 +775,7 @@ Response: ${rawResponseText}`;
   }
 
   async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
+    signal.throwIfAborted();
     if (this.context.config.getDirectWebFetch()) {
       return this.executeExperimental(signal);
     }
@@ -777,6 +783,7 @@ Response: ${rawResponseText}`;
     const { validUrls } = parsePrompt(userPrompt);
 
     const { toFetch, skipped } = await this.filterAndValidateUrls(validUrls);
+    signal.throwIfAborted();
 
     // If everything was skipped, fail early
     if (toFetch.length === 0 && skipped.length > 0) {
@@ -881,6 +888,7 @@ ${toFetch.join('\n')}
         returnDisplay: `Content processed from prompt.`,
       };
     } catch (error: unknown) {
+      signal.throwIfAborted();
       debugLogger.warn(
         `[WebFetchTool] Primary fetch failed, falling back: ${getErrorMessage(error)}`,
       );
