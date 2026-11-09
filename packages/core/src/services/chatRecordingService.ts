@@ -1212,12 +1212,33 @@ export class ChatRecordingService {
     });
 
     try {
-      const lastMsg = this.getLastMessage(this.cachedConversation);
-      if (
-        !lastMsg ||
-        lastMsg.type !== 'gemini' ||
-        this.queuedThoughts.length > 0
-      ) {
+      const incomingIds = new Set(enrichedToolCalls.map((tc) => tc.id));
+      type GeminiMessageRecord = MessageRecord & { type: 'gemini' };
+      let targetMsg: GeminiMessageRecord | undefined;
+
+      for (let i = this.cachedConversation.messages.length - 1; i >= 0; i--) {
+        const msg = this.cachedConversation.messages[i];
+        if (
+          msg.type === 'gemini' &&
+          msg.toolCalls?.some((tc) => incomingIds.has(tc.id))
+        ) {
+          targetMsg = msg;
+          break;
+        }
+      }
+
+      if (!targetMsg) {
+        const lastMsg = this.getLastMessage(this.cachedConversation);
+        if (
+          lastMsg &&
+          lastMsg.type === 'gemini' &&
+          this.queuedThoughts.length === 0
+        ) {
+          targetMsg = lastMsg;
+        }
+      }
+
+      if (!targetMsg) {
         const newMsg: MessageRecord = {
           ...this.newMessage('gemini' as const, ''),
           type: 'gemini' as const,
@@ -1235,11 +1256,11 @@ export class ChatRecordingService {
         }
         this.pushMessage(newMsg);
       } else {
-        if (!lastMsg.toolCalls) {
-          lastMsg.toolCalls = [];
+        if (!targetMsg.toolCalls) {
+          targetMsg.toolCalls = [];
         }
         // Deep clone toolCalls to avoid modifying memory references directly
-        const updatedToolCalls = [...lastMsg.toolCalls];
+        const updatedToolCalls = [...targetMsg.toolCalls];
 
         for (const toolCall of enrichedToolCalls) {
           const index = updatedToolCalls.findIndex(
@@ -1255,8 +1276,8 @@ export class ChatRecordingService {
           }
         }
 
-        lastMsg.toolCalls = updatedToolCalls;
-        this.pushMessage(lastMsg);
+        targetMsg.toolCalls = updatedToolCalls;
+        this.pushMessage(targetMsg);
       }
     } catch (error) {
       debugLogger.error(

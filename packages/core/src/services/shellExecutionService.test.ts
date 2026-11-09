@@ -2530,6 +2530,45 @@ describe('ShellExecutionService execution method selection', () => {
     expect(mockCpSpawn).toHaveBeenCalled();
     expect(result.executionMethod).toBe('child_process');
   });
+
+  it('cleanupAllActiveProcesses should terminate active child processes and PTYs', async () => {
+    mockPlatform.mockReturnValue('linux');
+    mockProcessKill.mockImplementation(
+      (_pid: number, signal?: string | number) => {
+        if (signal === 0) {
+          throw Object.assign(new Error('ESRCH'), { code: 'ESRCH' });
+        }
+        return true;
+      },
+    );
+
+    const abortController1 = new AbortController();
+    void ShellExecutionService.execute(
+      'sleep 10',
+      '/test/dir',
+      onOutputEventMock,
+      abortController1.signal,
+      false,
+      shellExecutionConfig,
+    );
+
+    const abortController2 = new AbortController();
+    void ShellExecutionService.execute(
+      'sleep 20',
+      '/test/dir',
+      onOutputEventMock,
+      abortController2.signal,
+      true,
+      shellExecutionConfig,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    await ShellExecutionService.cleanupAllActiveProcesses();
+
+    expect(mockProcessKill).toHaveBeenCalledWith(-54321, 'SIGTERM');
+    expect(mockPtyProcess.kill).toHaveBeenCalledWith('SIGTERM');
+  });
 });
 
 describe('ShellExecutionService environment variables', () => {
