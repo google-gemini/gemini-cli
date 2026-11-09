@@ -28,7 +28,13 @@ import {
 } from './tools.js';
 import { buildFilePathArgsPattern } from '../policy/utils.js';
 import { ToolErrorType } from './tool-error.js';
-import { makeRelative, shortenPath } from '../utils/paths.js';
+import {
+  makeRelative,
+  shortenPath,
+  resolveDefensiveToolPath,
+  resolveToRealPath,
+} from '../utils/paths.js';
+import { resolveActiveWorkspaceDir } from '../utils/pathCorrector.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { ensureCorrectFileContent } from '../utils/editCorrector.js';
 import { detectLineEnding } from '../utils/textUtils.js';
@@ -50,8 +56,16 @@ import { WRITE_FILE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { resolveAndValidatePlanPath } from '../utils/planUtils.js';
-import { isGemini3Model } from '../config/models.js';
+import {
+  isGemini3Model,
+  isGemini2Model,
+  isCustomModel,
+  resolveModel,
+} from '../config/models.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
+import { isBuildFile } from '../utils/buildFileUtils.js';
+import { recordModifiedBuildFile } from '../utils/untrustedContextTracker.js';
+import { withPathLock } from '../utils/pathMutex.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -109,10 +123,63 @@ export async function getCorrectedFileContent(
   let fileExists = false;
   let correctedContent = proposedContent;
 
+  let resolvedPath: string;
+  if (config.isPlanMode()) {
+    try {
+      const cleanFilePath = filePath.replace(/\0/g, '');
+      const planPath = resolveAndValidatePlanPath(
+        cleanFilePath,
+        config.storage.getPlansDir(),
+        config.getProjectRoot(),
+      );
+      resolvedPath = resolveToRealPath(planPath);
+    } catch (err) {
+      return {
+        originalContent: '',
+        correctedContent: proposedContent,
+        fileExists: false,
+        error: {
+          message:
+            'Failed to resolve plan path: ' +
+            (err instanceof Error ? err.message : String(err)),
+          code: 'EINVAL',
+        },
+      };
+    }
+  } else {
+    const targetDir = resolveActiveWorkspaceDir(config, filePath);
+    const sanitizedPath = resolveDefensiveToolPath(filePath, targetDir);
+    try {
+      resolvedPath = resolveToRealPath(path.resolve(targetDir, sanitizedPath));
+    } catch (err) {
+      return {
+        originalContent: '',
+        correctedContent: proposedContent,
+        fileExists: false,
+        error: {
+          message:
+            'Failed to resolve path: ' +
+            (err instanceof Error ? err.message : String(err)),
+          code: 'EINVAL',
+        },
+      };
+    }
+  }
+
+  const validationError = config.validatePathAccess(resolvedPath);
+  if (validationError) {
+    return {
+      originalContent: '',
+      correctedContent: proposedContent,
+      fileExists: false,
+      error: { message: validationError, code: 'EACCES' },
+    };
+  }
+
   try {
     originalContent = await config
       .getFileSystemService()
-      .readTextFile(filePath);
+      .readTextFile(resolvedPath);
     fileExists = true; // File exists and was read
   } catch (err) {
     if (isNodeError(err) && err.code === 'ENOENT') {
@@ -131,15 +198,28 @@ export async function getCorrectedFileContent(
     }
   }
 
-  const aggressiveUnescape = !isGemini3Model(config.getActiveModel());
-
-  correctedContent = await ensureCorrectFileContent(
-    proposedContent,
-    config.getBaseLlmClient(),
-    abortSignal,
-    config.getDisableLLMCorrection(),
-    aggressiveUnescape,
+  const fileExt = path.extname(filePath).toLowerCase();
+  const isJsonOrIpynb = ['.json', '.ipynb', '.jsonc', '.json5'].includes(
+    fileExt,
   );
+
+  if (!isJsonOrIpynb) {
+    const activeModel = config.getActiveModel();
+    const resolvedModel = resolveModel(activeModel, false, false, true, config);
+
+    const aggressiveUnescape =
+      !isGemini3Model(resolvedModel, config) &&
+      !isGemini2Model(resolvedModel, config) &&
+      !isCustomModel(resolvedModel, config);
+
+    correctedContent = await ensureCorrectFileContent(
+      proposedContent,
+      config.getBaseLlmClient(),
+      abortSignal,
+      config.getDisableLLMCorrection(),
+      aggressiveUnescape,
+    );
+  }
 
   return { originalContent, correctedContent, fileExists };
 }
@@ -170,24 +250,37 @@ class WriteFileToolInvocation extends BaseToolInvocation<
 
     if (this.config.isPlanMode()) {
       try {
-        this.resolvedPath = resolveAndValidatePlanPath(
-          this.params.file_path,
+        const cleanFilePath = this.params.file_path.replace(/\0/g, '');
+        const planPath = resolveAndValidatePlanPath(
+          cleanFilePath,
           this.config.storage.getPlansDir(),
           this.config.getProjectRoot(),
         );
+        this.resolvedPath = resolveToRealPath(planPath);
       } catch (e) {
         debugLogger.error(
           'Failed to resolve plan path during WriteFileTool invocation setup',
           e,
         );
         // Validation fails, set resolvedPath to something that will fail validation downstream or just the raw path.
-        this.resolvedPath = this.params.file_path;
+        this.resolvedPath = this.params.file_path.replace(/\0/g, '');
       }
     } else {
-      this.resolvedPath = path.resolve(
-        this.config.getTargetDir(),
+      const targetDir = resolveActiveWorkspaceDir(
+        this.config,
         this.params.file_path,
       );
+      const sanitizedPath = resolveDefensiveToolPath(
+        this.params.file_path,
+        targetDir,
+      );
+      try {
+        this.resolvedPath = resolveToRealPath(
+          path.resolve(targetDir, sanitizedPath),
+        );
+      } catch {
+        this.resolvedPath = path.resolve(targetDir, sanitizedPath);
+      }
     }
   }
 
@@ -206,7 +299,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   override getDescription(): string {
     const relativePath = makeRelative(
       this.resolvedPath,
-      this.config.getTargetDir(),
+      resolveActiveWorkspaceDir(this.config, this.params.file_path),
     );
     return `Writing to ${shortenPath(relativePath)}`;
   }
@@ -229,7 +322,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     const { originalContent, correctedContent } = correctedContentResult;
     const relativePath = makeRelative(
       this.resolvedPath,
-      this.config.getTargetDir(),
+      resolveActiveWorkspaceDir(this.config, this.params.file_path),
     );
     const fileName = path.basename(this.resolvedPath);
 
@@ -268,6 +361,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         }
       },
       ideConfirmation,
+      isBuildFile: isBuildFile(this.resolvedPath),
     };
     return confirmationDetails;
   }
@@ -287,6 +381,44 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       };
     }
 
+    // Serialize against other writers of this path, so that the existence
+    // check and content read that produce the diff cannot be interleaved with
+    // another write to the same file.
+    let lockKey = path.resolve(this.config.getTargetDir(), this.resolvedPath);
+    try {
+      lockKey = resolveToRealPath(lockKey);
+    } catch {
+      try {
+        const dir = path.dirname(lockKey);
+        const base = path.basename(lockKey);
+        lockKey = path.join(resolveToRealPath(dir), base);
+      } catch {
+        // Keep unresolved lockKey
+      }
+    }
+    try {
+      return await withPathLock(
+        lockKey,
+        () => this.applyWrite(abortSignal),
+        abortSignal,
+      );
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Aborted') {
+        throw new Error('Write aborted');
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Writes the file.
+   *
+   * Must be called while holding the path lock for `this.resolvedPath`.
+   */
+  private async applyWrite(abortSignal: AbortSignal): Promise<ToolResult> {
+    if (abortSignal.aborted) {
+      throw new Error('Write aborted');
+    }
     const { content, ai_proposed_content, modified_by_user } = this.params;
     const correctedContentResult = await getCorrectedFileContent(
       this.config,
@@ -343,6 +475,10 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       await this.config
         .getFileSystemService()
         .writeTextFile(this.resolvedPath, finalContent);
+
+      if (isBuildFile(this.resolvedPath)) {
+        recordModifiedBuildFile(this.resolvedPath, this.config);
+      }
 
       // Generate diff for display result
       const fileName = path.basename(this.resolvedPath);
@@ -416,6 +552,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         newContent: correctedContentResult.correctedContent,
         diffStat,
         isNewFile,
+        isBuildFile: isBuildFile(this.resolvedPath),
       };
 
       // Discover JIT subdirectory context for the written file path
@@ -525,16 +662,26 @@ export class WriteFileTool
     let resolvedPath: string;
     if (this.config.isPlanMode()) {
       try {
-        resolvedPath = resolveAndValidatePlanPath(
-          filePath,
+        const cleanFilePath = filePath.replace(/\0/g, '');
+        const planPath = resolveAndValidatePlanPath(
+          cleanFilePath,
           this.config.storage.getPlansDir(),
           this.config.getProjectRoot(),
         );
+        resolvedPath = resolveToRealPath(planPath);
       } catch (err) {
         return err instanceof Error ? err.message : String(err);
       }
     } else {
-      resolvedPath = path.resolve(this.config.getTargetDir(), filePath);
+      const targetDir = resolveActiveWorkspaceDir(this.config, filePath);
+      const sanitizedPath = resolveDefensiveToolPath(filePath, targetDir);
+      try {
+        resolvedPath = resolveToRealPath(
+          path.resolve(targetDir, sanitizedPath),
+        );
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
     }
 
     const validationError = this.config.validatePathAccess(resolvedPath);

@@ -64,6 +64,7 @@ Gemini CLI takes action.
     reach an informal agreement on the approach before proceeding.
 3.  **Review the plan:** Once you've agreed on the strategy, Gemini CLI creates
     a detailed implementation plan as a Markdown file in your plans directory.
+
     - **View:** You can open and read this file to understand the proposed
       changes.
     - **Edit:** Press `Ctrl+X` to open the plan directly in your configured
@@ -339,7 +340,7 @@ if [ -f "$plan_path" ]; then
   filename="$(date +%s)_$(basename "$plan_path")"
 
   # Upload the plan to GCS in the background so it doesn't block the CLI
-  gsutil cp "$plan_path" "gs://my-audit-bucket/gemini-plans/$filename" > /dev/null 2>&1 &
+  gcloud storage cp "$plan_path" "gs://my-audit-bucket/gemini-plans/$filename" > /dev/null 2>&1 &
 fi
 
 # AfterTool hooks should generally allow the flow to continue

@@ -206,4 +206,86 @@ describe('ContextManager', () => {
     expect(history).toHaveLength(0);
     expect(apiHistory).toHaveLength(0);
   });
+
+  it('renderHistory should correctly populate pendingApiHistory when pendingRequest contains <session_context>', async () => {
+    const contextManager = new ContextManager(
+      mockSidecar,
+      mockEnv,
+      mockTracer,
+      mockOrchestrator,
+      mockChatHistory,
+      mockAdvancedTokenCalculator,
+    );
+
+    const pendingRequest: HistoryTurn = {
+      id: 'pending-turn-session-context',
+      content: {
+        role: 'user',
+        parts: [
+          {
+            text: '<session_context>\nSome environment details\n</session_context>\nActual user prompt',
+          },
+        ],
+      },
+    };
+
+    const { pendingApiHistory } =
+      await contextManager.renderHistory(pendingRequest);
+
+    expect(pendingApiHistory).toHaveLength(1);
+    expect(
+      (pendingApiHistory[0].parts![0] as unknown as { text: string }).text,
+    ).toContain('<session_context>');
+  });
+
+  it('renderHistory should bridge an interrupted trailing user turn so pendingRequest is not coalesced into apiHistory or duplicated', async () => {
+    const historicalUserTurn: HistoryTurn = {
+      id: 'interrupted-user-turn',
+      content: {
+        role: 'user',
+        parts: [{ text: 'Previous interrupted prompt' }],
+      },
+    };
+    const interruptedThinkingModelTurn: HistoryTurn = {
+      id: 'interrupted-thinking-turn',
+      content: {
+        role: 'model',
+        parts: [{ text: 'Thinking before freeze...', thought: true }],
+      },
+    };
+
+    (mockChatHistory.get as Mock).mockReturnValue([
+      historicalUserTurn,
+      interruptedThinkingModelTurn,
+    ]);
+
+    const contextManager = new ContextManager(
+      mockSidecar,
+      mockEnv,
+      mockTracer,
+      mockOrchestrator,
+      mockChatHistory,
+      mockAdvancedTokenCalculator,
+    );
+
+    const pendingRequest: HistoryTurn = {
+      id: 'new-pending-user-turn',
+      content: { role: 'user', parts: [{ text: 'Fresh prompt after resume' }] },
+    };
+
+    const { apiHistory, pendingApiHistory } =
+      await contextManager.renderHistory(pendingRequest);
+
+    expect(pendingApiHistory).toHaveLength(1);
+    expect(pendingApiHistory[0]).toEqual({
+      role: 'user',
+      parts: [{ text: 'Fresh prompt after resume' }],
+    });
+
+    const combined = [...apiHistory, ...pendingApiHistory];
+    expect(combined.at(-1)?.role).toBe('user');
+    for (let i = 1; i < combined.length; i++) {
+      expect(combined[i].role).not.toBe(combined[i - 1].role);
+    }
+  });
 });

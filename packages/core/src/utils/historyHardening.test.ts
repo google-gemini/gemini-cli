@@ -8,10 +8,15 @@ import { describe, it, expect } from 'vitest';
 import {
   hardenHistory,
   SYNTHETIC_THOUGHT_SIGNATURE,
+  INTERRUPTED_RESPONSE_PLACEHOLDER,
+  SYNTHETIC_BINARY_ACK_TEXT,
+  isEmptyTextOnlyPart,
+  scrubContents,
+  scrubHistory,
 } from './historyHardening.js';
 import type { HistoryTurn } from '../core/agentChatHistory.js';
 import { deriveStableId } from './cryptoUtils.js';
-import type { Part } from '@google/genai';
+import type { Part, Content } from '@google/genai';
 
 describe('hardenHistory', () => {
   it('should return an empty array if input is empty', () => {
@@ -374,5 +379,424 @@ describe('hardenHistory', () => {
     const hardened = hardenHistory(history);
     expect(hardened[0].content.parts![0]).not.toHaveProperty('extraProp');
     expect(hardened[0].content.parts![0]).toHaveProperty('text', 'hello');
+  });
+
+  it('should completely filter out thought parts from the scrubbed history', () => {
+    const history: HistoryTurn[] = [
+      {
+        id: '1',
+        content: {
+          role: 'user',
+          parts: [{ text: 'User prompt' }],
+        },
+      },
+      {
+        id: '2',
+        content: {
+          role: 'model',
+          parts: [
+            {
+              text: 'Previous model thought...',
+              thought: true,
+            } as unknown as Part,
+            { text: 'Actual conversational text response' },
+          ],
+        },
+      },
+      {
+        id: '3',
+        content: {
+          role: 'user',
+          parts: [{ text: 'User follow-up prompt' }],
+        },
+      },
+    ];
+
+    const hardened = hardenHistory(history);
+    // Model turn (Turn 2, index 1 in hardened) should only contain the actual conversational text part
+    const modelTurn = hardened[1];
+    expect(modelTurn.content.parts).toHaveLength(1);
+    expect(modelTurn.content.parts![0]).toHaveProperty(
+      'text',
+      'Actual conversational text response',
+    );
+    expect(modelTurn.content.parts![0]).not.toHaveProperty('thought');
+  });
+
+  it('should remove the entire turn if it only contained thought parts and is now empty', () => {
+    const history: HistoryTurn[] = [
+      {
+        id: '1',
+        content: {
+          role: 'user',
+          parts: [{ text: 'User prompt' }],
+        },
+      },
+      {
+        id: '2',
+        content: {
+          role: 'model',
+          parts: [
+            {
+              text: 'Model is just thinking internally...',
+              thought: true,
+            } as unknown as Part,
+          ],
+        },
+      },
+      {
+        id: '3',
+        content: {
+          role: 'user',
+          parts: [{ text: 'User follow-up prompt' }],
+        },
+      },
+    ];
+
+    const hardened = hardenHistory(history);
+    // After scrubbing, Turn 2 should have 0 parts.
+    // The history mapping filters out empty turns, so the total turns should coalesce and reduce to 1 coalesced user turn.
+    // Let's inspect the hardened array:
+    // User prompt (Turn 1) + User follow-up prompt (Turn 3) will be coalesced into 1 User turn.
+    expect(hardened).toHaveLength(1);
+    expect(hardened[0].content.role).toBe('user');
+    expect(hardened[0].content.parts).toEqual([
+      { text: 'User prompt' },
+      { text: 'User follow-up prompt' },
+    ]);
+  });
+});
+
+describe('scrubContents', () => {
+  it('should scrub non-standard fields from parts', () => {
+    const contents: Content[] = [
+      {
+        role: 'user',
+        parts: [{ text: 'Hello', customField: 'ignored' } as unknown as Part],
+      },
+    ];
+    const scrubbed = scrubContents(contents);
+    expect(scrubbed).toEqual([
+      {
+        role: 'user',
+        parts: [{ text: 'Hello' }],
+      },
+    ]);
+  });
+
+  it('should filter out internal thought parts', () => {
+    const contents: Content[] = [
+      {
+        role: 'model',
+        parts: [
+          { text: 'thought', thought: true } as unknown as Part,
+          { text: 'response' },
+        ],
+      },
+    ];
+    const scrubbed = scrubContents(contents);
+    expect(scrubbed).toEqual([
+      {
+        role: 'model',
+        parts: [{ text: 'response' }],
+      },
+    ]);
+  });
+
+  it('should completely filter out Content objects that have no parts left after thought scrubbing and coalesce adjacent turns of the same role', () => {
+    const contents: Content[] = [
+      {
+        role: 'user',
+        parts: [{ text: 'Hello' }],
+      },
+      {
+        role: 'model',
+        parts: [{ text: 'thought', thought: true } as unknown as Part],
+      },
+      {
+        role: 'user',
+        parts: [{ text: 'How are you?' }],
+      },
+    ];
+    const scrubbed = scrubContents(contents);
+    expect(scrubbed).toEqual([
+      {
+        role: 'user',
+        parts: [{ text: 'Hello' }, { text: 'How are you?' }],
+      },
+    ]);
+  });
+
+  it('should coalesce adjacent turns of the same role when no filtration occurs', () => {
+    const contents: Content[] = [
+      {
+        role: 'user',
+        parts: [{ text: 'Part 1' }],
+      },
+      {
+        role: 'user',
+        parts: [{ text: 'Part 2' }],
+      },
+    ];
+    const scrubbed = scrubContents(contents);
+    expect(scrubbed).toEqual([
+      {
+        role: 'user',
+        parts: [{ text: 'Part 1' }, { text: 'Part 2' }],
+      },
+    ]);
+  });
+});
+
+describe('scrubHistory', () => {
+  it('should scrub non-standard fields and filter empty turns in history', () => {
+    const history: HistoryTurn[] = [
+      {
+        id: '1',
+        content: {
+          role: 'user',
+          parts: [{ text: 'Hello', customField: 'ignored' } as unknown as Part],
+        },
+      },
+      {
+        id: '2',
+        content: {
+          role: 'model',
+          parts: [{ text: 'thought', thought: true } as unknown as Part],
+        },
+      },
+      {
+        id: '3',
+        content: {
+          role: 'user',
+          parts: [{ text: 'World' }],
+        },
+      },
+    ];
+
+    const scrubbed = scrubHistory(history);
+    expect(scrubbed.length).toBe(1); // Since user turns are coalesced (Turn 1 + Turn 3) and Turn 2 is removed because it has 0 parts
+    expect(scrubbed[0].content.parts).toEqual([
+      { text: 'Hello' },
+      { text: 'World' },
+    ]);
+  });
+
+  it('should preserve nested parts array within functionResponse', () => {
+    const history: HistoryTurn[] = [
+      {
+        id: '1',
+        content: {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'readFile',
+                id: 'call-1',
+                response: { mimeType: 'image/png' },
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: 'image/png',
+                      data: 'base64data',
+                    },
+                  },
+                ],
+              } as unknown as Part['functionResponse'],
+            } as unknown as Part,
+          ],
+        },
+      },
+    ];
+
+    const scrubbed = scrubHistory(history);
+    expect(scrubbed.length).toBe(1);
+    const fr = scrubbed[0].content.parts![0].functionResponse;
+    expect(fr).toBeDefined();
+    expect((fr as unknown as Record<string, unknown>)['parts']).toEqual([
+      {
+        inlineData: {
+          mimeType: 'image/png',
+          data: 'base64data',
+        },
+      },
+    ]);
+  });
+
+  it('replaces a thought-only model turn following a functionResponse with INTERRUPTED_RESPONSE_PLACEHOLDER instead of fusing user turns', () => {
+    const history: HistoryTurn[] = [
+      { id: '1', content: { role: 'user', parts: [{ text: 'Check status' }] } },
+      {
+        id: '2',
+        content: {
+          role: 'model',
+          parts: [
+            {
+              functionCall: { id: 'c1', name: 'check_tool', args: {} },
+              thoughtSignature: 'sig',
+            },
+          ],
+        },
+      },
+      {
+        id: '3',
+        content: {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'c1',
+                name: 'check_tool',
+                response: { ok: true },
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: '4',
+        content: {
+          role: 'model',
+          parts: [{ text: 'Interrupted thinking...', thought: true } as Part],
+        },
+      },
+      {
+        id: '5',
+        content: {
+          role: 'user',
+          parts: [{ text: 'Continue with next step' }],
+        },
+      },
+    ];
+
+    const scrubbed = scrubHistory(history);
+    expect(scrubbed).toHaveLength(5);
+    expect(scrubbed[3].content).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
+    expect(scrubbed[4].content).toEqual({
+      role: 'user',
+      parts: [{ text: 'Continue with next step' }],
+    });
+
+    const hardened = hardenHistory(history);
+    expect(hardened).toHaveLength(5);
+    expect(hardened[3].content).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
+
+    const scrubbedRaw = scrubContents(history.map((h) => h.content));
+    expect(scrubbedRaw).toHaveLength(5);
+    expect(scrubbedRaw[3]).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
+  });
+
+  it('still drops synthetic binary acknowledgment thought turns so functionResponse and inlineData coalesce', () => {
+    const contents: Content[] = [
+      {
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              id: 'c1',
+              name: 'read_file',
+              response: { output: 'ok' },
+            },
+          },
+        ],
+      },
+      {
+        role: 'model',
+        parts: [
+          {
+            text: SYNTHETIC_BINARY_ACK_TEXT,
+            thought: true,
+            thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+          } as Part,
+        ],
+      },
+      {
+        role: 'user',
+        parts: [{ inlineData: { mimeType: 'image/png', data: 'abc' } }],
+      },
+    ];
+
+    const scrubbed = scrubContents(contents);
+    expect(scrubbed).toHaveLength(1);
+    expect(scrubbed[0].role).toBe('user');
+    expect(scrubbed[0].parts).toHaveLength(2);
+  });
+
+  it('handles nullish Part entries safely across isEmptyTextOnlyPart, hardenHistory, scrubHistory, and scrubContents', () => {
+    expect(isEmptyTextOnlyPart(undefined as unknown as Part)).toBe(true);
+    expect(isEmptyTextOnlyPart(null as unknown as Part)).toBe(true);
+
+    const history: HistoryTurn[] = [
+      { id: 'u1', content: { role: 'user', parts: [{ text: 'Check' }] } },
+      {
+        id: 'm1',
+        content: {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'c1',
+                name: 'read_file',
+                args: { file_path: 'a.ts' },
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: 'fr1',
+        content: {
+          role: 'user',
+          parts: [
+            undefined as unknown as Part,
+            {
+              functionResponse: {
+                id: 'c1',
+                name: 'read_file',
+                response: { output: 'ok' },
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: 'm2',
+        content: {
+          role: 'model',
+          parts: [
+            null as unknown as Part,
+            { text: 'Thinking...', thought: true } as Part,
+          ],
+        },
+      },
+      { id: 'u2', content: { role: 'user', parts: [{ text: 'Next' }] } },
+    ];
+
+    const hardened = hardenHistory(history);
+    expect(hardened[3].content).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
+
+    const scrubbedHist = scrubHistory(history);
+    expect(scrubbedHist[3].content).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
+
+    const scrubbedRaw = scrubContents(history.map((h) => h.content));
+    expect(scrubbedRaw[3]).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
   });
 });

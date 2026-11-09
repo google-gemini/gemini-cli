@@ -128,15 +128,26 @@ import { getModelConfigAlias, type AgentRegistry } from './registry.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 
 let mockChatHistory: Content[] = [];
-const mockSetHistory = vi.fn((newHistory: Content[]) => {
-  mockChatHistory = newHistory;
-});
+const mockSetHistory = vi.fn(
+  (newHistory: Array<Content | { content?: Content }>) => {
+    mockChatHistory = newHistory.map((h) =>
+      'content' in h && h.content ? h.content : (h as Content),
+    );
+  },
+);
 
-vi.mock('../context/chatCompressionService.js', () => ({
-  ChatCompressionService: vi.fn().mockImplementation(() => ({
-    compress: mockCompress,
-  })),
-}));
+vi.mock('../context/chatCompressionService.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import('../context/chatCompressionService.js')
+    >();
+  return {
+    ...actual,
+    ChatCompressionService: vi.fn().mockImplementation(() => ({
+      compress: mockCompress,
+    })),
+  };
+});
 
 vi.mock('../core/geminiChat.js', () => ({
   StreamEventType: {
@@ -4036,6 +4047,74 @@ describe('LocalAgentExecutor', () => {
       expect(scheduledRequests[0].name).toBe('click');
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+    });
+
+    it('should preserve all responseParts (including sibling inlineData parts for images) when forwarding tool results to chat', async () => {
+      const definition = createTestDefinition([READ_FILE_TOOL_NAME]);
+
+      // Turn 1: Model calls read_file on an image
+      mockModelResponse([
+        {
+          name: READ_FILE_TOOL_NAME,
+          args: { file_path: 'test.png' },
+          id: 'call-read-img',
+        },
+      ]);
+      const functionResponsePart: Part = {
+        functionResponse: {
+          name: READ_FILE_TOOL_NAME,
+          id: 'call-read-img',
+          response: { output: 'Binary content provided (image/png).' },
+        },
+      };
+      const inlineDataPart: Part = {
+        inlineData: {
+          mimeType: 'image/png',
+          data: 'base64imagedata',
+        },
+      };
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'success',
+          request: {
+            callId: 'call-read-img',
+            name: READ_FILE_TOOL_NAME,
+            args: { file_path: 'test.png' },
+            isClientInitiated: false,
+            prompt_id: 'test',
+          },
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as unknown as AnyToolInvocation,
+          response: {
+            callId: 'call-read-img',
+            resultDisplay: 'Read image',
+            responseParts: [functionResponsePart, inlineDataPart],
+            error: undefined,
+            errorType: undefined,
+            contentLength: undefined,
+          },
+        },
+      ]);
+
+      // Turn 2: Model completes
+      mockModelResponse([
+        {
+          name: COMPLETE_TASK_TOOL_NAME,
+          args: { finalResult: 'Image analyzed' },
+          id: 'call-done',
+        },
+      ]);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      const output = await executor.run({ goal: 'Read test.png' }, signal);
+
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      const { message: secondTurnMessage } = getMockMessageParams(1);
+      expect(secondTurnMessage).toEqual([functionResponsePart, inlineDataPart]);
     });
 
     it('should always include complete_task even when all tools are instances', async () => {

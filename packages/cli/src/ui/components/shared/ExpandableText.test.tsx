@@ -46,6 +46,45 @@ describe('ExpandableText', () => {
     unmount();
   });
 
+  it('does not split a supplementary character when truncating without a match', async () => {
+    const renderResult = await render(
+      <ExpandableText
+        label="aaaa😀tail"
+        userInput=""
+        textColor={color}
+        isExpanded={false}
+        maxWidth={5}
+      />,
+    );
+    const { lastFrame, unmount } = renderResult;
+    const f = flat(lastFrame());
+    expect(f).toBe('aaaa😀...');
+    expect(f).not.toMatch(
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/,
+    );
+    unmount();
+  });
+
+  it('does not split a supplementary character when truncating by maxLines', async () => {
+    const renderResult = await render(
+      <ExpandableText
+        label={'aaaa😀tail\nmore'}
+        userInput=""
+        textColor={color}
+        isExpanded={false}
+        maxWidth={5}
+        maxLines={1}
+      />,
+    );
+    const { lastFrame, unmount } = renderResult;
+    const f = flat(lastFrame());
+    expect(f).toBe('aaaa😀...');
+    expect(f).not.toMatch(
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/,
+    );
+    unmount();
+  });
+
   it('shows full long label when expanded and no match', async () => {
     const long = 'y'.repeat(MAX_WIDTH + 25);
     const renderResult = await render(

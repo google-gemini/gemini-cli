@@ -184,6 +184,40 @@ describe('<HistoryItemDisplay />', () => {
     unmount();
   });
 
+  it('renders HeatmapComponent for "heatmap_stats" type', async () => {
+    const item: HistoryItem = {
+      ...baseItem,
+      type: 'heatmap_stats',
+      dailyUsage: {
+        '2026-11-03': {
+          date: '2026-11-03',
+          totalTokens: 450,
+          inputTokens: 300,
+          outputTokens: 150,
+          cachedTokens: 50,
+          turns: 2,
+          sessions: 1,
+          modelBreakdown: { 'gemini-2.5-pro': 450 },
+        },
+      },
+      totalWindowTokens: 450,
+      totalWindowSessions: 1,
+      totalWindowTurns: 2,
+      currentStreak: 1,
+      longestStreak: 1,
+      today: '2026-11-03',
+      selectedDate: '2026-11-03',
+    };
+    const { lastFrame, unmount } = await renderWithProviders(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    expect(lastFrame()).toContain('Token Usage Heatmap');
+    expect(lastFrame()).toContain('Summary (last 28 weeks / 196 days)');
+    expect(lastFrame()).toContain('Total Tokens: 450 · 1 session · 2 turns');
+    expect(lastFrame()).toContain('Breakdown for 2026-11-03');
+    unmount();
+  });
+
   it('renders SessionSummaryDisplay for "quit" type', async () => {
     const item: HistoryItem = {
       ...baseItem,
@@ -277,6 +311,38 @@ describe('<HistoryItemDisplay />', () => {
     expect(confirmationDetails.command).toBe(
       'echo "\\u001b[31mhello\\u001b[0m"',
     );
+    unmount();
+  });
+
+  it('subtracts top margin from availableTerminalHeight when isToolGroupBoundary is true', async () => {
+    vi.mocked(ToolGroupMessage).mockClear();
+    const historyItem: HistoryItem = {
+      id: 1,
+      type: 'tool_group',
+      tools: [
+        {
+          callId: '123',
+          name: 'run_shell_command',
+          description: 'Run a shell command',
+          resultDisplay: 'output',
+          status: CoreToolCallStatus.Executing,
+          confirmationDetails: undefined,
+        },
+      ],
+    };
+
+    const { unmount } = await renderWithProviders(
+      <HistoryItemDisplay
+        item={historyItem}
+        terminalWidth={80}
+        availableTerminalHeight={10}
+        isPending={true}
+        isToolGroupBoundary={true}
+      />,
+    );
+
+    const passedProps = vi.mocked(ToolGroupMessage).mock.calls[0][0];
+    expect(passedProps.availableTerminalHeight).toBe(9);
     unmount();
   });
 

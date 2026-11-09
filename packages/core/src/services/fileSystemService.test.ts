@@ -5,13 +5,21 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { constants } from 'node:fs';
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import { StandardFileSystemService } from './fileSystemService.js';
 
 vi.mock('fs/promises');
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 describe('StandardFileSystemService', () => {
   let fileSystem: StandardFileSystemService;
+  const targetFile = path.resolve('/test/file.txt');
+  const tmpPattern = new RegExp(`^${escapeRegex(targetFile)}\\..*\\.tmp$`);
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -27,9 +35,9 @@ describe('StandardFileSystemService', () => {
       const testContent = 'Hello, World!';
       vi.mocked(fs.readFile).mockResolvedValue(testContent);
 
-      const result = await fileSystem.readTextFile('/test/file.txt');
+      const result = await fileSystem.readTextFile(targetFile);
 
-      expect(fs.readFile).toHaveBeenCalledWith('/test/file.txt', 'utf-8');
+      expect(fs.readFile).toHaveBeenCalledWith(targetFile, 'utf-8');
       expect(result).toBe(testContent);
     });
 
@@ -37,23 +45,197 @@ describe('StandardFileSystemService', () => {
       const error = new Error('ENOENT: File not found');
       vi.mocked(fs.readFile).mockRejectedValue(error);
 
-      await expect(fileSystem.readTextFile('/test/file.txt')).rejects.toThrow(
+      await expect(fileSystem.readTextFile(targetFile)).rejects.toThrow(
         'ENOENT: File not found',
       );
     });
   });
 
   describe('writeTextFile', () => {
-    it('should write file content using fs', async () => {
+    it('should write to a sibling temp file and rename it into place', async () => {
       vi.mocked(fs.writeFile).mockResolvedValue();
+      vi.mocked(fs.rename).mockResolvedValue();
+      vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT'));
 
-      await fileSystem.writeTextFile('/test/file.txt', 'Hello, World!');
+      await fileSystem.writeTextFile(targetFile, 'Hello, World!');
 
+      const [tmpPath, content, options] = vi.mocked(fs.writeFile).mock
+        .calls[0] as [string, string, { encoding: string }];
+      expect(content).toBe('Hello, World!');
+      expect(options.encoding).toBe('utf-8');
+      expect(tmpPath).toMatch(tmpPattern);
+      expect(fs.rename).toHaveBeenCalledWith(tmpPath, targetFile);
+    });
+
+    it('should match temp file patterns with Windows-style backslash paths', () => {
+      const winTarget = 'C:\\test\\folder\\file.txt';
+      const winTmpPattern = new RegExp(
+        `^${escapeRegex(winTarget)}\\..*\\.tmp$`,
+      );
+      const sampleWinTmp =
+        'C:\\test\\folder\\file.txt.12345678-1234-1234-1234-123456789abc.tmp';
+      expect(sampleWinTmp).toMatch(winTmpPattern);
+    });
+
+    it('should create the temp file with the destination permissions', async () => {
+      vi.mocked(fs.writeFile).mockResolvedValue();
+      vi.mocked(fs.rename).mockResolvedValue();
+      vi.mocked(fs.chmod).mockResolvedValue();
+      vi.mocked(fs.stat).mockResolvedValue({
+        mode: 0o600,
+      } as unknown as Awaited<ReturnType<typeof fs.stat>>);
+
+      const secretFile = path.resolve('/test/secret.txt');
+      await fileSystem.writeTextFile(secretFile, 'Hello, World!');
+
+      // Creating the temp file already restricted means the content is never
+      // briefly readable through a wider default mode.
+      const [, , options] = vi.mocked(fs.writeFile).mock.calls[0];
+      expect(options).toEqual({ encoding: 'utf-8', mode: 0o600 });
+    });
+
+    it('should still write the file when chmod is not permitted', async () => {
+      vi.mocked(fs.writeFile).mockResolvedValue();
+      vi.mocked(fs.rename).mockResolvedValue();
+      vi.mocked(fs.rm).mockResolvedValue();
+      vi.mocked(fs.stat).mockResolvedValue({
+        mode: 0o600,
+      } as unknown as Awaited<ReturnType<typeof fs.stat>>);
+      // FAT32/exFAT, some NFS/CIFS mounts and restricted sandboxes reject chmod.
+      vi.mocked(fs.chmod).mockRejectedValue(
+        Object.assign(new Error('operation not supported'), {
+          code: 'ENOTSUP',
+        }),
+      );
+
+      await expect(
+        fileSystem.writeTextFile(targetFile, 'Hello, World!'),
+      ).resolves.toBeUndefined();
+
+      expect(fs.rename).toHaveBeenCalled();
+      expect(fs.rm).not.toHaveBeenCalled();
+    });
+
+    it('should remove the temp file when the write fails', async () => {
+      vi.mocked(fs.writeFile).mockRejectedValue(new Error('ENOSPC'));
+      vi.mocked(fs.rm).mockResolvedValue();
+
+      await expect(
+        fileSystem.writeTextFile(targetFile, 'Hello, World!'),
+      ).rejects.toThrow('ENOSPC');
+
+      expect(fs.rename).not.toHaveBeenCalled();
+      const [removed] = vi.mocked(fs.rm).mock.calls[0] as [string];
+      expect(removed).toMatch(tmpPattern);
+    });
+
+    it('should retry rename when encountering EACCES', async () => {
+      vi.mocked(fs.writeFile).mockResolvedValue();
+      vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT'));
+      const eaccesError = Object.assign(new Error('permission denied'), {
+        code: 'EACCES',
+      });
+      vi.mocked(fs.rename)
+        .mockRejectedValueOnce(eaccesError)
+        .mockResolvedValueOnce();
+
+      await expect(
+        fileSystem.writeTextFile(targetFile, 'Hello, World!'),
+      ).resolves.toBeUndefined();
+
+      expect(fs.rename).toHaveBeenCalledTimes(2);
+    });
+
+    it('should fail before creating a temp file when the destination is not writable', async () => {
+      vi.mocked(fs.stat).mockResolvedValue({
+        mode: 0o444,
+        nlink: 1,
+      } as unknown as Awaited<ReturnType<typeof fs.stat>>);
+      // A rename only checks the directory's permissions, so this is the
+      // only place a read-only destination can be refused.
+      vi.mocked(fs.access).mockRejectedValue(
+        Object.assign(new Error('permission denied'), { code: 'EACCES' }),
+      );
+
+      await expect(
+        fileSystem.writeTextFile(targetFile, 'Hello, World!'),
+      ).rejects.toMatchObject({ code: 'EACCES' });
+
+      expect(fs.access).toHaveBeenCalledWith(targetFile, constants.W_OK);
+      expect(fs.writeFile).not.toHaveBeenCalled();
+      expect(fs.rename).not.toHaveBeenCalled();
+    });
+
+    it('should report a read-only destination as EACCES on Windows', async () => {
+      vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+      vi.mocked(fs.stat).mockResolvedValue({
+        mode: 0o444,
+        nlink: 1,
+      } as unknown as Awaited<ReturnType<typeof fs.stat>>);
+      // libuv reports the read-only attribute as EPERM from access(), while a
+      // plain write on the same file fails with EACCES.
+      vi.mocked(fs.access).mockRejectedValue(
+        Object.assign(new Error('operation not permitted'), { code: 'EPERM' }),
+      );
+
+      await expect(
+        fileSystem.writeTextFile(targetFile, 'Hello, World!'),
+      ).rejects.toMatchObject({
+        code: 'EACCES',
+        path: targetFile,
+        syscall: 'access',
+      });
+
+      expect(fs.writeFile).not.toHaveBeenCalled();
+    });
+
+    it('should keep EPERM from the write access check on other platforms', async () => {
+      vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
+      vi.mocked(fs.stat).mockResolvedValue({
+        mode: 0o644,
+        nlink: 1,
+      } as unknown as Awaited<ReturnType<typeof fs.stat>>);
+      // An immutable file fails with EPERM for a plain write too.
+      vi.mocked(fs.access).mockRejectedValue(
+        Object.assign(new Error('operation not permitted'), { code: 'EPERM' }),
+      );
+
+      await expect(
+        fileSystem.writeTextFile(targetFile, 'Hello, World!'),
+      ).rejects.toMatchObject({ code: 'EPERM' });
+
+      expect(fs.writeFile).not.toHaveBeenCalled();
+    });
+
+    it('should not check write access when creating a new file', async () => {
+      vi.mocked(fs.writeFile).mockResolvedValue();
+      vi.mocked(fs.rename).mockResolvedValue();
+      vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT'));
+
+      await fileSystem.writeTextFile(targetFile, 'Hello, World!');
+
+      expect(fs.access).not.toHaveBeenCalled();
+      expect(fs.rename).toHaveBeenCalled();
+    });
+
+    it('should write in place when the destination has multiple hard links', async () => {
+      vi.mocked(fs.writeFile).mockResolvedValue();
+      vi.mocked(fs.access).mockResolvedValue();
+      vi.mocked(fs.stat).mockResolvedValue({
+        mode: 0o644,
+        nlink: 2,
+      } as unknown as Awaited<ReturnType<typeof fs.stat>>);
+
+      await fileSystem.writeTextFile(targetFile, 'Hello, World!');
+
+      // Renaming a temp file over one name of a hard link would give it a new
+      // inode and leave the other names on the old content.
       expect(fs.writeFile).toHaveBeenCalledWith(
-        '/test/file.txt',
+        targetFile,
         'Hello, World!',
         'utf-8',
       );
+      expect(fs.rename).not.toHaveBeenCalled();
     });
   });
 });

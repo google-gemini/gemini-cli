@@ -150,6 +150,7 @@ interface ExternalExecutionState extends ManagedExecutionBase {
 type ManagedExecutionState = VirtualExecutionState | ExternalExecutionState;
 
 const NON_PROCESS_EXECUTION_ID_START = 2_000_000_000;
+const RESET_FOR_TEST_ABORT_MESSAGE = 'Aborted by test reset.';
 
 /**
  * Central owner for execution backgrounding lifecycle across shell and tools.
@@ -267,6 +268,38 @@ export class ExecutionLifecycleService {
    * Resets lifecycle state for isolated unit tests.
    */
   static resetForTest(): void {
+    for (const execution of this.activeExecutions.values()) {
+      try {
+        if (execution.kind === 'virtual') {
+          execution.onKill?.();
+        } else if (execution.kind === 'external') {
+          execution.kill?.();
+        }
+      } catch {
+        // ignored
+      }
+    }
+
+    for (const executionId of Array.from(this.activeResolvers.keys())) {
+      const execution = this.activeExecutions.get(executionId);
+      const output =
+        execution?.getBackgroundOutput?.() ?? execution?.output ?? '';
+      try {
+        this.completeWithResult(executionId, {
+          rawOutput: Buffer.from(output, 'utf8'),
+          output,
+          exitCode: 130,
+          signal: null,
+          error: new Error(RESET_FOR_TEST_ABORT_MESSAGE),
+          aborted: true,
+          pid: executionId,
+          executionMethod: execution?.executionMethod ?? 'none',
+        });
+      } catch {
+        // ignored
+      }
+    }
+
     this.activeExecutions.clear();
     this.activeResolvers.clear();
     this.activeListeners.clear();
@@ -445,12 +478,10 @@ export class ExecutionLifecycleService {
       return;
     }
 
-    const {
-      error = null,
-      aborted = false,
-      exitCode = error ? 1 : 0,
-      signal = null,
-    } = options ?? {};
+    const error = options?.error ?? null;
+    const aborted = options?.aborted ?? false;
+    const exitCode = options?.exitCode ?? (error ? 1 : 0);
+    const signal = options?.signal ?? null;
 
     const output = execution.getBackgroundOutput?.() ?? execution.output;
     const snapshot = execution.getSubscriptionSnapshot?.();
@@ -476,15 +507,21 @@ export class ExecutionLifecycleService {
     this.settleExecution(executionId, result);
   }
 
-  static background(executionId: number): void {
+  /**
+   * Transitions an active execution to the background and resolves its initial result.
+   *
+   * @param executionId The ID of the execution to move to the background.
+   * @returns true if the execution was active and successfully transitioned to the background; false otherwise.
+   */
+  static background(executionId: number): boolean {
     const resolve = this.activeResolvers.get(executionId);
     if (!resolve) {
-      return;
+      return false;
     }
 
     const execution = this.activeExecutions.get(executionId);
     if (!execution) {
-      return;
+      return false;
     }
 
     const output = execution.getBackgroundOutput?.() ?? execution.output;
@@ -518,6 +555,7 @@ export class ExecutionLifecycleService {
     for (const listener of this.backgroundStartListeners) {
       listener(info);
     }
+    return true;
   }
 
   static subscribe(

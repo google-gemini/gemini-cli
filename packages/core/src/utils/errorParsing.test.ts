@@ -34,7 +34,7 @@ describe('parseAndFormatApiError', () => {
     );
     expect(result).toContain('[API Error: Rate limit exceeded');
     expect(result).toContain(
-      'Possible quota limitations in place or slow response times detected. Switching to the gemini-2.5-flash model',
+      `Possible quota limitations in place or slow response times detected. Switching to the ${DEFAULT_GEMINI_FLASH_MODEL} model for the rest of this session.`,
     );
   });
 
@@ -107,6 +107,16 @@ describe('parseAndFormatApiError', () => {
     const result = parseAndFormatApiError(error, AuthType.USE_VERTEX_AI);
     expect(result).toContain('[API Error: Rate limit exceeded]');
     expect(result).toContain(vertexMessage);
+  });
+
+  it('should format a StructuredError with status: undefined', () => {
+    const error: StructuredError = {
+      message: 'Rate limit exceeded (simulated 429 error, limit: 0)',
+      status: undefined,
+    };
+    const expected =
+      '[API Error: Rate limit exceeded (simulated 429 error, limit: 0)]';
+    expect(parseAndFormatApiError(error)).toBe(expected);
   });
 
   it('should handle an unknown error type', () => {

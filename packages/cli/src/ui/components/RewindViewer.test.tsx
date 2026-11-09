@@ -426,6 +426,53 @@ describe('RewindViewer', () => {
     expect(lastFrame2()).toMatchSnapshot('after-update');
     unmount2();
   });
+
+  it('excludes user messages that only carry tool responses from the rewind points', async () => {
+    const messages: MessageRecord[] = [
+      { type: 'user', content: 'Run the tool', id: '1', timestamp: '1' },
+      { type: 'gemini', content: 'Running it now.', id: '2', timestamp: '2' },
+      {
+        type: 'user',
+        content: [
+          {
+            functionResponse: {
+              name: 'testTool',
+              id: 'call-1',
+              response: { output: 'tool output' },
+            },
+          },
+        ],
+        id: '3',
+        timestamp: '3',
+      },
+      {
+        type: 'user',
+        content: 'Thanks, next question',
+        id: '4',
+        timestamp: '4',
+      },
+    ];
+    const conversation = createConversation(messages);
+    const onExit = vi.fn();
+    const onRewind = vi.fn();
+
+    const { lastFrame, unmount } = await renderWithProviders(
+      <RewindViewer
+        conversation={conversation}
+        onExit={onExit}
+        onRewind={onRewind}
+      />,
+    );
+
+    const frame = lastFrame();
+    expect(frame).toContain('Run the tool');
+    expect(frame).toContain('Thanks, next question');
+    expect(frame).toContain('Stay at current position');
+    // Only the two authored prompts are listed as rewind points; the
+    // tool-response record between them is not offered as a third entry.
+    expect((frame?.match(/No files have been changed/g) ?? []).length).toBe(2);
+    unmount();
+  });
 });
 it('renders accessible screen reader view when screen reader is enabled', async () => {
   const { useIsScreenReaderEnabled } = await import('ink');

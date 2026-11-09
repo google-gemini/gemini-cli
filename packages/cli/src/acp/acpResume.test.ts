@@ -28,7 +28,6 @@ import {
 } from '../utils/sessionUtils.js';
 import { convertSessionToClientHistory } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
-import { waitFor } from '../test-utils/async.js';
 
 vi.mock('../config/config.js', () => ({
   loadCliConfig: vi.fn(),
@@ -244,70 +243,131 @@ describe('GeminiAgent Session Resume', () => {
       }),
     );
 
-    await waitFor(() => {
-      // User message
-      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          update: expect.objectContaining({
-            sessionUpdate: 'user_message_chunk',
-            content: expect.objectContaining({ text: 'Hello' }),
-          }),
+    // User message
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'user_message_chunk',
+          content: expect.objectContaining({ text: 'Hello' }),
         }),
-      );
+      }),
+    );
 
-      // Agent thought
-      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          update: expect.objectContaining({
-            sessionUpdate: 'agent_thought_chunk',
-            content: expect.objectContaining({
-              text: '**Thinking**\nabout greeting',
-            }),
+    // Agent thought
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_thought_chunk',
+          content: expect.objectContaining({
+            text: '**Thinking**\nabout greeting',
           }),
         }),
-      );
+      }),
+    );
 
-      // Agent message
-      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          update: expect.objectContaining({
-            sessionUpdate: 'agent_message_chunk',
-            content: expect.objectContaining({ text: 'Hi there' }),
-          }),
+    // Agent message
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_message_chunk',
+          content: expect.objectContaining({ text: 'Hi there' }),
         }),
-      );
+      }),
+    );
 
-      // Successful tool call → 'completed'
-      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          update: expect.objectContaining({
-            sessionUpdate: 'tool_call',
-            toolCallId: 'call-1',
-            status: 'completed',
-            title: 'Test Tool',
-            kind: 'read',
-            content: [
-              {
-                type: 'content',
-                content: { type: 'text', text: 'Tool output' },
-              },
-            ],
-          }),
+    // Successful tool call → 'completed'
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call',
+          toolCallId: 'call-1',
+          status: 'completed',
+          title: 'Test Tool',
+          kind: 'read',
+          content: [
+            {
+              type: 'content',
+              content: { type: 'text', text: 'Tool output' },
+            },
+          ],
         }),
-      );
+      }),
+    );
 
-      // Failed tool call → 'failed'
-      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          update: expect.objectContaining({
-            sessionUpdate: 'tool_call',
-            toolCallId: 'call-2',
-            status: 'failed',
-            title: 'Write File',
-            kind: 'read',
-          }),
+    // Failed tool call → 'failed'
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call',
+          toolCallId: 'call-2',
+          status: 'failed',
+          title: 'Write File',
+          kind: 'read',
         }),
-      );
+      }),
+    );
+  });
+
+  it('should resolve session before initializing config or fresh chat recording', async () => {
+    const callOrder: string[] = [];
+    const resolveSessionMock = vi.fn().mockImplementation(async () => {
+      callOrder.push('resolveSession');
+      return {
+        sessionData: {
+          sessionId: 'same-minute-session-id',
+          messages: [{ type: 'user', content: [{ text: 'Hello' }] }],
+        },
+        sessionPath: '/path/to/session.jsonl',
+      };
     });
+
+    (SessionSelector as unknown as Mock).mockImplementation(() => ({
+      resolveSession: resolveSessionMock,
+    }));
+    mockConfig.initialize.mockImplementation(async () => {
+      callOrder.push('config.initialize');
+    });
+    vi.mocked(mockConfig.getGeminiClient().resumeChat).mockImplementation(
+      async () => {
+        callOrder.push('geminiClient.resumeChat');
+      },
+    );
+    (convertSessionToClientHistory as unknown as Mock).mockReturnValue([
+      { role: 'user', parts: [{ text: 'Hello' }] },
+    ]);
+
+    await agent.loadSession({
+      sessionId: 'same-minute-session-id',
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+
+    expect(callOrder).toEqual([
+      'resolveSession',
+      'config.initialize',
+      'geminiClient.resumeChat',
+    ]);
+    expect(mockConfig.getGeminiClient().initialize).not.toHaveBeenCalled();
+  });
+
+  it('should not initialize config if session resolution fails', async () => {
+    (SessionSelector as unknown as Mock).mockImplementation(() => ({
+      resolveSession: vi
+        .fn()
+        .mockRejectedValue(
+          new Error('No previous sessions found for this project.'),
+        ),
+    }));
+
+    await expect(
+      agent.loadSession({
+        sessionId: 'missing-session-id',
+        cwd: '/tmp',
+        mcpServers: [],
+      }),
+    ).rejects.toThrow('No previous sessions found for this project.');
+
+    expect(mockConfig.initialize).not.toHaveBeenCalled();
+    expect(mockConfig.getGeminiClient().resumeChat).not.toHaveBeenCalled();
   });
 });

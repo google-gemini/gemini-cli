@@ -46,16 +46,30 @@ import {
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
-import { ApprovalMode } from '../policy/types.js';
+import { ApprovalMode, PolicyDecision } from '../policy/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { getToolCallContext } from '../utils/toolCallContext.js';
+import {
+  acknowledgeUntrustedFlags,
+  extractUntrustedContext,
+  findUntrustedFlags,
+  getUnacknowledgedUntrustedFlags,
+  isBuildOrTestCommand,
+  isRemoteContentCommand,
+  getModifiedBuildFiles,
+  resetModifiedBuildFiles,
+  REMOTE_SHELL_OUTPUT_SOURCE,
+} from '../utils/untrustedContextTracker.js';
 import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import type { Content } from '@google/genai';
 import { toPathKey, isSubpath, resolveToRealPath } from '../utils/paths.js';
 import {
   getProactiveToolSuggestions,
   isNetworkReliantCommand,
 } from '../sandbox/utils/proactivePermissions.js';
+import { wrapUntrusted } from '../utils/textUtils.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 export const LIVE_OUTPUT_MAX_BUFFER_CHARS = 100_000;
@@ -96,6 +110,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
   ToolResult
 > {
   private proactivePermissionsConfirmed?: SandboxPermissions;
+  private confirmedCommand?: string;
 
   constructor(
     private readonly context: AgentLoopContext,
@@ -245,8 +260,60 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return this.params.command;
   }
 
+  private getHistory(): readonly Content[] {
+    const clientFromProp = this.context.geminiClient;
+    if (clientFromProp && typeof clientFromProp.getHistory === 'function') {
+      return clientFromProp.getHistory();
+    }
+    const clientFromMethod = this.context.config?.getGeminiClient?.();
+    if (clientFromMethod && typeof clientFromMethod.getHistory === 'function') {
+      return clientFromMethod.getHistory();
+    }
+    return [];
+  }
+
   override getExplanation(): string {
     return this.getContextualDetails().trim();
+  }
+
+  /**
+   * Returns flags or arguments of the command that were sourced from untrusted
+   * context, excluding workspace-local paths and flags already approved for
+   * the same root commands in this session.
+   */
+  private getUntrustedFlags(command: string): string[] {
+    const untrustedContext = extractUntrustedContext(this.getHistory());
+    if (untrustedContext.untrustedTexts.length === 0) {
+      return [];
+    }
+    const config = this.context.config;
+    const targetDir = config.getTargetDir();
+    const workspaceContext = config.getWorkspaceContext();
+    const untrustedFlags = findUntrustedFlags(command, untrustedContext, {
+      cwd: this.params.dir_path
+        ? path.resolve(targetDir, this.params.dir_path)
+        : targetDir,
+      isPathWithinWorkspace: (absolutePath) =>
+        workspaceContext.isPathWithinWorkspace(absolutePath),
+    });
+    let roots: string[] = [];
+    try {
+      roots = getCommandRoots(command);
+    } catch {
+      roots = [command.trim().split(/\s+/)[0] || 'shell'];
+    }
+    return getUnacknowledgedUntrustedFlags(untrustedFlags, roots, config);
+  }
+
+  hasTaintedOrBuildFileRisk(): boolean {
+    const command = stripShellWrapper(this.params.command);
+    const untrustedFlags = this.getUntrustedFlags(command);
+    const modifiedBuildFiles = getModifiedBuildFiles(this.context.config);
+    const isBuildCmd = isBuildOrTestCommand(command);
+
+    return (
+      untrustedFlags.length > 0 || (isBuildCmd && modifiedBuildFiles.length > 0)
+    );
   }
 
   override getPolicyUpdateOptions(
@@ -257,13 +324,31 @@ export class ShellToolInvocation extends BaseToolInvocation<
       outcome === ToolConfirmationOutcome.ProceedAlways
     ) {
       const command = stripShellWrapper(this.params.command);
+      if (this.hasTaintedOrBuildFileRisk()) {
+        return undefined;
+      }
       const rootCommands = [...new Set(getCommandRoots(command))];
       const allowRedirection = hasRedirection(command) ? true : undefined;
+      const allowCommandSubstitution = detectCommandSubstitution(command)
+        ? true
+        : undefined;
 
       if (rootCommands.length > 0) {
-        return { commandPrefix: rootCommands, allowRedirection };
+        return {
+          commandPrefix: rootCommands,
+          allowRedirection,
+          ...(allowCommandSubstitution !== undefined
+            ? { allowCommandSubstitution }
+            : {}),
+        };
       }
-      return { commandPrefix: this.params.command, allowRedirection };
+      return {
+        commandPrefix: this.params.command,
+        allowRedirection,
+        ...(allowCommandSubstitution !== undefined
+          ? { allowCommandSubstitution }
+          : {}),
+      };
     }
     return undefined;
   }
@@ -272,7 +357,18 @@ export class ShellToolInvocation extends BaseToolInvocation<
     abortSignal: AbortSignal,
     forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.context.config.getApprovalMode() === ApprovalMode.YOLO) {
+    if (forcedDecision === 'deny') {
+      return super.shouldConfirmExecute(abortSignal, forcedDecision);
+    }
+
+    if (this.hasTaintedOrBuildFileRisk()) {
+      return this.getConfirmationDetails(abortSignal);
+    }
+
+    if (
+      this.context.config.getApprovalMode() === ApprovalMode.YOLO &&
+      forcedDecision !== 'ask_user'
+    ) {
       return super.shouldConfirmExecute(abortSignal, forcedDecision);
     }
 
@@ -405,8 +501,21 @@ export class ShellToolInvocation extends BaseToolInvocation<
         .join(', ');
     }
 
-    const rootCommands = [...new Set(getCommandRoots(command))];
+    let rootCommands: string[] = [];
+    try {
+      rootCommands = [...new Set(getCommandRoots(command))];
+    } catch {
+      rootCommands = [command.trim().split(/\s+/)[0] || 'shell'];
+    }
     const rootCommand = rootCommands[0] || 'shell';
+
+    const untrustedFlags = this.getUntrustedFlags(command);
+    const modifiedBuildFiles = getModifiedBuildFiles(this.context.config);
+    const isBuildCmd = isBuildOrTestCommand(command);
+
+    const hasSecurityWarning =
+      untrustedFlags.length > 0 ||
+      (isBuildCmd && modifiedBuildFiles.length > 0);
 
     // Proactively suggest expansion for known network-heavy tools (npm install, etc.)
     // to avoid hangs when network is restricted by default.
@@ -416,8 +525,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     // Rely entirely on PolicyEngine for interactive confirmation.
     // If we are here, it means PolicyEngine returned ASK_USER (or no message bus),
     // so we must provide confirmation details.
-    // If additional_permissions are provided, it's an expansion request
-    if (effectiveAdditionalPermissions) {
+    // If additional_permissions are provided, and no security warnings are present,
+    // it's an expansion request
+    if (effectiveAdditionalPermissions && !hasSecurityWarning) {
       return {
         type: 'sandbox_expansion',
         title: proactivePermissions
@@ -427,6 +537,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
         rootCommand: rootCommandDisplay,
         additionalPermissions: effectiveAdditionalPermissions,
         onConfirm: async (outcome: ToolConfirmationOutcome) => {
+          if (
+            outcome !== ToolConfirmationOutcome.Cancel &&
+            outcome !== ToolConfirmationOutcome.ModifyWithEditor
+          ) {
+            this.confirmedCommand = this.params.command;
+          }
           if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
             this.context.config.sandboxPolicyManager.addPersistentApproval(
               rootCommand,
@@ -448,11 +564,66 @@ export class ShellToolInvocation extends BaseToolInvocation<
       command: this.params.command,
       rootCommand: rootCommandDisplay,
       rootCommands,
-      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+      untrustedFlags: untrustedFlags.length > 0 ? untrustedFlags : undefined,
+      modifiedBuildFiles:
+        isBuildCmd && modifiedBuildFiles.length > 0
+          ? modifiedBuildFiles
+          : undefined,
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
         // Policy updates are now handled centrally by the scheduler
+        if (
+          outcome === ToolConfirmationOutcome.Cancel ||
+          outcome === ToolConfirmationOutcome.ModifyWithEditor
+        ) {
+          return;
+        }
+        this.confirmedCommand = this.params.command;
+        // Remember approved flags and the reviewed build file state for the
+        // rest of the session so identical follow-up commands do not prompt.
+        acknowledgeUntrustedFlags(
+          untrustedFlags,
+          rootCommands,
+          this.context.config,
+        );
+        if (isBuildCmd && modifiedBuildFiles.length > 0) {
+          resetModifiedBuildFiles(this.context.config);
+        }
       },
     };
     return confirmationDetails;
+  }
+
+  private async isCommandSubstitutionAllowed(
+    options: ExecuteOptions,
+  ): Promise<boolean> {
+    if (
+      (options.isClientInitiated ?? false) ||
+      (options.isUserConfirmed ?? false) ||
+      this.confirmedCommand === this.params.command
+    ) {
+      return true;
+    }
+
+    if (this.hasTaintedOrBuildFileRisk()) {
+      return false;
+    }
+
+    const policyEngine = this.context.config?.getPolicyEngine?.();
+    if (policyEngine) {
+      const checkResult = await policyEngine.check(
+        {
+          name: this._toolName ?? SHELL_TOOL_NAME,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          args: this.params as unknown as Record<string, unknown>,
+        },
+        this._serverName,
+        this._toolAnnotations,
+        getToolCallContext()?.subagent,
+      );
+      return checkResult.decision === PolicyDecision.ALLOW;
+    }
+
+    return this.context.config?.getApprovalMode?.() === ApprovalMode.YOLO;
   }
 
   async execute(options: ExecuteOptions): Promise<ToolResult> {
@@ -464,7 +635,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
     } = options;
     const strippedCommand = stripShellWrapper(this.params.command);
 
-    if (detectCommandSubstitution(strippedCommand)) {
+    if (
+      detectCommandSubstitution(strippedCommand) &&
+      !(await this.isCommandSubstitutionAllowed(options))
+    ) {
       return {
         llmContent:
           'Command injection detected: command substitution syntax ' +
@@ -486,6 +660,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const isWindows = os.platform() === 'win32';
     let tempFilePath = '';
     let tempDir = '';
+    let isBackgrounded = false;
 
     const timeoutMs = this.context.config.getShellToolInactivityTimeout();
     const timeoutController = new AbortController();
@@ -655,6 +830,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           this.context.config.isInteractiveShellEnabled(),
           {
             ...shellExecutionConfig,
+            env: this.context.config.env,
             sessionId: this.context.config?.getSessionId?.() ?? 'default',
             pager: 'cat',
             sanitizationConfig:
@@ -683,6 +859,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             backgroundCompletionBehavior:
               this.context.config.getShellBackgroundCompletionBehavior(),
             originalCommand: strippedCommand,
+            tempDir,
           },
         );
 
@@ -691,28 +868,62 @@ export class ShellToolInvocation extends BaseToolInvocation<
           setExecutionIdCallback(pid);
         }
 
-        // If the model requested to run in the background, do so after a short delay.
         let completed = false;
         if (this.params.is_background) {
+          const sessionId = this.context.config?.getSessionId?.() ?? 'default';
+          const delay = this.params.delay_ms ?? BACKGROUND_DELAY_MS;
+          let promotionTimer: ReturnType<typeof setTimeout> | null = setTimeout(
+            () => {
+              promotionTimer = null;
+              if (!completed) {
+                try {
+                  ShellExecutionService.background(
+                    pid,
+                    sessionId,
+                    strippedCommand,
+                    tempDir,
+                  );
+                  isBackgrounded = true;
+                } catch (err) {
+                  debugLogger.error(
+                    'Failed to background shell execution:',
+                    err,
+                  );
+                }
+              }
+            },
+            delay,
+          );
+
+          const clearPromotionTimer = () => {
+            if (promotionTimer) {
+              clearTimeout(promotionTimer);
+              promotionTimer = null;
+            }
+          };
+
           resultPromise
             .then(() => {
               completed = true;
+              clearPromotionTimer();
             })
             .catch(() => {
-              completed = true; // Also mark completed if it failed
+              completed = true;
+              clearPromotionTimer();
             });
 
-          const sessionId = this.context.config?.getSessionId?.() ?? 'default';
-          const delay = this.params.delay_ms ?? BACKGROUND_DELAY_MS;
-          setTimeout(() => {
-            ShellExecutionService.background(pid, sessionId, strippedCommand);
-          }, delay);
-
-          // Wait for the delay amount to see if command returns quickly
-          await new Promise((resolve) => setTimeout(resolve, delay));
+          let raceTimeoutId: ReturnType<typeof setTimeout> | undefined;
+          await Promise.race([
+            resultPromise.catch(() => {}),
+            new Promise<void>((resolve) => {
+              raceTimeoutId = setTimeout(resolve, delay);
+            }),
+          ]);
+          if (raceTimeoutId) {
+            clearTimeout(raceTimeoutId);
+          }
 
           if (!completed) {
-            // Return early with initial output if still running
             return {
               llmContent: `Command is running in background. PID: ${pid}. Initial output:\n${cumulativeOutput}`,
               returnDisplay: `Background process started with PID ${pid}.`,
@@ -722,7 +933,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       const result = await resultPromise;
-      if (!result.backgrounded) {
+      if (result.backgrounded) {
+        isBackgrounded = true;
+      } else {
         flushOutput();
       }
 
@@ -1008,6 +1221,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       const summarizeConfig =
         this.context.config.getSummarizeToolOutputConfig();
+      const outputSource = isRemoteContentCommand(strippedCommand)
+        ? REMOTE_SHELL_OUTPUT_SOURCE
+        : undefined;
       const executionError = result.error
         ? {
             error: {
@@ -1025,7 +1241,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           signal,
         );
         return {
-          llmContent: summary,
+          llmContent: wrapUntrusted(summary, outputSource),
           returnDisplay,
           ...executionError,
         };
@@ -1038,7 +1254,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           : undefined;
 
       return {
-        llmContent,
+        llmContent: wrapUntrusted(llmContent, outputSource),
         display: {
           name: 'Shell',
           description: this.getDescription(),
@@ -1063,9 +1279,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
       timeoutController.signal.removeEventListener('abort', onAbort);
 
       // Only clean up if NOT running in background.
-      // Background processes need the temp directory and PID file to remain
-      // available until they exit.
-      if (!this.params.is_background) {
+      // Background processes transfer ownership of the temp directory to
+      // ShellExecutionService, which removes it once the process exits.
+      if (!isBackgrounded) {
         if (tempFilePath) {
           try {
             await fsPromises.unlink(tempFilePath);

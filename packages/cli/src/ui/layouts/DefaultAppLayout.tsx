@@ -26,61 +26,76 @@ export const DefaultAppLayout: React.FC = () => {
 
   const { rootUiRef, terminalHeight } = uiState;
   useFlickerDetector(rootUiRef, terminalHeight);
+  // In inline mode, Ink redraws the whole terminal (erasing the scrollback and
+  // printing every earlier <Static> output again) whenever the dynamic UI is
+  // as tall as the terminal. Keep it at least one row shorter; if its content
+  // is momentarily taller, the top is clipped so the input stays visible. The
+  // wrapper is always rendered so toggling the cap never remounts <Static>.
+  const capInlineHeight = !isAlternateBuffer && uiState.constrainHeight;
   // If in alternate buffer mode, need to leave room to draw the scrollbar on
   // the right side of the terminal.
   return (
     <Box
       flexDirection="column"
-      width={uiState.terminalWidth}
-      height={isAlternateBuffer ? terminalHeight : undefined}
-      paddingBottom={isAlternateBuffer ? 1 : undefined}
       flexShrink={0}
       flexGrow={0}
-      ref={uiState.rootUiRef}
+      maxHeight={capInlineHeight ? Math.max(1, terminalHeight - 1) : undefined}
+      overflowY={capInlineHeight ? 'hidden' : undefined}
+      justifyContent={capInlineHeight ? 'flex-end' : undefined}
     >
-      <MainContent />
-
-      {uiState.isBackgroundTaskVisible &&
-        uiState.backgroundTasks.size > 0 &&
-        uiState.activeBackgroundTaskPid &&
-        uiState.backgroundTaskHeight > 0 &&
-        uiState.streamingState !== StreamingState.WaitingForConfirmation && (
-          <Box height={uiState.backgroundTaskHeight} flexShrink={0}>
-            <BackgroundTaskDisplay
-              shells={uiState.backgroundTasks}
-              activePid={uiState.activeBackgroundTaskPid}
-              width={uiState.terminalWidth}
-              height={uiState.backgroundTaskHeight}
-              isFocused={
-                uiState.embeddedShellFocused && !uiState.dialogsVisible
-              }
-              isListOpenProp={uiState.isBackgroundTaskListOpen}
-            />
-          </Box>
-        )}
       <Box
         flexDirection="column"
-        ref={uiState.mainControlsRef}
+        width={uiState.terminalWidth}
+        height={isAlternateBuffer ? terminalHeight : undefined}
+        paddingBottom={isAlternateBuffer ? 1 : undefined}
         flexShrink={0}
         flexGrow={0}
-        width={uiState.terminalWidth}
-        height={copyModeEnabled ? uiState.stableControlsHeight : undefined}
+        ref={uiState.rootUiRef}
       >
-        <Notifications />
-        <CopyModeWarning />
+        <MainContent />
 
-        {uiState.customDialog ? (
-          uiState.customDialog
-        ) : uiState.dialogsVisible ? (
-          <DialogManager
-            terminalWidth={uiState.terminalWidth}
-            addItem={uiState.historyManager.addItem}
-          />
-        ) : (
-          <Composer isFocused={true} />
-        )}
+        {uiState.isBackgroundTaskVisible &&
+          uiState.backgroundTasks.size > 0 &&
+          uiState.activeBackgroundTaskPid &&
+          uiState.backgroundTaskHeight > 0 &&
+          uiState.streamingState !== StreamingState.WaitingForConfirmation && (
+            <Box height={uiState.backgroundTaskHeight} flexShrink={0}>
+              <BackgroundTaskDisplay
+                shells={uiState.backgroundTasks}
+                activePid={uiState.activeBackgroundTaskPid}
+                width={uiState.terminalWidth}
+                height={uiState.backgroundTaskHeight}
+                isFocused={
+                  uiState.embeddedShellFocused && !uiState.dialogsVisible
+                }
+                isListOpenProp={uiState.isBackgroundTaskListOpen}
+              />
+            </Box>
+          )}
+        <Box
+          flexDirection="column"
+          ref={uiState.mainControlsRef}
+          flexShrink={0}
+          flexGrow={0}
+          width={uiState.terminalWidth}
+          height={copyModeEnabled ? uiState.stableControlsHeight : undefined}
+        >
+          <Notifications />
+          <CopyModeWarning />
 
-        <ExitWarning />
+          {uiState.customDialog ? (
+            uiState.customDialog
+          ) : uiState.dialogsVisible ? (
+            <DialogManager
+              terminalWidth={uiState.terminalWidth}
+              addItem={uiState.historyManager.addItem}
+            />
+          ) : (
+            <Composer isFocused={true} />
+          )}
+
+          <ExitWarning />
+        </Box>
       </Box>
     </Box>
   );

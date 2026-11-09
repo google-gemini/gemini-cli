@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
-import { useLoadingIndicator } from './useLoadingIndicator.js';
+import { useLoadingIndicator, isNetworkRetry } from './useLoadingIndicator.js';
 import { StreamingState } from '../types.js';
 import {
   PHRASE_CHANGE_INTERVAL_MS,
@@ -36,6 +36,7 @@ describe('useLoadingIndicator', () => {
     initialShowTips: boolean = true,
     initialShowWit: boolean = true,
     initialErrorVerbosity: 'low' | 'full' = 'full',
+    initialPauseUpdates: boolean = false,
   ) => {
     let hookResult: ReturnType<typeof useLoadingIndicator>;
     function TestComponent({
@@ -45,6 +46,7 @@ describe('useLoadingIndicator', () => {
       showTips,
       showWit,
       errorVerbosity,
+      pauseUpdates,
     }: {
       streamingState: StreamingState;
       shouldShowFocusHint?: boolean;
@@ -52,6 +54,7 @@ describe('useLoadingIndicator', () => {
       showTips?: boolean;
       showWit?: boolean;
       errorVerbosity?: 'low' | 'full';
+      pauseUpdates?: boolean;
     }) {
       hookResult = useLoadingIndicator({
         streamingState,
@@ -60,6 +63,7 @@ describe('useLoadingIndicator', () => {
         showTips,
         showWit,
         errorVerbosity,
+        pauseUpdates,
       });
       return null;
     }
@@ -72,6 +76,7 @@ describe('useLoadingIndicator', () => {
         showTips={initialShowTips}
         showWit={initialShowWit}
         errorVerbosity={initialErrorVerbosity}
+        pauseUpdates={initialPauseUpdates}
       />,
     );
     return {
@@ -87,12 +92,14 @@ describe('useLoadingIndicator', () => {
         showTips?: boolean;
         showWit?: boolean;
         errorVerbosity?: 'low' | 'full';
+        pauseUpdates?: boolean;
       }) => {
         rerender(
           <TestComponent
             showTips={initialShowTips}
             showWit={initialShowWit}
             errorVerbosity={initialErrorVerbosity}
+            pauseUpdates={initialPauseUpdates}
             {...newProps}
           />,
         );
@@ -239,6 +246,9 @@ describe('useLoadingIndicator', () => {
 
     expect(result.current.currentLoadingPhrase).toContain('Trying to reach');
     expect(result.current.currentLoadingPhrase).toContain('Attempt 3/3');
+    expect(result.current.statusPhrase).toBe(
+      'Trying to reach gemini-pro (Attempt 3/3)',
+    );
   });
 
   it('should not show retry status phrase when idle', async () => {
@@ -255,6 +265,7 @@ describe('useLoadingIndicator', () => {
     );
 
     expect(result.current.currentLoadingPhrase).toBeUndefined();
+    expect(result.current.statusPhrase).toBeUndefined();
   });
 
   it('should hide low-verbosity retry status for early retry attempts', async () => {
@@ -299,6 +310,86 @@ describe('useLoadingIndicator', () => {
     );
   });
 
+  it('should immediately surface retry progress in low error verbosity mode for network failures', async () => {
+    const retryStatus: RetryAttemptPayload = {
+      model: 'gemini-pro',
+      attempt: 1,
+      maxAttempts: 3,
+      delayMs: 5000,
+      error: 'FETCH_FAILED',
+    };
+    const { result } = await renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      retryStatus,
+      true,
+      true,
+      'low',
+    );
+
+    expect(result.current.statusPhrase).toBe(
+      'Trying to reach gemini-pro (Attempt 2/3)',
+    );
+    expect(result.current.currentLoadingPhrase).toBe(
+      'Trying to reach gemini-pro (Attempt 2/3)',
+    );
+  });
+
+  describe('isNetworkRetry', () => {
+    it('returns true for network and timeout errors without HTTP status', () => {
+      expect(
+        isNetworkRetry({
+          model: 'gemini-pro',
+          attempt: 1,
+          maxAttempts: 3,
+          delayMs: 5000,
+          error: 'FETCH_FAILED',
+        }),
+      ).toBe(true);
+      expect(
+        isNetworkRetry({
+          model: 'gemini-pro',
+          attempt: 1,
+          maxAttempts: 3,
+          delayMs: 5000,
+          error: 'UND_ERR_CONNECT_TIMEOUT',
+        }),
+      ).toBe(true);
+      expect(
+        isNetworkRetry({
+          model: 'gemini-pro',
+          attempt: 1,
+          maxAttempts: 3,
+          delayMs: 5000,
+          error: 'TypeError: fetch failed',
+        }),
+      ).toBe(true);
+    });
+
+    it('returns false when HTTP status is present or error is non-network', () => {
+      expect(
+        isNetworkRetry({
+          model: 'gemini-pro',
+          attempt: 1,
+          maxAttempts: 3,
+          delayMs: 5000,
+          error: 'SERVER_ERROR',
+          status: 503,
+        }),
+      ).toBe(false);
+      expect(
+        isNetworkRetry({
+          model: 'gemini-pro',
+          attempt: 1,
+          maxAttempts: 3,
+          delayMs: 5000,
+          error: 'INVALID_CONTENT',
+        }),
+      ).toBe(false);
+      expect(isNetworkRetry(null)).toBe(false);
+    });
+  });
+
   it('should show no phrases when showTips and showWit are false', async () => {
     const { result } = await renderLoadingIndicatorHook(
       StreamingState.Responding,
@@ -309,5 +400,37 @@ describe('useLoadingIndicator', () => {
     );
 
     expect(result.current.currentLoadingPhrase).toBeUndefined();
+  });
+
+  it('should pause elapsedTime updates when pauseUpdates is true', async () => {
+    const { result, rerender } = await renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      null,
+      true,
+      true,
+      'full',
+      true,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS + 5000);
+    });
+
+    expect(result.current.elapsedTime).toBe(0);
+
+    // Resuming updates should start advancing the timer
+    await act(async () => {
+      await rerender({
+        streamingState: StreamingState.Responding,
+        pauseUpdates: false,
+      });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(result.current.elapsedTime).toBe(2);
   });
 });

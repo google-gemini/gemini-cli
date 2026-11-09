@@ -10,12 +10,14 @@ import {
   expect,
   vi,
   beforeEach,
+  afterEach,
   type MockedFunction,
 } from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
 import { useBanner, _clearSessionBannersForTest } from './useBanner.js';
 import { persistentState } from '../../utils/persistentState.js';
 import crypto from 'node:crypto';
+import chalk from 'chalk';
 
 vi.mock('../../utils/persistentState.js', () => ({
   persistentState: {
@@ -94,7 +96,9 @@ describe('useBanner', () => {
 
     const { result } = await renderHook(() => useBanner(antigravityBannerData));
 
-    expect(result.current.bannerText).toBe('Antigravity is coming to town!');
+    expect(result.current.bannerText).toContain(
+      'Antigravity is coming to town!',
+    );
   });
 
   it('should increment the persistent count when banner is shown', async () => {
@@ -136,5 +140,78 @@ describe('useBanner', () => {
     const { result } = await renderHook(() => useBanner(data));
 
     expect(result.current.bannerText).toBe('Line1\nLine2');
+  });
+
+  describe('Antigravity installation commands', () => {
+    const originalPlatform = process.platform;
+
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+      vi.unstubAllEnvs();
+    });
+
+    it('should append macOS & Linux install command when on darwin', async () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      const data = { defaultText: 'Welcome to Antigravity!', warningText: '' };
+
+      const { result } = await renderHook(() => useBanner(data));
+
+      expect(result.current.bannerText).toBe(
+        `Welcome to Antigravity!\n \nTo install run "${chalk.bold('curl -fsSL https://antigravity.google/cli/install.sh | bash')}"`,
+      );
+    });
+
+    it('should append macOS & Linux install command when on linux', async () => {
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+      const data = { defaultText: 'Welcome to Antigravity!', warningText: '' };
+
+      const { result } = await renderHook(() => useBanner(data));
+
+      expect(result.current.bannerText).toBe(
+        `Welcome to Antigravity!\n \nTo install run "${chalk.bold('curl -fsSL https://antigravity.google/cli/install.sh | bash')}"`,
+      );
+    });
+
+    it('should append Windows PowerShell install command when on win32 and PSModulePath is set', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      vi.stubEnv('PSModulePath', 'C:\\some\\path');
+      const data = { defaultText: 'Welcome to Antigravity!', warningText: '' };
+
+      const { result } = await renderHook(() => useBanner(data));
+
+      expect(result.current.bannerText).toBe(
+        `Welcome to Antigravity!\n \nTo install run "${chalk.bold('irm https://antigravity.google/cli/install.ps1 | iex')}"`,
+      );
+    });
+
+    it('should append Windows CMD install command when on win32 and PSModulePath is not set', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      vi.stubEnv('PSModulePath', '');
+      const data = { defaultText: 'Welcome to Antigravity!', warningText: '' };
+
+      const { result } = await renderHook(() => useBanner(data));
+
+      expect(result.current.bannerText).toBe(
+        `Welcome to Antigravity!\n \nTo install run "${chalk.bold('curl -fsSL https://antigravity.google/cli/install.cmd -o install.cmd && install.cmd && del install.cmd')}"`,
+      );
+    });
+
+    it('should not append install command if banner text does not contain Antigravity', async () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      const data = { defaultText: 'Regular Banner', warningText: '' };
+
+      const { result } = await renderHook(() => useBanner(data));
+
+      expect(result.current.bannerText).toBe('Regular Banner');
+    });
+
+    it('should not append install command if process.platform is an unsupported platform', async () => {
+      Object.defineProperty(process, 'platform', { value: 'freebsd' });
+      const data = { defaultText: 'Welcome to Antigravity!', warningText: '' };
+
+      const { result } = await renderHook(() => useBanner(data));
+
+      expect(result.current.bannerText).toBe('Welcome to Antigravity!');
+    });
   });
 });

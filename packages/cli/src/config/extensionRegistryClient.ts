@@ -112,7 +112,7 @@ export class ExtensionRegistryClient {
     ExtensionRegistryClient.fetchPromise = (async () => {
       try {
         if (uri.startsWith('http')) {
-          if (isPrivateIp(uri)) {
+          if (await isPrivateIp(uri)) {
             throw new Error(
               'Private IP addresses are not allowed for the extension registry.',
             );

@@ -25,9 +25,13 @@ import {
   type ToolConfirmationOutcome,
   type ExecuteOptions,
 } from './tools.js';
-import { makeRelative, shortenPath } from '../utils/paths.js';
+import {
+  makeRelative,
+  shortenPath,
+  resolveToRealPath,
+} from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
-import { isGitRepository } from '../utils/gitUtils.js';
+import { isGitRepository, getSafeGitEnv } from '../utils/gitUtils.js';
 import type { Config } from '../config/config.js';
 import type { FileExclusions } from '../utils/ignorePatterns.js';
 import { ToolErrorType } from './tool-error.js';
@@ -146,7 +150,21 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       let searchDirAbs: string | null = null;
       if (pathParam) {
-        searchDirAbs = path.resolve(this.config.getTargetDir(), pathParam);
+        try {
+          searchDirAbs = resolveToRealPath(
+            path.resolve(this.config.getTargetDir(), pathParam),
+          );
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          return {
+            llmContent: errMsg,
+            returnDisplay: 'Error: Path resolution failed.',
+            error: {
+              message: errMsg,
+              type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+            },
+          };
+        }
         const validationError = this.config.validatePathAccess(
           searchDirAbs,
           'read',
@@ -444,6 +462,7 @@ class GrepToolInvocation extends BaseToolInvocation<
             signal: options.signal,
             allowedExitCodes: [0, 1],
             sandboxManager: this.config.sandboxManager,
+            env: getSafeGitEnv(),
           });
 
           const results: GrepMatch[] = [];
@@ -722,10 +741,14 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
 
     // Only validate dir_path if one is provided
     if (params.dir_path) {
-      const resolvedPath = path.resolve(
-        this.config.getTargetDir(),
-        params.dir_path,
-      );
+      let resolvedPath: string;
+      try {
+        resolvedPath = resolveToRealPath(
+          path.resolve(this.config.getTargetDir(), params.dir_path),
+        );
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
       const validationError = this.config.validatePathAccess(
         resolvedPath,
         'read',

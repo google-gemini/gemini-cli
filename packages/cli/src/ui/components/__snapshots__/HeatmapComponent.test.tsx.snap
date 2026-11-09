@@ -1,0 +1,56 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<HeatmapComponent /> > renders 28-week grid, weekday labels, month headers, legend, and streak summary 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│  Token Usage Heatmap                                                         │
+│                                                                              │
+│      Apr       Jun     Jul     Aug       Sep     Oct                         │
+│      ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■                 │
+│  Mon ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■                 │
+│      ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■                 │
+│  Wed ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■                   │
+│      ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■                   │
+│  Fri ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■                   │
+│      ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■                   │
+│                                                                              │
+│  Less ■ ■ ■ ■ ■ More                                                         │
+│                                                                              │
+│  Summary (last 28 weeks / 196 days)                                          │
+│  Total Tokens: 29,000 · 4 sessions · 10 turns                                │
+│  Current streak: 3 days · Longest streak: 7 days                             │
+╰──────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<HeatmapComponent /> > renders detailed day breakdown with token split, activity, and per-model usage 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│  Token Usage Heatmap                                                         │
+│                                                                              │
+│      Apr       Jun     Jul     Aug       Sep     Oct                         │
+│      ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■                 │
+│  Mon ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■                 │
+│      ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■                 │
+│  Wed ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■                   │
+│      ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■                   │
+│  Fri ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■                   │
+│      ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■                   │
+│                                                                              │
+│  Less ■ ■ ■ ■ ■ More                                                         │
+│                                                                              │
+│  Summary (last 28 weeks / 196 days)                                          │
+│  Total Tokens: 16,500 · 3 sessions · 7 turns                                 │
+│  Current streak: 2 days · Longest streak: 5 days                             │
+│                                                                              │
+│  ──────────────────────────────────────────────────────────────────────────  │
+│                                                                              │
+│  Breakdown for 2026-11-03                                                    │
+│  Total Tokens: 12,500                                                        │
+│  Token Split: 8,000 input · 4,500 output · 2,000 cached                      │
+│  Activity: 2 sessions · 5 turns                                              │
+│                                                                              │
+│  Models                                                                      │
+│    » gemini-2.5-pro: 9,000 tokens                                            │
+│    » gemini-2.5-flash: 3,500 tokens                                          │
+╰──────────────────────────────────────────────────────────────────────────────╯"
+`;

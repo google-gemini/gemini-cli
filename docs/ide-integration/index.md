@@ -27,6 +27,7 @@ AI-generated code changes directly within your editor.
 
 - **Workspace context:** The CLI automatically gains awareness of your workspace
   to provide more relevant and accurate responses. This context includes:
+
   - The **10 most recently accessed files** in your workspace.
   - Your active cursor position.
   - Any text you have selected (up to a 16KB limit; longer selections will be
@@ -213,12 +214,22 @@ If you are using Gemini CLI within a sandbox, be aware of the following:
 - **On macOS:** The IDE integration requires network access to communicate with
   the IDE companion extension. You must use a Seatbelt profile that allows
   network access.
-- **In a Docker container:** If you run Gemini CLI inside a Docker (or Podman)
-  container, the IDE integration can still connect to the VS Code extension
-  running on your host machine. The CLI is configured to automatically find the
-  IDE server on `host.docker.internal`. No special configuration is usually
-  required, but you may need to ensure your Docker networking setup allows
-  connections from the container to the host.
+- **In a container sandbox (Docker, Podman, or gVisor/runsc):** IDE integration
+  works, but not over the network. The companion extension's server listens only
+  on your host's loopback interface and requires an authentication token that is
+  never passed into the container. Instead, Gemini CLI on the host bridges the
+  connection for you: it connects to the extension itself and relays the IDE
+  calls into the container over `docker exec` (or `podman exec`), using a Unix
+  socket inside the container. The bridge doesn't depend on container
+  networking, so it also works with gVisor's isolated network stack. Only
+  `openDiff` and `closeDiff` for files inside your IDE workspace, and the IDE
+  context updates, are relayed. For the bridge to be set up, the extension must
+  be running when you start Gemini CLI, and the sandbox image must provide
+  `node` (the default image does).
+- **In a dev container or Remote - SSH session:** IDE integration connects
+  directly, because the extension host and Gemini CLI share the same loopback
+  interface.
+- **With LXC/LXD:** IDE integration isn't available from inside an LXC sandbox.
 
 ## Troubleshooting
 
@@ -228,6 +239,7 @@ If you are using Gemini CLI within a sandbox, be aware of the following:
 
 - **Message:**
   `🔴 Disconnected: Failed to connect to IDE companion extension in [IDE Name]. Please ensure the extension is running. To install the extension, run /ide install.`
+
   - **Cause:** Gemini CLI could not find the necessary environment variables
     (`GEMINI_CLI_IDE_WORKSPACE_PATH` or `GEMINI_CLI_IDE_SERVER_PORT`) to connect
     to the IDE. This usually means the IDE companion extension is not running or
@@ -237,6 +249,20 @@ If you are using Gemini CLI within a sandbox, be aware of the following:
         your IDE and that it is enabled.
     2.  Open a new terminal window in your IDE to ensure it picks up the correct
         environment.
+
+- **Message:**
+  `🔴 Disconnected: Failed to connect to IDE companion extension in [IDE Name]. Gemini CLI is running inside a sandbox: make sure the extension is installed and running in your IDE, then restart Gemini CLI so the sandbox can bridge the connection.`
+
+  - **Cause:** Gemini CLI is running inside a container sandbox and the host
+    couldn't bridge the connection, usually because the extension wasn't running
+    when the sandbox started.
+  - **Solution:**
+    1.  Make sure the **Gemini CLI Companion** extension is enabled and shows as
+        running in your IDE.
+    2.  Quit Gemini CLI and start it again from the IDE's integrated terminal.
+        The bridge is set up when the sandbox starts.
+    3.  If the problem continues, start Gemini CLI with `DEBUG=1` and look for
+        `[IdeBridge]` messages before the UI appears.
 
 - **Message:**
   `🔴 Disconnected: IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable`
@@ -270,6 +296,7 @@ to connect using the provided PID.
 
 - **Message:**
   `🔴 Disconnected: Directory mismatch. Gemini CLI is running in a different location than the open workspace in [IDE Name]. Please run the CLI from one of the following directories: [List of directories]`
+
   - **Cause:** The CLI's current working directory is outside the workspace you
     have open in your IDE.
   - **Solution:** `cd` into the same directory that is open in your IDE and
@@ -284,6 +311,7 @@ to connect using the provided PID.
 
 - **Message:**
   `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: [List of IDEs]`
+
   - **Cause:** You are running Gemini CLI in a terminal or environment that is
     not a supported IDE.
   - **Solution:** Run Gemini CLI from the integrated terminal of a supported

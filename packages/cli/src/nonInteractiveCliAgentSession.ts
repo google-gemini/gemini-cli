@@ -39,6 +39,13 @@ import {
   geminiPartsToContentParts,
   displayContentToString,
   debugLogger,
+  normalizeError,
+  THINKING_ONLY_COMPRESS_SUGGESTION,
+  MAX_TOKENS_EXCEEDED_SUGGESTION,
+  SAFETY_BLOCKED_MESSAGE,
+  RECITATION_BLOCKED_MESSAGE,
+  OTHER_BLOCKED_MESSAGE,
+  TRUE_EMPTY_RESPONSE_MESSAGE,
 } from '@google/gemini-cli-core';
 
 import type { Part } from '@google/genai';
@@ -48,8 +55,14 @@ import stripAnsi from 'strip-ansi';
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
-import { handleError, handleToolError } from './utils/errors.js';
+import {
+  handleError,
+  handleToolError,
+  handleCancellationError,
+  isFatalCancellationError,
+} from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
+import { runExitCleanup } from './utils/cleanup.js';
 
 interface RunNonInteractiveParams {
   config: Config;
@@ -117,13 +130,46 @@ export async function runNonInteractive({
     let isAborting = false;
     let cancelMessageTimer: NodeJS.Timeout | null = null;
 
-    // Setup stdin listener for Ctrl+C detection
+    // Setup stdin listener for Ctrl+C detection and process signal handlers
     let stdinWasRaw = false;
     let rl: readline.Interface | null = null;
+    let keypressHandler:
+      | ((str: string, key: { name?: string; ctrl?: boolean }) => void)
+      | null = null;
 
-    const setupStdinCancellation = () => {
+    const handleStdoutError = (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EPIPE') {
+        // Exit gracefully if the pipe is closed.
+        cleanupCancellation();
+        consolePatcher.cleanup();
+        process.exit(0);
+      }
+      throw err;
+    };
+
+    const triggerAbort = () => {
+      // If already aborting, force exit immediately on repeated signal
+      if (isAborting) {
+        process.exit(130);
+      }
+
+      isAborting = true;
+
+      // Only show message if cancellation takes longer than 200ms
+      // This reduces verbosity for fast cancellations
+      cancelMessageTimer = setTimeout(() => {
+        process.stderr.write('\nCancelling...\n');
+      }, 200);
+
+      abortController.abort();
+    };
+
+    const setupCancellation = () => {
+      process.on('SIGINT', triggerAbort);
+      process.on('SIGTERM', triggerAbort);
+
       // Only setup if stdin is a TTY (user can interact)
-      if (!process.stdin.isTTY) {
+      if (!process.stdin?.isTTY) {
         return;
       }
 
@@ -142,33 +188,24 @@ export async function runNonInteractive({
       readline.emitKeypressEvents(process.stdin, rl);
 
       // Listen for Ctrl+C
-      const keypressHandler = (
+      keypressHandler = (
         str: string,
         key: { name?: string; ctrl?: boolean },
       ) => {
         // Detect Ctrl+C: either ctrl+c key combo or raw character code 3
         if ((key && key.ctrl && key.name === 'c') || str === '\u0003') {
-          // Only handle once
-          if (isAborting) {
-            return;
-          }
-
-          isAborting = true;
-
-          // Only show message if cancellation takes longer than 200ms
-          // This reduces verbosity for fast cancellations
-          cancelMessageTimer = setTimeout(() => {
-            process.stderr.write('\nCancelling...\n');
-          }, 200);
-
-          abortController.abort();
+          triggerAbort();
         }
       };
 
       process.stdin.on('keypress', keypressHandler);
     };
 
-    const cleanupStdinCancellation = () => {
+    const cleanupCancellation = () => {
+      process.off('SIGINT', triggerAbort);
+      process.off('SIGTERM', triggerAbort);
+      process.stdout.off('error', handleStdoutError);
+
       // Clear any pending cancel message timer
       if (cancelMessageTimer) {
         clearTimeout(cancelMessageTimer);
@@ -182,10 +219,13 @@ export async function runNonInteractive({
       }
 
       // Remove keypress listener
-      process.stdin.removeAllListeners('keypress');
+      if (keypressHandler && process.stdin) {
+        process.stdin.off('keypress', keypressHandler);
+        keypressHandler = null;
+      }
 
       // Restore stdin to original state
-      if (process.stdin.isTTY) {
+      if (process.stdin?.isTTY) {
         process.stdin.setRawMode(stdinWasRaw);
         process.stdin.pause();
       }
@@ -207,21 +247,14 @@ export async function runNonInteractive({
         );
       }
 
-      // Setup stdin cancellation listener
-      setupStdinCancellation();
+      // Setup cancellation listeners
+      setupCancellation();
 
       coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
       coreEvents.drainBacklogs();
 
       // Handle EPIPE errors when the output is piped to a command that closes early.
-      process.stdout.on('error', (err: NodeJS.ErrnoException) => {
-        if (err.code === 'EPIPE') {
-          // Exit gracefully if the pipe is closed.
-          cleanupStdinCancellation();
-          consolePatcher.cleanup();
-          process.exit(0);
-        }
-      });
+      process.stdout.on('error', handleStdoutError);
 
       const geminiClient = config.getGeminiClient();
       scheduler = new Scheduler({
@@ -332,14 +365,17 @@ export async function runNonInteractive({
         return text ? text : undefined;
       };
 
-      const emitFinalSuccessResult = (): void => {
+      const emitFinalResult = (errorPayload?: {
+        type: string;
+        message: string;
+      }): void => {
         if (streamFormatter) {
           const metrics = uiTelemetryService.getMetrics();
           const durationMs = Date.now() - startTime;
           streamFormatter.emitEvent({
             type: JsonStreamEventType.RESULT,
             timestamp: new Date().toISOString(),
-            status: 'success',
+            status: errorPayload ? 'error' : 'success',
             stats: streamFormatter.convertToStreamStats(metrics, durationMs),
           });
         } else if (config.getOutputFormat() === OutputFormat.JSON) {
@@ -350,7 +386,7 @@ export async function runNonInteractive({
               config.getSessionId(),
               responseText,
               stats,
-              undefined,
+              errorPayload,
               warnings,
             ),
           );
@@ -365,68 +401,74 @@ export async function runNonInteractive({
           typeof errorMeta?.['errorName'] === 'string'
             ? errorMeta['errorName']
             : undefined;
+        const rawError = errorMeta?.['rawError'];
+        const normalized = normalizeError(
+          rawError ?? {
+            message: event.message,
+            status: errorMeta?.['status'],
+            code: errorMeta?.['code'],
+          },
+        );
+        const code =
+          normalized.code ??
+          (typeof normalized.status === 'string'
+            ? normalized.status
+            : undefined);
 
         let errToThrow: Error;
         switch (name) {
           case 'FatalAuthenticationError':
-            errToThrow = new FatalAuthenticationError(event.message);
+            errToThrow = new FatalAuthenticationError(normalized.message);
             break;
           case 'FatalInputError':
-            errToThrow = new FatalInputError(event.message);
+            errToThrow = new FatalInputError(normalized.message);
             break;
           case 'FatalSandboxError':
-            errToThrow = new FatalSandboxError(event.message);
+            errToThrow = new FatalSandboxError(normalized.message);
             break;
           case 'FatalConfigError':
-            errToThrow = new FatalConfigError(event.message);
+            errToThrow = new FatalConfigError(normalized.message);
             break;
           case 'FatalTurnLimitedError':
-            errToThrow = new FatalTurnLimitedError(event.message);
+            errToThrow = new FatalTurnLimitedError(normalized.message);
             break;
           case 'FatalToolExecutionError':
-            errToThrow = new FatalToolExecutionError(event.message);
+            errToThrow = new FatalToolExecutionError(normalized.message);
             break;
           case 'FatalCancellationError':
-            errToThrow = new FatalCancellationError(event.message);
+            errToThrow = new FatalCancellationError(normalized.message);
             break;
           case 'FatalError':
             errToThrow = new FatalError(
-              event.message,
+              normalized.message,
               typeof errorMeta?.['exitCode'] === 'number'
                 ? errorMeta['exitCode']
                 : 1,
             );
             break;
           default:
-            errToThrow = new Error(event.message);
-            if (name) {
-              Object.defineProperty(errToThrow, 'name', {
-                value: name,
-                enumerable: true,
-              });
-            }
+            errToThrow = Object.assign(
+              new Error(
+                normalized.message,
+                rawError !== undefined ? { cause: rawError } : undefined,
+              ),
+              name ? { name } : {},
+            );
             break;
         }
 
-        if (errorMeta?.['exitCode'] !== undefined) {
-          Object.defineProperty(errToThrow, 'exitCode', {
-            value: errorMeta['exitCode'],
-            enumerable: true,
-          });
-        }
-        if (errorMeta?.['code'] !== undefined) {
-          Object.defineProperty(errToThrow, 'code', {
-            value: errorMeta['code'],
-            enumerable: true,
-          });
-        }
-        if (errorMeta?.['status'] !== undefined) {
-          Object.defineProperty(errToThrow, 'status', {
-            value: errorMeta['status'],
-            enumerable: true,
-          });
-        }
-        return errToThrow;
+        return Object.assign(errToThrow, {
+          ...(errorMeta?.['exitCode'] !== undefined
+            ? { exitCode: errorMeta['exitCode'] }
+            : {}),
+          ...(typeof normalized.status === 'number'
+            ? { status: normalized.status }
+            : {}),
+          ...(code !== undefined ? { code } : {}),
+          ...(normalized.details !== undefined
+            ? { details: normalized.details }
+            : {}),
+        });
       };
 
       // Consume AgentEvents for output formatting
@@ -545,6 +587,52 @@ export async function runNonInteractive({
             break;
           }
           case 'error': {
+            if (event._meta?.['code'] === 'INVALID_STREAM') {
+              const errorTypeVal = event._meta?.['errorType'];
+              const errorType =
+                typeof errorTypeVal === 'string' ? errorTypeVal : undefined;
+
+              let errorMessage = event.message;
+              if (errorType === 'NO_RESPONSE_TEXT') {
+                errorMessage = TRUE_EMPTY_RESPONSE_MESSAGE;
+              } else if (errorType === 'THINKING_ONLY_RESPONSE') {
+                errorMessage = THINKING_ONLY_COMPRESS_SUGGESTION;
+              } else if (errorType === 'MAX_TOKENS_EXCEEDED') {
+                errorMessage = MAX_TOKENS_EXCEEDED_SUGGESTION;
+              } else if (errorType === 'SAFETY_BLOCKED') {
+                errorMessage = SAFETY_BLOCKED_MESSAGE;
+              } else if (errorType === 'RECITATION_BLOCKED') {
+                errorMessage = RECITATION_BLOCKED_MESSAGE;
+              } else if (errorType === 'OTHER_BLOCKED') {
+                errorMessage = OTHER_BLOCKED_MESSAGE;
+              }
+
+              if (streamFormatter) {
+                streamFormatter.emitEvent({
+                  type: JsonStreamEventType.ERROR,
+                  timestamp: new Date().toISOString(),
+                  severity: 'error',
+                  message: errorMessage,
+                });
+              } else if (config.getOutputFormat() === OutputFormat.TEXT) {
+                process.stderr.write(`[ERROR] ${errorMessage}\n`);
+              }
+
+              // Log semantic error telemetry without double-counting requests
+              uiTelemetryService.recordSemanticValidationError(
+                geminiClient.getCurrentSequenceModel() ?? config.getModel(),
+                errorType || 'INVALID_STREAM',
+              );
+
+              // If it's a fatal stream error, we should terminate and output final results
+              emitFinalResult({
+                type: 'INVALID_STREAM',
+                message: errorMessage,
+              });
+              streamEnded = true;
+              break;
+            }
+
             if (event.fatal) {
               throw reconstructFatalError(event);
             }
@@ -613,7 +701,7 @@ export async function runNonInteractive({
               process.stderr.write(`Agent execution stopped: ${stopMessage}\n`);
             }
 
-            emitFinalSuccessResult();
+            emitFinalResult();
             streamEnded = true;
             break;
           }
@@ -636,13 +724,22 @@ export async function runNonInteractive({
     } catch (error) {
       errorToHandle = error;
     } finally {
-      // Cleanup stdin cancellation before other cleanup
-      cleanupStdinCancellation();
+      // Cleanup cancellation listeners before other cleanup
+      cleanupCancellation();
       abortController.signal.removeEventListener('abort', abortSession);
 
       scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
+
+      await runExitCleanup();
+    }
+
+    if (
+      abortController.signal.aborted ||
+      isFatalCancellationError(errorToHandle)
+    ) {
+      handleCancellationError(config);
     }
 
     if (errorToHandle) {

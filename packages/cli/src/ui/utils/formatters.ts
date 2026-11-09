@@ -23,6 +23,8 @@ export const formatBytes = (bytes: number): string => {
 /**
  * Formats a duration in milliseconds into a concise, human-readable string (e.g., "1h 5s").
  * It omits any time units that are zero.
+ * The duration is rounded to the precision of the unit it is displayed in
+ * (whole milliseconds, tenths of a second, or whole seconds).
  * @param milliseconds The duration in milliseconds.
  * @returns A formatted string representing the duration.
  */
@@ -31,15 +33,21 @@ export const formatDuration = (milliseconds: number): string => {
     return '0s';
   }
 
-  if (milliseconds < 1000) {
-    return `${Math.round(milliseconds)}ms`;
+  // Select each unit based on the value *after* rounding it to that unit's
+  // display precision. Comparing the raw value instead would let durations just
+  // below a unit boundary round up into the next unit's range (e.g. 999.5ms
+  // would render as "1000ms" and 59950ms as "60.0s").
+  const roundedMs = Math.round(milliseconds);
+  if (roundedMs < 1000) {
+    return `${roundedMs}ms`;
   }
 
-  const totalSeconds = milliseconds / 1000;
-
-  if (totalSeconds < 60) {
-    return `${totalSeconds.toFixed(1)}s`;
+  // 59950ms is the smallest duration that rounds to 60.0s at one decimal place.
+  if (milliseconds < 59950) {
+    return `${(milliseconds / 1000).toFixed(1)}s`;
   }
+
+  const totalSeconds = Math.round(milliseconds / 1000);
 
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);

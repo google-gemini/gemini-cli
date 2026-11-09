@@ -55,12 +55,14 @@ describe('CliHelpAgent', () => {
     expect(query).toContain('${question}');
   });
 
-  it('should process output to a formatted JSON string', () => {
+  it('should process output to a formatted markdown string', () => {
     const mockOutput = {
-      answer: 'This is the answer.',
-      sources: ['file1.md', 'file2.md'],
+      answer: '  This is the answer.  ',
+      sources: ['file1.md', 'file2.md', 'file1.md', '   ', ''],
     };
     const processed = localAgent.processOutput?.(mockOutput);
-    expect(processed).toBe(JSON.stringify(mockOutput, null, 2));
+    expect(processed).toBe(
+      'This is the answer.\n\n**Sources:**\n- file1.md\n- file2.md',
+    );
   });
 });

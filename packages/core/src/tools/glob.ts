@@ -18,7 +18,12 @@ import {
   type ToolConfirmationOutcome,
   type ExecuteOptions,
 } from './tools.js';
-import { shortenPath, makeRelative } from '../utils/paths.js';
+import {
+  shortenPath,
+  makeRelative,
+  resolveToRealPath,
+  toPathKey,
+} from '../utils/paths.js';
 import { type Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
@@ -138,10 +143,22 @@ class GlobToolInvocation extends BaseToolInvocation<
       // If a specific path is provided, resolve it and check if it's within workspace
       let searchDirectories: readonly string[];
       if (this.params.dir_path) {
-        const searchDirAbsolute = path.resolve(
-          this.config.getTargetDir(),
-          this.params.dir_path,
-        );
+        let searchDirAbsolute: string;
+        try {
+          searchDirAbsolute = resolveToRealPath(
+            path.resolve(this.config.getTargetDir(), this.params.dir_path),
+          );
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          return {
+            llmContent: errMsg,
+            returnDisplay: 'Path resolution failed.',
+            error: {
+              message: errMsg,
+              type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+            },
+          };
+        }
         const validationError = this.config.validatePathAccess(
           searchDirAbsolute,
           'read',
@@ -189,9 +206,24 @@ class GlobToolInvocation extends BaseToolInvocation<
         allEntries.push(...entries);
       }
 
-      const relativePaths = allEntries.map((p) =>
-        path.relative(this.config.getTargetDir(), p.fullpath()),
-      );
+      let realTargetDir = this.config.getTargetDir();
+      try {
+        realTargetDir = resolveToRealPath(realTargetDir);
+      } catch {
+        // Ignore and use raw targetDir
+      }
+
+      const resolvedPathMap = new Map<GlobPath, string>();
+      const relativePaths = allEntries.map((p) => {
+        let realFullPath = p.fullpath();
+        try {
+          realFullPath = resolveToRealPath(realFullPath);
+        } catch {
+          // Ignore and use raw fullpath
+        }
+        resolvedPathMap.set(p, realFullPath);
+        return path.relative(realTargetDir, realFullPath);
+      });
 
       const { filteredPaths, ignoredCount } =
         fileDiscovery.filterFilesWithReport(relativePaths, {
@@ -206,12 +238,25 @@ class GlobToolInvocation extends BaseToolInvocation<
         });
 
       const filteredAbsolutePaths = new Set(
-        filteredPaths.map((p) => path.resolve(this.config.getTargetDir(), p)),
+        filteredPaths
+          .map((p) => path.resolve(realTargetDir, p))
+          .filter((p) => !this.config.validatePathAccess(p, 'read'))
+          .map((p) => toPathKey(p)),
       );
 
-      const filteredEntries = allEntries.filter((entry) =>
-        filteredAbsolutePaths.has(entry.fullpath()),
-      );
+      const seenCanonicalPaths = new Set<string>();
+      const filteredEntries = allEntries.filter((entry) => {
+        const canonicalPath = resolvedPathMap.get(entry) ?? entry.fullpath();
+        const pathKey = toPathKey(canonicalPath);
+        if (
+          !filteredAbsolutePaths.has(pathKey) ||
+          seenCanonicalPaths.has(pathKey)
+        ) {
+          return false;
+        }
+        seenCanonicalPaths.add(pathKey);
+        return true;
+      });
 
       if (!filteredEntries || filteredEntries.length === 0) {
         let message = `No files found matching pattern "${this.params.pattern}"`;
@@ -240,8 +285,8 @@ class GlobToolInvocation extends BaseToolInvocation<
         oneDayInMs,
       );
 
-      const sortedAbsolutePaths = sortedEntries.map((entry) =>
-        entry.fullpath(),
+      const sortedAbsolutePaths = sortedEntries.map(
+        (entry) => resolvedPathMap.get(entry) ?? entry.fullpath(),
       );
       const fileListDescription = sortedAbsolutePaths.join('\n');
       const fileCount = sortedAbsolutePaths.length;
@@ -304,10 +349,14 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
   protected override validateToolParamValues(
     params: GlobToolParams,
   ): string | null {
-    const searchDirAbsolute = path.resolve(
-      this.config.getTargetDir(),
-      params.dir_path || '.',
-    );
+    let searchDirAbsolute: string;
+    try {
+      searchDirAbsolute = resolveToRealPath(
+        path.resolve(this.config.getTargetDir(), params.dir_path || '.'),
+      );
+    } catch (err) {
+      return err instanceof Error ? err.message : String(err);
+    }
 
     const validationError = this.config.validatePathAccess(
       searchDirAbsolute,

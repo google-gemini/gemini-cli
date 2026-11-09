@@ -8,6 +8,7 @@ import type { Content } from '@google/genai';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import { promptIdContext } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
+import { wrapUntrusted } from './textUtils.js';
 import { LRUCache } from 'mnemonist';
 import { LlmRole } from '../telemetry/types.js';
 
@@ -40,6 +41,11 @@ export async function ensureCorrectFileContent(
     return cachedResult;
   }
 
+  if (disableLLMCorrection && !aggressiveUnescape) {
+    fileContentCorrectionCache.set(content, content);
+    return content;
+  }
+
   const unescapedContent = unescapeStringForGeminiBug(content);
   if (unescapedContent === content) {
     fileContentCorrectionCache.set(content, content);
@@ -47,12 +53,8 @@ export async function ensureCorrectFileContent(
   }
 
   if (disableLLMCorrection) {
-    if (aggressiveUnescape) {
-      fileContentCorrectionCache.set(content, unescapedContent);
-      return unescapedContent;
-    }
-    fileContentCorrectionCache.set(content, content);
-    return content;
+    fileContentCorrectionCache.set(content, unescapedContent);
+    return unescapedContent;
   }
 
   const correctedContent = await correctStringEscaping(
@@ -82,17 +84,16 @@ export async function correctStringEscaping(
   abortSignal: AbortSignal,
 ): Promise<string> {
   const prompt = `
-Context: An LLM has just generated potentially_problematic_string and the text might have been improperly escaped (e.g. too many backslashes for newlines like \\n instead of \n, or unnecessarily quotes like \\"Hello\\" instead of "Hello").
+Context: An LLM has just generated potentially_problematic_string and the text might have been improperly escaped (e.g. too many backslashes for newlines like \\\\n instead of \\n, or unnecessarily escaped quotes like \\"Hello\\" instead of "Hello").
 
 potentially_problematic_string (this text MIGHT have bad escaping, or might be entirely correct):
-\`\`\`
-${potentiallyProblematicString}
-\`\`\`
+${wrapUntrusted(potentiallyProblematicString)}
 
-Task: Analyze the potentially_problematic_string. If it's syntactically invalid due to incorrect escaping (e.g., "\n", "\t", "\\", "\\'", "\\""), correct the invalid syntax. The goal is to ensure the text will be a valid and correctly interpreted.
+Task: Analyze the potentially_problematic_string. If it's syntactically invalid due to incorrect over-escaping (e.g., "\\\\n", "\\\\t", "\\\\", "\\\\'", "\\""), correct the invalid syntax while preserving valid escape sequences inside string literals or regular expressions (such as "\\n", "\\t", "\\r", "\\\\"). The goal is to ensure the text will be valid and correctly interpreted.
 
-For example, if potentially_problematic_string is "bar\\nbaz", the corrected_new_string_escaping should be "bar\nbaz".
+For example, if potentially_problematic_string is "bar\\\\nbaz", the corrected_string_escaping should be "bar\\nbaz".
 If potentially_problematic_string is console.log(\\"Hello World\\"), it should be console.log("Hello World").
+Do NOT replace valid escape sequences like "\\n" inside string literals with actual newline characters.
 
 Return ONLY the corrected string in the specified JSON format with the key 'corrected_string_escaping'. If no escaping correction is needed, return the original potentially_problematic_string.
   `.trim();

@@ -392,6 +392,12 @@ export class Theme {
  * @returns A new Theme instance.
  */
 export function createCustomTheme(customTheme: CustomTheme): Theme {
+  const focusColor =
+    customTheme.ui?.focus ??
+    customTheme.status?.success ??
+    customTheme.AccentGreen ??
+    '#3CA84B'; // Fallback to a default green if not found
+
   const colors: ColorsTheme = {
     type: 'custom',
     Background: customTheme.background?.primary ?? customTheme.Background ?? '',
@@ -428,10 +434,10 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
     ),
     FocusBackground: interpolateColor(
       customTheme.background?.primary ?? customTheme.Background ?? '',
-      customTheme.status?.success ?? customTheme.AccentGreen ?? '#3CA84B', // Fallback to a default green if not found
+      focusColor,
       DEFAULT_SELECTION_OPACITY,
     ),
-    FocusColor: customTheme.ui?.focus ?? customTheme.AccentGreen,
+    FocusColor: focusColor,
     GradientColors: customTheme.ui?.gradient ?? customTheme.GradientColors,
   };
 

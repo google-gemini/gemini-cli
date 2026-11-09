@@ -46,7 +46,7 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/paths.js')>();
   return {
     ...actual,
-    resolveToRealPath: vi.fn((p) => p),
+    resolveToRealPath: vi.fn((p) => actual.resolveToRealPath(p)),
     normalizePath: vi.fn((p) =>
       typeof p === 'string' ? p.replace(/\\/g, '/') : p,
     ),
@@ -1351,7 +1351,9 @@ describe('RipGrepTool', () => {
     });
 
     it('should add .geminiignore when enabled and patterns exist', async () => {
-      const geminiIgnorePath = path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME);
+      const geminiIgnorePath = resolveToRealPath(
+        path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
+      );
       await fs.writeFile(geminiIgnorePath, 'ignored.log');
 
       const configWithGeminiIgnore = createMockConfig(tempRootDir);
@@ -1395,7 +1397,9 @@ describe('RipGrepTool', () => {
     });
 
     it('should skip .geminiignore when disabled', async () => {
-      const geminiIgnorePath = path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME);
+      const geminiIgnorePath = resolveToRealPath(
+        path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
+      );
       await fs.writeFile(geminiIgnorePath, 'ignored.log');
       const configWithoutGeminiIgnore = createMockConfig(tempRootDir);
       vi.spyOn(
@@ -1949,6 +1953,43 @@ describe('resolveRipgrepPath', () => {
       it('should reject system PATH if it is untrusted on Windows', async () => {
         vi.mocked(fileExists).mockResolvedValue(false);
         const unsafePath = 'D:\\Downloads\\rg.exe';
+        vi.mocked(resolveExecutable).mockReturnValue(unsafePath);
+        vi.mocked(resolveToRealPath).mockReturnValue(unsafePath);
+
+        const resolvedPath = await resolveRipgrepPath();
+        expect(resolvedPath).toBeNull();
+      });
+    });
+
+    describe('on Android', () => {
+      beforeEach(() => {
+        vi.spyOn(os, 'platform').mockReturnValue('android');
+        vi.spyOn(os, 'arch').mockReturnValue('arm64');
+        vi.stubGlobal(
+          'process',
+          Object.create(process, {
+            platform: {
+              get: () => 'android',
+            },
+          }),
+        );
+        vi.stubEnv('PREFIX', '/data/data/com.termux/files/usr');
+      });
+
+      it('should fall back to system PATH if system is trusted on Android', async () => {
+        const termuxRg = '/data/data/com.termux/files/usr/bin/rg';
+        vi.mocked(fileExists).mockResolvedValue(false);
+        vi.mocked(resolveExecutable).mockReturnValue(termuxRg);
+        vi.mocked(resolveToRealPath).mockReturnValue(termuxRg);
+
+        const resolvedPath = await resolveRipgrepPath();
+        expect(resolvedPath).toBe(termuxRg);
+        expect(resolveExecutable).toHaveBeenCalledWith('rg');
+      });
+
+      it('should reject system PATH if it is untrusted on Android', async () => {
+        vi.mocked(fileExists).mockResolvedValue(false);
+        const unsafePath = '/sdcard/Download/rg';
         vi.mocked(resolveExecutable).mockReturnValue(unsafePath);
         vi.mocked(resolveToRealPath).mockReturnValue(unsafePath);
 

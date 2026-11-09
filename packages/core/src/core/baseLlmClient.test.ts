@@ -155,12 +155,13 @@ describe('BaseLlmClient', () => {
 
       expect(result).toEqual({ color: 'blue' });
 
-      // Ensure the retry mechanism was engaged with shouldRetryOnContent
+      // Ensure the retry mechanism was engaged with shouldRetryOnContent and signal
       expect(retryWithBackoff).toHaveBeenCalledTimes(1);
       expect(retryWithBackoff).toHaveBeenCalledWith(
         expect.any(Function),
         expect.objectContaining({
           shouldRetryOnContent: expect.any(Function),
+          signal: defaultOptions.abortSignal,
         }),
       );
 
@@ -549,12 +550,13 @@ describe('BaseLlmClient', () => {
 
       expect(result).toBe(mockResponse);
 
-      // Ensure the retry mechanism was engaged
+      // Ensure the retry mechanism was engaged with signal
       expect(retryWithBackoff).toHaveBeenCalledTimes(1);
       expect(retryWithBackoff).toHaveBeenCalledWith(
         expect.any(Function),
         expect.objectContaining({
           shouldRetryOnContent: expect.any(Function),
+          signal: options.abortSignal,
         }),
       );
 
@@ -872,6 +874,56 @@ describe('BaseLlmClient', () => {
       ).toHaveBeenCalledWith({ model: fallbackModel });
       expect(secondCall?.model).toBe(fallbackModel);
       expect(secondCall?.config?.temperature).toBe(0.9);
+    });
+
+    it('should re-select fallback model mid-retry when retry_once marks model unavailable without changing activeModel', async () => {
+      const firstModel = 'gemini-pro';
+      const fallbackModel = 'gemini-flash';
+
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockImplementation((key) => {
+        if (key.model === fallbackModel) {
+          return makeResolvedModelConfig(fallbackModel, { temperature: 0.7 });
+        }
+        return makeResolvedModelConfig(firstModel, { temperature: 0.1 });
+      });
+
+      vi.mocked(mockAvailabilityService.selectFirstAvailable)
+        .mockReturnValueOnce({ selectedModel: firstModel, skipped: [] })
+        .mockReturnValueOnce({ selectedModel: fallbackModel, skipped: [] });
+      vi.mocked(mockAvailabilityService.snapshot).mockImplementation(
+        (model) => ({
+          available: model !== firstModel,
+        }),
+      );
+
+      mockConfig.getActiveModel.mockReturnValue(firstModel);
+      mockGenerateContent
+        .mockResolvedValueOnce(createMockResponse(''))
+        .mockResolvedValueOnce(createMockResponse('fallback-response'));
+
+      vi.mocked(retryWithBackoff).mockImplementation(async (fn, options) => {
+        const first = (await fn()) as GenerateContentResponse;
+        if (options?.shouldRetryOnContent?.(first)) {
+          return (await fn()) as GenerateContentResponse;
+        }
+        return first;
+      });
+
+      await client.generateContent({
+        ...contentOptions,
+        modelConfigKey: { model: firstModel },
+        maxAttempts: 2,
+        role: LlmRole.UTILITY_TOOL,
+      });
+
+      expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+      expect(mockGenerateContent.mock.calls[0]?.[0]?.model).toBe(firstModel);
+      expect(mockGenerateContent.mock.calls[1]?.[0]?.model).toBe(fallbackModel);
+      expect(mockGenerateContent.mock.calls[1]?.[0]?.config?.temperature).toBe(
+        0.7,
+      );
     });
   });
 });

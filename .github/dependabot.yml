@@ -8,6 +8,10 @@ updates:
     open-pull-requests-limit: 10
     reviewers:
       - 'joshualitt'
+    cooldown:
+      semver-major-days: 14
+      semver-minor-days: 14
+      semver-patch-days: 14
     groups:
       npm-dependencies:
         patterns:
@@ -24,6 +28,10 @@ updates:
     open-pull-requests-limit: 10
     reviewers:
       - 'joshualitt'
+    cooldown:
+      semver-major-days: 14
+      semver-minor-days: 14
+      semver-patch-days: 14
     groups:
       actions-dependencies:
         patterns:

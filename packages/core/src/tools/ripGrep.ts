@@ -185,7 +185,22 @@ class GrepToolInvocation extends BaseToolInvocation<
       // This forces CWD search instead of 'all workspaces' search by default.
       const pathParam = this.params.dir_path || '.';
 
-      const searchDirAbs = path.resolve(this.config.getTargetDir(), pathParam);
+      let searchDirAbs: string;
+      try {
+        searchDirAbs = resolveToRealPath(
+          path.resolve(this.config.getTargetDir(), pathParam),
+        );
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        return {
+          llmContent: errMsg,
+          returnDisplay: 'Error: Path resolution failed.',
+          error: {
+            message: errMsg,
+            type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+          },
+        };
+      }
       const validationError = this.config.validatePathAccess(
         searchDirAbs,
         'read',
@@ -624,8 +639,14 @@ export class RipGrepTool extends BaseDeclarativeTool<
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
+    let targetDir = config.getTargetDir();
+    try {
+      targetDir = resolveToRealPath(targetDir);
+    } catch {
+      // Ignore and use raw targetDir
+    }
     this.fileDiscoveryService = new FileDiscoveryService(
-      config.getTargetDir(),
+      targetDir,
       config.getFileFilteringOptions(),
     );
   }
@@ -670,10 +691,14 @@ export class RipGrepTool extends BaseDeclarativeTool<
 
     // Only validate path if one is provided
     if (params.dir_path) {
-      const resolvedPath = path.resolve(
-        this.config.getTargetDir(),
-        params.dir_path,
-      );
+      let resolvedPath: string;
+      try {
+        resolvedPath = resolveToRealPath(
+          path.resolve(this.config.getTargetDir(), params.dir_path),
+        );
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
       const validationError = this.config.validatePathAccess(
         resolvedPath,
         'read',
