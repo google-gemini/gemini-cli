@@ -22,6 +22,6 @@ jobs:
 
       - name: 'Link Checker'
         id: 'lychee'
-        uses: 'lycheeverse/lychee-action@885c65f3dc543b57c898c8099f4e08c8afd178a2' # ratchet: lycheeverse/lychee-action@v2.6.1
+        uses: 'lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8' # ratchet: lycheeverse/lychee-action@v2.9.0
         with:
           args: '--verbose --no-progress --accept 200,503 ./**/*.md'
