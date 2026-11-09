@@ -375,6 +375,70 @@ describe('WebFetchTool', () => {
   });
 
   describe('execute', () => {
+    it('does not start fallback when the primary request is cancelled', async () => {
+      vi.spyOn(fetchUtils, 'isPrivateIp').mockResolvedValue(false);
+      const controller = new AbortController();
+      mockGenerateContent.mockImplementationOnce(async () => {
+        controller.abort();
+        throw new Error('primary request cancelled');
+      });
+
+      const invocation = new WebFetchTool(mockConfig, bus).build({
+        prompt: 'fetch https://cancel-primary.example.com',
+      });
+
+      await expect(
+        invocation.execute({ abortSignal: controller.signal }),
+      ).rejects.toMatchObject({ name: 'AbortError' });
+      expect(fetchUtils.fetchWithTimeout).not.toHaveBeenCalled();
+      expect(logWebFetchFallbackAttempt).not.toHaveBeenCalled();
+    });
+
+    it('stops fallback URL processing when cancellation happens during fetch', async () => {
+      vi.spyOn(fetchUtils, 'isPrivateIp').mockResolvedValue(false);
+      const controller = new AbortController();
+      mockGenerateContent.mockRejectedValueOnce(new Error('primary failed'));
+      vi.mocked(fetchUtils.fetchWithTimeout).mockImplementationOnce(
+        async () => {
+          controller.abort();
+          throw new Error('fallback request cancelled');
+        },
+      );
+
+      const invocation = new WebFetchTool(mockConfig, bus).build({
+        prompt:
+          'fetch https://cancel-one.example.com https://cancel-two.example.com',
+      });
+
+      await expect(
+        invocation.execute({ abortSignal: controller.signal }),
+      ).rejects.toMatchObject({ name: 'AbortError' });
+      expect(fetchUtils.fetchWithTimeout).toHaveBeenCalledTimes(1);
+      expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves normal fallback when the request is not cancelled', async () => {
+      vi.spyOn(fetchUtils, 'isPrivateIp').mockResolvedValue(false);
+      mockGenerateContent
+        .mockRejectedValueOnce(new Error('primary unavailable'))
+        .mockResolvedValueOnce({
+          candidates: [
+            { content: { parts: [{ text: 'fallback succeeded' }] } },
+          ],
+        });
+      mockFetch('https://fallback-success.example.com/', {
+        text: () => Promise.resolve('page content'),
+      });
+
+      const invocation = new WebFetchTool(mockConfig, bus).build({
+        prompt: 'fetch https://fallback-success.example.com',
+      });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.llmContent).toContain('fallback succeeded');
+    });
+
     it('should return WEB_FETCH_PROCESSING_ERROR on rate limit exceeded', async () => {
       vi.spyOn(fetchUtils, 'isPrivateIp').mockResolvedValue(false);
       mockGenerateContent.mockResolvedValue({
