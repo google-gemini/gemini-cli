@@ -143,6 +143,21 @@ function computeContentDigest(value: PartListUnion | null | undefined): string {
     const len = str.length;
     mix(len);
     totalLen += len;
+    if (len >= 4096) {
+      const buf = Buffer.from(str);
+      const wordEnd = buf.length - (buf.length % 4);
+      for (let i = 0; i < wordEnd; i += 4) {
+        const word = buf.readUInt32LE(i);
+        h1 = Math.imul(h1 ^ word, 2654435761);
+        h2 = Math.imul(h2 ^ word, 1597334677);
+      }
+      for (let i = wordEnd; i < buf.length; i++) {
+        const byte = buf[i];
+        h1 = Math.imul(h1 ^ byte, 2654435761);
+        h2 = Math.imul(h2 ^ byte, 1597334677);
+      }
+      return;
+    }
     for (let i = 0; i < len; i++) {
       const ch = str.charCodeAt(i);
       h1 = Math.imul(h1 ^ ch, 2654435761);
@@ -684,6 +699,7 @@ export class ChatRecordingService {
   private hasEvictedMessages = false;
   private fullConversationCache: WeakRef<ConversationRecord> | null = null;
   private isCacheDirty = true;
+  private ensuredConversationDir: string | null = null;
 
   constructor(context: AgentLoopContext) {
     this.context = context;
@@ -797,6 +813,7 @@ export class ChatRecordingService {
         }
 
         fs.mkdirSync(chatsDir, { recursive: true });
+        this.ensuredConversationDir = chatsDir;
 
         const timestamp = new Date()
           .toISOString()
@@ -945,8 +962,22 @@ export class ChatRecordingService {
     this.fullConversationCache = null;
     try {
       const line = JSON.stringify(record) + '\n';
-      fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
-      fs.appendFileSync(this.conversationFile, line);
+      const dir = path.dirname(this.conversationFile);
+      if (this.ensuredConversationDir !== dir) {
+        fs.mkdirSync(dir, { recursive: true });
+        this.ensuredConversationDir = dir;
+      }
+      try {
+        fs.appendFileSync(this.conversationFile, line);
+      } catch (writeError) {
+        if (isNodeError(writeError) && writeError.code === 'ENOENT') {
+          fs.mkdirSync(dir, { recursive: true });
+          this.ensuredConversationDir = dir;
+          fs.appendFileSync(this.conversationFile, line);
+        } else {
+          throw writeError;
+        }
+      }
     } catch (error) {
       if (isNodeError(error) && error.code === 'ENOSPC') {
         this.conversationFile = null;
@@ -1269,7 +1300,35 @@ export class ChatRecordingService {
     if (loaded) {
       const fullRecord: ConversationRecord = {
         ...this.cachedConversation,
-        messages: loaded.messages,
+        messages: loaded.messages ?? [],
+      };
+      this.fullConversationCache = new WeakRef(fullRecord);
+      this.isCacheDirty = false;
+      return fullRecord;
+    }
+    return this.cachedConversation;
+  }
+
+  /**
+   * Asynchronously retrieves the full conversation record without blocking the
+   * event loop when messages have been evicted from the in-memory window.
+   */
+  async getConversationAsync(): Promise<ConversationRecord | null> {
+    if (!this.conversationFile || !this.cachedConversation) return null;
+    if (!this.hasEvictedMessages) {
+      return this.cachedConversation;
+    }
+    const cachedFull = !this.isCacheDirty
+      ? this.fullConversationCache?.deref()
+      : undefined;
+    if (cachedFull) {
+      return cachedFull;
+    }
+    const loaded = await loadConversationRecord(this.conversationFile);
+    if (loaded) {
+      const fullRecord: ConversationRecord = {
+        ...this.cachedConversation,
+        messages: loaded.messages ?? [],
       };
       this.fullConversationCache = new WeakRef(fullRecord);
       this.isCacheDirty = false;
@@ -1400,6 +1459,53 @@ export class ChatRecordingService {
       const fullConversation = loadConversationRecordSync(
         this.conversationFile,
       );
+      const allMessages =
+        fullConversation?.messages ?? this.cachedConversation.messages;
+      const messageIndex = allMessages.findIndex((m) => m.id === messageId);
+      rewoundMessages =
+        messageIndex !== -1 ? allMessages.slice(0, messageIndex) : [];
+    }
+
+    this.appendRecord({ $rewindTo: messageId });
+    this.rebuildIndexAndWindow(rewoundMessages);
+
+    if (!this.hasEvictedMessages) {
+      return this.cachedConversation;
+    }
+    return {
+      ...this.cachedConversation,
+      messages: rewoundMessages,
+    };
+  }
+
+  /**
+   * Asynchronously rewinds the conversation to the state right BEFORE the
+   * specified message ID without blocking the event loop on large session files.
+   */
+  async rewindToAsync(messageId: string): Promise<ConversationRecord | null> {
+    if (!this.conversationFile || !this.cachedConversation) return null;
+
+    const orderIndex = this.messageOrder.indexOf(messageId);
+    if (orderIndex === -1) {
+      debugLogger.error(
+        'Message to rewind to not found in conversation history',
+      );
+      return this.getConversationAsync();
+    }
+
+    let rewoundMessages: MessageRecord[];
+    if (!this.hasEvictedMessages) {
+      const messageIndex = this.cachedConversation.messages.findIndex(
+        (m) => m.id === messageId,
+      );
+      rewoundMessages =
+        messageIndex !== -1
+          ? this.cachedConversation.messages.slice(0, messageIndex)
+          : [];
+    } else if (orderIndex === 0) {
+      rewoundMessages = [];
+    } else {
+      const fullConversation = await this.getConversationAsync();
       const allMessages =
         fullConversation?.messages ?? this.cachedConversation.messages;
       const messageIndex = allMessages.findIndex((m) => m.id === messageId);
@@ -1588,20 +1694,31 @@ export class ChatRecordingService {
         anyChange = true;
       }
 
+      const targetWindowIds = historyIds.slice(-MAX_HISTORY_MESSAGES);
+      const cachedById = new Map(
+        this.cachedConversation.messages.map((m) => [m.id, m]),
+      );
+      const missingFromWindow = targetWindowIds.some(
+        (id) => !cachedById.has(id),
+      );
+
       let reloadedFromDisk = false;
       if (
         this.hasEvictedMessages &&
         this.conversationFile &&
-        (removedIds.length > 0 || orderChanged)
+        (removedIds.length > 0 || orderChanged) &&
+        missingFromWindow
       ) {
-        const fullConversation = loadConversationRecordSync(
-          this.conversationFile,
-        );
+        const cachedFull = !this.isCacheDirty
+          ? this.fullConversationCache?.deref()
+          : undefined;
+        const fullConversation =
+          cachedFull ?? loadConversationRecordSync(this.conversationFile);
         if (fullConversation) {
           const msgMap = new Map(
-            fullConversation.messages.map((m) => [m.id, m]),
+            (fullConversation.messages ?? []).map((m) => [m.id, m]),
           );
-          this.cachedConversation.messages = historyIds
+          this.cachedConversation.messages = targetWindowIds
             .map((id) => msgMap.get(id))
             .filter((m): m is MessageRecord => m !== undefined);
           reloadedFromDisk = true;
@@ -1609,18 +1726,8 @@ export class ChatRecordingService {
       }
 
       if (!reloadedFromDisk) {
-        if (removedIds.length > 0) {
-          const removedSet = new Set(removedIds);
-          this.cachedConversation.messages =
-            this.cachedConversation.messages.filter(
-              (m) => !removedSet.has(m.id),
-            );
-        }
-        if (orderChanged) {
-          const cachedById = new Map(
-            this.cachedConversation.messages.map((m) => [m.id, m]),
-          );
-          this.cachedConversation.messages = historyIds
+        if (removedIds.length > 0 || orderChanged) {
+          this.cachedConversation.messages = targetWindowIds
             .map((id) => cachedById.get(id))
             .filter((m): m is MessageRecord => m !== undefined);
         }

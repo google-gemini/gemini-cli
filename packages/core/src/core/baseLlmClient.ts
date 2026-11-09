@@ -381,6 +381,7 @@ export class BaseLlmClient {
         authType:
           this.authType ?? this.config.getContentGeneratorConfig()?.authType,
         retryFetchErrors: this.config.getRetryFetchErrors(),
+        signal: abortSignal,
         onRetry: (attempt, error, delayMs) => {
           const actualMaxAttempts =
             getAvailabilityContext()?.policy.maxAttempts ??
@@ -396,6 +397,7 @@ export class BaseLlmClient {
             error: errorType,
             model: modelName,
             status: getErrorStatus(error),
+            sessionId: this.config.getSessionId?.(),
           });
 
           logNetworkRetryAttempt(

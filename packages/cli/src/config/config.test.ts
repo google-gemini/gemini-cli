@@ -884,28 +884,18 @@ describe('loadCliConfig', () => {
   });
 
   describe('Proxy configuration', () => {
-    const originalProxyEnv: { [key: string]: string | undefined } = {};
     const proxyEnvVars = [
       'HTTP_PROXY',
       'HTTPS_PROXY',
+      'ALL_PROXY',
       'http_proxy',
       'https_proxy',
+      'all_proxy',
     ];
 
     beforeEach(() => {
       for (const key of proxyEnvVars) {
-        originalProxyEnv[key] = process.env[key];
-        delete process.env[key];
-      }
-    });
-
-    afterEach(() => {
-      for (const key of proxyEnvVars) {
-        if (originalProxyEnv[key]) {
-          process.env[key] = originalProxyEnv[key];
-        } else {
-          delete process.env[key];
-        }
+        vi.stubEnv(key, '');
       }
     });
 
@@ -943,6 +933,20 @@ describe('loadCliConfig', () => {
       {
         input: {
           env_name: 'HTTP_PROXY',
+          proxy_url,
+        },
+        expected: proxy_url,
+      },
+      {
+        input: {
+          env_name: 'ALL_PROXY',
+          proxy_url,
+        },
+        expected: proxy_url,
+      },
+      {
+        input: {
+          env_name: 'all_proxy',
           proxy_url,
         },
         expected: proxy_url,
@@ -2098,6 +2102,33 @@ describe('loadCliConfig compressionThreshold', () => {
     const settings = createTestMergedSettings();
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(await config.getCompressionThreshold()).toBe(0.5);
+  });
+});
+
+describe('loadCliConfig requestTimeoutMs', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.stubEnv('GEMINI_API_HEADERS_TIMEOUT_MS', '');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should pass model.requestTimeoutMs from settings to the core config', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      model: {
+        requestTimeoutMs: 180000,
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getRequestTimeoutMs()).toBe(180000);
   });
 });
 

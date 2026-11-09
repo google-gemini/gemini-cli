@@ -128,18 +128,22 @@ function buildObjectShapeFromProperties(
  */
 function buildPrimitiveSchema(
   type: 'string' | 'number' | 'boolean',
+  minimum?: number,
 ): z.ZodTypeAny {
   switch (type) {
     case 'string':
       return z.string();
-    case 'number':
+    case 'number': {
+      const numberSchema =
+        minimum !== undefined ? z.number().min(minimum) : z.number();
       return z.preprocess((val) => {
         if (typeof val === 'string' && val.trim() !== '') {
           const num = Number(val);
           if (!isNaN(num)) return num;
         }
         return val;
-      }, z.number());
+      }, numberSchema);
+    }
     case 'boolean':
       return z.preprocess((val) => {
         if (typeof val === 'string') {
@@ -188,7 +192,7 @@ function buildZodSchemaFromDefinition(
     case 'string':
     case 'number':
     case 'boolean':
-      baseSchema = buildPrimitiveSchema(definition.type);
+      baseSchema = buildPrimitiveSchema(definition.type, definition.minimum);
       break;
 
     case 'enum': {

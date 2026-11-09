@@ -759,6 +759,32 @@ describe('Gemini Client (client.ts)', () => {
         },
       );
     });
+
+    it('prefers non-blocking getConversationAsync over synchronous getConversation during compression', async () => {
+      const { client, mockOriginalChat } = setup({
+        compressionStatus: CompressionStatus.COMPRESSED,
+      });
+
+      const mockConversation = { sessionId: 'async-session', messages: [] };
+      const mockFilePath = '/tmp/session.jsonl';
+      const syncSpy = vi.fn();
+      const asyncSpy = vi.fn().mockResolvedValue(mockConversation);
+
+      vi.mocked(mockOriginalChat.getChatRecordingService!).mockReturnValue({
+        getConversation: syncSpy,
+        getConversationAsync: asyncSpy,
+        getConversationFilePath: vi.fn().mockReturnValue(mockFilePath),
+      } as unknown as ChatRecordingService);
+
+      await client.tryCompressChat('prompt-id', false);
+
+      expect(asyncSpy).toHaveBeenCalledOnce();
+      expect(syncSpy).not.toHaveBeenCalled();
+      expect(client['startChat']).toHaveBeenCalledWith(expect.anything(), {
+        conversation: mockConversation,
+        filePath: mockFilePath,
+      });
+    });
   });
 
   describe('sendMessageStream', () => {
@@ -796,6 +822,60 @@ describe('Gemini Client (client.ts)', () => {
       expect(manageHistorySpy).toHaveBeenCalledWith(
         expect.any(Array),
         expect.any(AbortSignal),
+      );
+    });
+
+    it('includes all hardened turns from pendingApiHistory in apiHistoryOverride so requests never end on a model turn', async () => {
+      mockConfig.getContextManagementConfig = vi
+        .fn()
+        .mockReturnValue({ enabled: true });
+
+      const renderHistorySpy = vi.fn().mockResolvedValue({
+        history: [],
+        apiHistory: [
+          { role: 'user', parts: [{ text: 'Earlier prompt' }] },
+          { role: 'model', parts: [{ text: 'Earlier answer' }] },
+        ],
+        pendingApiHistory: [
+          { role: 'user', parts: [{ text: 'Processed prompt' }] },
+          { role: 'model', parts: [{ text: 'Injected model context' }] },
+          { role: 'user', parts: [{ text: 'Please continue.' }] },
+        ],
+        baseUnits: 42,
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (client as any).contextManager = {
+        renderHistory: renderHistorySpy,
+      };
+
+      mockTurnRunFn.mockReturnValue(
+        (async function* () {
+          yield { type: 'content', value: 'Hello' };
+        })(),
+      );
+
+      const stream = client.sendMessageStream(
+        [{ text: 'Raw prompt' }],
+        new AbortController().signal,
+        'prompt-cm-multi-pending',
+      );
+      await fromAsync(stream);
+
+      expect(renderHistorySpy).toHaveBeenCalledOnce();
+      expect(mockTurnRunFn).toHaveBeenCalledWith(
+        expect.anything(),
+        [{ text: 'Processed prompt' }],
+        expect.any(AbortSignal),
+        expect.objectContaining({
+          apiHistoryOverride: [
+            { role: 'user', parts: [{ text: 'Earlier prompt' }] },
+            { role: 'model', parts: [{ text: 'Earlier answer' }] },
+            { role: 'user', parts: [{ text: 'Processed prompt' }] },
+            { role: 'model', parts: [{ text: 'Injected model context' }] },
+            { role: 'user', parts: [{ text: 'Please continue.' }] },
+          ],
+        }),
       );
     });
 
