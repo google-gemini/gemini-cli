@@ -751,6 +751,10 @@ export function loadEnvironment(
 
       for (const key in parsedEnv) {
         if (Object.hasOwn(parsedEnv, key)) {
+          // Git settings from .env files must not affect Git child processes.
+          if (/^git_/i.test(key)) {
+            continue;
+          }
           let value = parsedEnv[key];
           // If the workspace is untrusted, only allow whitelisted variables.
           if (!isTrusted) {

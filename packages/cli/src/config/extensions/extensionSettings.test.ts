@@ -567,6 +567,25 @@ describe('extensionSettings', () => {
       });
     });
 
+    it('preserves Git settings explicitly stored in the user extension .env', async () => {
+      const userEnvPath = path.join(extensionDir, EXTENSION_SETTINGS_FILENAME);
+      await fsPromises.writeFile(
+        userEnvPath,
+        'GIT_SSH_COMMAND=user-value\nVAR1=user-value1',
+      );
+
+      const contents = await getScopedEnvContents(
+        config,
+        extensionId,
+        ExtensionSettingScope.USER,
+      );
+
+      expect(contents).toEqual({
+        GIT_SSH_COMMAND: 'user-value',
+        VAR1: 'user-value1',
+      });
+    });
+
     it('should return combined contents from workspace .env and keychain for WORKSPACE scope', async () => {
       const workspaceEnvPath = path.join(
         tempWorkspaceDir,
@@ -588,6 +607,45 @@ describe('extensionSettings', () => {
       expect(contents).toEqual({
         VAR1: 'workspace-value1',
         SENSITIVE_VAR: 'workspace-secret',
+      });
+    });
+
+    it('excludes workspace file Git variables without blocking keychain settings', async () => {
+      const workspaceEnvPath = path.join(
+        tempWorkspaceDir,
+        EXTENSION_SETTINGS_FILENAME,
+      );
+      await fsPromises.writeFile(
+        workspaceEnvPath,
+        'GIT_SSH_COMMAND=file-value\ngIt_FuTuRe_OpTiOn=file-value\nGIT_PROXY_COMMAND=file-value\nVAR1=workspace-value',
+      );
+      const workspaceKeychain = new KeychainTokenStorage(
+        `Gemini CLI Extensions test-ext 12345 ${tempWorkspaceDir}`,
+      );
+      await workspaceKeychain.setSecret('GIT_PROXY_COMMAND', 'keychain-value');
+      const configWithGitSecret: ExtensionConfig = {
+        ...config,
+        settings: [
+          ...(config.settings ?? []),
+          {
+            name: 'Git proxy',
+            description: 'Git proxy',
+            envVar: 'GIT_PROXY_COMMAND',
+            sensitive: true,
+          },
+        ],
+      };
+
+      const contents = await getScopedEnvContents(
+        configWithGitSecret,
+        extensionId,
+        ExtensionSettingScope.WORKSPACE,
+        tempWorkspaceDir,
+      );
+
+      expect(contents).toEqual({
+        GIT_PROXY_COMMAND: 'keychain-value',
+        VAR1: 'workspace-value',
       });
     });
 
@@ -632,7 +690,7 @@ describe('extensionSettings', () => {
       const userEnvPath = path.join(extensionDir, EXTENSION_SETTINGS_FILENAME);
       await fsPromises.writeFile(
         userEnvPath,
-        'VAR1=user-value1\nVAR3=user-value3',
+        'VAR1=user-value1\nVAR3=user-value3\nGIT_SSH_COMMAND=user-value',
       );
       const userKeychain = new KeychainTokenStorage(
         `Gemini CLI Extensions test-ext ${extensionId}`,
@@ -644,7 +702,10 @@ describe('extensionSettings', () => {
         tempWorkspaceDir,
         EXTENSION_SETTINGS_FILENAME,
       );
-      await fsPromises.writeFile(workspaceEnvPath, 'VAR1=workspace-value1');
+      await fsPromises.writeFile(
+        workspaceEnvPath,
+        'VAR1=workspace-value1\nGIT_SSH_COMMAND=workspace-value',
+      );
       const workspaceKeychain = new KeychainTokenStorage(
         `Gemini CLI Extensions test-ext ${extensionId} ${tempWorkspaceDir}`,
       );
@@ -660,6 +721,7 @@ describe('extensionSettings', () => {
         VAR1: 'workspace-value1',
         VAR2: 'workspace-secret2',
         VAR3: 'user-value3',
+        GIT_SSH_COMMAND: 'user-value',
       });
     });
   });
