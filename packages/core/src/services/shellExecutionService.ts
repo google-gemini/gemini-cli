@@ -2189,7 +2189,6 @@ export class ShellExecutionService {
             escalate: true,
             isExited: () =>
               !this.activeChildProcesses.has(pid) ||
-              proc.killed ||
               proc.exitCode !== null ||
               proc.signalCode !== null,
           }).catch(() => {}),
