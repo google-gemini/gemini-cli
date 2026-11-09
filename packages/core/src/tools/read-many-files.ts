@@ -20,6 +20,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import { glob, escape } from 'glob';
+import picomatch from 'picomatch';
 import { buildParamArgsPattern } from '../policy/utils.js';
 import {
   detectFileType,
@@ -121,6 +122,86 @@ function getDefaultExcludes(config?: Config): string[] {
 
 const DEFAULT_OUTPUT_SEPARATOR_FORMAT = '--- {filePath} ---';
 const DEFAULT_OUTPUT_TERMINATOR = `\n${REFERENCE_CONTENT_END}`;
+
+/**
+ * Determines whether a non-text asset file (image, PDF, audio) was explicitly requested
+ * by name or extension in the include patterns, rather than matched by an indiscriminate
+ * directory traversal or unrelated glob pattern.
+ */
+export function isAssetExplicitlyRequested(
+  include: string[],
+  relativePath: string,
+  filePath: string,
+): boolean {
+  const normalizedPath = relativePath.replace(/\\/g, '/').replace(/^\.\//, '');
+  const normalizedFilePath = filePath.replace(/\\/g, '/');
+  const fileName = path.posix.basename(normalizedFilePath);
+  const fileExt = path.posix.extname(normalizedFilePath);
+  const stem = fileName.slice(0, fileName.length - fileExt.length);
+
+  return include.some((pattern) => {
+    const normalizedPattern = pattern.replace(/\\/g, '/').replace(/^\.\//, '');
+
+    // 1. Check if this pattern matches the file path
+    const isMatchPath = picomatch(normalizedPattern, {
+      nocase: true,
+      dot: true,
+    });
+    let matches = isMatchPath(normalizedPath);
+    if (!matches && !normalizedPattern.includes('/')) {
+      matches = picomatch(normalizedPattern, { nocase: true, dot: true })(
+        fileName,
+      );
+    }
+    if (!matches) {
+      return false;
+    }
+
+    // 2. Check if the pattern terminal segment explicitly targets this asset
+    const lastSegment = normalizedPattern.split('/').pop() ?? '';
+    if (!lastSegment || lastSegment === '*' || lastSegment === '**') {
+      return false;
+    }
+
+    const lowerLast = lastSegment.toLowerCase();
+    const lowerExt = fileExt.toLowerCase();
+
+    // Explicit extension match (e.g. *.png, logo.png, *.{png,jpg})
+    let hasExplicitExtension = false;
+    if (lowerExt.length > 0) {
+      if (lowerLast.includes(lowerExt)) {
+        hasExplicitExtension = true;
+      } else {
+        const extWithoutDot = lowerExt.slice(1);
+        const braceMatches = lastSegment.match(/\{([^}]+)\}/g);
+        if (braceMatches) {
+          for (const b of braceMatches) {
+            const items = b
+              .slice(1, -1)
+              .split(',')
+              .map((s) => s.trim().toLowerCase().replace(/^\./, ''));
+            if (items.includes(extWithoutDot)) {
+              hasExplicitExtension = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Explicit stem match (e.g. logo.*, report-final.pdf, Logo)
+    const lastSegmentStem = lastSegment.includes('.')
+      ? lastSegment.slice(0, lastSegment.lastIndexOf('.'))
+      : lastSegment;
+
+    const hasExplicitStem =
+      stem.length > 0 &&
+      (lastSegmentStem.toLowerCase() === stem.toLowerCase() ||
+        lowerLast === fileName.toLowerCase());
+
+    return hasExplicitExtension || hasExplicitStem;
+  });
+}
 
 class ReadManyFilesToolInvocation extends BaseToolInvocation<
   ReadManyFilesParams,
@@ -298,15 +379,10 @@ ${finalExclusionPatternsForDescription
             fileType === 'pdf' ||
             fileType === 'audio'
           ) {
-            const fileExtension = path.extname(filePath).toLowerCase();
-            const fileNameWithoutExtension = path.basename(
+            const requestedExplicitly = isAssetExplicitlyRequested(
+              include,
+              relativePathForDisplay,
               filePath,
-              fileExtension,
-            );
-            const requestedExplicitly = include.some(
-              (pattern: string) =>
-                pattern.toLowerCase().includes(fileExtension) ||
-                pattern.includes(fileNameWithoutExtension),
             );
 
             if (!requestedExplicitly) {
