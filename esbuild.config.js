@@ -7,7 +7,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { wasmLoader } from 'esbuild-plugin-wasm';
 
 let esbuild;
@@ -160,6 +160,12 @@ const a2aServerConfig = {
   plugins: createWasmPlugins(),
   alias: commonAliases,
 };
+
+// With splitting, chunk names are content hashes, so output from an earlier
+// build (e.g. before a version bump) is never overwritten and would otherwise
+// be packed into the npm tarball. scripts/copy_bundle_assets.js re-copies the
+// non-JS assets after this script runs.
+rmSync(path.resolve(__dirname, 'bundle'), { recursive: true, force: true });
 
 Promise.allSettled([
   esbuild.build(cliConfig).then(({ metafile }) => {
