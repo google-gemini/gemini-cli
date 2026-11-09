@@ -82,8 +82,8 @@ export default tseslint.config(
     },
   },
   {
-    // Rules for packages/*/src and tools/caretaker-agent (TS/TSX)
-    files: ['packages/*/src/**/*.{ts,tsx}', 'tools/caretaker-agent/**/*.{ts,tsx}'],
+    // Rules for packages/*/src (TS/TSX)
+    files: ['packages/*/src/**/*.{ts,tsx}'],
     plugins: {
       import: importPlugin,
     },
