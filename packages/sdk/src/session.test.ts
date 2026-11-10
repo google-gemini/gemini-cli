@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GeminiCliSession } from './session.js';
 import type { GeminiCliAgent } from './agent.js';
 import type { GeminiCliAgentOptions } from './types.js';
@@ -335,5 +335,114 @@ describe('GeminiCliSession sendStream()', () => {
     }
     expect(mockConfig.setUserMemory).not.toHaveBeenCalled();
     expect(mockClient.updateSystemInstruction).not.toHaveBeenCalled();
+  });
+});
+
+describe('GeminiCliSession sendStream() retry handling', () => {
+  // `sendStream` reads the loop context through `Config` properties rather
+  // than through the accessors mocked above, so wire up the minimum surface
+  // needed by `initialize()` and the tool scheduling path.
+  const configWithLoopContext = mockConfig as unknown as {
+    geminiClient: typeof mockClient;
+    toolRegistry: Record<string, unknown>;
+    messageBus: Record<string, unknown>;
+  };
+
+  beforeEach(() => {
+    configWithLoopContext.geminiClient = mockClient;
+    configWithLoopContext.messageBus = {};
+    configWithLoopContext.toolRegistry = {
+      getTool: vi.fn().mockReturnValue(null),
+      registerTool: vi.fn(),
+      unregisterTool: vi.fn(),
+      clone: vi.fn(() => ({
+        getTool: vi.fn().mockReturnValue(null),
+      })),
+    };
+  });
+
+  afterEach(() => {
+    const mutableConfig = configWithLoopContext as unknown as Record<
+      string,
+      unknown
+    >;
+    delete mutableConfig['geminiClient'];
+    delete mutableConfig['toolRegistry'];
+    delete mutableConfig['messageBus'];
+  });
+
+  it('drops tool calls streamed by a failed attempt when the turn is retried', async () => {
+    const { GeminiEventType } = await import('@google/gemini-cli-core');
+
+    // The first attempt streams a tool call, then the stream is retried and
+    // the successful attempt streams its own call.
+    let callCount = 0;
+    mockClient.sendMessageStream.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return (async function* () {
+          yield {
+            type: GeminiEventType.ToolCallRequest,
+            value: {
+              callId: 'failed-call',
+              name: 'testTool',
+              args: { target: 'failed' },
+            },
+          };
+          yield { type: GeminiEventType.Retry };
+          yield {
+            type: GeminiEventType.ToolCallRequest,
+            value: {
+              callId: 'retried-call',
+              name: 'testTool',
+              args: { target: 'retried' },
+            },
+          };
+        })();
+      }
+      return (async function* () {})();
+    });
+
+    mockScheduleAgentTools.mockResolvedValue([
+      {
+        response: {
+          responseParts: [
+            {
+              functionResponse: {
+                name: 'testTool',
+                response: { result: 'done' },
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const session = new GeminiCliSession(
+      baseOptions,
+      'session-retry-1',
+      mockAgent,
+    );
+    const events: Array<{ type: string }> = [];
+    for await (const event of session.sendStream('Use the tool')) {
+      events.push(event);
+    }
+
+    // Retry remains a control event that is yielded to the caller in order.
+    expect(events.map((event) => event.type)).toEqual([
+      GeminiEventType.ToolCallRequest,
+      GeminiEventType.Retry,
+      GeminiEventType.ToolCallRequest,
+    ]);
+
+    // Only the successful attempt's tool call is executed.
+    expect(mockScheduleAgentTools).toHaveBeenCalledOnce();
+    const [, scheduledRequests] = mockScheduleAgentTools.mock.calls[0] as [
+      unknown,
+      Array<{ callId: string }>,
+    ];
+    expect(scheduledRequests.map((request) => request.callId)).toEqual([
+      'retried-call',
+    ]);
   });
 });

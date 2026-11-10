@@ -2094,6 +2094,98 @@ describe('LocalAgentExecutor', () => {
       expect(output.result).toBe('Aborted due to tool failure.');
     });
 
+    it('should drop function calls from a failed attempt when the stream is retried', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME]);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: the first attempt streams a call, then the retried attempt
+      // streams a different call.
+      mockSendMessageStream.mockImplementationOnce(async () =>
+        (async function* () {
+          yield {
+            type: StreamEventType.CHUNK,
+            value: createMockResponseChunk(
+              [],
+              [{ name: LS_TOOL_NAME, args: { path: '/failed' }, id: 'failed' }],
+            ),
+          } as StreamEvent;
+          yield { type: StreamEventType.RETRY } as StreamEvent;
+          yield {
+            type: StreamEventType.CHUNK,
+            value: createMockResponseChunk(
+              [],
+              [
+                {
+                  name: LS_TOOL_NAME,
+                  args: { path: '/retried' },
+                  id: 'retried',
+                },
+              ],
+            ),
+          } as StreamEvent;
+        })(),
+      );
+
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: CoreToolCallStatus.Success,
+          request: {
+            callId: 'retried',
+            name: LS_TOOL_NAME,
+            args: { path: '/retried' },
+            isClientInitiated: false,
+            prompt_id: 'test-prompt',
+          },
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as unknown as AnyToolInvocation,
+          response: {
+            callId: 'retried',
+            resultDisplay: 'ok',
+            responseParts: [
+              {
+                functionResponse: {
+                  name: LS_TOOL_NAME,
+                  response: {},
+                  id: 'retried',
+                },
+              },
+            ],
+            error: undefined,
+            errorType: undefined,
+            contentLength: 0,
+          },
+        },
+      ]);
+
+      // Turn 2: the model sees the single tool result and completes
+      mockModelResponse([
+        {
+          name: COMPLETE_TASK_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call2',
+        },
+      ]);
+
+      const output = await executor.run({ goal: 'Retry test' }, signal);
+
+      expect(mockScheduleAgentTools).toHaveBeenCalledTimes(2);
+      const firstScheduleRequests = mockScheduleAgentTools.mock
+        .calls[0][1] as ToolCallRequestInfo[];
+      expect(firstScheduleRequests).toEqual([
+        expect.objectContaining({ callId: 'retried' }),
+      ]);
+      expect(getMockMessageParams(1).message).toEqual([
+        expect.objectContaining({
+          functionResponse: expect.objectContaining({ id: 'retried' }),
+        }),
+      ]);
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+    });
+
     it('should handle a soft tool rejection (outcome: Cancel) and provide direct instructions to the model', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME]);
       const executor = await LocalAgentExecutor.create(

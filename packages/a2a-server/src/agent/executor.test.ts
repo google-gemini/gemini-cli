@@ -25,6 +25,8 @@ vi.mock('@google/gemini-cli-core', () => ({
   GeminiEventType: {
     PRIMARY_TURN_STARTED: 'PRIMARY_TURN_STARTED',
     SECONDARY_TURN_STARTED: 'SECONDARY_TURN_STARTED',
+    ToolCallRequest: 'tool_call_request',
+    Retry: 'retry',
   },
   SimpleExtensionLoader: vi.fn(),
   checkPathTrust: vi.fn().mockReturnValue({ isTrusted: false }),
@@ -323,6 +325,79 @@ describe('CoderAgentExecutor', () => {
       undefined,
       true,
     );
+  });
+
+  it('should drop tool calls from a failed attempt when the turn is retried', async () => {
+    const taskId = 'test-task-retry';
+    const contextId = 'test-context';
+
+    const mockSocket = new EventEmitter();
+    (requestStorage.getStore as Mock).mockReturnValue({
+      req: { socket: mockSocket },
+    });
+
+    const wrapper = await executor.createTask(
+      taskId,
+      contextId,
+      undefined,
+      mockEventBus,
+    );
+    const task = wrapper.task as unknown as {
+      acceptUserMessage: Mock;
+      acceptAgentMessage: Mock;
+      scheduleToolCalls: Mock;
+    };
+    task.acceptUserMessage.mockReturnValue(
+      (async function* () {
+        yield {
+          type: 'tool_call_request',
+          value: {
+            callId: 'failed-call',
+            name: 'test_tool',
+            args: {},
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        };
+        yield { type: 'retry' };
+        yield {
+          type: 'tool_call_request',
+          value: {
+            callId: 'retried-call',
+            name: 'test_tool',
+            args: {},
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        };
+      })(),
+    );
+
+    const requestContext = {
+      userMessage: {
+        messageId: 'msg-1',
+        taskId,
+        contextId,
+        parts: [{ kind: 'text', text: 'hi' }],
+        metadata: {
+          coderAgent: { kind: 'agent-settings', workspacePath: '/tmp' },
+        },
+      },
+    } as unknown as RequestContext;
+
+    await executor.execute(requestContext, mockEventBus);
+
+    expect(task.scheduleToolCalls).toHaveBeenCalledTimes(1);
+    const [requests] = task.scheduleToolCalls.mock.calls[0] as [
+      Array<{ callId: string }>,
+      AbortSignal,
+    ];
+    expect(requests).toEqual([
+      expect.objectContaining({ callId: 'retried-call' }),
+    ]);
+    // The retry is a control event: forwarding it would hand a stream signal
+    // to the message handler.
+    expect(task.acceptAgentMessage).not.toHaveBeenCalledWith({ type: 'retry' });
   });
 
   it('cancelTask should abort the active execution loop', async () => {
