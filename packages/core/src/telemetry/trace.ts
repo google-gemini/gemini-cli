@@ -193,6 +193,7 @@ function createEndSpan(
       meta.input = undefined;
       meta.output = undefined;
       meta.error = undefined;
+      meta.attributes = {};
       span.end();
     }
   };

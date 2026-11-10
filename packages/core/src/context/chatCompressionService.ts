@@ -504,7 +504,20 @@ async function truncateHistoryToBudget(
           }
 
           contentStr = contentStr ?? '';
-          const nestedParts = part.functionResponse.parts ?? [];
+          const nestedParts: Part[] = part.functionResponse.parts ?? [];
+          if (!contentStr && nestedParts.length > 0) {
+            contentStr =
+              nestedParts
+                .map(
+                  (p) =>
+                    p.text ||
+                    (p.inlineData
+                      ? `[Inline Data: ${p.inlineData.mimeType}]`
+                      : ''),
+                )
+                .filter(Boolean)
+                .join('\n') || JSON.stringify(nestedParts, null, 2);
+          }
           const nestedTokens =
             nestedParts.length > 0 ? estimateTokenCountSync(nestedParts) : 0;
           const textTokens = estimateTokenCountSync([{ text: contentStr }]);

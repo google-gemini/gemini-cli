@@ -184,7 +184,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     serverDetails?: ServerDetails,
   ): void {
     const requestText = this.config.getTelemetryLogPromptsEnabled?.()
-      ? JSON.stringify(contents)
+      ? safeJsonStringify(contents)
       : undefined;
     logApiRequest(
       this.config,
@@ -418,7 +418,7 @@ export class LoggingContentGenerator implements ContentGenerator {
             response.candidates,
             response.usageMetadata,
             this.config.getTelemetryLogPromptsEnabled?.()
-              ? JSON.stringify({
+              ? safeJsonStringify({
                   candidates: response.candidates,
                   usageMetadata: response.usageMetadata,
                   responseId: response.responseId,
@@ -569,7 +569,7 @@ export class LoggingContentGenerator implements ContentGenerator {
         responses.flatMap((response) => response.candidates || []),
         lastUsageMetadata,
         this.config.getTelemetryLogPromptsEnabled?.()
-          ? JSON.stringify(
+          ? safeJsonStringify(
               responses.map((r) => ({
                 candidates: r.candidates,
                 usageMetadata: r.usageMetadata,

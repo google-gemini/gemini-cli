@@ -363,5 +363,6 @@ describe('runInDevTraceSpan', () => {
     expect(capturedMetadata?.input).toBeUndefined();
     expect(capturedMetadata?.output).toBeUndefined();
     expect(capturedMetadata?.error).toBeUndefined();
+    expect(capturedMetadata?.attributes).toEqual({});
   });
 });
