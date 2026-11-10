@@ -18,6 +18,7 @@ import {
 import { Session } from './acpSession.js';
 import type * as acp from '@agentclientprotocol/sdk';
 import {
+  CoreToolCallStatus,
   ReadManyFilesTool,
   type GeminiChat,
   type Config,
@@ -601,6 +602,119 @@ describe('Session', () => {
         },
       },
     });
+  });
+
+  it('should record completed tool calls on the active chat from geminiClient rather than a stale initial chat', async () => {
+    const activeChat = {
+      sendMessageStream: vi.fn(),
+      addHistory: vi.fn(),
+      recordCompletedToolCalls: vi.fn(),
+      getHistory: vi.fn().mockReturnValue([]),
+    } as unknown as Mocked<GeminiChat>;
+
+    (mockConfig.geminiClient.getChat as Mock).mockReturnValue(activeChat);
+
+    const stream1 = createMockStream([
+      {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'call-1',
+          name: 'test_tool',
+          args: { foo: 'bar' },
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: 'Result',
+      },
+    ]);
+
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(activeChat.recordCompletedToolCalls).toHaveBeenCalledWith(
+      'gemini-pro',
+      expect.arrayContaining([
+        expect.objectContaining({
+          status: CoreToolCallStatus.Success,
+          request: expect.objectContaining({
+            callId: 'call-1',
+            name: 'test_tool',
+          }),
+        }),
+      ]),
+    );
+    expect(mockChat.recordCompletedToolCalls).not.toHaveBeenCalled();
+  });
+
+  it('should record failed tool calls on the active chat from geminiClient', async () => {
+    const activeChat = {
+      sendMessageStream: vi.fn(),
+      addHistory: vi.fn(),
+      recordCompletedToolCalls: vi.fn(),
+      getHistory: vi.fn().mockReturnValue([]),
+    } as unknown as Mocked<GeminiChat>;
+
+    (mockConfig.geminiClient.getChat as Mock).mockReturnValue(activeChat);
+
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: vi.fn().mockRejectedValue(new Error('Tool failed')),
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'call-err',
+          name: 'test_tool',
+          args: { foo: 'bar' },
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: 'After error',
+      },
+    ]);
+
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(activeChat.recordCompletedToolCalls).toHaveBeenCalledWith(
+      'gemini-pro',
+      expect.arrayContaining([
+        expect.objectContaining({
+          status: CoreToolCallStatus.Error,
+          request: expect.objectContaining({
+            callId: 'call-err',
+            name: 'test_tool',
+          }),
+        }),
+      ]),
+    );
+    expect(mockChat.recordCompletedToolCalls).not.toHaveBeenCalled();
   });
 
   it('should handle tool call permission request', async () => {
