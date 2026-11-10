@@ -503,6 +503,7 @@ async function truncateHistoryToBudget(
             contentStr = JSON.stringify(responseObj, null, 2);
           }
 
+          contentStr = contentStr ?? '';
           const nestedParts = part.functionResponse.parts ?? [];
           const nestedTokens =
             nestedParts.length > 0 ? estimateTokenCountSync(nestedParts) : 0;
