@@ -162,11 +162,25 @@ const defaultGraphemeSegmenter = new Intl.Segmenter(undefined, {
  */
 export function collapseOlderFunctionResponses(
   history: Content[],
+  maxBytesPerOldResponse?: number,
+  segmenter?: Intl.Segmenter,
+  protectedTurns?: number,
+  exemptTools?: ReadonlySet<string>,
+): Content[];
+export function collapseOlderFunctionResponses(
+  history: readonly Content[],
+  maxBytesPerOldResponse?: number,
+  segmenter?: Intl.Segmenter,
+  protectedTurns?: number,
+  exemptTools?: ReadonlySet<string>,
+): readonly Content[];
+export function collapseOlderFunctionResponses(
+  history: readonly Content[],
   maxBytesPerOldResponse: number = COLLAPSED_FUNCTION_RESPONSE_MAX_BYTES,
   segmenter: Intl.Segmenter = defaultGraphemeSegmenter,
   protectedTurns: number = RECENT_TURNS_PROTECTED,
   exemptTools: ReadonlySet<string> = RETRIEVAL_TOOL_NAMES_EXEMPT_FROM_COLLAPSE,
-): Content[] {
+): readonly Content[] {
   // Find all indices of user messages that contain functionResponse
   const toolIndices: number[] = [];
   for (let i = 0; i < history.length; i++) {
@@ -502,6 +516,7 @@ async function truncateHistoryToBudget(
             const toolName =
               part.functionResponse.name?.trim() || 'generic_tool';
             if (
+              part.functionResponse.response !== undefined &&
               nestedParts.length > 0 &&
               functionResponseTokenCounter + textTokens <=
                 COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET

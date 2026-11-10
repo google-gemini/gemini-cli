@@ -1335,9 +1335,8 @@ export class GeminiClient {
       calculateHistoryByteSize(updatedHistory) >=
       COLLAPSE_HISTORY_BYTE_THRESHOLD
     ) {
-      const candidateHistory = [...updatedHistory];
-      const collapsedHistory = collapseOlderFunctionResponses(candidateHistory);
-      if (collapsedHistory !== candidateHistory) {
+      const collapsedHistory = collapseOlderFunctionResponses(updatedHistory);
+      if (collapsedHistory !== updatedHistory) {
         updatedHistory = collapsedHistory;
       }
     }
