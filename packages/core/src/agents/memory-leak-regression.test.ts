@@ -8,7 +8,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import v8 from 'node:v8';
+import vm from 'node:vm';
 import { MAX_STORED_TOOL_OUTPUT_BYTES } from '../utils/constants.js';
+import { LoggingContentGenerator } from '../core/loggingContentGenerator.js';
+import type { ContentGenerator } from '../core/contentGenerator.js';
+import { LlmRole } from '../telemetry/types.js';
 import {
   truncateToolOutput,
   truncateFunctionResponsePart,
@@ -772,6 +777,249 @@ describe('GH-28537 / b/561554750 Memory Leak Regression Tests', () => {
       // Without collapsing retrieval tools, 50 turns * 60 KB = 3,000 KB (3 MB).
       // Older turns beyond the recent window must be collapsed so total size stays bounded under 350 KB.
       expect(totalByteSize).toBeLessThan(350 * 1024);
+    });
+  });
+
+  describe('GH-29591 PDF Ingestion & Telemetry Buffer Heap OOM Regression Tests', () => {
+    it('does not retain evicted PDF inlineData or leak serialized requestText in telemetryBuffer across turns when telemetry is disabled', async () => {
+      v8.setFlagsFromString('--expose_gc');
+      const gc = vm.runInNewContext('gc') as () => void;
+
+      const config = makeFakeConfig();
+      vi.spyOn(config, 'getTelemetryEnabled').mockReturnValue(false);
+      vi.spyOn(config, 'getTelemetryLogPromptsEnabled').mockReturnValue(false);
+      vi.spyOn(config, 'getTelemetryTracesEnabled').mockReturnValue(false);
+
+      const wrappedGenerator: ContentGenerator = {
+        generateContent: async () => ({
+          candidates: [],
+          text: undefined,
+          functionCalls: undefined,
+          executableCode: undefined,
+          codeExecutionResult: undefined,
+          data: undefined,
+        }),
+        generateContentStream: async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [{ text: 'Created wiki page.' }],
+                  },
+                },
+              ],
+              usageMetadata: {
+                promptTokenCount: 52000,
+                candidatesTokenCount: 25,
+                totalTokenCount: 52025,
+              },
+              text: undefined,
+              functionCalls: undefined,
+              executableCode: undefined,
+              codeExecutionResult: undefined,
+              data: undefined,
+            };
+          })(),
+        countTokens: async () => ({ totalTokens: 52000 }),
+        embedContent: async () => ({ embeddings: [] }),
+      };
+
+      const loggingGenerator = new LoggingContentGenerator(
+        wrappedGenerator,
+        config,
+      );
+
+      gc();
+      const baselineHeapBytes = process.memoryUsage().heapUsed;
+
+      // Allocate two 2 MB base64 PDF payloads inside an isolated scope so only
+      // conversation history (and any internal leaks) can hold references to them.
+      const createInitialPdfSession = (): {
+        history: Content[];
+        pdfPartRef: WeakRef<Part>;
+      } => {
+        const pdf1Part: Part = {
+          inlineData: {
+            mimeType: 'application/pdf',
+            data: Buffer.alloc(1.5 * 1024 * 1024, 'A').toString('base64'),
+          },
+        };
+        const pdf2Part: Part = {
+          inlineData: {
+            mimeType: 'application/pdf',
+            data: Buffer.alloc(1.5 * 1024 * 1024, 'B').toString('base64'),
+          },
+        };
+        return {
+          history: [
+            {
+              role: 'user',
+              parts: [
+                pdf1Part,
+                pdf2Part,
+                { text: 'Ingest these two 80-slide PDFs into wiki pages.' },
+              ],
+            },
+          ],
+          pdfPartRef: new WeakRef(pdf1Part),
+        };
+      };
+
+      let { history, pdfPartRef } = createInitialPdfSession();
+
+      // Simulate 6 agent tool turns (3 protected turns + 3 turns after collapse)
+      for (let turn = 1; turn <= 6; turn++) {
+        history.push(
+          {
+            role: 'model',
+            parts: [
+              {
+                functionCall: {
+                  name: 'write_file',
+                  args: {
+                    path: `wiki/page-${turn}.md`,
+                    content: `# Page ${turn}`,
+                  },
+                },
+              },
+            ],
+          },
+          {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  name: 'write_file',
+                  response: { output: 'Successfully wrote file.' },
+                },
+              },
+            ],
+          },
+        );
+
+        history = collapseOlderFunctionResponses(history);
+
+        const stream = await loggingGenerator.generateContentStream(
+          {
+            model: 'gemini-3-flash-preview',
+            contents: history,
+          },
+          `prompt-gh-29591########${turn}`,
+          LlmRole.MAIN,
+        );
+        for await (const _chunk of stream) {
+          // consume stream
+        }
+      }
+
+      // Active history has already evicted the PDF inlineData (< 2 KB remaining)
+      expect(calculateHistoryByteSize(history)).toBeLessThan(2 * 1024);
+
+      // Allow microtasks/finalizers to settle and run V8 garbage collection
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      gc();
+
+      const retainedHeapDeltaBytes =
+        process.memoryUsage().heapUsed - baselineHeapBytes;
+
+      // The evicted PDF Part must be eligible for garbage collection (not pinned in telemetryBuffer)
+      expect(pdfPartRef.deref() === undefined).toBe(true);
+      // Heap growth after PDF eviction must remain bounded (< 4 MB), not ~16+ MB of leaked JSON.stringify copies
+      expect(retainedHeapDeltaBytes).toBeLessThan(4 * 1024 * 1024);
+    });
+
+    it('truncates older multimodal inlineData in ChatCompressionService.compress budget truncation path', async () => {
+      const compressionService = new ChatCompressionService();
+      const base64Pdf = 'P'.repeat(512 * 1024); // 512 KB base64 PDF payload each
+
+      // Simulate 2 PDF tool turns (2 * 25,800 = 51,600 tokens > COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET of 30,000)
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'Ingest deck1.pdf and deck2.pdf' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                name: 'read_file',
+                args: { file_path: 'deck1.pdf' },
+                id: 'call-pdf-1',
+              },
+            },
+          ],
+        },
+        {
+          role: 'user',
+          parts: convertToFunctionResponse(
+            'read_file',
+            'call-pdf-1',
+            [{ inlineData: { mimeType: 'application/pdf', data: base64Pdf } }],
+            'gemini-3-flash-preview',
+          ),
+        },
+        { role: 'model', parts: [{ text: 'Read deck1.pdf.' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                name: 'read_file',
+                args: { file_path: 'deck2.pdf' },
+                id: 'call-pdf-2',
+              },
+            },
+          ],
+        },
+        {
+          role: 'user',
+          parts: convertToFunctionResponse(
+            'read_file',
+            'call-pdf-2',
+            [{ inlineData: { mimeType: 'application/pdf', data: base64Pdf } }],
+            'gemini-3-flash-preview',
+          ),
+        },
+        { role: 'model', parts: [{ text: 'Read deck2.pdf.' }] },
+      ];
+
+      const mockChat = {
+        getHistory: vi.fn().mockReturnValue(history),
+        getLastPromptTokenCount: vi.fn().mockReturnValue(600_000),
+      } as unknown as GeminiChat;
+
+      vi.mocked(tokenLimit).mockReturnValue(1_000_000);
+      const mockConfig = makeFakeConfig();
+      mockConfig.getCompressionThreshold = vi.fn().mockResolvedValue(0.5);
+
+      // When summarization has previously failed (e.g. 429 quota exhausted), compress() relies on truncateHistoryToBudget
+      const result = await compressionService.compress(
+        mockChat,
+        'gh-29591-compress-test',
+        false,
+        'gemini-3-flash-preview',
+        mockConfig,
+        true,
+      );
+
+      expect(result.info.compressionStatus).toBe(
+        CompressionStatus.CONTENT_TRUNCATED,
+      );
+      expect(result.newHistory).not.toBeNull();
+      // The older PDF (turn index 2) exceeds the 30,000 token budget and must have its 512 KB inlineData stripped
+      const olderPdfTurn = result.newHistory![2];
+      const hasOlderInlineData =
+        olderPdfTurn.parts?.some(
+          (p) =>
+            p.inlineData !== undefined ||
+            p.functionResponse?.parts?.some(
+              (fp) => fp.inlineData !== undefined,
+            ),
+        ) ?? false;
+      expect(hasOlderInlineData).toBe(false);
+      expect(calculateHistoryByteSize(result.newHistory!)).toBeLessThan(
+        600 * 1024,
+      );
     });
   });
 });

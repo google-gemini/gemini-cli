@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content } from '@google/genai';
+import type { Content, Part } from '@google/genai';
 import type { Config } from '../config/config.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { type ChatCompressionInfo, CompressionStatus } from '../core/turn.js';
@@ -99,6 +99,9 @@ export const MAX_EXEMPT_RETRIEVAL_HISTORY_BYTES = 64 * 1024; // 64 KB
  */
 export const COLLAPSE_HISTORY_BYTE_THRESHOLD = 256 * 1024; // 256 KB
 
+const OMITTED_BINARY_MESSAGE =
+  '[Binary content omitted from previous turn to conserve memory]';
+
 /**
  * Computes the total byte size of text and payload content across all turns in history.
  */
@@ -159,11 +162,25 @@ const defaultGraphemeSegmenter = new Intl.Segmenter(undefined, {
  */
 export function collapseOlderFunctionResponses(
   history: Content[],
+  maxBytesPerOldResponse?: number,
+  segmenter?: Intl.Segmenter,
+  protectedTurns?: number,
+  exemptTools?: ReadonlySet<string>,
+): Content[];
+export function collapseOlderFunctionResponses(
+  history: readonly Content[],
+  maxBytesPerOldResponse?: number,
+  segmenter?: Intl.Segmenter,
+  protectedTurns?: number,
+  exemptTools?: ReadonlySet<string>,
+): readonly Content[];
+export function collapseOlderFunctionResponses(
+  history: readonly Content[],
   maxBytesPerOldResponse: number = COLLAPSED_FUNCTION_RESPONSE_MAX_BYTES,
   segmenter: Intl.Segmenter = defaultGraphemeSegmenter,
   protectedTurns: number = RECENT_TURNS_PROTECTED,
   exemptTools: ReadonlySet<string> = RETRIEVAL_TOOL_NAMES_EXEMPT_FROM_COLLAPSE,
-): Content[] {
+): readonly Content[] {
   // Find all indices of user messages that contain functionResponse
   const toolIndices: number[] = [];
   for (let i = 0; i < history.length; i++) {
@@ -285,7 +302,7 @@ export function collapseOlderFunctionResponses(
       if (part.inlineData) {
         partsModified = true;
         return {
-          text: '[Binary content omitted from previous turn to conserve memory]',
+          text: OMITTED_BINARY_MESSAGE,
         };
       }
 
@@ -486,47 +503,103 @@ async function truncateHistoryToBudget(
             contentStr = JSON.stringify(responseObj, null, 2);
           }
 
-          const tokens = estimateTokenCountSync([{ text: contentStr }]);
+          contentStr = contentStr ?? '';
+          const nestedParts: Part[] = part.functionResponse.parts ?? [];
+          if (!contentStr && nestedParts.length > 0) {
+            contentStr =
+              nestedParts
+                .map(
+                  (p) =>
+                    p.text ||
+                    (p.inlineData
+                      ? `[Inline Data: ${p.inlineData.mimeType}]`
+                      : ''),
+                )
+                .filter(Boolean)
+                .join('\n') || JSON.stringify(nestedParts, null, 2);
+          }
+          const nestedTokens =
+            nestedParts.length > 0 ? estimateTokenCountSync(nestedParts) : 0;
+          const textTokens = estimateTokenCountSync([{ text: contentStr }]);
+          const tokens = textTokens + nestedTokens;
 
           if (
             functionResponseTokenCounter + tokens >
             COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET
           ) {
-            try {
-              // Budget exceeded: Truncate this response.
-              const { outputFile } = await saveTruncatedToolOutput(
-                contentStr,
-                part.functionResponse.name ?? 'unknown_tool',
-                config.getNextCompressionTruncationId(),
-                config.storage.getProjectTempDir(),
-              );
-
-              const truncatedMessage = formatTruncatedToolOutput(
-                contentStr,
-                outputFile,
-                config.getTruncateToolOutputThreshold(),
-              );
-
+            const toolName =
+              part.functionResponse.name?.trim() || 'generic_tool';
+            if (
+              part.functionResponse.response !== undefined &&
+              nestedParts.length > 0 &&
+              functionResponseTokenCounter + textTokens <=
+                COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET
+            ) {
               newParts.unshift({
                 functionResponse: {
-                  // eslint-disable-next-line @typescript-eslint/no-misused-spread
-                  ...part.functionResponse,
-                  response: { output: truncatedMessage },
+                  id: part.functionResponse.id,
+                  name: toolName,
+                  response: part.functionResponse.response,
                 },
               });
+              functionResponseTokenCounter += textTokens;
+            } else {
+              try {
+                // Budget exceeded: Truncate this response.
+                const { outputFile } = await saveTruncatedToolOutput(
+                  contentStr,
+                  toolName,
+                  config.getNextCompressionTruncationId(),
+                  config.storage.getProjectTempDir(),
+                );
 
-              // Count the small truncated placeholder towards the budget.
-              functionResponseTokenCounter += estimateTokenCountSync([
-                { text: truncatedMessage },
-              ]);
-            } catch (error) {
-              // Fallback: if truncation fails, keep the original part to avoid data loss in the chat.
-              debugLogger.debug('Failed to truncate history to budget:', error);
-              newParts.unshift(part);
-              functionResponseTokenCounter += tokens;
+                const truncatedMessage = formatTruncatedToolOutput(
+                  contentStr,
+                  outputFile,
+                  config.getTruncateToolOutputThreshold(),
+                );
+
+                newParts.unshift({
+                  functionResponse: {
+                    id: part.functionResponse.id,
+                    name: toolName,
+                    response: { output: truncatedMessage },
+                  },
+                });
+
+                // Count the small truncated placeholder towards the budget.
+                functionResponseTokenCounter += estimateTokenCountSync([
+                  { text: truncatedMessage },
+                ]);
+              } catch (error) {
+                // Fallback: if truncation fails, keep the original part to avoid data loss in the chat.
+                debugLogger.debug(
+                  'Failed to truncate history to budget:',
+                  error,
+                );
+                newParts.unshift(part);
+                functionResponseTokenCounter += tokens;
+              }
             }
           } else {
             // Within budget: keep the full response.
+            functionResponseTokenCounter += tokens;
+            newParts.unshift(part);
+          }
+        } else if (part.inlineData) {
+          const tokens = estimateTokenCountSync([part]);
+          if (
+            functionResponseTokenCounter + tokens >
+            COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET
+          ) {
+            const omittedPart: Part = {
+              text: OMITTED_BINARY_MESSAGE,
+            };
+            newParts.unshift(omittedPart);
+            functionResponseTokenCounter += estimateTokenCountSync([
+              omittedPart,
+            ]);
+          } else {
             functionResponseTokenCounter += tokens;
             newParts.unshift(part);
           }
