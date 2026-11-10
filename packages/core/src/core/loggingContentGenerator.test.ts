@@ -172,6 +172,80 @@ describe('LoggingContentGenerator', () => {
       });
     });
 
+    it('should omit serialized request_text, response_text, and prompt.contents when prompt logging is disabled', async () => {
+      vi.mocked(config.getTelemetryLogPromptsEnabled).mockReturnValue(false);
+      vi.mocked(config.getTelemetryTracesEnabled).mockReturnValue(false);
+
+      const req = {
+        contents: [{ role: 'user', parts: [{ text: 'large-payload' }] }],
+        model: 'gemini-pro',
+      };
+      const response: GenerateContentResponse = {
+        candidates: [{ content: { parts: [{ text: 'reply' }] } }],
+        usageMetadata: {
+          promptTokenCount: 10,
+          candidatesTokenCount: 5,
+          totalTokenCount: 15,
+        },
+        text: undefined,
+        functionCalls: undefined,
+        executableCode: undefined,
+        codeExecutionResult: undefined,
+        data: undefined,
+      };
+      vi.mocked(wrapped.generateContent).mockResolvedValue(response);
+
+      await loggingContentGenerator.generateContent(
+        req,
+        'prompt-no-log',
+        LlmRole.MAIN,
+      );
+
+      const requestEvent = vi.mocked(logApiRequest).mock.calls[0][1];
+      const responseEvent = vi.mocked(logApiResponse).mock.calls[0][1];
+      expect(requestEvent.request_text).toBeUndefined();
+      expect(requestEvent.prompt.contents).toEqual([]);
+      expect(responseEvent.response_text).toBeUndefined();
+      expect(responseEvent.prompt.contents).toEqual([]);
+    });
+
+    it('should include prompt.contents only when both prompt logging and traces are enabled', async () => {
+      vi.mocked(config.getTelemetryLogPromptsEnabled).mockReturnValue(true);
+      vi.mocked(config.getTelemetryTracesEnabled).mockReturnValue(true);
+
+      const req = {
+        contents: [{ role: 'user', parts: [{ text: 'trace-payload' }] }],
+        model: 'gemini-pro',
+      };
+      const response: GenerateContentResponse = {
+        candidates: [{ content: { parts: [{ text: 'reply' }] } }],
+        usageMetadata: {
+          promptTokenCount: 10,
+          candidatesTokenCount: 5,
+          totalTokenCount: 15,
+        },
+        text: undefined,
+        functionCalls: undefined,
+        executableCode: undefined,
+        codeExecutionResult: undefined,
+        data: undefined,
+      };
+      vi.mocked(wrapped.generateContent).mockResolvedValue(response);
+
+      await loggingContentGenerator.generateContent(
+        req,
+        'prompt-trace-enabled',
+        LlmRole.MAIN,
+      );
+
+      const requestEvent = vi.mocked(logApiRequest).mock.calls[0][1];
+      const responseEvent = vi.mocked(logApiResponse).mock.calls[0][1];
+      expect(requestEvent.request_text).toContain('trace-payload');
+      expect(requestEvent.prompt.contents).toEqual(req.contents);
+      expect(responseEvent.response_text).toContain('reply');
+      expect(responseEvent.prompt.contents).toEqual(req.contents);
+    });
+
     it('should log error on failure', async () => {
       const req = {
         contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
