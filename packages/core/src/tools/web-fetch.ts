@@ -253,6 +253,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       delayMs,
       error: errorType,
       model: modelName,
+      sessionId: this.context.config.getSessionId?.(),
     });
 
     logNetworkRetryAttempt(

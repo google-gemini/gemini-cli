@@ -25,6 +25,7 @@ import {
   FatalSandboxError,
   GEMINI_DIR,
   homedir,
+  isNodeError,
   resolveToRealPath,
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
@@ -57,6 +58,64 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
+
+// Upper bound for `podman info` so an unresponsive Podman service cannot
+// stall sandbox startup.
+const PODMAN_INFO_TIMEOUT_MS = 5000;
+
+/**
+ * Checks whether Podman is running in rootless mode.
+ * Queries `{{.Host.Security.Rootless}}` first and falls back to
+ * `{{.Host.ServiceIsRootless}}` if empty or unsupported.
+ */
+export async function isPodmanRootless(): Promise<boolean> {
+  const formats = [
+    '{{.Host.Security.Rootless}}',
+    '{{.Host.ServiceIsRootless}}',
+  ];
+
+  for (const format of formats) {
+    try {
+      const { stdout } = await execFileAsync(
+        'podman',
+        ['info', '--format', format],
+        {
+          encoding: 'utf-8',
+          timeout: PODMAN_INFO_TIMEOUT_MS,
+          killSignal: 'SIGKILL',
+        },
+      );
+      const trimmed = String(stdout ?? '')
+        .trim()
+        .toLowerCase();
+      if (trimmed === 'true') {
+        return true;
+      }
+      if (trimmed === 'false') {
+        return false;
+      }
+    } catch (err) {
+      // A missing podman binary or a timed-out query would fail the fallback
+      // query the same way, so stop instead of running podman again. When
+      // execFile kills the process on timeout, the error reports
+      // `killed: true` rather than an ETIMEDOUT code.
+      const isMissingBinary = isNodeError(err) && err.code === 'ENOENT';
+      const timedOut = isRecord(err) && err['killed'] === true;
+      if (isMissingBinary || timedOut) {
+        break;
+      }
+      // Property may be unsupported or podman execution failed; try fallback if available.
+    }
+  }
+
+  return false;
+}
+
+function hasUsernsFlag(flags: string[]): boolean {
+  return flags.some(
+    (flag) => flag === '--userns' || flag.startsWith('--userns='),
+  );
+}
 
 export async function start_sandbox(
   config: SandboxConfig,
@@ -497,13 +556,12 @@ export async function start_sandbox(
     }
 
     // add custom flags from SANDBOX_FLAGS
-    if (process.env['SANDBOX_FLAGS']) {
-      const flags = parse(process.env['SANDBOX_FLAGS'], process.env).filter(
-        (f): f is string => typeof f === 'string',
-      );
-
-      args.push(...flags);
-    }
+    const customFlags = process.env['SANDBOX_FLAGS']
+      ? parse(process.env['SANDBOX_FLAGS'], process.env).filter(
+          (f): f is string => typeof f === 'string',
+        )
+      : [];
+    args.push(...customFlags);
 
     // add TTY only if stdin is TTY as well, i.e. for piped input don't init TTY in container
     if (process.stdin.isTTY) {
@@ -935,6 +993,19 @@ export async function start_sandbox(
       // For the user-creation logic to work, the container must start as root.
       // The entrypoint script then handles dropping privileges to the correct user.
       args.push('--user', 'root');
+
+      // Under rootless Podman, container UIDs other than root map to
+      // subordinate host UIDs, so files the sandbox user creates in bind
+      // mounts would not be owned by the host user. --userns=keep-id maps the
+      // host UID to the same UID inside the container. Skip it when the user
+      // already configured --userns via SANDBOX_FLAGS.
+      if (
+        command === 'podman' &&
+        !hasUsernsFlag(customFlags) &&
+        (await isPodmanRootless())
+      ) {
+        args.push('--userns=keep-id');
+      }
 
       const uid = (await execAsync('id -u')).stdout.trim();
       const gid = (await execAsync('id -g')).stdout.trim();

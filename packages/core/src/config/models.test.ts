@@ -72,6 +72,8 @@ describe('Dynamic Configuration Parity', () => {
     DEFAULT_GEMINI_MODEL_AUTO,
     PREVIEW_GEMINI_MODEL,
     DEFAULT_GEMINI_MODEL,
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
     'custom-model',
   ];
 
@@ -446,6 +448,56 @@ describe('supportsMultimodalFunctionResponse', () => {
   it('should return false for other models', () => {
     expect(supportsMultimodalFunctionResponse('some-other-model')).toBe(false);
     expect(supportsMultimodalFunctionResponse('')).toBe(false);
+  });
+
+  it('should return false when config indicates no access to preview models and a preview or auto model is resolved', () => {
+    const noPreviewLegacyConfig = {
+      getExperimentalDynamicModelConfiguration: () => false,
+      getHasAccessToPreviewModel: () => false,
+      modelConfigService,
+    } as unknown as Config;
+    const noPreviewDynamicConfig = {
+      getExperimentalDynamicModelConfiguration: () => true,
+      getHasAccessToPreviewModel: () => false,
+      modelConfigService,
+    } as unknown as Config;
+
+    expect(
+      supportsMultimodalFunctionResponse(
+        GEMINI_MODEL_ALIAS_AUTO,
+        noPreviewLegacyConfig,
+      ),
+    ).toBe(false);
+    expect(
+      supportsMultimodalFunctionResponse(
+        GEMINI_MODEL_ALIAS_AUTO,
+        noPreviewDynamicConfig,
+      ),
+    ).toBe(false);
+    expect(
+      supportsMultimodalFunctionResponse(
+        PREVIEW_GEMINI_MODEL,
+        noPreviewLegacyConfig,
+      ),
+    ).toBe(false);
+    expect(
+      supportsMultimodalFunctionResponse(
+        PREVIEW_GEMINI_MODEL,
+        noPreviewDynamicConfig,
+      ),
+    ).toBe(false);
+  });
+
+  it('should fall back to gemini-3 prefix check when dynamic config has no model definition for a gemini-3 variant', () => {
+    expect(
+      supportsMultimodalFunctionResponse('gemini-3-flash', dynamicConfig),
+    ).toBe(true);
+    expect(
+      supportsMultimodalFunctionResponse('gemini-3.0-pro', dynamicConfig),
+    ).toBe(true);
+    expect(
+      supportsMultimodalFunctionResponse('gemini-2.5-pro', dynamicConfig),
+    ).toBe(false);
   });
 });
 
@@ -847,6 +899,8 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
   });
 
   it.each([
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
     'gemini-3.6-flash',
     'gemini-3.7-flash',
     'gemini-3.9-flash',
@@ -857,6 +911,27 @@ describe('resolveModel Gemini 3.5 Flash GA', () => {
       expect(resolveModel(model, false, false, true, undefined, true)).toBe(
         model,
       );
+    },
+  );
+
+  it.each([
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-3.6-flash',
+    'gemini-3.7-flash',
+    'gemini-3.9-flash',
+    'gemini-9.9-flash',
+  ])(
+    'should preserve the explicit versioned model %s when useGemini3_5Flash is true (dynamic)',
+    (model) => {
+      const mockDynamicConfig = {
+        getExperimentalDynamicModelConfiguration: () => true,
+        modelConfigService,
+      } as unknown as Config;
+
+      expect(
+        resolveModel(model, false, false, true, mockDynamicConfig, true),
+      ).toBe(model);
     },
   );
 

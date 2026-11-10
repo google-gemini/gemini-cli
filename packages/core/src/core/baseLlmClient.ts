@@ -319,9 +319,12 @@ export class BaseLlmClient {
     );
 
     let initialActiveModel = this.config.getActiveModel();
+    let isFirstAttempt = true;
 
     try {
       const apiCall = () => {
+        const firstAttempt = isFirstAttempt;
+        isFirstAttempt = false;
         // Ensure we use the current active model
         // in case a fallback occurred in a previous attempt.
         const activeModel = this.config.getActiveModel();
@@ -335,6 +338,18 @@ export class BaseLlmClient {
             });
           currentModel = resolvedModel;
           currentGenerateContentConfig = generateContentConfig;
+        } else if (
+          !firstAttempt &&
+          (this.config.getModelAvailabilityService?.()?.snapshot(currentModel)
+            ?.available ?? true) === false
+        ) {
+          const { model: reselectedModel, config: reselectedConfig } =
+            applyModelSelection(this.config, modelConfigKey);
+          currentModel = reselectedModel;
+          if (reselectedConfig) {
+            currentGenerateContentConfig = reselectedConfig;
+          }
+          initialActiveModel = this.config.getActiveModel();
         }
         const finalConfig: GenerateContentConfig = {
           ...currentGenerateContentConfig,
@@ -366,6 +381,7 @@ export class BaseLlmClient {
         authType:
           this.authType ?? this.config.getContentGeneratorConfig()?.authType,
         retryFetchErrors: this.config.getRetryFetchErrors(),
+        signal: abortSignal,
         onRetry: (attempt, error, delayMs) => {
           const actualMaxAttempts =
             getAvailabilityContext()?.policy.maxAttempts ??
@@ -381,6 +397,7 @@ export class BaseLlmClient {
             error: errorType,
             model: modelName,
             status: getErrorStatus(error),
+            sessionId: this.config.getSessionId?.(),
           });
 
           logNetworkRetryAttempt(

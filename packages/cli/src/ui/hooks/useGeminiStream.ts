@@ -252,6 +252,7 @@ export const useGeminiStream = (
   terminalHeight: number,
   isShellFocused?: boolean,
   consumeUserHint?: () => string | null,
+  isEditorDialogOpen?: boolean,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
@@ -1074,7 +1075,7 @@ export const useGeminiStream = (
 
   useKeypress(
     (key) => {
-      if (key.name === 'escape' && !isShellFocused) {
+      if (key.name === 'escape' && !isShellFocused && !isEditorDialogOpen) {
         void cancelOngoingRequest(false);
         return true;
       }
@@ -1082,8 +1083,9 @@ export const useGeminiStream = (
     },
     {
       isActive:
-        streamingState === StreamingState.Responding ||
-        streamingState === StreamingState.WaitingForConfirmation,
+        !isEditorDialogOpen &&
+        (streamingState === StreamingState.Responding ||
+          streamingState === StreamingState.WaitingForConfirmation),
     },
   );
 
@@ -1161,7 +1163,8 @@ export const useGeminiStream = (
           }
         }
 
-        if (shellModeActive && handleShellCommand(trimmedQuery, abortSignal)) {
+        if (shellModeActive) {
+          handleShellCommand(trimmedQuery, abortSignal);
           return { queryToSend: null, shouldProceed: false };
         }
 

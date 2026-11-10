@@ -351,6 +351,12 @@ interactive = true
 # defined in. In chained commands (e.g., cmd1 > file && cmd2), each
 # individual command rule must permit redirection if it's used.
 allowRedirection = true
+
+# (Optional) If true, lets shell commands use command substitution
+# ($(), backticks, <(), >(), or PowerShell @()). By default, the policy
+# engine asks for confirmation when substitution syntax is detected, even if
+# inner subcommands are also allowed.
+allowCommandSubstitution = true
 ```
 
 ### Using arrays (lists)

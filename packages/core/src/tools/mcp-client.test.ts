@@ -122,6 +122,7 @@ describe('mcp-client', () => {
     await cleanupTmpDir(testWorkspace);
     workspaceContext = null as unknown as WorkspaceContext;
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   describe('McpClient', () => {
@@ -2265,6 +2266,41 @@ describe('mcp-client', () => {
         });
       });
 
+      describe('with __GCLI_EXPAND_TARGET__ in environment', () => {
+        beforeEach(() => {
+          vi.stubEnv('GEMINI_CLI_HEADER_VAR', 'header-value');
+          vi.stubEnv('__GCLI_EXPAND_TARGET__', 'unexpected-override');
+        });
+
+        it('expands headers without being overwritten by __GCLI_EXPAND_TARGET__', async () => {
+          const transport = await createTransport(
+            'test-server',
+            {
+              url: 'http://test-server',
+              headers: {
+                'X-Custom-Header': 'Prefix $GEMINI_CLI_HEADER_VAR',
+                'X-Static-Header': 'literal-value',
+              },
+            },
+            false,
+            MOCK_CONTEXT,
+          );
+
+          expect(unwrap(transport)).toBeInstanceOf(
+            StreamableHTTPClientTransport,
+          );
+          expect(unwrap(transport)).toMatchObject({
+            _url: new URL('http://test-server'),
+            _requestInit: {
+              headers: {
+                'X-Custom-Header': 'Prefix header-value',
+                'X-Static-Header': 'literal-value',
+              },
+            },
+          });
+        });
+      });
+
       it('with type="http" creates StreamableHTTPClientTransport', async () => {
         const transport = await createTransport(
           'test-server',
@@ -2634,6 +2670,39 @@ describe('mcp-client', () => {
         expect(callArgs.env).toBeDefined();
         expect(callArgs.env!['TEST_EXPANDED']).toBe('Value is expanded-value');
         expect(callArgs.env!['SECRET_KEY']).toBe('intentional-secret-123');
+      });
+
+      describe('when __GCLI_EXPAND_TARGET__ is set in environment', () => {
+        beforeEach(() => {
+          vi.stubEnv('GEMINI_CLI_TEST_VAR', 'expanded-value');
+          vi.stubEnv('__GCLI_EXPAND_TARGET__', 'unexpected-override');
+        });
+
+        it('expands mcpServerConfig.env values without overwriting them', async () => {
+          const mockedTransport = vi
+            .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+            .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+          await createTransport(
+            'test-server',
+            {
+              command: 'test-command',
+              env: {
+                TEST_EXPANDED: 'Value is $GEMINI_CLI_TEST_VAR',
+                SECRET_KEY: 'intentional-secret-123',
+              },
+            },
+            false,
+            MOCK_CONTEXT,
+          );
+
+          const callArgs = mockedTransport.mock.calls[0][0];
+          expect(callArgs.env).toBeDefined();
+          expect(callArgs.env!['TEST_EXPANDED']).toBe(
+            'Value is expanded-value',
+          );
+          expect(callArgs.env!['SECRET_KEY']).toBe('intentional-secret-123');
+        });
       });
 
       it('should filter out dangerous environment variables from mcpServerConfig.env', async () => {

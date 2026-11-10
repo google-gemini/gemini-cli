@@ -113,6 +113,14 @@
     (global-name "com.apple.SystemConfiguration.configd")
 )
 
+;; allow FSEvents, which Node's fs.watch uses for directory watches on macOS
+;; (e.g. the git branch indicator watching .git/HEAD). Without it, watchers
+;; fail asynchronously with EMFILE and live branch-name updates stop. FSEvents
+;; only reports file changes, and file-read* is already allowed above.
+(allow mach-lookup
+    (global-name "com.apple.FSEvents")
+)
+
 ;; AF_SYSTEM socket used by the network stack (from baseProfile.ts)
 (allow system-socket
     (require-all

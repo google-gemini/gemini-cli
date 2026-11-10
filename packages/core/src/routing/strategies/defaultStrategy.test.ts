@@ -124,4 +124,26 @@ describe('DefaultStrategy', () => {
       },
     });
   });
+
+  it('should route to gemini-3.1-pro-preview-customtools when auto and custom tools are enabled', async () => {
+    const strategy = new DefaultStrategy();
+    const mockContext = {} as RoutingContext;
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue(GEMINI_MODEL_ALIAS_AUTO),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(true),
+      getUseCustomToolModelSync: vi.fn().mockReturnValue(true),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
+    } as unknown as Config;
+    const mockClient = {} as BaseLlmClient;
+    const mockLocalLiteRtLmClient = {} as LocalLiteRtLmClient;
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision.model).toBe('gemini-3.1-pro-preview-customtools');
+  });
 });
