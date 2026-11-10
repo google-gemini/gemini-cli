@@ -466,6 +466,11 @@ describe('Telemetry SDK', () => {
       await initializeTelemetry(mockConfig);
       await new Promise((resolve) => setTimeout(resolve, 10));
       expect(callback).not.toHaveBeenCalled();
+
+      // If telemetry is subsequently disabled at runtime, events must not execute even when initialized
+      vi.spyOn(mockConfig, 'getTelemetryEnabled').mockReturnValue(false);
+      bufferTelemetryEvent(callback, mockConfig);
+      expect(callback).not.toHaveBeenCalled();
     });
 
     it('should cap buffered events at MAX_TELEMETRY_BUFFER_SIZE before SDK initialization', async () => {

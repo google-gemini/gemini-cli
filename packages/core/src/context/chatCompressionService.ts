@@ -99,6 +99,9 @@ export const MAX_EXEMPT_RETRIEVAL_HISTORY_BYTES = 64 * 1024; // 64 KB
  */
 export const COLLAPSE_HISTORY_BYTE_THRESHOLD = 256 * 1024; // 256 KB
 
+const OMITTED_BINARY_MESSAGE =
+  '[Binary content omitted from previous turn to conserve memory]';
+
 /**
  * Computes the total byte size of text and payload content across all turns in history.
  */
@@ -285,7 +288,7 @@ export function collapseOlderFunctionResponses(
       if (part.inlineData) {
         partsModified = true;
         return {
-          text: '[Binary content omitted from previous turn to conserve memory]',
+          text: OMITTED_BINARY_MESSAGE,
         };
       }
 
@@ -496,29 +499,29 @@ async function truncateHistoryToBudget(
             functionResponseTokenCounter + tokens >
             COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET
           ) {
+            const toolName =
+              part.functionResponse.name?.trim() || 'generic_tool';
             if (
               nestedParts.length > 0 &&
               functionResponseTokenCounter + textTokens <=
                 COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET
             ) {
-              const omittedOutput =
-                '[Binary content omitted from previous turn to conserve memory]';
               newParts.unshift({
                 functionResponse: {
                   id: part.functionResponse.id,
-                  name: part.functionResponse.name,
-                  response: { output: omittedOutput },
+                  name: toolName,
+                  response: { output: OMITTED_BINARY_MESSAGE },
                 },
               });
               functionResponseTokenCounter += estimateTokenCountSync([
-                { text: omittedOutput },
+                { text: OMITTED_BINARY_MESSAGE },
               ]);
             } else {
               try {
                 // Budget exceeded: Truncate this response.
                 const { outputFile } = await saveTruncatedToolOutput(
                   contentStr,
-                  part.functionResponse.name ?? 'unknown_tool',
+                  toolName,
                   config.getNextCompressionTruncationId(),
                   config.storage.getProjectTempDir(),
                 );
@@ -532,7 +535,7 @@ async function truncateHistoryToBudget(
                 newParts.unshift({
                   functionResponse: {
                     id: part.functionResponse.id,
-                    name: part.functionResponse.name,
+                    name: toolName,
                     response: { output: truncatedMessage },
                   },
                 });
@@ -563,7 +566,7 @@ async function truncateHistoryToBudget(
             COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET
           ) {
             const omittedPart: Part = {
-              text: '[Binary content omitted from previous turn to conserve memory]',
+              text: OMITTED_BINARY_MESSAGE,
             };
             newParts.unshift(omittedPart);
             functionResponseTokenCounter += estimateTokenCountSync([

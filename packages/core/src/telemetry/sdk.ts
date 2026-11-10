@@ -120,15 +120,15 @@ export function bufferTelemetryEvent(
   fn: () => void | Promise<void>,
   config?: Config,
 ): void {
-  if (telemetryInitialized) {
-    void fn();
-    return;
-  }
   if (
     config &&
     typeof config.getTelemetryEnabled === 'function' &&
     !config.getTelemetryEnabled()
   ) {
+    return;
+  }
+  if (telemetryInitialized) {
+    void fn();
     return;
   }
   if (telemetryBuffer.length >= MAX_TELEMETRY_BUFFER_SIZE) {
