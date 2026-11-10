@@ -128,7 +128,16 @@ export function bufferTelemetryEvent(
     return;
   }
   if (telemetryInitialized) {
-    void fn();
+    try {
+      const result = fn();
+      if (result instanceof Promise) {
+        result.catch((e) => {
+          debugLogger.error('Error executing telemetry event promise', e);
+        });
+      }
+    } catch (e) {
+      debugLogger.error('Error executing telemetry event', e);
+    }
     return;
   }
   if (telemetryBuffer.length >= MAX_TELEMETRY_BUFFER_SIZE) {

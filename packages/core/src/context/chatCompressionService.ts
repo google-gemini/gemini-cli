@@ -510,12 +510,10 @@ async function truncateHistoryToBudget(
                 functionResponse: {
                   id: part.functionResponse.id,
                   name: toolName,
-                  response: { output: OMITTED_BINARY_MESSAGE },
+                  response: part.functionResponse.response,
                 },
               });
-              functionResponseTokenCounter += estimateTokenCountSync([
-                { text: OMITTED_BINARY_MESSAGE },
-              ]);
+              functionResponseTokenCounter += textTokens;
             } else {
               try {
                 // Budget exceeded: Truncate this response.
