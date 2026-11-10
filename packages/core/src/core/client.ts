@@ -1335,7 +1335,10 @@ export class GeminiClient {
       calculateHistoryByteSize(updatedHistory) >=
       COLLAPSE_HISTORY_BYTE_THRESHOLD
     ) {
-      updatedHistory = collapseOlderFunctionResponses([...updatedHistory]);
+      const collapsedHistory = collapseOlderFunctionResponses(updatedHistory);
+      if (collapsedHistory !== updatedHistory) {
+        updatedHistory = collapsedHistory;
+      }
     }
     if (updatedHistory !== history) {
       const existingTurns = chat.getHistoryTurns?.(false);

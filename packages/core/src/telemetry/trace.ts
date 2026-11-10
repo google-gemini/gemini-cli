@@ -9,6 +9,7 @@ import {
   SpanStatusCode,
   trace,
   type AttributeValue,
+  type Span,
   type SpanOptions,
 } from '@opentelemetry/api';
 
@@ -120,6 +121,84 @@ export interface SpanMetadata {
  * @param fn The function to run in the span.
  * @returns The result of the function.
  */
+function createEndSpan(
+  span: Span,
+  meta: SpanMetadata,
+  tracesEnabled: boolean | undefined,
+  logPrompts: boolean | undefined,
+): () => void {
+  let spanEnded = false;
+  return () => {
+    if (spanEnded) {
+      return;
+    }
+    spanEnded = true;
+    try {
+      if (tracesEnabled) {
+        if (logPrompts !== false) {
+          if (meta.input !== undefined) {
+            const truncated = truncateForTelemetry(meta.input);
+            if (truncated !== undefined) {
+              span.setAttribute(GEN_AI_INPUT_MESSAGES, truncated);
+            }
+          }
+          if (meta.output !== undefined) {
+            const truncated = truncateForTelemetry(meta.output);
+            if (truncated !== undefined) {
+              span.setAttribute(GEN_AI_OUTPUT_MESSAGES, truncated);
+            }
+          }
+        }
+        for (const [key, value] of Object.entries(meta.attributes)) {
+          const truncated = truncateForTelemetry(value);
+          if (truncated !== undefined) {
+            span.setAttribute(key, truncated);
+          }
+        }
+      } else {
+        // Add basic attributes even when traces are disabled
+        for (const [key, value] of Object.entries(meta.attributes)) {
+          if (
+            key === GEN_AI_OPERATION_NAME ||
+            key === GEN_AI_AGENT_NAME ||
+            key === GEN_AI_AGENT_DESCRIPTION ||
+            key === GEN_AI_CONVERSATION_ID
+          ) {
+            const truncated = truncateForTelemetry(value);
+            if (truncated !== undefined) {
+              span.setAttribute(key, truncated);
+            }
+          }
+        }
+      }
+      if (meta.error) {
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: getErrorMessage(meta.error),
+        });
+        if (meta.error instanceof Error) {
+          span.recordException(meta.error);
+        }
+      } else {
+        span.setStatus({ code: SpanStatusCode.OK });
+      }
+    } catch (e) {
+      // Log the error but don't rethrow, to ensure span.end() is called.
+      diag.error('Error setting span attributes in endSpan', e);
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: `Error in endSpan: ${getErrorMessage(e)}`,
+      });
+    } finally {
+      meta.input = undefined;
+      meta.output = undefined;
+      meta.error = undefined;
+      meta.attributes = {};
+      span.end();
+    }
+  };
+}
+
 export async function runInDevTraceSpan<R>(
   opts: SpanOptions & {
     operation: GeminiCliOperation;
@@ -148,72 +227,7 @@ export async function runInDevTraceSpan<R>(
         [GEN_AI_CONVERSATION_ID]: sessionId,
       },
     };
-    let spanEnded = false;
-    const endSpan = () => {
-      if (spanEnded) {
-        return;
-      }
-      spanEnded = true;
-      try {
-        if (tracesEnabled) {
-          if (logPrompts !== false) {
-            if (meta.input !== undefined) {
-              const truncated = truncateForTelemetry(meta.input);
-              if (truncated !== undefined) {
-                span.setAttribute(GEN_AI_INPUT_MESSAGES, truncated);
-              }
-            }
-            if (meta.output !== undefined) {
-              const truncated = truncateForTelemetry(meta.output);
-              if (truncated !== undefined) {
-                span.setAttribute(GEN_AI_OUTPUT_MESSAGES, truncated);
-              }
-            }
-          }
-          for (const [key, value] of Object.entries(meta.attributes)) {
-            const truncated = truncateForTelemetry(value);
-            if (truncated !== undefined) {
-              span.setAttribute(key, truncated);
-            }
-          }
-        } else {
-          // Add basic attributes even when traces are disabled
-          for (const [key, value] of Object.entries(meta.attributes)) {
-            if (
-              key === GEN_AI_OPERATION_NAME ||
-              key === GEN_AI_AGENT_NAME ||
-              key === GEN_AI_AGENT_DESCRIPTION ||
-              key === GEN_AI_CONVERSATION_ID
-            ) {
-              const truncated = truncateForTelemetry(value);
-              if (truncated !== undefined) {
-                span.setAttribute(key, truncated);
-              }
-            }
-          }
-        }
-        if (meta.error) {
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: getErrorMessage(meta.error),
-          });
-          if (meta.error instanceof Error) {
-            span.recordException(meta.error);
-          }
-        } else {
-          span.setStatus({ code: SpanStatusCode.OK });
-        }
-      } catch (e) {
-        // Log the error but don't rethrow, to ensure span.end() is called.
-        diag.error('Error setting span attributes in endSpan', e);
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: `Error in endSpan: ${getErrorMessage(e)}`,
-        });
-      } finally {
-        span.end();
-      }
-    };
+    const endSpan = createEndSpan(span, meta, tracesEnabled, logPrompts);
 
     let isStream = false;
     try {
