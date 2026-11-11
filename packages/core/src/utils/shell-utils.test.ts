@@ -19,6 +19,8 @@ import {
   getShellConfiguration,
   initializeShellParsers,
   parseCommandDetails,
+  parseCommandDetailsAsync,
+  clearPowerShellParseCache,
   splitCommands,
   stripShellWrapper,
   normalizeCommand,
@@ -50,9 +52,11 @@ vi.mock('node:fs', () => ({
   constants: { X_OK: 1 },
 }));
 
+const mockExecFile = vi.hoisted(() => vi.fn());
 const mockSpawnSync = vi.hoisted(() => vi.fn());
 vi.mock('node:child_process', () => ({
   spawnSync: mockSpawnSync,
+  execFile: mockExecFile,
   spawn: vi.fn(),
 }));
 
@@ -97,6 +101,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  clearPowerShellParseCache();
   vi.clearAllMocks();
 });
 
@@ -958,5 +963,102 @@ describe('isInteractiveGeminiCommand', () => {
     expect(isInteractiveGeminiCommand('command -V gemini')).toBe(false);
     expect(isInteractiveGeminiCommand('gemini\\ config')).toBe(false);
     expect(isInteractiveGeminiCommand('git status')).toBe(false);
+  });
+});
+
+describe('asynchronous PowerShell parsing', () => {
+  beforeEach(() => {
+    mockPlatform.mockReturnValue('win32');
+    vi.stubEnv('ComSpec', 'powershell.exe');
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('waits asynchronously and shares complete results with synchronous consumers', async () => {
+    const output = JSON.stringify({
+      success: true,
+      commands: [
+        {
+          name: 'Get-Content',
+          text: 'Get-Content a > b',
+          startIndex: 0,
+          args: ['a'],
+        },
+      ],
+      hasRedirection: true,
+      hasCommandSubstitution: true,
+    });
+    let complete!: (error: Error | null, stdout: string) => void;
+    mockExecFile.mockImplementation((_exe, _args, _options, callback) => {
+      complete = callback;
+    });
+    const pending = parseCommandDetailsAsync('Get-Content a > b');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(mockSpawnSync).not.toHaveBeenCalled();
+    complete(null, output);
+    const result = await pending;
+    expect(result).toMatchObject({
+      hasRedirection: true,
+      hasCommandSubstitution: true,
+    });
+    expect(parseCommandDetails('Get-Content a > b')).toEqual(result);
+    expect(mockSpawnSync).not.toHaveBeenCalled();
+  });
+
+  it('does not synthesize unsafe cached results for child commands', async () => {
+    mockExecFile.mockImplementation((_exe, _args, _options, callback) =>
+      callback(
+        null,
+        JSON.stringify({
+          success: true,
+          commands: [
+            {
+              name: 'Write-Output',
+              text: 'Write-Output $(Get-Content a)',
+              startIndex: 0,
+            },
+            { name: 'Get-Content', text: 'Get-Content a', startIndex: 15 },
+          ],
+          hasCommandSubstitution: true,
+        }),
+      ),
+    );
+    await parseCommandDetailsAsync('Write-Output $(Get-Content a)');
+    mockPowerShellResult(
+      [{ name: 'Get-Content', text: 'Get-Content a' }],
+      false,
+    );
+    parseCommandDetails('Get-Content a');
+    expect(mockSpawnSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps redirection checks non-blocking after failure and retries asynchronously', async () => {
+    mockExecFile.mockImplementation((_exe, _args, _options, callback) =>
+      callback(new Error('failed'), ''),
+    );
+    const command = 'Write-Output hi > out.txt';
+    const fallback = await parseCommandDetailsAsync(command);
+    expect(fallback?.hasError).toBe(false);
+    expect(hasRedirection(command)).toBe(true);
+    expect(mockSpawnSync).not.toHaveBeenCalled();
+    await parseCommandDetailsAsync(command);
+    expect(mockExecFile).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry process failures synchronously', async () => {
+    mockExecFile.mockImplementation((_exe, _args, _options, callback) =>
+      callback(new Error('failed'), ''),
+    );
+    await parseCommandDetailsAsync('Write-Output $(Get-Date)');
+    expect(mockSpawnSync).not.toHaveBeenCalled();
+    expect(mockExecFile).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({
+        timeout: 10000,
+        maxBuffer: 1048576,
+        windowsHide: true,
+      }),
+      expect.any(Function),
+    );
   });
 });

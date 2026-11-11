@@ -10,7 +10,7 @@ import {
   SHELL_TOOL_NAMES,
   REDIRECTION_NAMES,
   initializeShellParsers,
-  parseCommandDetails,
+  parseCommandDetailsAsync,
   stripShellWrapper,
   hasRedirection,
   detectCommandSubstitution,
@@ -490,7 +490,7 @@ export class PolicyEngine {
     }
 
     await initializeShellParsers();
-    const parsed = parseCommandDetails(command);
+    const parsed = await parseCommandDetailsAsync(command);
     const subCommands = parsed?.details ?? [];
 
     // Handle parser failures or syntax errors

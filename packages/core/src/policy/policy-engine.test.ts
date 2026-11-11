@@ -23,6 +23,7 @@ import type { CheckerRunner } from '../safety/checker-runner.js';
 import {
   initializeShellParsers,
   parseCommandDetails,
+  parseCommandDetailsAsync,
 } from '../utils/shell-utils.js';
 import { buildArgsPatterns } from './utils.js';
 import {
@@ -46,6 +47,11 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
       }
       return [command];
     }),
+    parseCommandDetailsAsync: vi
+      .fn()
+      .mockImplementation(async (command: string) =>
+        parseCommandDetails(command),
+      ),
     parseCommandDetails: vi.fn().mockImplementation((command: string) => {
       // Basic mock implementation for PolicyEngine test needs
       const commands = command.includes('&&')
@@ -139,6 +145,27 @@ describe('PolicyEngine', () => {
       },
       mockCheckerRunner,
     );
+  });
+
+  it('uses the default decision without a synchronous retry when async parsing fails', async () => {
+    vi.mocked(parseCommandDetailsAsync).mockResolvedValueOnce(null);
+    const syncCalls = vi.mocked(parseCommandDetails).mock.calls.length;
+    engine = new PolicyEngine({
+      defaultDecision: PolicyDecision.ASK_USER,
+      rules: [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          priority: 1,
+        },
+      ],
+    });
+    const result = await engine.check(
+      { name: 'run_shell_command', args: { command: 'Get-Content a' } },
+      undefined,
+    );
+    expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    expect(vi.mocked(parseCommandDetails).mock.calls.length).toBe(syncCalls);
   });
 
   describe('constructor', () => {
