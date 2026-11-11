@@ -567,33 +567,6 @@ export function parseBashCommandDetails(
   };
 }
 
-// Cache only complete parses: child AST extents cannot safely stand in for
-// independent parses (offsets, nested commands and safety flags can differ).
-const powerShellParseCache = new Map<string, CommandParseResult | null>();
-const MAX_POWERSHELL_CACHE_SIZE = 500;
-
-export function clearPowerShellParseCache(): void {
-  powerShellParseCache.clear();
-}
-
-function powerShellCacheKey(command: string, executable: string): string {
-  return JSON.stringify([executable, command]);
-}
-
-function cachePowerShellResult(
-  key: string,
-  result: CommandParseResult | null,
-): void {
-  // Remember failures for synchronous safety helpers, so they use their
-  // conservative fallback instead of blocking on another process. Async
-  // requests retry null entries, allowing recovery from transient failures.
-  powerShellParseCache.delete(key);
-  powerShellParseCache.set(key, result);
-  if (powerShellParseCache.size > MAX_POWERSHELL_CACHE_SIZE) {
-    powerShellParseCache.delete(powerShellParseCache.keys().next().value!);
-  }
-}
-
 function processPowerShellParserOutput(
   stdout: string,
   command: string,
@@ -673,9 +646,6 @@ async function parsePowerShellCommandDetailsAsync(
   executable: string,
 ): Promise<CommandParseResult | null> {
   if (!command.trim()) return { details: [], hasError: true };
-  const key = powerShellCacheKey(command, executable);
-  const cached = powerShellParseCache.get(key);
-  if (cached) return cached;
   const result = await new Promise<CommandParseResult | null>((resolve) => {
     try {
       execFile(
@@ -691,7 +661,6 @@ async function parsePowerShellCommandDetailsAsync(
           env: { ...process.env, [POWERSHELL_COMMAND_ENV]: command },
           encoding: 'utf-8',
           windowsHide: true,
-          timeout: 10000,
           maxBuffer: 1024 * 1024,
         },
         (error, stdout) =>
@@ -703,7 +672,6 @@ async function parsePowerShellCommandDetailsAsync(
       resolve(null);
     }
   });
-  cachePowerShellResult(key, result);
   return result;
 }
 
@@ -718,10 +686,6 @@ function parsePowerShellCommandDetails(
       hasError: true,
     };
   }
-
-  const cacheKey = powerShellCacheKey(command, executable);
-  const cached = powerShellParseCache.get(cacheKey);
-  if (cached !== undefined) return cached;
 
   try {
     const result = spawnSync(
@@ -750,7 +714,6 @@ function parsePowerShellCommandDetails(
       (result.stdout ?? '').toString(),
       command,
     );
-    cachePowerShellResult(cacheKey, parsed);
     return parsed;
   } catch {
     return null;
@@ -777,16 +740,93 @@ export function parseCommandDetails(
   return null;
 }
 
-export async function parseCommandDetailsAsync(
-  command: string,
-): Promise<CommandParseResult | null> {
-  const configuration = getShellConfiguration();
-  if (configuration.shell !== 'powershell') return parseCommandDetails(command);
-  const result = await parsePowerShellCommandDetailsAsync(
-    command,
-    configuration.executable,
-  );
-  return powerShellParseFallback(command, result);
+/**
+ * Parsing state owned by one policy check or shell invocation. Only complete,
+ * exact command parses are reused; failures cannot leak into later operations.
+ * Async lifecycle methods prepare commands before synchronous tool hooks read
+ * them. Standalone synchronous APIs retain their original behavior.
+ */
+export class ShellCommandParser {
+  private readonly pending = new Map<
+    string,
+    Promise<CommandParseResult | null>
+  >();
+  private readonly results = new Map<string, CommandParseResult | null>();
+
+  private key(command: string): string {
+    return JSON.stringify([getShellConfiguration().executable, command]);
+  }
+
+  async prepare(command: string): Promise<void> {
+    await initializeShellParsers();
+    let current = command;
+    for (let depth = 0; depth <= 3; depth++) {
+      const key = this.key(current);
+      let pending = this.pending.get(key);
+      if (!pending) {
+        const configuration = getShellConfiguration();
+        pending =
+          configuration.shell === 'powershell'
+            ? parsePowerShellCommandDetailsAsync(
+                current,
+                configuration.executable,
+              )
+            : Promise.resolve(parseCommandDetails(current));
+        this.pending.set(key, pending);
+      }
+      this.results.set(key, await pending);
+      const next = stripShellWrapper(current.trim());
+      if (next === current || depth === 3) break;
+      current = next;
+    }
+  }
+
+  getCommandDetails(command: string): CommandParseResult | null {
+    const key = this.key(command);
+    if (!this.results.has(key)) return parseCommandDetails(command);
+    const result = this.results.get(key)!;
+    return getShellConfiguration().shell === 'powershell'
+      ? powerShellParseFallback(command, result)
+      : result;
+  }
+
+  getCommandRoots(command: string): string[] {
+    if (!command) return [];
+    const parsed = this.getCommandDetails(command);
+    return !parsed || parsed.hasError
+      ? []
+      : parsed.details
+          .map((detail) => detail.name)
+          .filter((name) => Boolean(name) && !REDIRECTION_NAMES.has(name));
+  }
+
+  hasRedirection(command: string): boolean {
+    if (!/[><]/.test(command)) return false;
+    const key = this.key(command);
+    if (
+      getShellConfiguration().shell !== 'powershell' ||
+      !this.results.has(key)
+    ) {
+      return hasRedirection(command);
+    }
+    // Redirection detection uses the raw PowerShell result, never Bash fallback.
+    const result = this.results.get(key);
+    return result && !result.hasError
+      ? !!result.hasRedirection
+      : /[><]/.test(command);
+  }
+
+  isInteractiveGeminiCommand(command: string): boolean {
+    return isInteractiveGeminiCommand(command, (unwrapped) => {
+      const parsed = this.getCommandDetails(unwrapped);
+      return !parsed || parsed.hasError
+        ? []
+        : parsed.details
+            .filter((detail) => !REDIRECTION_NAMES.has(detail.name))
+            .map((detail) => detail.text)
+            .filter(Boolean);
+    });
+  }
 }
 
 function powerShellParseFallback(
@@ -2676,7 +2716,10 @@ function isInteractiveGeminiSegment(segment: string): boolean {
  * `gemini` CLI session or an invalid management subcommand such as
  * `gemini config ...`.
  */
-export function isInteractiveGeminiCommand(command: string): boolean {
+export function isInteractiveGeminiCommand(
+  command: string,
+  parseSegments: (command: string) => string[] = splitCommands,
+): boolean {
   if (!command || !command.trim()) {
     return false;
   }
@@ -2690,7 +2733,7 @@ export function isInteractiveGeminiCommand(command: string): boolean {
     unwrapped = next;
   }
 
-  const parsedSegments = splitCommands(unwrapped);
+  const parsedSegments = parseSegments(unwrapped);
   const fallbackSegments = splitShellCommandSegments(unwrapped);
   const allSegments =
     parsedSegments.length > 0

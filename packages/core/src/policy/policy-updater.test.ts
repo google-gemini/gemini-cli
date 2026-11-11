@@ -24,6 +24,14 @@ import { escapeRegex } from './utils.js';
 vi.mock('node:fs/promises');
 vi.mock('../config/storage.js');
 vi.mock('../utils/shell-utils.js', () => ({
+  ShellCommandParser: class {
+    getCommandRoots(command: string) {
+      return shellUtils.getCommandRoots(command);
+    }
+    hasRedirection(command: string) {
+      return shellUtils.hasRedirection(command);
+    }
+  },
   getCommandRoots: vi.fn(),
   stripShellWrapper: vi.fn(),
   hasRedirection: vi.fn(),

@@ -19,8 +19,7 @@ import {
   getShellConfiguration,
   initializeShellParsers,
   parseCommandDetails,
-  parseCommandDetailsAsync,
-  clearPowerShellParseCache,
+  ShellCommandParser,
   splitCommands,
   stripShellWrapper,
   normalizeCommand,
@@ -101,7 +100,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  clearPowerShellParseCache();
   vi.clearAllMocks();
 });
 
@@ -966,45 +964,83 @@ describe('isInteractiveGeminiCommand', () => {
   });
 });
 
-describe('asynchronous PowerShell parsing', () => {
+describe('scoped asynchronous PowerShell parsing', () => {
   beforeEach(() => {
     mockPlatform.mockReturnValue('win32');
     vi.stubEnv('ComSpec', 'powershell.exe');
   });
   afterEach(() => vi.unstubAllEnvs());
 
-  it('waits asynchronously and shares complete results with synchronous consumers', async () => {
-    const output = JSON.stringify({
-      success: true,
-      commands: [
-        {
-          name: 'Get-Content',
-          text: 'Get-Content a > b',
-          startIndex: 0,
-          args: ['a'],
-        },
-      ],
-      hasRedirection: true,
-      hasCommandSubstitution: true,
-    });
+  it('shares an in-flight parse only within one operation without blocking timers', async () => {
     let complete!: (error: Error | null, stdout: string) => void;
     mockExecFile.mockImplementation((_exe, _args, _options, callback) => {
       complete = callback;
     });
-    const pending = parseCommandDetailsAsync('Get-Content a > b');
+    const parser = new ShellCommandParser();
+    const first = parser.prepare('Get-Content a > b');
+    const second = parser.prepare('Get-Content a > b');
     await new Promise((resolve) => setImmediate(resolve));
+    expect(mockExecFile).toHaveBeenCalledTimes(1);
     expect(mockSpawnSync).not.toHaveBeenCalled();
-    complete(null, output);
-    const result = await pending;
-    expect(result).toMatchObject({
+    complete(
+      null,
+      JSON.stringify({
+        success: true,
+        commands: [
+          {
+            name: 'Get-Content',
+            text: 'Get-Content a > b',
+            startIndex: 0,
+            args: ['a'],
+          },
+        ],
+        hasRedirection: true,
+        hasCommandSubstitution: true,
+      }),
+    );
+    await Promise.all([first, second]);
+    expect(parser.getCommandDetails('Get-Content a > b')).toMatchObject({
       hasRedirection: true,
       hasCommandSubstitution: true,
     });
-    expect(parseCommandDetails('Get-Content a > b')).toEqual(result);
+    expect(parser.hasRedirection('Get-Content a > b')).toBe(true);
+    expect(mockSpawnSync).not.toHaveBeenCalled();
+    const third = new ShellCommandParser().prepare('Get-Content a > b');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(mockExecFile).toHaveBeenCalledTimes(2);
+    complete(null, '{"success":false}');
+    await third;
+  });
+
+  it('keeps raw PowerShell failure separate from Bash fallback and retries in the next operation', async () => {
+    mockExecFile.mockImplementation((_exe, _args, _options, callback) =>
+      callback(new Error('failed'), ''),
+    );
+    const parser = new ShellCommandParser();
+    const command = 'Write-Output hi > out.txt';
+    await parser.prepare(command);
+    expect(parser.getCommandDetails(command)?.hasError).toBe(false);
+    expect(parser.hasRedirection(command)).toBe(true);
+    expect(parser.getCommandRoots(command)).toContain('Write-Output');
+    expect(mockSpawnSync).not.toHaveBeenCalled();
+    await new ShellCommandParser().prepare(command);
+    expect(mockExecFile).toHaveBeenCalledTimes(2);
+    expect(mockExecFile.mock.calls[0][2]).not.toHaveProperty('timeout');
+  });
+
+  it('prepares stripped wrappers for the interactive-command guard', async () => {
+    mockExecFile.mockImplementation((_exe, _args, _options, callback) =>
+      callback(null, '{"success":false}'),
+    );
+    const parser = new ShellCommandParser();
+    await parser.prepare('powershell -Command "gemini"');
+    expect(
+      parser.isInteractiveGeminiCommand('powershell -Command "gemini"'),
+    ).toBe(true);
     expect(mockSpawnSync).not.toHaveBeenCalled();
   });
 
-  it('does not synthesize unsafe cached results for child commands', async () => {
+  it('does not treat child extents as independent parse results', async () => {
     mockExecFile.mockImplementation((_exe, _args, _options, callback) =>
       callback(
         null,
@@ -1022,43 +1058,9 @@ describe('asynchronous PowerShell parsing', () => {
         }),
       ),
     );
-    await parseCommandDetailsAsync('Write-Output $(Get-Content a)');
-    mockPowerShellResult(
-      [{ name: 'Get-Content', text: 'Get-Content a' }],
-      false,
-    );
-    parseCommandDetails('Get-Content a');
-    expect(mockSpawnSync).toHaveBeenCalledTimes(1);
-  });
-
-  it('keeps redirection checks non-blocking after failure and retries asynchronously', async () => {
-    mockExecFile.mockImplementation((_exe, _args, _options, callback) =>
-      callback(new Error('failed'), ''),
-    );
-    const command = 'Write-Output hi > out.txt';
-    const fallback = await parseCommandDetailsAsync(command);
-    expect(fallback?.hasError).toBe(false);
-    expect(hasRedirection(command)).toBe(true);
-    expect(mockSpawnSync).not.toHaveBeenCalled();
-    await parseCommandDetailsAsync(command);
+    const parser = new ShellCommandParser();
+    await parser.prepare('Write-Output $(Get-Content a)');
+    await parser.prepare('Get-Content a');
     expect(mockExecFile).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not retry process failures synchronously', async () => {
-    mockExecFile.mockImplementation((_exe, _args, _options, callback) =>
-      callback(new Error('failed'), ''),
-    );
-    await parseCommandDetailsAsync('Write-Output $(Get-Date)');
-    expect(mockSpawnSync).not.toHaveBeenCalled();
-    expect(mockExecFile).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.any(Array),
-      expect.objectContaining({
-        timeout: 10000,
-        maxBuffer: 1048576,
-        windowsHide: true,
-      }),
-      expect.any(Function),
-    );
   });
 });
