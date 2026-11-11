@@ -649,15 +649,15 @@ describe('Session', () => {
     });
 
     try {
-      const sent = JSON.stringify(mockSendMessageStream.mock.calls[1][0]);
-      expect(sent).toContain('Output too large.');
-      expect(sent).not.toContain('MIDDLE');
-      const savedPath = path.join(
-        projectTempDir,
-        'tool-outputs',
-        'run_shell_command_call-1.txt',
+      const [part] = mockSendMessageStream.mock.calls[1][0];
+      const text = String(part.functionResponse?.response?.['output']);
+      expect(text).toContain('Output too large.');
+      expect(text).not.toContain('MIDDLE');
+      // Read the path from the text itself, so Windows separators match.
+      const savedPath = text.match(/For full output see: (.+)/)?.[1] ?? '';
+      expect(path.dirname(savedPath)).toBe(
+        path.join(projectTempDir, 'tool-outputs'),
       );
-      expect(sent).toContain(savedPath);
       expect(readFileSync(savedPath, 'utf8')).toBe(output);
     } finally {
       rmSync(projectTempDir, { recursive: true, force: true });
