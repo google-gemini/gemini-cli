@@ -6999,5 +6999,354 @@ describe('GeminiChat', () => {
         }),
       ]);
     });
+
+    it('preserves role alternation on modern models when an empty or thoughtSignature-only model turn after ReadFile is followed by addHistory or getHistory(true) (issue #29574)', async () => {
+      vi.spyOn(mockConfig, 'getModel').mockReturnValue(
+        'gemini-3-flash-preview',
+      );
+      chat.setHistory([
+        {
+          id: 'u1',
+          content: { role: 'user', parts: [{ text: 'Describe image.png' }] },
+        },
+        {
+          id: 'm1',
+          content: {
+            role: 'model',
+            parts: [
+              {
+                functionCall: {
+                  id: 'read_file__call_1',
+                  name: 'read_file',
+                  args: { file_path: 'image.png' },
+                },
+                thoughtSignature: 'sig-call',
+              },
+            ],
+          },
+        },
+      ]);
+
+      vi.mocked(
+        mockContentGenerator.generateContentStream,
+      ).mockResolvedValueOnce(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [
+                    {
+                      text: '',
+                      thoughtSignature: 'sig-empty-stop',
+                    },
+                  ],
+                },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const toolResponseStream = await chat.sendMessageStream(
+        { model: 'gemini-3-flash-preview' },
+        [
+          {
+            functionResponse: {
+              id: 'read_file__call_1',
+              name: 'read_file',
+              response: { output: 'Binary content provided (1 item(s)).' },
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: 'image/png',
+                    data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+                  },
+                },
+              ],
+            },
+          },
+        ],
+        'prompt-image-read-29574',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of toolResponseStream) {
+        // consume
+      }
+
+      // Simulate IDE context or follow-up user turn appended via addHistory before the next sendMessageStream
+      chat.addHistory({
+        role: 'user',
+        parts: [{ text: ' IDE context update' }],
+      });
+
+      const curated = chat.getHistory(true);
+      expect(curated).toHaveLength(5);
+      expect(curated[3]).toEqual({
+        role: 'model',
+        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+      });
+      expect(curated[4]).toEqual({
+        role: 'user',
+        parts: [{ text: ' IDE context update' }],
+      });
+
+      let capturedContents: Content[] | undefined;
+      vi.mocked(
+        mockContentGenerator.generateContentStream,
+      ).mockImplementationOnce(async (params) => {
+        capturedContents = params.contents as Content[];
+        return (async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [{ text: 'The image is a 1x1 pixel PNG.' }],
+                },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })();
+      });
+
+      const followUpStream = await chat.sendMessageStream(
+        { model: 'gemini-3-flash-preview' },
+        [{ text: 'What is in the image?' }],
+        'prompt-followup-29574',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of followUpStream) {
+        // consume
+      }
+
+      expect(capturedContents).toBeDefined();
+      expect(capturedContents).toHaveLength(5);
+      expect(capturedContents![2].role).toBe('user');
+      expect(
+        capturedContents![2].parts?.some((p) => !!p.functionResponse),
+      ).toBe(true);
+      expect(
+        capturedContents![2].parts?.some((p) =>
+          p.text?.includes('What is in the image?'),
+        ),
+      ).toBe(false);
+      expect(capturedContents![3]).toEqual({
+        role: 'model',
+        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+      });
+      expect(capturedContents![4]).toEqual({
+        role: 'user',
+        parts: [
+          { text: ' IDE context update' },
+          { text: 'What is in the image?' },
+        ],
+      });
+    });
+
+    it('preserves INTERRUPTED_RESPONSE_PLACEHOLDER in getHistory(true) when an interior model turn after ReadFile has only empty text and thoughtSignature (issue #29574)', () => {
+      vi.spyOn(mockConfig, 'getModel').mockReturnValue(
+        'gemini-3-flash-preview',
+      );
+      chat.setHistory([
+        {
+          id: 'u1',
+          content: { role: 'user', parts: [{ text: 'Describe image.png' }] },
+        },
+        {
+          id: 'm1',
+          content: {
+            role: 'model',
+            parts: [
+              {
+                functionCall: {
+                  id: 'read_file__call_1',
+                  name: 'read_file',
+                  args: { file_path: 'image.png' },
+                },
+                thoughtSignature: 'sig-call',
+              },
+            ],
+          },
+        },
+        {
+          id: 'u2',
+          content: {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  id: 'read_file__call_1',
+                  name: 'read_file',
+                  response: { output: 'Binary content provided (1 item(s)).' },
+                },
+              },
+            ],
+          },
+        },
+        {
+          id: 'm2',
+          content: {
+            role: 'model',
+            parts: [{ text: '', thoughtSignature: 'sig-empty' }],
+          },
+        },
+        {
+          id: 'u3',
+          content: {
+            role: 'user',
+            parts: [{ text: 'Please describe it now.' }],
+          },
+        },
+      ]);
+
+      const curated = chat.getHistory(true);
+      expect(curated).toHaveLength(5);
+      expect(curated[3]).toEqual({
+        role: 'model',
+        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+      });
+      expect(curated[4]).toEqual({
+        role: 'user',
+        parts: [{ text: 'Please describe it now.' }],
+      });
+    });
+
+    it('closes an empty model turn after a BINARY_INJECTION_KEY ReadFile tool response before sending the next user turn (issue #29574)', async () => {
+      vi.spyOn(mockConfig, 'getModel').mockReturnValue('gemini-2.5-flash');
+      chat.setHistory([
+        {
+          id: 'u1',
+          content: { role: 'user', parts: [{ text: 'Describe image.png' }] },
+        },
+        {
+          id: 'm1',
+          content: {
+            role: 'model',
+            parts: [
+              {
+                functionCall: {
+                  id: 'read_file__call_1',
+                  name: 'read_file',
+                  args: { file_path: 'image.png' },
+                },
+              },
+            ],
+          },
+        },
+      ]);
+
+      vi.mocked(
+        mockContentGenerator.generateContentStream,
+      ).mockResolvedValueOnce(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [],
+                },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const toolResponseStream = await chat.sendMessageStream(
+        { model: 'gemini-2.5-flash' },
+        [
+          {
+            functionResponse: {
+              id: 'read_file__call_1',
+              name: 'read_file',
+              response: {
+                output: 'Binary content provided (1 item(s)).',
+                [BINARY_INJECTION_KEY]: [
+                  {
+                    inlineData: {
+                      mimeType: 'image/png',
+                      data: 'base64data',
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        ],
+        'prompt-binary-injection-29574',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of toolResponseStream) {
+        // consume
+      }
+
+      let capturedContents: Content[] | undefined;
+      vi.mocked(
+        mockContentGenerator.generateContentStream,
+      ).mockImplementationOnce(async (params) => {
+        capturedContents = params.contents as Content[];
+        return (async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts: [{ text: 'Described binary image.' }],
+                },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })();
+      });
+
+      const followUpStream = await chat.sendMessageStream(
+        { model: 'gemini-2.5-flash' },
+        'Tell me more about it',
+        'prompt-binary-followup-29574',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of followUpStream) {
+        // consume
+      }
+
+      expect(capturedContents).toBeDefined();
+      expect(capturedContents).toHaveLength(5);
+      expect(capturedContents![2]).toEqual({
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              id: 'call_1',
+              name: 'read_file',
+              response: { output: 'Binary content provided (1 item(s)).' },
+            },
+          },
+          {
+            inlineData: {
+              mimeType: 'image/png',
+              data: 'base64data',
+            },
+          },
+        ],
+      });
+      expect(capturedContents![3]).toEqual({
+        role: 'model',
+        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+      });
+      expect(capturedContents![4]).toEqual({
+        role: 'user',
+        parts: [{ text: 'Tell me more about it' }],
+      });
+    });
   });
 });
