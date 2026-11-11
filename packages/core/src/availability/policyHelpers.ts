@@ -304,7 +304,11 @@ export function applyModelSelection(
   const finalModel = selection.selectedModel ?? model;
   let generateContentConfig = resolved.generateContentConfig;
 
-  if (finalModel !== model) {
+  // A tier alias such as `flash-lite` resolves to the first model of its
+  // chain. That is the model the resolved config was written for, so keep it;
+  // only a fallback to another model takes that model's config.
+  const intendedModel = resolvePolicyChain(config, model)[0]?.model ?? model;
+  if (finalModel !== model && finalModel !== intendedModel) {
     const fallbackResolved = config.modelConfigService.getResolvedConfig({
       ...modelConfigKey,
       model: finalModel,
