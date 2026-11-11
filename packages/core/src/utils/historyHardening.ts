@@ -129,15 +129,15 @@ export function isSyntheticBinaryAckTurn(content: Content): boolean {
 function hasTrailingToolResponseUserTurn(
   turns: readonly HistoryTurn[],
 ): boolean {
-  if (turns.at(-1)?.content.role !== 'user') {
+  if (turns.at(-1)?.content?.role !== 'user') {
     return false;
   }
   for (
     let i = turns.length - 1;
-    i >= 0 && turns[i].content.role === 'user';
+    i >= 0 && turns[i]?.content?.role === 'user';
     i--
   ) {
-    if ((turns[i].content.parts ?? []).some((p) => !!p?.functionResponse)) {
+    if ((turns[i]?.content?.parts ?? []).some((p) => !!p?.functionResponse)) {
       return true;
     }
   }

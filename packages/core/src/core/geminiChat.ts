@@ -243,7 +243,7 @@ function isToolResponseTurnAt(
   turns: readonly HistoryTurn[],
   idx: number,
 ): boolean {
-  if (turns[idx]?.content.role !== 'user') {
+  if (turns[idx]?.content?.role !== 'user') {
     return false;
   }
   for (let i = idx; i >= 0; i--) {
@@ -962,7 +962,7 @@ export class GeminiChat {
     let targetIdx = turns.length - 1;
     let hadEmptyTrailingModelTurn = false;
     if (
-      turns[targetIdx]?.content.role === 'model' &&
+      turns[targetIdx]?.content?.role === 'model' &&
       !isSyntheticBinaryAckTurn(turns[targetIdx].content) &&
       !hasNonThoughtContent(turns[targetIdx].content)
     ) {
