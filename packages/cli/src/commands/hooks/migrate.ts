@@ -24,7 +24,8 @@ const EVENT_MAPPING: Record<string, string> = {
   PostToolUse: 'AfterTool',
   UserPromptSubmit: 'BeforeAgent',
   Stop: 'AfterAgent',
-  SubAgentStop: 'AfterAgent', // Gemini doesn't have sub-agents, map to AfterAgent
+  SubagentStop: 'AfterAgent', // Gemini doesn't have sub-agents, map to AfterAgent
+  SubAgentStop: 'AfterAgent', // Fallback for alternate casing
   SessionStart: 'SessionStart',
   SessionEnd: 'SessionEnd',
   PreCompact: 'PreCompress',
@@ -62,6 +63,9 @@ function transformMatcher(matcher: string | undefined): string | undefined {
   return transformed;
 }
 
+const MS_PER_SECOND = 1000;
+const MAX_TIMEOUT_MS = 2147483647; // Max 32-bit signed integer for Node.js setTimeout
+
 /**
  * Migrate a Claude Code hook configuration to Gemini format
  */
@@ -93,10 +97,13 @@ function migrateClaudeHook(claudeHook: unknown): unknown {
     migrated['type'] = 'command';
   }
 
-  // Map timeout field (Claude uses seconds, Gemini uses seconds)
-  // eslint-disable-next-line no-restricted-syntax
-  if ('timeout' in hook && typeof hook['timeout'] === 'number') {
-    migrated['timeout'] = hook['timeout'];
+  // Map timeout field (Claude uses seconds, Gemini uses milliseconds)
+  const timeout = hook['timeout'];
+  if (typeof timeout === 'number' && Number.isFinite(timeout) && timeout > 0) {
+    const ms = Math.round(timeout * MS_PER_SECOND);
+    if (ms > 0) {
+      migrated['timeout'] = Math.min(ms, MAX_TIMEOUT_MS);
+    }
   }
 
   return migrated;
@@ -112,7 +119,7 @@ function migrateClaudeHooks(claudeConfig: unknown): Record<string, unknown> {
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const config = claudeConfig as Record<string, unknown>;
-  const geminiHooks: Record<string, unknown> = {};
+  const geminiHooks: Record<string, unknown[]> = {};
 
   // Check if there's a hooks section
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -161,7 +168,10 @@ function migrateClaudeHooks(claudeConfig: unknown): Record<string, unknown> {
       return migratedDef;
     });
 
-    geminiHooks[geminiEventName] = migratedDefinitions;
+    geminiHooks[geminiEventName] = [
+      ...(geminiHooks[geminiEventName] || []),
+      ...migratedDefinitions,
+    ];
   }
 
   return geminiHooks;

@@ -13,6 +13,8 @@ import {
   RELAUNCH_EXIT_CODE,
   getSpawnConfig,
   getScriptArgs,
+  setupSignalForwarding,
+  handleChildProcessClose,
 } from './src/utils/processUtils.js';
 
 // --- Global Entry Point ---
@@ -62,12 +64,6 @@ async function run() {
 
     let latestAdminSettings: unknown = undefined;
 
-    // Prevent the parent process from exiting prematurely on signals.
-    // The child process will receive the same signals and handle its own cleanup.
-    for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-      process.on(sig as NodeJS.Signals, () => {});
-    }
-
     const runner = () => {
       process.stdin.pause();
 
@@ -97,16 +93,18 @@ async function run() {
         },
       );
 
+      const removeForwarders = setupSignalForwarding(child);
+
       return new Promise<number>((resolve) => {
         child.on('error', (err) => {
+          removeForwarders();
           process.stderr.write(
             'Error: Failed to start child process: ' + err.message + '\n',
           );
           resolve(1);
         });
-        child.on('close', (code) => {
-          process.stdin.resume();
-          resolve(code ?? 1);
+        child.on('close', (code, signal) => {
+          handleChildProcessClose(code, signal, removeForwarders, resolve);
         });
       });
     };
@@ -133,6 +131,9 @@ async function run() {
       '@google/gemini-cli-core'
     );
     const { runExitCleanup } = await import('./src/utils/cleanup.js');
+    const { formatCliError, isCliDebugEnabled } = await import(
+      './src/utils/formatError.js'
+    );
 
     main().catch(async (error: unknown) => {
       // Set a timeout to force exit if cleanup hangs
@@ -160,12 +161,12 @@ async function run() {
         process.exit(error.exitCode);
       }
 
-      writeToStderr('An unexpected critical error occurred:');
-      if (error instanceof Error) {
-        writeToStderr(error.stack + '\n');
-      } else {
-        writeToStderr(String(error) + '\n');
-      }
+      writeToStderr(
+        formatCliError(error, {
+          debug: isCliDebugEnabled(),
+          prefix: 'An unexpected critical error occurred: ',
+        }) + '\n',
+      );
       process.exit(1);
     });
   }

@@ -138,6 +138,7 @@ export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
 export * from './services/FolderTrustDiscoveryService.js';
 export * from './services/chatRecordingService.js';
+export * from './services/usageAggregator.js';
 export * from './services/fileSystemService.js';
 export * from './services/sandboxedFileSystemService.js';
 export * from './services/modelConfigService.js';
@@ -167,6 +168,13 @@ export {
 } from './ide/detect-ide.js';
 export * from './ide/constants.js';
 export * from './ide/types.js';
+export {
+  createProxyAwareFetch,
+  getConnectionConfigFromFile,
+  getPortFromEnv,
+  type ConnectionConfig,
+} from './ide/ide-connection-utils.js';
+export { getIdeProcessInfo } from './ide/process-utils.js';
 
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';

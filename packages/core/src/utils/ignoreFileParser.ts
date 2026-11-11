@@ -11,13 +11,17 @@ import ignorePkg, { type Ignore } from 'ignore';
 const ignore = ((ignorePkg as unknown as { default?: () => Ignore }).default ??
   ignorePkg) as () => Ignore;
 import { debugLogger } from './debugLogger.js';
-import { getNormalizedRelativePath } from './ignorePathUtils.js';
+import {
+  getNormalizedRelativePath,
+  expandWildcardDirectoryPatterns,
+} from './ignorePathUtils.js';
 
 export interface IgnoreFileFilter {
   isIgnored(filePath: string, isDirectory: boolean): boolean;
   getPatterns(): string[];
   getIgnoreFilePaths(): string[];
   hasPatterns(): boolean;
+  clearCache?(): void;
 }
 
 /**
@@ -41,7 +45,7 @@ export class IgnoreFileParser implements IgnoreFileFilter {
       this.fileNames = [];
       const patterns = Array.isArray(input) ? input : [input];
       this.patterns.push(...patterns);
-      this.ig.add(patterns);
+      this.ig.add(expandWildcardDirectoryPatterns(patterns));
     } else {
       this.fileNames = Array.isArray(input) ? input : [input];
       this.loadPatternsFromFiles();
@@ -54,8 +58,8 @@ export class IgnoreFileParser implements IgnoreFileFilter {
     for (const fileName of [...this.fileNames].reverse()) {
       const patterns = this.parseIgnoreFile(fileName);
       this.patterns.push(...patterns);
-      this.ig.add(patterns);
     }
+    this.ig.add(expandWildcardDirectoryPatterns(this.patterns));
   }
 
   private parseIgnoreFile(fileName: string): string[] {

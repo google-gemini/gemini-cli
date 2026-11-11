@@ -7,6 +7,8 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { isNodeError } from '../utils/errors.js';
+import { withPathLock } from '../utils/pathMutex.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import { spawnAsync } from '../utils/shell-utils.js';
 import {
   simpleGit,
@@ -137,9 +139,35 @@ export class GitService {
 
     await fs.mkdir(repoDir, { recursive: true });
 
+    let coreExcludesPath: string | undefined;
+    try {
+      const { stdout } = await spawnAsync(
+        'git',
+        ['config', '--global', '--path', '--get', 'core.excludesFile'],
+        { env: getSafeGitEnv() },
+      );
+      const trimmed = stdout.trim();
+      if (
+        trimmed &&
+        !trimmed.includes('\0') &&
+        !trimmed.includes('\n') &&
+        !trimmed.includes('\r')
+      ) {
+        coreExcludesPath = trimmed;
+      }
+    } catch {
+      // core.excludesFile is not set or failed to read.
+    }
+
     // We don't want to inherit the user's name, email, or gpg signing
     // preferences for the shadow repository, so we create a dedicated gitconfig.
-    const gitConfigContent = `[user]\n  name = ${SHADOW_REPO_AUTHOR_NAME}\n  email = ${SHADOW_REPO_AUTHOR_EMAIL}\n[commit]\n  gpgsign = false\n`;
+    let gitConfigContent = `[user]\n  name = ${SHADOW_REPO_AUTHOR_NAME}\n  email = ${SHADOW_REPO_AUTHOR_EMAIL}\n[commit]\n  gpgsign = false\n`;
+    if (coreExcludesPath) {
+      const sanitizedPath = coreExcludesPath
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"');
+      gitConfigContent += `[core]\n  excludesFile = "${sanitizedPath}"\n`;
+    }
     await fs.writeFile(gitConfigPath, gitConfigContent);
 
     const shadowRepoEnv = this.getShadowRepoEnv(repoDir);
@@ -163,6 +191,159 @@ export class GitService {
 
       await repo.commit('Initial commit', { '--allow-empty': null });
     }
+
+    let realProjectRoot = this.projectRoot;
+    try {
+      realProjectRoot = resolveToRealPath(this.projectRoot);
+    } catch {
+      // Keep unresolved if resolve fails
+    }
+
+    const safeResolve = (p: string) => {
+      try {
+        return resolveToRealPath(p);
+      } catch {
+        return path.resolve(p);
+      }
+    };
+
+    let gitCommonDir: string | undefined;
+    let gitDir: string | undefined;
+    try {
+      const { stdout } = await spawnAsync(
+        'git',
+        ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+        { cwd: realProjectRoot, env: getSafeGitEnv() },
+      );
+      const trimmed = stdout.trim();
+      if (
+        trimmed &&
+        !trimmed.includes('\0') &&
+        !trimmed.includes('\n') &&
+        !trimmed.includes('\r')
+      ) {
+        gitCommonDir = safeResolve(path.resolve(realProjectRoot, trimmed));
+      }
+    } catch {
+      try {
+        const { stdout } = await spawnAsync(
+          'git',
+          ['rev-parse', '--git-common-dir'],
+          { cwd: realProjectRoot, env: getSafeGitEnv() },
+        );
+        const trimmed = stdout.trim();
+        if (
+          trimmed &&
+          !trimmed.includes('\0') &&
+          !trimmed.includes('\n') &&
+          !trimmed.includes('\r')
+        ) {
+          gitCommonDir = safeResolve(path.resolve(realProjectRoot, trimmed));
+        }
+      } catch {
+        // rev-parse might fail if not a git repository
+      }
+    }
+
+    try {
+      const { stdout } = await spawnAsync(
+        'git',
+        ['rev-parse', '--absolute-git-dir'],
+        { cwd: realProjectRoot, env: getSafeGitEnv() },
+      );
+      const trimmed = stdout.trim();
+      if (
+        trimmed &&
+        !trimmed.includes('\0') &&
+        !trimmed.includes('\n') &&
+        !trimmed.includes('\r')
+      ) {
+        gitDir = safeResolve(path.resolve(realProjectRoot, trimmed));
+      }
+    } catch {
+      // rev-parse might fail if not a git repository
+    }
+
+    const isSafeGitSubpath = (candidatePath: string) =>
+      (gitCommonDir && isSubpath(gitCommonDir, candidatePath)) ||
+      (gitDir && isSubpath(gitDir, candidatePath)) ||
+      isSubpath(realProjectRoot, candidatePath);
+
+    let projectInfoExcludePath: string | undefined;
+    try {
+      const { stdout } = await spawnAsync(
+        'git',
+        ['rev-parse', '--path-format=absolute', '--git-path', 'info/exclude'],
+        { cwd: realProjectRoot, env: getSafeGitEnv() },
+      );
+      const trimmed = stdout.trim();
+      if (
+        trimmed &&
+        !trimmed.includes('\0') &&
+        !trimmed.includes('\n') &&
+        !trimmed.includes('\r')
+      ) {
+        const resolved = safeResolve(path.resolve(realProjectRoot, trimmed));
+        if (isSafeGitSubpath(resolved)) {
+          projectInfoExcludePath = resolved;
+        }
+      }
+    } catch {
+      try {
+        const { stdout } = await spawnAsync(
+          'git',
+          ['rev-parse', '--git-path', 'info/exclude'],
+          { cwd: realProjectRoot, env: getSafeGitEnv() },
+        );
+        const trimmed = stdout.trim();
+        if (
+          trimmed &&
+          !trimmed.includes('\0') &&
+          !trimmed.includes('\n') &&
+          !trimmed.includes('\r')
+        ) {
+          const resolved = safeResolve(path.resolve(realProjectRoot, trimmed));
+          if (isSafeGitSubpath(resolved)) {
+            projectInfoExcludePath = resolved;
+          }
+        }
+      } catch {
+        // Fallback handled below
+      }
+    }
+
+    if (!projectInfoExcludePath) {
+      const fallbackPath = path.resolve(
+        this.projectRoot,
+        '.git',
+        'info',
+        'exclude',
+      );
+      const resolved = safeResolve(fallbackPath);
+      if (isSafeGitSubpath(resolved)) {
+        projectInfoExcludePath = resolved;
+      }
+    }
+
+    let userExcludeContent = '';
+    if (projectInfoExcludePath) {
+      try {
+        userExcludeContent = await fs.readFile(projectInfoExcludePath, 'utf-8');
+      } catch (error) {
+        if (
+          isNodeError(error) &&
+          error.code !== 'ENOENT' &&
+          error.code !== 'ENOTDIR'
+        ) {
+          throw error;
+        }
+      }
+    }
+
+    const shadowInfoDir = path.join(repoDir, '.git', 'info');
+    await fs.mkdir(shadowInfoDir, { recursive: true });
+    const shadowInfoExcludePath = path.join(shadowInfoDir, 'exclude');
+    await fs.writeFile(shadowInfoExcludePath, userExcludeContent);
 
     const userGitIgnorePath = path.join(this.projectRoot, '.gitignore');
     const shadowGitIgnorePath = path.join(repoDir, '.gitignore');
@@ -194,23 +375,34 @@ export class GitService {
   }
 
   async createFileSnapshot(message: string): Promise<string> {
+    // `add('.')` stages the entire working tree, so two snapshots running at
+    // once fold each other's files into whichever commit lands first. Serialize
+    // stage -> status -> commit per shadow repository.
+    let realProjectRoot = this.projectRoot;
     try {
-      const repo = this.shadowGitRepository;
-      await repo.add('.');
-      const status = await repo.status();
-      if (status.isClean()) {
-        // If no changes are staged, return the current HEAD commit hash
-        return await this.getCurrentCommitHash();
-      }
-      const commitResult = await repo.commit(message, {
-        '--no-verify': null,
-      });
-      return commitResult.commit;
-    } catch (error) {
-      throw new Error(
-        `Failed to create checkpoint snapshot: ${error instanceof Error ? error.message : 'Unknown error'}. Checkpointing may not be working properly.`,
-      );
+      realProjectRoot = resolveToRealPath(this.projectRoot);
+    } catch {
+      // Keep unresolved
     }
+    return withPathLock(`git-snapshot:${realProjectRoot}`, async () => {
+      try {
+        const repo = this.shadowGitRepository;
+        await repo.add('.');
+        const status = await repo.status();
+        if (status.isClean()) {
+          // If no changes are staged, return the current HEAD commit hash
+          return await this.getCurrentCommitHash();
+        }
+        const commitResult = await repo.commit(message, {
+          '--no-verify': null,
+        });
+        return commitResult.commit;
+      } catch (error) {
+        throw new Error(
+          `Failed to create checkpoint snapshot: ${error instanceof Error ? error.message : 'Unknown error'}. Checkpointing may not be working properly.`,
+        );
+      }
+    });
   }
 
   async restoreProjectFromSnapshot(commitHash: string): Promise<void> {

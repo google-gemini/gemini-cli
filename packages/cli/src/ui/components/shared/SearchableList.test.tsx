@@ -162,6 +162,22 @@ describe('SearchableList', () => {
     });
   });
 
+  it('should allow typing spaces in search query without triggering selection', async () => {
+    const { lastFrame, stdin } = await renderList();
+
+    await React.act(async () => {
+      stdin.write('Item Two');
+    });
+
+    await waitFor(() => {
+      const frame = lastFrame();
+      expect(frame).toContain('Item Two');
+      expect(frame).not.toContain('Item One');
+      expect(frame).not.toContain('Item Three');
+    });
+    expect(mockOnSelect).not.toHaveBeenCalled();
+  });
+
   it('should show "No items found." when no items match', async () => {
     const { lastFrame, stdin } = await renderList();
 

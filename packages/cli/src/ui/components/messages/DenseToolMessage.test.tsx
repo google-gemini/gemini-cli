@@ -563,6 +563,109 @@ describe('DenseToolMessage', () => {
       // Verify it shows the diff when expanded
       expect(lastFrame()).toContain('new line');
     });
+
+    it.each([50, 150])(
+      'preserves right-hand border when rendering wrapped text and scrollbar (terminalWidth=%i)',
+      async (terminalWidth) => {
+        const addedLines = Array.from({ length: 20 }, (_, i) =>
+          i === 2
+            ? '+This document provides a comprehensive state of the "Agent Teams" feature as of April 6, 2026. This context is intended for handover to ensure a seamless continuation of development.'
+            : `+Line ${i + 1} content here`,
+        ).join('\n');
+
+        const longDiffResult: FileDiff = {
+          fileName: 'CURRENT_CONTEXT.md',
+          filePath: '/path/to/CURRENT_CONTEXT.md',
+          fileDiff: `--- a/CURRENT_CONTEXT.md\n+++ b/CURRENT_CONTEXT.md\n@@ -0,0 +1,20 @@\n${addedLines}`,
+          originalContent: '',
+          newContent: addedLines,
+        };
+
+        const { lastFrame, waitUntilReady } = await renderWithProviders(
+          <DenseToolMessage
+            {...defaultProps}
+            name="WriteFile"
+            terminalWidth={terminalWidth}
+            resultDisplay={longDiffResult as ToolResultDisplay}
+            status={CoreToolCallStatus.Success}
+          />,
+          {
+            width: terminalWidth,
+            config: makeFakeConfig({ useAlternateBuffer: true }),
+            settings: createMockSettings({
+              ui: { useAlternateBuffer: true, showLineNumbers: true },
+            }),
+            toolActions: {
+              isExpanded: () => true,
+            },
+          },
+        );
+        await waitUntilReady();
+
+        const output = lastFrame();
+        const boxBodyLines = output
+          .split('\n')
+          .map((line) => line.trim())
+          .filter((line) => line.startsWith('│'));
+
+        expect(boxBodyLines.length).toBeGreaterThan(0);
+        for (const line of boxBodyLines) {
+          expect(line.endsWith('│')).toBe(true);
+        }
+      },
+    );
+
+    it('preserves right-hand border for Edit diffs with hunk gaps and continuous long strings', async () => {
+      const editDiffWithGap: FileDiff = {
+        fileName: 'CURRENT_CONTEXT.md',
+        filePath: '/path/to/CURRENT_CONTEXT.md',
+        fileDiff: [
+          '--- a/CURRENT_CONTEXT.md',
+          '+++ b/CURRENT_CONTEXT.md',
+          '@@ -1,3 +1,3 @@',
+          ' line 1 context',
+          '-old line 2',
+          '+' + 'A'.repeat(120),
+          ' line 3 context',
+          '@@ -20,15 +20,15 @@',
+          ...Array.from({ length: 15 }, (_, i) => `+Added line ${i + 20}`),
+        ].join('\n'),
+        originalContent: 'old',
+        newContent: 'new',
+      };
+
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
+        <DenseToolMessage
+          {...defaultProps}
+          name="Edit"
+          terminalWidth={50}
+          resultDisplay={editDiffWithGap as ToolResultDisplay}
+          status={CoreToolCallStatus.Success}
+        />,
+        {
+          width: 50,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({
+            ui: { useAlternateBuffer: true, showLineNumbers: true },
+          }),
+          toolActions: {
+            isExpanded: () => true,
+          },
+        },
+      );
+      await waitUntilReady();
+
+      const output = lastFrame();
+      const boxBodyLines = output
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.startsWith('│'));
+
+      expect(boxBodyLines.length).toBeGreaterThan(0);
+      for (const line of boxBodyLines) {
+        expect(line.endsWith('│')).toBe(true);
+      }
+    });
   });
 
   describe('Visual Regression', () => {

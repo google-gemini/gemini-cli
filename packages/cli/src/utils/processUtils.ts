@@ -4,8 +4,89 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { ChildProcess } from 'node:child_process';
 import { runExitCleanup } from './cleanup.js';
 import { waitForUpdateCompletion } from './handleAutoUpdate.js';
+
+/**
+ * Signals intercepted by the parent process when supervising a child process.
+ * On POSIX platforms, all of these signals are forwarded to the child process
+ * so signals sent directly to the parent PID (e.g., by process supervisors)
+ * reach the child. On Windows (`win32`), `SIGINT` and `SIGQUIT` are intercepted
+ * on the parent without calling `child.kill()` to avoid abrupt termination via
+ * `TerminateProcess`.
+ */
+export const FORWARDED_SIGNALS: readonly NodeJS.Signals[] = [
+  'SIGTERM',
+  'SIGHUP',
+  'SIGINT',
+  'SIGQUIT',
+  'SIGUSR1',
+  'SIGUSR2',
+];
+
+/**
+ * Registers signal listeners on the parent process to forward termination and
+ * user signals to the spawned child process, returning a cleanup function to
+ * remove the registered listeners.
+ */
+export function setupSignalForwarding(child: ChildProcess): () => void {
+  const forwarders = new Map<NodeJS.Signals, () => void>();
+  for (const sig of FORWARDED_SIGNALS) {
+    const handler = () => {
+      if (
+        process.platform === 'win32' &&
+        (sig === 'SIGINT' || sig === 'SIGQUIT')
+      ) {
+        // Do not forward terminal-generated signals on Windows to avoid abrupt parent termination.
+        return;
+      }
+      try {
+        child.kill(sig);
+      } catch {
+        // Child may already be gone
+      }
+    };
+    forwarders.set(sig, handler);
+    process.on(sig, handler);
+  }
+  return () => {
+    for (const [sig, handler] of forwarders) {
+      process.off(sig, handler);
+    }
+    forwarders.clear();
+  };
+}
+
+/**
+ * Handles the `close` event of a supervised child process by cleaning up signal
+ * forwarders, resuming `process.stdin`, and either re-raising the child's
+ * termination signal on the parent process (with a fallback timeout) or
+ * resolving with the child's exit code.
+ */
+export function handleChildProcessClose(
+  code: number | null,
+  signal: NodeJS.Signals | null,
+  removeForwarders: () => void,
+  resolve: (exitCode: number) => void,
+): void {
+  removeForwarders();
+  // Resume stdin before the parent process exits.
+  process.stdin.resume();
+  if (signal) {
+    try {
+      process.kill(process.pid, signal);
+    } catch {
+      resolve(1);
+      return;
+    }
+    setTimeout(() => {
+      resolve(1);
+    }, 100);
+    return;
+  }
+  resolve(code ?? 1);
+}
 
 /**
  * Exit code used to signal that the CLI should be relaunched.

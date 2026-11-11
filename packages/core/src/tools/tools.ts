@@ -42,6 +42,8 @@ export interface ExecuteOptions {
   updateOutput?: (output: ToolLiveOutput) => void;
   shellExecutionConfig?: ShellExecutionConfig;
   setExecutionIdCallback?: (executionId: number) => void;
+  isClientInitiated?: boolean;
+  isUserConfirmed?: boolean;
 }
 
 /**
@@ -153,6 +155,7 @@ export interface PolicyUpdateOptions {
   mcpName?: string;
   toolName?: string;
   allowRedirection?: boolean;
+  allowCommandSubstitution?: boolean;
 }
 
 /**

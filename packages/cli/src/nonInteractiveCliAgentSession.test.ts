@@ -618,6 +618,93 @@ describe('runNonInteractive', () => {
     ).rejects.toThrow('API connection failed');
   });
 
+  it('normalizes plain StructuredError from GeminiEventType.Error into an Error instance in TEXT mode', async () => {
+    const events: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.Error,
+        value: {
+          error: {
+            message: 'Model not found',
+            status: 404,
+          },
+        },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    let caughtError: unknown;
+    try {
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Trigger API 404',
+        prompt_id: 'prompt-id-error-repro',
+      });
+    } catch (err) {
+      caughtError = err;
+    }
+
+    expect(caughtError).toBeInstanceOf(Error);
+    expect((caughtError as Error).message).toBe('Model not found');
+    expect((caughtError as Error).cause).toEqual({
+      message: 'Model not found',
+      status: 404,
+    });
+    expect((caughtError as { status?: number }).status).toBe(404);
+    expect(
+      Object.getOwnPropertyDescriptor(caughtError, 'status'),
+    ).toMatchObject({
+      value: 404,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  });
+
+  it('preserves string-based status on code without violating numeric status contract in GeminiEventType.Error', async () => {
+    const events: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.Error,
+        value: {
+          error: {
+            message: 'Permission denied on resource',
+            status: 'PERMISSION_DENIED' as unknown as number,
+          },
+        },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    let caughtError: unknown;
+    try {
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Trigger string status error',
+        prompt_id: 'prompt-id-string-status',
+      });
+    } catch (err) {
+      caughtError = err;
+    }
+
+    expect(caughtError).toBeInstanceOf(Error);
+    expect((caughtError as Error).message).toBe(
+      'Permission denied on resource',
+    );
+    expect((caughtError as { status?: unknown }).status).toBeUndefined();
+    expect((caughtError as { code?: string }).code).toBe('PERMISSION_DENIED');
+    expect(Object.getOwnPropertyDescriptor(caughtError, 'code')).toMatchObject({
+      value: 'PERMISSION_DENIED',
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  });
+
   it('should not exit if a tool is not found, and should send error back to model', async () => {
     const toolCallEvent: ServerGeminiStreamEvent = {
       type: GeminiEventType.ToolCallRequest,
@@ -1046,6 +1133,53 @@ describe('runNonInteractive', () => {
     );
   });
 
+  it('preserves StructuredError JSON formatting when GeminiEventType.Error is normalized', async () => {
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents([
+        {
+          type: GeminiEventType.Error,
+          value: {
+            error: {
+              message: 'Model not found',
+              status: 404,
+            },
+          },
+        },
+      ]),
+    );
+
+    let thrownError: Error | null = null;
+    try {
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Test JSON API error',
+        prompt_id: 'prompt-id-json-error',
+      });
+      expect.fail('Expected process.exit to be called');
+    } catch (error) {
+      thrownError = error as Error;
+    }
+
+    expect(thrownError?.message).toBe('process.exit(404) called');
+    expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+      'error',
+      JSON.stringify(
+        {
+          session_id: 'test-session-id',
+          error: {
+            type: 'Error',
+            message: 'Model not found',
+            code: 404,
+          },
+        },
+        null,
+        2,
+      ),
+    );
+  });
+
   it('should handle FatalInputError with custom exit code in JSON format', async () => {
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
     const fatalError = new FatalInputError('Invalid command syntax provided');
@@ -1248,7 +1382,7 @@ describe('runNonInteractive', () => {
       keypressHandler('\u0003', { ctrl: true, name: 'c' });
     }
 
-    await expect(runPromise).rejects.toThrow('Operation cancelled.');
+    await expect(runPromise).rejects.toThrow('process.exit(130) called');
 
     expect(
       processStderrSpy.mock.calls.some(
@@ -1271,6 +1405,123 @@ describe('runNonInteractive', () => {
     }
     // Spies are automatically restored by vi.restoreAllMocks() in afterEach,
     // but we can also do it manually if needed.
+  });
+
+  it('should register SIGINT and SIGTERM listeners and abort on signal in non-TTY mode', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    try {
+      const processOnSpy = vi.spyOn(process, 'on');
+      const processOffSpy = vi.spyOn(process, 'off');
+
+      mockGeminiClient.sendMessageStream.mockImplementation(
+        (_messages, signal: AbortSignal) =>
+          (async function* () {
+            yield { type: GeminiEventType.Content, value: 'Thinking...' };
+            await new Promise((_resolve, reject) => {
+              signal.addEventListener('abort', () => {
+                reject(new Error('Aborted'));
+              });
+            });
+          })(),
+      );
+
+      const runPromise = runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Long running query in non-TTY',
+        prompt_id: 'prompt-id-cancel-nontty',
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const sigintCall = processOnSpy.mock.calls.find(
+        (call) => call[0] === 'SIGINT',
+      );
+      const sigtermCall = processOnSpy.mock.calls.find(
+        (call) => call[0] === 'SIGTERM',
+      );
+      expect(sigintCall).toBeDefined();
+      expect(sigtermCall).toBeDefined();
+
+      const sigintHandler = sigintCall?.[1] as (() => void) | undefined;
+      sigintHandler?.();
+
+      await expect(runPromise).rejects.toThrow('process.exit(130) called');
+
+      expect(processOffSpy).toHaveBeenCalledWith(
+        'SIGINT',
+        expect.any(Function),
+      );
+      expect(processOffSpy).toHaveBeenCalledWith(
+        'SIGTERM',
+        expect.any(Function),
+      );
+    } finally {
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalIsTTY,
+        configurable: true,
+      });
+    }
+  });
+
+  it('should immediately force exit with code 130 on repeated interrupt signal', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    try {
+      const processOnSpy = vi.spyOn(process, 'on');
+
+      mockGeminiClient.sendMessageStream.mockImplementation(
+        (_messages, signal: AbortSignal) =>
+          (async function* () {
+            yield { type: GeminiEventType.Content, value: 'Thinking...' };
+            await new Promise((_resolve, reject) => {
+              signal.addEventListener('abort', () => {
+                reject(new Error('Aborted'));
+              });
+            });
+          })(),
+      );
+
+      const runPromise = runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Test repeated signal in agent session',
+        prompt_id: 'prompt-repeated-signal-agent',
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const sigintCall = processOnSpy.mock.calls.find(
+        (call) => call[0] === 'SIGINT',
+      );
+      const sigintHandler = sigintCall?.[1] as (() => void) | undefined;
+
+      // First signal initiates cancellation
+      sigintHandler?.();
+
+      // Second signal triggers immediate force exit
+      expect(() => sigintHandler?.()).toThrow('process.exit(130) called');
+
+      try {
+        await runPromise;
+      } catch {
+        // Expected
+      }
+    } finally {
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalIsTTY,
+        configurable: true,
+      });
+    }
   });
 
   it('should honor cancellation that happens before session.send()', async () => {
@@ -1317,7 +1568,7 @@ describe('runNonInteractive', () => {
         input: 'Cancelled query',
         prompt_id: 'prompt-id-pre-send-cancel',
       }),
-    ).rejects.toThrow('Operation cancelled.');
+    ).rejects.toThrow('process.exit(130) called');
 
     expect(sendSpy).not.toHaveBeenCalled();
     expect(stdinOnSpy).toHaveBeenCalled();

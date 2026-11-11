@@ -196,6 +196,30 @@ describe('Extension Update Logic', () => {
       });
     });
 
+    it('should succeed when tempDir removal transiently fails with EBUSY on Windows', async () => {
+      const ebusyError = Object.assign(
+        new Error("EBUSY: resource busy or locked, rmdir '/tmp/mock-dir'"),
+        { code: 'EBUSY' },
+      );
+      vi.mocked(fs.promises.rm)
+        .mockRejectedValueOnce(ebusyError)
+        .mockResolvedValueOnce(undefined);
+
+      const result = await updateExtension(
+        mockExtension,
+        mockExtensionManager,
+        ExtensionUpdateState.UPDATE_AVAILABLE,
+        mockDispatch,
+      );
+
+      expect(result).toEqual({
+        name: 'test-extension',
+        originalVersion: '1.0.0',
+        updatedVersion: '1.1.0',
+      });
+      expect(fs.promises.rm).toHaveBeenCalledTimes(2);
+    });
+
     it('should migrate source if migratedTo is set and an update is available', async () => {
       vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue(
         Promise.resolve({
@@ -307,6 +331,28 @@ describe('Extension Update Logic', () => {
         },
       });
       expect(fs.promises.rm).toHaveBeenCalled();
+    });
+
+    it('should not mask primary update error if tempDir cleanup fails in finally', async () => {
+      vi.mocked(
+        mockExtensionManager.installOrUpdateExtension,
+      ).mockRejectedValueOnce(new Error('Install failed'));
+      const cleanupError = Object.assign(
+        new Error('EACCES: permission denied'),
+        {
+          code: 'EACCES',
+        },
+      );
+      vi.mocked(fs.promises.rm).mockRejectedValueOnce(cleanupError);
+
+      await expect(
+        updateExtension(
+          mockExtension,
+          mockExtensionManager,
+          ExtensionUpdateState.UPDATE_AVAILABLE,
+          mockDispatch,
+        ),
+      ).rejects.toThrow('Updated extension not found after installation');
     });
 
     describe('Integrity Verification', () => {

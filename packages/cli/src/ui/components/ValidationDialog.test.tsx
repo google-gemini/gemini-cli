@@ -189,6 +189,62 @@ describe('ValidationDialog', () => {
       expect(lastFrame()).toContain('Waiting for verification...');
       unmount();
     });
+
+    it('should resolve verify after Enter in waiting state without resetting timer on re-render', async () => {
+      const { lastFrame, waitUntilReady, rerender, unmount } = await render(
+        <ValidationDialog
+          validationLink="https://accounts.google.com/verify"
+          onChoice={mockOnChoice}
+        />,
+      );
+
+      const onSelect = (RadioButtonSelect as Mock).mock.calls[0][0].onSelect;
+      await act(async () => {
+        await onSelect('verify');
+      });
+      await waitUntilReady();
+
+      expect(lastFrame()).toContain('Waiting for verification...');
+
+      vi.useFakeTimers();
+      try {
+        // Press Enter to confirm verification in browser is complete
+        await act(async () => {
+          mockKeypressHandler({
+            name: 'enter',
+            ctrl: false,
+            shift: false,
+            alt: false,
+            cmd: false,
+            insertable: false,
+            sequence: '\r',
+          });
+        });
+
+        // Advance 300ms, then simulate parent re-render with a new inline onChoice callback
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(300);
+        });
+        const newOnChoice = vi.fn();
+        rerender(
+          <ValidationDialog
+            validationLink="https://accounts.google.com/verify"
+            onChoice={newOnChoice}
+          />,
+        );
+
+        // Advance remaining 200ms — timer should fire at 500ms total without having been reset
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(200);
+        });
+
+        expect(newOnChoice).toHaveBeenCalledTimes(1);
+        expect(newOnChoice).toHaveBeenCalledWith('verify');
+      } finally {
+        vi.useRealTimers();
+      }
+      unmount();
+    });
   });
 
   describe('headless mode', () => {

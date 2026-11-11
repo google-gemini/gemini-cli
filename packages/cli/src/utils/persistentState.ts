@@ -20,6 +20,12 @@ interface PersistentStateData {
   // Add other persistent state keys here as needed
 }
 
+function isPersistentStateData(obj: unknown): obj is PersistentStateData {
+  return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
+}
+
+let tempCounter = 0;
+
 export class PersistentState {
   private cache: PersistentStateData | null = null;
   private filePath: string | null = null;
@@ -35,34 +41,106 @@ export class PersistentState {
     if (this.cache) {
       return this.cache;
     }
-    try {
-      const filePath = this.getPath();
-      if (fs.existsSync(filePath)) {
+    const filePath = this.getPath();
+    const backupPath = `${filePath}.bak`;
+    const corruptPath = `${filePath}.corrupt`;
+
+    if (fs.existsSync(filePath)) {
+      try {
         const content = fs.readFileSync(filePath, 'utf-8');
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        this.cache = JSON.parse(content);
-      } else {
-        this.cache = {};
+        const parsed: unknown = JSON.parse(content);
+        if (isPersistentStateData(parsed)) {
+          this.cache = parsed;
+          return this.cache;
+        }
+        throw new Error('Persistent state is not a valid JSON object');
+      } catch (error) {
+        debugLogger.warn('Failed to load persistent state:', error);
+        try {
+          if (fs.existsSync(filePath)) {
+            if (fs.existsSync(corruptPath)) {
+              fs.unlinkSync(corruptPath);
+            }
+            fs.renameSync(filePath, corruptPath);
+          }
+        } catch {
+          try {
+            fs.unlinkSync(filePath);
+          } catch {
+            // Ignore failure to remove corrupt file
+          }
+        }
       }
-    } catch (error) {
-      debugLogger.warn('Failed to load persistent state:', error);
-      // If error reading (e.g. corrupt JSON), start fresh
-      this.cache = {};
     }
-    return this.cache!;
+
+    if (fs.existsSync(backupPath)) {
+      try {
+        const bakContent = fs.readFileSync(backupPath, 'utf-8');
+        const bakParsed: unknown = JSON.parse(bakContent);
+        if (isPersistentStateData(bakParsed)) {
+          debugLogger.warn('Recovered persistent state from backup');
+          this.cache = bakParsed;
+          this.save(true);
+          return this.cache;
+        }
+      } catch (bakError) {
+        debugLogger.warn(
+          'Failed to load persistent state from backup:',
+          bakError,
+        );
+      }
+    }
+
+    this.cache = {};
+    return this.cache;
   }
 
-  private save() {
+  private save(skipBackup = false) {
     if (!this.cache) return;
+    const filePath = this.getPath();
+    const dir = path.dirname(filePath);
+    const tempPath = path.join(
+      dir,
+      `.${STATE_FILENAME}.${process.pid}.${Date.now()}.${tempCounter++}.tmp`,
+    );
+
     try {
-      const filePath = this.getPath();
-      const dir = path.dirname(filePath);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
-      fs.writeFileSync(filePath, JSON.stringify(this.cache, null, 2));
+
+      const content = JSON.stringify(this.cache, null, 2);
+      const fd = fs.openSync(tempPath, 'w', 0o600);
+      try {
+        fs.writeFileSync(fd, content, 'utf-8');
+        try {
+          fs.fsyncSync(fd);
+        } catch {
+          // fsync can fail on unsupported or virtualized filesystems
+        }
+      } finally {
+        fs.closeSync(fd);
+      }
+
+      const backupPath = `${filePath}.bak`;
+      if (!skipBackup && fs.existsSync(filePath)) {
+        try {
+          fs.copyFileSync(filePath, backupPath);
+        } catch (err) {
+          debugLogger.warn('Failed to update persistent state backup:', err);
+        }
+      }
+
+      fs.renameSync(tempPath, filePath);
     } catch (error) {
       debugLogger.warn('Failed to save persistent state:', error);
+      try {
+        if (fs.existsSync(tempPath)) {
+          fs.unlinkSync(tempPath);
+        }
+      } catch {
+        // Ignore cleanup error
+      }
     }
   }
 

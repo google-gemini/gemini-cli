@@ -14,7 +14,7 @@ import {
   type MockInstance,
 } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { RELAUNCH_EXIT_CODE } from './processUtils.js';
+import { FORWARDED_SIGNALS, RELAUNCH_EXIT_CODE } from './processUtils.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 
 const mocks = vi.hoisted(() => ({
@@ -141,8 +141,13 @@ describe('relaunchAppInChildProcess', () => {
   const originalExecArgv = [...process.execArgv];
   const originalArgv = [...process.argv];
   const originalExecPath = process.execPath;
+  const initialListeners = new Map<NodeJS.Signals, NodeJS.SignalsListener[]>();
 
   beforeEach(() => {
+    for (const sig of FORWARDED_SIGNALS) {
+      initialListeners.set(sig, process.listeners(sig));
+    }
+
     vi.clearAllMocks();
     mocks.writeToStderr.mockClear();
 
@@ -166,6 +171,15 @@ describe('relaunchAppInChildProcess', () => {
   });
 
   afterEach(() => {
+    for (const sig of FORWARDED_SIGNALS) {
+      process.removeAllListeners(sig);
+      const listeners = initialListeners.get(sig) || [];
+      for (const listener of listeners) {
+        process.on(sig, listener);
+      }
+    }
+    initialListeners.clear();
+
     vi.unstubAllEnvs();
     process.execArgv = [...originalExecArgv];
     process.argv = [...originalArgv];
@@ -367,6 +381,125 @@ describe('relaunchAppInChildProcess', () => {
       mockChild.emit('close', 0);
 
       await expect(relaunchPromise).rejects.toThrow('PROCESS_EXIT_CALLED');
+    });
+
+    it('should forward all signals on POSIX platforms and skip SIGINT/SIGQUIT on Windows', async () => {
+      const originalPlatform = process.platform;
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockReturnValue(mockChild);
+
+      const relaunchPromise = relaunchAppInChildProcess([], []);
+
+      try {
+        Object.defineProperty(process, 'platform', {
+          value: 'linux',
+          configurable: true,
+        });
+        for (const sig of FORWARDED_SIGNALS) {
+          process.emit(sig, sig);
+          expect(mockChild.kill).toHaveBeenCalledWith(sig);
+        }
+
+        vi.mocked(mockChild.kill).mockClear();
+        Object.defineProperty(process, 'platform', {
+          value: 'win32',
+          configurable: true,
+        });
+        for (const sig of ['SIGINT', 'SIGQUIT'] as const) {
+          process.emit(sig, sig);
+          expect(mockChild.kill).not.toHaveBeenCalledWith(sig);
+        }
+        process.emit('SIGTERM', 'SIGTERM');
+        expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
+      } finally {
+        Object.defineProperty(process, 'platform', {
+          value: originalPlatform,
+          configurable: true,
+        });
+      }
+
+      mockChild.emit('close', 0);
+      await expect(relaunchPromise).rejects.toThrow('PROCESS_EXIT_CALLED');
+    });
+
+    it('should remove signal forwarders on close and not leak listeners across relaunches', async () => {
+      const initialCounts = new Map(
+        FORWARDED_SIGNALS.map((sig) => [sig, process.listenerCount(sig)]),
+      );
+
+      let spawnCount = 0;
+      mockedSpawn.mockImplementation(() => {
+        spawnCount++;
+        const child = createMockChildProcess(0, false);
+        setImmediate(() => {
+          child.emit('close', spawnCount === 1 ? RELAUNCH_EXIT_CODE : 0);
+        });
+        return child;
+      });
+
+      await expect(relaunchAppInChildProcess([], [])).rejects.toThrow(
+        'PROCESS_EXIT_CALLED',
+      );
+
+      expect(spawnCount).toBe(2);
+      for (const sig of FORWARDED_SIGNALS) {
+        expect(process.listenerCount(sig)).toBe(initialCounts.get(sig));
+      }
+    });
+
+    it('should remove signal forwarders when child emits error', async () => {
+      const initialSigtermCount = process.listenerCount('SIGTERM');
+      const mockChild = createMockChildProcess(0, false);
+      mockedSpawn.mockReturnValue(mockChild);
+
+      const relaunchPromise = relaunchAppInChildProcess([], []);
+      mockChild.emit('error', new Error('Spawn failed'));
+
+      await expect(relaunchPromise).rejects.toThrow('PROCESS_EXIT_CALLED');
+      expect(process.listenerCount('SIGTERM')).toBe(initialSigtermCount);
+    });
+
+    it('should ignore errors thrown by child.kill when forwarding signals', async () => {
+      const mockChild = createMockChildProcess(0, false);
+      vi.mocked(mockChild.kill).mockImplementation(() => {
+        throw new Error('ESRCH');
+      });
+      mockedSpawn.mockReturnValue(mockChild);
+
+      const relaunchPromise = relaunchAppInChildProcess([], []);
+
+      expect(() => process.emit('SIGTERM', 'SIGTERM')).not.toThrow();
+      expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
+
+      mockChild.emit('close', 0);
+      await expect(relaunchPromise).rejects.toThrow('PROCESS_EXIT_CALLED');
+    });
+
+    it('should re-raise signal on parent process when child is terminated by signal', async () => {
+      vi.useFakeTimers();
+      const processKillSpy = vi
+        .spyOn(process, 'kill')
+        .mockImplementation(() => true);
+
+      try {
+        const mockChild = createMockChildProcess(0, false);
+        mockedSpawn.mockReturnValue(mockChild);
+
+        const relaunchPromise = relaunchAppInChildProcess([], []);
+
+        mockChild.emit('close', null, 'SIGTERM');
+
+        expect(processKillSpy).toHaveBeenCalledWith(process.pid, 'SIGTERM');
+
+        // Fast-forward the 100ms fallback timer
+        vi.runAllTimers();
+
+        await expect(relaunchPromise).rejects.toThrow('PROCESS_EXIT_CALLED');
+        expect(processExitSpy).toHaveBeenCalledWith(1);
+      } finally {
+        processKillSpy.mockRestore();
+        vi.useRealTimers();
+      }
     });
   });
 });

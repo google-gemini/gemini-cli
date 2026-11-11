@@ -30,6 +30,7 @@ import {
   getRetryErrorType,
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
+import { getErrorStatus } from '../utils/httpErrors.js';
 import {
   resolveModel,
   supportsModernFeatures,
@@ -37,7 +38,11 @@ import {
 } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
-import type { CompletedToolCall } from '../scheduler/types.js';
+import {
+  CoreToolCallStatus,
+  type CompletedToolCall,
+} from '../scheduler/types.js';
+import type { ToolCallRecord } from '../services/chatRecordingTypes.js';
 import { isAbortError } from '../utils/errors.js';
 import {
   logContentRetry,
@@ -56,10 +61,17 @@ import {
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
-import { scrubHistory, scrubContents } from '../utils/historyHardening.js';
+import {
+  scrubHistory,
+  scrubContents,
+  INTERRUPTED_RESPONSE_PLACEHOLDER,
+  isSyntheticBinaryAckTurn,
+} from '../utils/historyHardening.js';
+export { INTERRUPTED_RESPONSE_PLACEHOLDER };
 import {
   partListUnionToString,
   ensureStableToolIds,
+  convertSessionToClientHistory,
 } from '../utils/sessionUtils.js';
 import { BINARY_INJECTION_KEY } from '../utils/generateContentResponseUtilities.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
@@ -70,6 +82,7 @@ import {
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -110,11 +123,17 @@ const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 
 /**
- * Stands in for a model turn that never arrived because the stream failed
- * after a tool response was already committed to history.
+ * Error payload used for synthesized function responses that close a model
+ * function call whose real response never arrived.
  */
-export const INTERRUPTED_RESPONSE_PLACEHOLDER =
-  '[The previous response was interrupted before it completed.]';
+export const INTERRUPTED_TOOL_RESPONSE_ERROR =
+  'Response was lost or interrupted.';
+
+/**
+ * Text used for a synthesized user turn when the request would otherwise not
+ * end with a user turn that carries content.
+ */
+export const CONTINUE_PROMPT_TEXT = 'Please continue.';
 
 /**
  * Internal interface for parts that carry the magic 'callIndex' property
@@ -169,17 +188,35 @@ function isValidContent(content: Content): boolean {
     if (part === undefined || Object.keys(part).length === 0) {
       return false;
     }
-    // Check if the part contains any keys other than 'text', 'thought', or 'callIndex'.
+    // Check if the part contains any keys other than 'text', 'thought', 'callIndex', or 'thoughtSignature'.
     // If it has other keys, it carries an active payload (such as tools, files, or code execution)
     // and must be preserved even if the text itself is empty, preventing history sequence corruption.
     const nonTextKeys = Object.keys(part).filter(
-      (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+      (key) =>
+        key !== 'text' &&
+        key !== 'thought' &&
+        key !== 'callIndex' &&
+        key !== 'thoughtSignature',
     );
     if (
       !part.thought &&
-      part.text !== undefined &&
-      part.text === '' &&
-      nonTextKeys.length === 0
+      (part.text === undefined || part.text === '') &&
+      nonTextKeys.length === 0 &&
+      content.parts.every((p) => {
+        if (!p) return true;
+        const ntk = Object.keys(p).filter(
+          (k) =>
+            k !== 'text' &&
+            k !== 'thought' &&
+            k !== 'callIndex' &&
+            k !== 'thoughtSignature',
+        );
+        return (
+          !p.thought &&
+          (p.text === undefined || p.text === '') &&
+          ntk.length === 0
+        );
+      })
     ) {
       return false;
     }
@@ -401,19 +438,11 @@ export class GeminiChat {
           : { id: randomUUID(), content: item },
       );
     } else if (resumedSessionData) {
-      // Otherwise, if resuming from disk, build from the persisted record.
-      initialHistory = resumedSessionData.conversation.messages
-        .filter((m) => m.type === 'user' || m.type === 'gemini')
-        .map((m) => ({
-          id: m.id,
-          content: {
-            role: m.type === 'user' ? 'user' : 'model',
-            parts: Array.isArray(m.content)
-              ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                (m.content as Part[])
-              : [{ text: String(m.content) }],
-          },
-        }));
+      // Otherwise, if resuming from disk, build from the persisted record
+      // using the canonical converter so toolCalls and thoughts are preserved.
+      initialHistory = convertSessionToClientHistory(
+        resumedSessionData.conversation?.messages ?? [],
+      );
     } else {
       initialHistory = [];
     }
@@ -488,6 +517,18 @@ export class GeminiChat {
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
+    let userContent = createUserContent(message);
+    const isOriginalFunctionResponse = isFunctionResponse(userContent);
+
+    // If history ended on an unanswered model tool call or an unanswered tool response
+    // (e.g. cancelled tool call, interrupted stream, or user follow-up prompt), close it
+    // with dedicated synthetic turns BEFORE capturing rollback baselines so durable
+    // repairs of pre-existing broken history survive if the upcoming turn fails or aborts.
+    if (!isOriginalFunctionResponse) {
+      this.closeUnansweredToolCallsTurn();
+      this.closeUnansweredToolResponseTurn();
+    }
+
     const historyLengthBefore = this.agentHistory.length;
     const baselinePromptTokenCount = this.lastPromptTokenCount;
 
@@ -507,18 +548,6 @@ export class GeminiChat {
       streamDoneResolver = resolve;
     });
     this.sendPromise = streamDonePromise;
-
-    let userContent = createUserContent(message);
-    const isOriginalFunctionResponse = isFunctionResponse(userContent);
-
-    // A turn can end leaving history on an unanswered tool response: a stream
-    // error after the response was committed, or a cancelled tool call. Close
-    // it before recording a genuinely new user message, otherwise the two user
-    // turns are coalesced into one and the model continues the trailing text
-    // instead of answering it.
-    if (!isOriginalFunctionResponse) {
-      this.closeUnansweredToolResponseTurn();
-    }
 
     const { model } =
       this.context.config.modelConfigService.getResolvedConfig(modelConfigKey);
@@ -559,6 +588,7 @@ export class GeminiChat {
         const lastTurn = history[history.length - 1];
         if (
           !lastTurn ||
+          lastTurn.content.role !== 'user' ||
           partListUnionToString(lastTurn.content.parts || []) !==
             userMessageContent
         ) {
@@ -572,6 +602,10 @@ export class GeminiChat {
         }
       }
     } else {
+      const binaryParts = !isContextManagementEnabled
+        ? this.extractBinaryInjections(userContent.parts)
+        : null;
+
       // Record tool response as a message to ensure durable ID and linear history for resume.
       const id = this.chatRecordingService.recordSyntheticMessage(
         'user',
@@ -579,8 +613,6 @@ export class GeminiChat {
       );
 
       if (!isContextManagementEnabled) {
-        // Binary injections: If the tool output contains binary data, we expand the history.
-        const binaryParts = this.extractBinaryInjections(userContent.parts);
         if (binaryParts) {
           // Turn 1: The original tool response (now cleaned)
           this.agentHistory.push({ id, content: userContent });
@@ -630,6 +662,7 @@ export class GeminiChat {
         const lastTurn = history[history.length - 1];
         if (
           !lastTurn ||
+          lastTurn.content.role !== 'user' ||
           partListUnionToString(lastTurn.content.parts || []) !==
             partListUnionToString(userContent.parts || [])
         ) {
@@ -637,6 +670,10 @@ export class GeminiChat {
         }
       }
     }
+
+    // Durable history repair runs once per send, outside the retry loop, so
+    // retried attempts never append duplicate synthetic turns.
+    this.replaceEmptyTrailingUserTurn();
 
     const requestHistory = this.getHistoryTurns(true);
 
@@ -766,6 +803,8 @@ export class GeminiChat {
                   delayMs,
                   error: errorType,
                   model,
+                  status: getErrorStatus(error),
+                  sessionId: this.context.config.getSessionId?.(),
                 });
                 await new Promise((res) => setTimeout(res, delayMs));
                 continue;
@@ -825,25 +864,110 @@ export class GeminiChat {
   }
 
   /**
+   * Appends a dedicated synthetic user turn with matching functionResponse
+   * parts when history ends with an unclosed model functionCall. The
+   * subsequent user prompt is then recorded as a clean turn of its own (after
+   * `closeUnansweredToolResponseTurn` adds the closing model turn).
+   */
+  private closeUnansweredToolCallsTurn(): void {
+    const turns = this.agentHistory.get();
+    const last = turns[turns.length - 1];
+    if (last?.content.role !== 'model') {
+      return;
+    }
+    const missingResponses = buildInterruptedToolResponseParts(
+      last.content.parts ?? [],
+    );
+    if (missingResponses.length === 0) {
+      return;
+    }
+    const id = this.chatRecordingService.recordSyntheticMessage(
+      'user',
+      missingResponses,
+    );
+    this.agentHistory.push({
+      id,
+      content: { role: 'user', parts: missingResponses },
+    });
+  }
+
+  /**
+   * Replaces the parts of a trailing user turn that carries no content (e.g.
+   * only empty text parts) with a continuation prompt, keeping the in-memory
+   * history and the session log in sync. Runs once per send so that the
+   * persisted history never keeps an empty user turn between model turns.
+   */
+  private replaceEmptyTrailingUserTurn(): void {
+    const turns = this.agentHistory.get();
+    const last = turns[turns.length - 1];
+    if (last?.content.role !== 'user' || hasNonThoughtContent(last.content)) {
+      return;
+    }
+    this.agentHistory.set([
+      ...turns.slice(0, -1),
+      {
+        id: last.id,
+        content: { ...last.content, parts: [{ text: CONTINUE_PROMPT_TEXT }] },
+      },
+    ]);
+    this.chatRecordingService.updateMessagesFromHistory(
+      this.agentHistory.get(),
+    );
+  }
+
+  /**
    * Appends a closing model turn when history ends with an unanswered tool
-   * response, so the next user message stays a turn of its own.
+   * response (including when followed by an empty or thought-only model turn),
+   * so the next user message stays a turn of its own.
    */
   private closeUnansweredToolResponseTurn(): void {
     const turns = this.agentHistory.get();
-    const last = turns[turns.length - 1];
+    let targetTurn = turns[turns.length - 1];
+    let hadEmptyTrailingModelTurn = false;
     if (
-      last?.content.role !== 'user' ||
-      !last.content.parts?.some((part) => !!part.functionResponse)
+      targetTurn?.content.role === 'model' &&
+      !hasNonThoughtContent(targetTurn.content)
+    ) {
+      hadEmptyTrailingModelTurn = true;
+      targetTurn = turns[turns.length - 2];
+    }
+    if (
+      targetTurn?.content.role !== 'user' ||
+      !targetTurn.content.parts?.some((part) => !!part.functionResponse)
     ) {
       return;
     }
-    this.agentHistory.push({
-      id: randomUUID(),
-      content: {
-        role: 'model',
-        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
-      },
-    });
+    if (hadEmptyTrailingModelTurn) {
+      const lastTurn = turns[turns.length - 1];
+      this.agentHistory.set([
+        ...turns.slice(0, -1),
+        {
+          id: lastTurn.id,
+          content: {
+            ...lastTurn.content,
+            parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+          },
+        },
+      ]);
+      this.chatRecordingService.updateMessagesFromHistory(
+        this.agentHistory.get(),
+      );
+    } else {
+      const placeholderParts: Part[] = [
+        { text: INTERRUPTED_RESPONSE_PLACEHOLDER },
+      ];
+      const id = this.chatRecordingService.recordSyntheticMessage(
+        'gemini',
+        placeholderParts,
+      );
+      this.agentHistory.push({
+        id,
+        content: {
+          role: 'model',
+          parts: placeholderParts,
+        },
+      });
+    }
   }
 
   private extractBinaryInjections(
@@ -912,34 +1036,71 @@ export class GeminiChat {
       () => lastModelToUse,
     );
     // Track initial active model to detect fallback changes
-    const initialActiveModel = this.context.config.getActiveModel();
+    let initialActiveModel = this.context.config.getActiveModel();
+    let isFirstAttempt = true;
 
     const apiCall = async () => {
+      const firstAttempt = isFirstAttempt;
+      isFirstAttempt = false;
       const useGemini3_1 =
         (await this.context.config.getGemini31Launched?.()) ?? false;
+      const useCustomToolModel =
+        (await this.context.config.getUseCustomToolModel?.()) ??
+        this.context.config.getUseCustomToolModelSync?.() ??
+        false;
       const hasAccessToPreview =
         this.context.config.getHasAccessToPreviewModel?.() ?? true;
+      const useLatestFlash =
+        this.context.config.hasLatestFlashGAAccess?.() ??
+        this.context.config.hasGemini35FlashGAAccess?.() ??
+        false;
+      const useLatestFlashLite =
+        this.context.config.hasLatestFlashLiteGAAccess?.() ?? false;
       // Default to the last used model (which respects arguments/availability selection)
       let modelToUse = resolveModel(
         lastModelToUse,
         useGemini3_1,
-        false,
+        useCustomToolModel,
         hasAccessToPreview,
         this.context.config,
-        this.context.config.hasGemini35FlashGAAccess?.() ?? false,
+        useLatestFlash,
+        useLatestFlashLite,
       );
 
       // If the active model has changed (e.g. due to a fallback updating the config),
       // we switch to the new active model.
       if (this.context.config.getActiveModel() !== initialActiveModel) {
+        initialActiveModel = this.context.config.getActiveModel();
         modelToUse = resolveModel(
-          this.context.config.getActiveModel(),
+          initialActiveModel,
           useGemini3_1,
-          false,
+          useCustomToolModel,
           hasAccessToPreview,
           this.context.config,
-          this.context.config.hasGemini35FlashGAAccess?.() ?? false,
+          useLatestFlash,
+          useLatestFlashLite,
         );
+      } else if (
+        !firstAttempt &&
+        (this.context.config
+          .getModelAvailabilityService?.()
+          ?.snapshot(modelToUse)?.available ?? true) === false
+      ) {
+        const { model: reselectedModel, config: reselectedConfig } =
+          applyModelSelection(this.context.config, modelConfigKey);
+        modelToUse = resolveModel(
+          reselectedModel,
+          useGemini3_1,
+          useCustomToolModel,
+          hasAccessToPreview,
+          this.context.config,
+          useLatestFlash,
+          useLatestFlashLite,
+        );
+        if (reselectedConfig) {
+          currentGenerateContentConfig = reselectedConfig;
+        }
+        initialActiveModel = this.context.config.getActiveModel();
       }
 
       if (modelToUse !== lastModelToUse) {
@@ -1020,10 +1181,11 @@ export class GeminiChat {
           modelToUse = resolveModel(
             beforeModelResult.modifiedModel,
             useGemini3_1,
-            false,
+            useCustomToolModel,
             hasAccessToPreview,
             this.context.config,
-            this.context.config.hasGemini35FlashGAAccess?.() ?? false,
+            useLatestFlash,
+            useLatestFlashLite,
           );
           lastModelToUse = modelToUse;
           // Re-evaluate contentsToUse based on the new model's feature support
@@ -1072,12 +1234,23 @@ export class GeminiChat {
         this.tools = await this.onModelChanged(modelToUse);
       }
 
+      // Strip tool call ID prefixes and empty parts first, then normalize the
+      // outbound payload so it always ends with a user turn that carries
+      // content. This is a pure transformation: retries, per-call history
+      // overrides and hook-modified contents never leak into the persistent
+      // history or the session log.
+      const strippedContents = stripToolCallIdPrefixes(contentsToUse);
+      const finalContents = ensureTerminalUserTurn(strippedContents);
+      if (finalContents !== strippedContents) {
+        debugLogger.warn(
+          'Final contents do not end with a valid user turn. Normalizing contents to satisfy Gemini API invariant.',
+        );
+      }
+
       // Track final request parameters for AfterModel hooks
       lastModelToUse = modelToUse;
       lastConfig = config;
-      lastContentsToUse = contentsToUse;
-
-      const finalContents = stripToolCallIdPrefixes(contentsToUse);
+      lastContentsToUse = finalContents;
 
       return this.context.config.getContentGenerator().generateContentStream(
         {
@@ -1127,6 +1300,8 @@ export class GeminiChat {
           delayMs,
           error: error instanceof Error ? error.message : String(error),
           model: lastModelToUse,
+          status: getErrorStatus(error),
+          sessionId: this.context.config.getSessionId?.(),
         });
       },
     });
@@ -1217,6 +1392,33 @@ export class GeminiChat {
     ensureStableToolIds(this.agentHistory.get() as HistoryTurn[]);
   }
 
+  /**
+   * Removes the trailing model turn when it holds function calls that were
+   * never answered (e.g. every call in the batch was declined). Earlier
+   * completed tool rounds and the originating user prompt are kept, and the
+   * durable IDs of the remaining turns are preserved.
+   *
+   * @returns true when a turn was removed.
+   */
+  discardTrailingUnansweredToolCallTurn(): boolean {
+    const turns = this.agentHistory.get();
+    const last = turns[turns.length - 1];
+    if (
+      last?.content.role !== 'model' ||
+      !last.content.parts?.some((part) => !!part.functionCall)
+    ) {
+      return false;
+    }
+    this.agentHistory.rollback(turns.length - 1);
+    this.lastPromptTokenCount = estimateTokenCountSync(
+      this.agentHistory.flatMap((c) => c.content.parts || []),
+    );
+    this.chatRecordingService.updateMessagesFromHistory(
+      this.agentHistory.get(),
+    );
+    return true;
+  }
+
   setHistory(history: ReadonlyArray<Content | HistoryTurn>): void {
     const wrappedHistory: HistoryTurn[] = history.map((item) => {
       if ('id' in item && 'content' in item) {
@@ -1257,47 +1459,37 @@ export class GeminiChat {
   }
 
   // To ensure our requests validate, the first function call in every model
-  // turn within the active loop must have a `thoughtSignature` property.
-  // If we do not do this, we will get back 400 errors from the API.
+  // turn across the conversation history must have a thoughtSignature property.
+  // If we do not do this, the API rejects the request with a 400 Bad Request error.
+  //
+  // Rationale for using undocumented/internal SDK properties:
+  // The thoughtSignature property is an internal/undocumented field in the Gemini SDK/API.
+  // It is required to bypass thought signature validation for historical turns to prevent
+  // HTTP 400 Bad Request errors. Since there is no public API to manage these signatures
+  // on historical turns, we must use this internal property directly.
   ensureActiveLoopHasThoughtSignatures(
     requestContents: readonly Content[],
   ): readonly Content[] {
-    // First, find the start of the active loop by finding the last user turn
-    // with a text message, i.e. that is not a function response. Testing for
-    // text alone is not enough: `coalesceConsecutiveRoles` can merge a function
-    // response turn with the prompt that follows it, and starting the loop at
-    // such a turn starts it later than the API starts the turn, leaving earlier
-    // function calls unsigned but still validated.
-    let activeLoopStartIndex = -1;
-    for (let i = requestContents.length - 1; i >= 0; i--) {
+    interface ThoughtPart extends Part {
+      thoughtSignature?: string;
+    }
+
+    // Iterate through every message, ensuring that the first function call in
+    // each model message's list of parts has a valid thoughtSignature property.
+    // If it does not, we replace the function call with a copy that uses the
+    // synthetic thought signature, allocating new arrays lazily only when needed.
+    let newContents: Content[] | undefined = undefined;
+    for (let i = 0; i < requestContents.length; i++) {
       const content = requestContents[i];
-      if (
-        content.role === 'user' &&
-        content.parts?.some((part) => part.text) &&
-        !content.parts?.some((part) => part.functionResponse)
-      ) {
-        activeLoopStartIndex = i;
-        break;
-      }
-    }
-
-    if (activeLoopStartIndex === -1) {
-      return requestContents;
-    }
-
-    // Iterate through every message in the active loop, ensuring that the first
-    // function call in each message's list of parts has a valid
-    // thoughtSignature property. If it does not we replace the function call
-    // with a copy that uses the synthetic thought signature.
-    const newContents = requestContents.slice(); // Shallow copy the array
-    for (let i = activeLoopStartIndex; i < newContents.length; i++) {
-      const content = newContents[i];
       if (content.role === 'model' && content.parts) {
-        const newParts = content.parts.slice();
-        for (let j = 0; j < newParts.length; j++) {
-          const part = newParts[j];
-          if (part.functionCall) {
+        for (let j = 0; j < content.parts.length; j++) {
+          const part = content.parts[j] as ThoughtPart | undefined;
+          if (part?.functionCall) {
             if (!part.thoughtSignature) {
+              if (!newContents) {
+                newContents = requestContents.slice();
+              }
+              const newParts = content.parts.slice();
               newParts[j] = {
                 ...part,
                 thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
@@ -1312,7 +1504,7 @@ export class GeminiChat {
         }
       }
     }
-    return newContents;
+    return newContents ?? requestContents;
   }
 
   setTools(tools: Tool[]): void {
@@ -1437,7 +1629,7 @@ export class GeminiChat {
           let localFunctionCallCounter = 0;
           modelResponseParts.push(
             ...content.parts
-              .filter((part) => !part.thought)
+              .filter((part) => !part.thought && !isEmptyTextPart(part))
               .map((part) => {
                 if (!this.context.config.isContextManagementEnabled()) {
                   return part;
@@ -1662,6 +1854,36 @@ export class GeminiChat {
       );
     }
 
+    // Persist scheduled tool calls immediately so the session retains a record
+    // if the process is terminated while tool execution is in flight.
+    if (hasToolCall) {
+      const scheduledToolCalls: ToolCallRecord[] = [];
+      let fallbackIndex = 0;
+      for (const part of consolidatedParts) {
+        if (part.functionCall) {
+          const fc = part.functionCall;
+          if (!fc.id) {
+            fc.id = `call_${Date.now()}_${fallbackIndex++}`;
+          }
+          scheduledToolCalls.push({
+            id: fc.id,
+            name: fc.name?.trim() || 'generic_tool',
+            args:
+              typeof fc.args === 'object' &&
+              fc.args !== null &&
+              !Array.isArray(fc.args)
+                ? fc.args
+                : {},
+            status: CoreToolCallStatus.Scheduled,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+      if (scheduledToolCalls.length > 0) {
+        this.chatRecordingService.recordToolCalls(model, scheduledToolCalls);
+      }
+    }
+
     this.agentHistory.push({
       id,
       content: { role: 'model', parts: consolidatedParts },
@@ -1753,8 +1975,86 @@ export function isInvalidArgumentError(errorMessage: string): boolean {
   return errorMessage.includes('Request contains an invalid argument');
 }
 
+/**
+ * Returns true for a part that only holds an empty `text` value (optionally
+ * alongside bookkeeping keys) and no other payload.
+ */
+function isEmptyTextPart(part: Part): boolean {
+  if (!part) {
+    return true;
+  }
+  if (part.text !== undefined && part.text !== '') {
+    return false;
+  }
+  return !Object.keys(part).some(
+    (key) =>
+      key !== 'text' &&
+      key !== 'thought' &&
+      key !== 'callIndex' &&
+      key !== 'thoughtSignature',
+  );
+}
+
+/**
+ * Returns true when the content has at least one part that survives both
+ * thought stripping and `stripToolCallIdPrefixes` (i.e. neither an internal
+ * `thought: true` part nor an empty text part).
+ */
+function hasNonThoughtContent(content: Content): boolean {
+  return (content.parts ?? []).some(
+    (part) => part && !part.thought && !isEmptyTextPart(part),
+  );
+}
+
+/**
+ * Builds functionResponse parts that close every functionCall in `parts`
+ * whose real response was lost or interrupted.
+ */
+export function buildInterruptedToolResponseParts(
+  parts: readonly Part[],
+): Part[] {
+  return parts
+    .filter((part) => !!part?.functionCall)
+    .map((part) => ({
+      functionResponse: {
+        name: part.functionCall!.name?.trim() || 'generic_tool',
+        id: part.functionCall!.id,
+        response: { error: INTERRUPTED_TOOL_RESPONSE_ERROR },
+      },
+    }));
+}
+
+/**
+ * Ensures the request contents end with a user turn that carries content, as
+ * required by the Gemini API. Pure: returns the same array when no change is
+ * needed, otherwise a new array; the input is never mutated.
+ *
+ * - A trailing user turn without non-thought content gets a continuation prompt.
+ * - A trailing model turn with function calls gets matching responses.
+ * - Any other trailing turn (or no turn at all) gets a continuation prompt.
+ */
+export function ensureTerminalUserTurn(contents: Content[]): Content[] {
+  const last = contents.at(-1);
+  if (last?.role === 'user' && hasNonThoughtContent(last)) {
+    return contents;
+  }
+  if (last?.role === 'user') {
+    return [
+      ...contents.slice(0, -1),
+      { ...last, parts: [{ text: CONTINUE_PROMPT_TEXT }] },
+    ];
+  }
+  const missingResponses = buildInterruptedToolResponseParts(last?.parts ?? []);
+  const parts =
+    missingResponses.length > 0
+      ? missingResponses
+      : [{ text: CONTINUE_PROMPT_TEXT }];
+  return [...contents, { role: 'user', parts }];
+}
+
 export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
-  return contents.map((content) => {
+  const stripped: Content[] = [];
+  for (const content of contents) {
     const parts = (content.parts || [])
       .map((part) => {
         const newPart = { ...part };
@@ -1763,8 +2063,7 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
           const name = fc.name?.trim() || 'generic_tool';
           if (fc.id && fc.id.startsWith(`${name}__`)) {
             newPart.functionCall = {
-              name: fc.name,
-              args: fc.args,
+              ...fc,
               id: fc.id.substring(name.length + 2),
             };
           }
@@ -1774,8 +2073,9 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
           const name = fr.name?.trim() || 'generic_tool';
           if (fr.id && fr.id.startsWith(`${name}__`)) {
             newPart.functionResponse = {
-              name: fr.name,
-              response: fr.response,
+              // History parts are plain JSON objects, not class instances.
+              // eslint-disable-next-line @typescript-eslint/no-misused-spread
+              ...fr,
               id: fr.id.substring(name.length + 2),
             };
           }
@@ -1784,7 +2084,11 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
         // If there's an empty text key alongside other active properties, remove the empty text key
         // so it doesn't trigger "contains empty parts" validation errors on the Gemini API.
         const hasOtherKeys = Object.keys(newPart).some(
-          (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
+          (key) =>
+            key !== 'text' &&
+            key !== 'thought' &&
+            key !== 'callIndex' &&
+            key !== 'thoughtSignature',
         );
         if (newPart.text !== undefined && newPart.text === '' && hasOtherKeys) {
           delete newPart.text;
@@ -1792,22 +2096,51 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
 
         return newPart;
       })
-      .filter((part) => {
-        // Filter out truly empty parts that have only text: '' and no payload
-        const hasOtherKeys = Object.keys(part).some(
-          (key) => key !== 'text' && key !== 'thought' && key !== 'callIndex',
-        );
-        if (part.text !== undefined && part.text === '' && !hasOtherKeys) {
-          return false;
-        }
-        return true;
-      });
+      // Filter out truly empty parts that have only text: '' and no payload
+      .filter((part) => !isEmptyTextPart(part));
 
-    return {
+    if (parts.length === 0) {
+      const prev = stripped.at(-1);
+      if (
+        content.role === 'model' &&
+        prev?.role === 'user' &&
+        prev.parts?.some((part) => !!part.functionResponse)
+      ) {
+        stripped.push({
+          ...content,
+          parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+        });
+      }
+      continue;
+    }
+
+    stripped.push({
       ...content,
       parts,
-    };
-  });
+    });
+  }
+
+  return coalesceConsecutiveContents(stripped);
+}
+
+export function coalesceConsecutiveContents(contents: Content[]): Content[] {
+  const result: Content[] = [];
+  for (const item of contents) {
+    const lastIdx = result.length - 1;
+    const last = result[lastIdx];
+    if (last && last.role && last.role === item.role) {
+      const hasParts = last.parts || item.parts;
+      result[lastIdx] = {
+        ...last,
+        parts: hasParts
+          ? [...(last.parts || []), ...(item.parts || [])]
+          : undefined,
+      };
+    } else {
+      result.push({ ...item });
+    }
+  }
+  return result;
 }
 
 export function coalesceConsecutiveRoles(
@@ -1839,43 +2172,70 @@ export function coalesceConsecutiveRoles(
 }
 
 export function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
-  return history
-    .map((turn) => {
-      if (!turn.content.parts) return turn;
-      const hasThought = turn.content.parts.some((p) => p && p.thought);
-      if (!hasThought) return turn;
+  const result: HistoryTurn[] = [];
+  for (const turn of history) {
+    if (!turn.content.parts) {
+      result.push(turn);
+      continue;
+    }
+    const hasThought = turn.content.parts.some((p) => p && p.thought);
+    if (!hasThought) {
+      if (turn.content.parts.length > 0) {
+        result.push(turn);
+      }
+      continue;
+    }
 
-      const nonThoughtParts = turn.content.parts.filter((p) => p && !p.thought);
+    const nonThoughtParts = turn.content.parts.filter((p) => p && !p.thought);
 
-      // The thoughtSignature the API requires on the first functionCall of a
-      // model turn is sometimes only carried by the thought part we just
-      // removed, not by the functionCall part itself. Without it, replaying
-      // this turn in a later request gets rejected with a 400 "missing
-      // thought_signature" error, so inject a synthetic one if needed.
-      let patchedFirstCall = false;
-      const finalParts =
-        turn.content.role === 'model'
-          ? nonThoughtParts.map((p) => {
-              if (!patchedFirstCall && p.functionCall) {
-                patchedFirstCall = true;
-                if (!p.thoughtSignature) {
-                  return {
-                    ...p,
-                    thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
-                  };
-                }
+    if (nonThoughtParts.length === 0) {
+      const prev = result.at(-1);
+      if (
+        turn.content.role === 'model' &&
+        !isSyntheticBinaryAckTurn(turn.content) &&
+        prev?.content.role === 'user' &&
+        (prev.content.parts ?? []).some((p) => !!p?.functionResponse)
+      ) {
+        result.push({
+          ...turn,
+          content: {
+            ...turn.content,
+            parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+          },
+        });
+      }
+      continue;
+    }
+
+    // The thoughtSignature the API requires on the first functionCall of a
+    // model turn is sometimes only carried by the thought part we just
+    // removed, not by the functionCall part itself. Without it, replaying
+    // this turn in a later request gets rejected with a 400 "missing
+    // thought_signature" error, so inject a synthetic one if needed.
+    let patchedFirstCall = false;
+    const finalParts =
+      turn.content.role === 'model'
+        ? nonThoughtParts.map((p) => {
+            if (!patchedFirstCall && p.functionCall) {
+              patchedFirstCall = true;
+              if (!p.thoughtSignature) {
+                return {
+                  ...p,
+                  thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+                };
               }
-              return p;
-            })
-          : nonThoughtParts;
+            }
+            return p;
+          })
+        : nonThoughtParts;
 
-      return {
-        ...turn,
-        content: {
-          ...turn.content,
-          parts: finalParts,
-        },
-      };
-    })
-    .filter((turn) => !turn.content.parts || turn.content.parts.length > 0);
+    result.push({
+      ...turn,
+      content: {
+        ...turn.content,
+        parts: finalParts,
+      },
+    });
+  }
+  return result;
 }

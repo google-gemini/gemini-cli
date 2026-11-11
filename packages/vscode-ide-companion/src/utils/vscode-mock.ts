@@ -81,7 +81,7 @@ export const vscodeMock = {
     onDidCloseTextDocument: vi.fn(() => ({ dispose: vi.fn() })),
     onDidDeleteFiles: vi.fn(() => ({ dispose: vi.fn() })),
     onDidRenameFiles: vi.fn(() => ({ dispose: vi.fn() })),
-    registerTextDocumentContentProvider: vi.fn(),
+    registerTextDocumentContentProvider: vi.fn(() => ({ dispose: vi.fn() })),
     onDidChangeWorkspaceFolders: vi.fn(() => ({ dispose: vi.fn() })),
     onDidGrantWorkspaceTrust: vi.fn(() => ({ dispose: vi.fn() })),
     getConfiguration: vi.fn(() => ({
@@ -95,7 +95,7 @@ export const vscodeMock = {
   },
   commands: {
     executeCommand: vi.fn(),
-    registerCommand: vi.fn(),
+    registerCommand: vi.fn(() => ({ dispose: vi.fn() })),
   },
   Uri: {
     file: vi.fn(

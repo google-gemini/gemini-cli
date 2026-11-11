@@ -47,6 +47,7 @@ vi.mock('../utils/summarizer.js');
 import { initializeShellParsers } from '../utils/shell-utils.js';
 import {
   ShellTool,
+  type ShellToolInvocation,
   OUTPUT_UPDATE_INTERVAL_MS,
   LIVE_OUTPUT_MAX_BUFFER_CHARS,
 } from './shell.js';
@@ -85,8 +86,11 @@ import { type SandboxManager } from '../services/sandboxManager.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   recordModifiedBuildFile,
+  REMOTE_SHELL_OUTPUT_SOURCE,
   resetModifiedBuildFiles,
 } from '../utils/untrustedContextTracker.js';
+import { wrapUntrusted } from '../utils/textUtils.js';
+import type { Content } from '@google/genai';
 
 interface TestableMockMessageBus extends MessageBus {
   defaultToolDecision: 'allow' | 'deny' | 'ask_user';
@@ -1178,6 +1182,130 @@ EOF`;
       expect(confirmation).not.toBe(false);
       expect(confirmation && confirmation.type).toBe('exec');
     });
+
+    describe('untrusted flag provenance and session approvals', () => {
+      const setHistory = (history: Content[]) => {
+        (mockConfig.getGeminiClient as Mock).mockReturnValue({
+          getHistory: vi.fn().mockReturnValue(history),
+        });
+      };
+
+      const shellOutputTurn = (output: string): Content => ({
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              name: SHELL_TOOL_NAME,
+              response: { output: wrapUntrusted(`Output: ${output}`) },
+            },
+          },
+        ],
+      });
+
+      const buildInvocation = (command: string) =>
+        shellTool.build({ command }) as ShellToolInvocation;
+
+      beforeEach(() => {
+        const bus = (shellTool as unknown as { messageBus: MessageBus })
+          .messageBus;
+        (
+          getMockMessageBusInstance(bus) as unknown as TestableMockMessageBus
+        ).defaultToolDecision = 'allow';
+        vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+          ApprovalMode.YOLO,
+        );
+      });
+
+      it('should not request confirmation for flags that only appeared in local shell output', async () => {
+        setHistory([
+          shellOutputTurn(
+            'npm ERR! retry this command with --force or --legacy-peer-deps',
+          ),
+        ]);
+        const invocation = buildInvocation('npm install --legacy-peer-deps');
+
+        expect(invocation.hasTaintedOrBuildFileRisk()).toBe(false);
+        expect(
+          await invocation.shouldConfirmExecute(new AbortController().signal),
+        ).toBe(false);
+      });
+
+      it('should not flag workspace paths printed by earlier shell output', async () => {
+        const workspaceDir = mockConfig
+          .getWorkspaceContext()
+          .getDirectories()[0];
+        const packageJson = path.join(workspaceDir, 'package.json');
+        setHistory([shellOutputTurn(`${workspaceDir}\n${packageJson}`)]);
+        const invocation = buildInvocation(`ls -la ${packageJson}`);
+
+        expect(invocation.hasTaintedOrBuildFileRisk()).toBe(false);
+        expect(
+          await invocation.shouldConfirmExecute(new AbortController().signal),
+        ).toBe(false);
+      });
+
+      it('should not request confirmation again for flags approved earlier in the session', async () => {
+        setHistory([
+          {
+            role: 'user',
+            parts: [
+              {
+                text: '<untrusted_context>Run with --fixture_flag</untrusted_context>',
+              },
+            ],
+          },
+        ]);
+
+        const first = (await buildInvocation(
+          'command --fixture_flag',
+        ).shouldConfirmExecute(
+          new AbortController().signal,
+        )) as ToolExecuteConfirmationDetails;
+        expect(first.untrustedFlags).toEqual(['--fixture_flag']);
+        await first.onConfirm(ToolConfirmationOutcome.Cancel);
+        expect(
+          buildInvocation('command --fixture_flag').hasTaintedOrBuildFileRisk(),
+        ).toBe(true);
+
+        const second = (await buildInvocation(
+          'command --fixture_flag',
+        ).shouldConfirmExecute(
+          new AbortController().signal,
+        )) as ToolExecuteConfirmationDetails;
+        await second.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+
+        const repeated = buildInvocation('command --fixture_flag');
+        expect(repeated.hasTaintedOrBuildFileRisk()).toBe(false);
+        expect(
+          await repeated.shouldConfirmExecute(new AbortController().signal),
+        ).toBe(false);
+        // Approvals are scoped to the root commands they were granted for.
+        expect(
+          buildInvocation('other --fixture_flag').hasTaintedOrBuildFileRisk(),
+        ).toBe(true);
+      });
+
+      it('should stop reporting modified build files once a build command is approved', async () => {
+        const buildFile = path.join(tempRootDir, 'package.json');
+        recordModifiedBuildFile(buildFile, mockConfig);
+
+        const first = (await buildInvocation('npm test').shouldConfirmExecute(
+          new AbortController().signal,
+        )) as ToolExecuteConfirmationDetails;
+        expect(first.modifiedBuildFiles).toEqual([buildFile]);
+        await first.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+
+        expect(
+          buildInvocation('npm run lint').hasTaintedOrBuildFileRisk(),
+        ).toBe(false);
+
+        // A later edit to a build file is reported again.
+        recordModifiedBuildFile(buildFile, mockConfig);
+        expect(
+          buildInvocation('npm run lint').hasTaintedOrBuildFileRisk(),
+        ).toBe(true);
+      });
+    });
   });
 
   describe('getDescription', () => {
@@ -1402,6 +1530,19 @@ EOF`;
       // Should only contain Output field
       expect(result.llmContent).toBe(
         '<untrusted_context>\nOutput: hello\n</untrusted_context>',
+      );
+    });
+
+    it('should record the remote source attribute for commands that retrieve remote content', async () => {
+      const invocation = shellTool.build({
+        command: 'curl -s https://example.com',
+      });
+      const promise = invocation.execute({ abortSignal: mockAbortSignal });
+      resolveShellExecution({ output: 'hello', exitCode: 0, pid: undefined });
+
+      const result = await promise;
+      expect(result.llmContent).toBe(
+        `<untrusted_context source="${REMOTE_SHELL_OUTPUT_SOURCE}">\nOutput: hello\n</untrusted_context>`,
       );
     });
   });
@@ -2015,6 +2156,248 @@ EOF`;
         abortSignal: new AbortController().signal,
       });
       expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should allow PowerShell method calls, compound conditions, and wrapped -NonInteractive commands', async () => {
+      mockPlatform.mockReturnValue('win32');
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: 'ok',
+          rawOutput: Buffer.from('ok'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+
+      const commands = [
+        '$str.Trim()',
+        "[System.IO.Path]::GetFullPath('foo')",
+        "Get-ChildItem | Where-Object { $_.Name.EndsWith('.ts') }",
+        'if (($a -eq 1) -and ($b -eq 2)) { Write-Host ok }',
+        'if (-not ($x)) { Write-Host ok }',
+        'dir "C:\\Program Files (x86)\\Git"',
+        'node -e "console.log(`"hello (world)`")"',
+        'powershell.exe -NoProfile -NonInteractive -Command "node -e \\"console.log(\'hello (world)\')\\""',
+      ];
+
+      for (const command of commands) {
+        const tool = new ShellTool(mockConfig, createMockMessageBus());
+        const invocation = tool.build({ command });
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
+        expect(result.returnDisplay).not.toContain('Blocked');
+      }
+    });
+
+    it('should allow command substitution when PolicyEngine allows all commands', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: 'clean',
+          rawOutput: Buffer.from('clean'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const configWithAllowPolicy = Object.assign(Object.create(mockConfig), {
+        getPolicyEngine: () => ({
+          check: vi.fn().mockResolvedValue({ decision: 'allow' }),
+        }),
+      }) as Config;
+
+      const tool = new ShellTool(configWithAllowPolicy, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo $(git status)' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should block command substitution when PolicyEngine requires confirmation and user has not confirmed', async () => {
+      const configWithAskPolicy = Object.assign(Object.create(mockConfig), {
+        getPolicyEngine: () => ({
+          check: vi.fn().mockResolvedValue({ decision: 'ask_user' }),
+        }),
+      }) as Config;
+
+      const tool = new ShellTool(configWithAskPolicy, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo $(whoami)' });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(result.returnDisplay).toContain('Blocked');
+    });
+
+    it('should allow command substitution after explicit user confirmation or in YOLO mode', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: 'user',
+          rawOutput: Buffer.from('user'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+
+      // 1. Confirmed via scheduler ExecuteOptions.isUserConfirmed
+      const configWithAskPolicy = Object.assign(Object.create(mockConfig), {
+        getPolicyEngine: () => ({
+          check: vi.fn().mockResolvedValue({ decision: 'ask_user' }),
+        }),
+      }) as Config;
+      const tool = new ShellTool(configWithAskPolicy, createMockMessageBus());
+      const confirmedInvocation = tool.build({ command: 'echo $(whoami)' });
+      const confirmedResult = await confirmedInvocation.execute({
+        abortSignal: new AbortController().signal,
+        isUserConfirmed: true,
+      });
+      expect(confirmedResult.returnDisplay).not.toContain('Blocked');
+
+      // 2. YOLO mode fallback when PolicyEngine is not attached
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.YOLO);
+      const yoloTool = new ShellTool(mockConfig, createMockMessageBus());
+      const yoloInvocation = yoloTool.build({ command: 'echo $(whoami)' });
+      const yoloResult = await yoloInvocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(yoloResult.returnDisplay).not.toContain('Blocked');
+
+      // 3. Nested wrapper with command substitution is still blocked when unconfirmed
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+        ApprovalMode.DEFAULT,
+      );
+      const nestedTool = new ShellTool(
+        configWithAskPolicy,
+        createMockMessageBus(),
+      );
+      const nestedInvocation = nestedTool.build({
+        command:
+          'cmd.exe /c "powershell.exe -NoProfile -NonInteractive -Command \\"echo $(whoami)\\""',
+      });
+      const nestedResult = await nestedInvocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(nestedResult.returnDisplay).toContain('Blocked');
+
+      // 4. Tainted / prompt-injected flags block substitution even if PolicyEngine allows
+      const configWithAllowPolicy = Object.assign(Object.create(mockConfig), {
+        getPolicyEngine: () => ({
+          check: vi.fn().mockResolvedValue({ decision: 'allow' }),
+        }),
+      }) as Config;
+      const taintTool = new ShellTool(
+        configWithAllowPolicy,
+        createMockMessageBus(),
+      );
+      const taintedInvocation = taintTool.build({
+        command: 'echo --evil-flag $(git status)',
+      });
+      vi.spyOn(
+        taintedInvocation as unknown as {
+          hasTaintedOrBuildFileRisk: () => boolean;
+        },
+        'hasTaintedOrBuildFileRisk',
+      ).mockReturnValue(true);
+      const taintedResult = await taintedInvocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(taintedResult.returnDisplay).toContain('Blocked');
+    });
+  });
+
+  describe('recursive interactive gemini command guard', () => {
+    beforeEach(() => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: '1.0.0',
+          rawOutput: Buffer.from('1.0.0'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+    });
+
+    it('should reject "gemini config set default-model gemini-2.5 -y" before spawning a PTY', async () => {
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({
+        command: 'gemini config set default-model gemini-2.5 -y',
+      });
+      const confirmDetails = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmDetails).toBe(false);
+
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(mockShellExecutionService).not.toHaveBeenCalled();
+      expect(result.llmContent).toBe(
+        "Tool Error: Do not invoke interactive 'gemini' or 'gemini config' via the Shell tool. Use built-in slash commands (/model, /settings) or inform the user how to change their setting.",
+      );
+      expect(result.error?.type).toBe(ToolErrorType.SHELL_EXECUTE_ERROR);
+    });
+
+    it('should reject bare interactive "gemini" command before spawning a PTY', async () => {
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({
+        command: 'gemini',
+      });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(mockShellExecutionService).not.toHaveBeenCalled();
+      expect(result.llmContent).toContain(
+        "Tool Error: Do not invoke interactive 'gemini' or 'gemini config' via the Shell tool.",
+      );
+    });
+
+    it('should allow non-interactive "gemini --version" and "gemini --help"', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: '1.0.0',
+          rawOutput: Buffer.from('1.0.0'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({
+        command: 'gemini --version',
+      });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(mockShellExecutionService).toHaveBeenCalled();
+      expect(result.error).toBeUndefined();
     });
   });
 });

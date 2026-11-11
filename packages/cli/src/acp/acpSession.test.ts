@@ -191,7 +191,8 @@ describe('Session', () => {
     }));
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await session.dispose();
     vi.restoreAllMocks();
   });
 
@@ -247,6 +248,172 @@ describe('Session', () => {
       },
     });
     expect(result).toMatchObject({ stopReason: 'end_turn' });
+  });
+
+  it('should handle mid-stream GeminiEventType.Retry without concatenating abandoned attempts', async () => {
+    const stream = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: 'Abandoned attempt partial text (',
+      },
+      {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'call-1',
+          name: 'abandoned_tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      },
+      {
+        type: GeminiEventType.Retry,
+      },
+      {
+        type: GeminiEventType.Content,
+        value: 'Successful attempt full text.',
+      },
+    ]);
+    mockSendMessageStream.mockReturnValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    const updates = (mockConnection.sessionUpdate as Mock).mock.calls.map(
+      (call) => call[0].update,
+    );
+
+    // 1. Verify that retry thought chunk was sent to inform the client
+    const retryThought = updates.find(
+      (u) => u.sessionUpdate === 'agent_thought_chunk' && u._meta?.retry,
+    );
+    expect(retryThought).toBeDefined();
+
+    // 2. Verify that the first content chunk after retry has reset metadata
+    const resetChunk = updates.find(
+      (u) =>
+        u.sessionUpdate === 'agent_message_chunk' &&
+        u.content?.text === 'Successful attempt full text.',
+    );
+    expect(resetChunk).toBeDefined();
+    expect(resetChunk?._meta).toEqual({ retry: true, reset: true });
+
+    // 3. Verify that the abandoned tool call request was dropped and not executed/prompted for permission
+    expect(mockConnection.requestPermission).not.toHaveBeenCalled();
+  });
+
+  it('should preserve isFirstChunkAfterRetry across sub-turns when a retry is followed by a tool call', async () => {
+    // Turn 1: Partial text -> Retry -> ToolCallRequest (no content chunks after retry in this turn)
+    const stream1 = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: 'Abandoned partial text',
+      },
+      {
+        type: GeminiEventType.Retry,
+      },
+      {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'call-1',
+          name: 'test_tool',
+          args: { foo: 'bar' },
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      },
+    ]);
+    // Turn 2 (Tool response turn): Content chunk emitted after tool execution
+    const stream2 = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: 'Result after tool execution',
+      },
+    ]);
+
+    mockSendMessageStream
+      .mockReturnValueOnce(stream1)
+      .mockReturnValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    const updates = (mockConnection.sessionUpdate as Mock).mock.calls.map(
+      (call) => call[0].update,
+    );
+
+    // Verify that the content chunk in Turn 2 still received { retry: true, reset: true }
+    const resultChunk = updates.find(
+      (u) =>
+        u.sessionUpdate === 'agent_message_chunk' &&
+        u.content?.text === 'Result after tool execution',
+    );
+    expect(resultChunk).toBeDefined();
+    expect(resultChunk?._meta).toEqual({ retry: true, reset: true });
+  });
+
+  it('should include standard ACP token usage in PromptResponse.usage and emit usage_update', async () => {
+    async function* mockStreamWithUsage(): AsyncGenerator<ServerGeminiStreamEvent> {
+      yield {
+        type: GeminiEventType.Content,
+        value: 'Hello',
+      };
+      yield {
+        type: GeminiEventType.Finished,
+        value: {
+          reason: FinishReason.STOP,
+          usageMetadata: {
+            promptTokenCount: 120,
+            candidatesTokenCount: 45,
+            cachedContentTokenCount: 80,
+            thoughtsTokenCount: 15,
+          },
+        },
+      };
+    }
+    mockSendMessageStream.mockReturnValue(mockStreamWithUsage());
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(result.usage).toEqual({
+      inputTokens: 120,
+      outputTokens: 45,
+      cachedReadTokens: 80,
+      thoughtTokens: 15,
+      totalTokens: 165,
+    });
+    expect(result._meta).toEqual({
+      quota: {
+        token_count: {
+          input_tokens: 120,
+          output_tokens: 45,
+        },
+        model_usage: [
+          {
+            model: 'gemini-pro',
+            token_count: {
+              input_tokens: 120,
+              output_tokens: 45,
+            },
+          },
+        ],
+      },
+    });
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'usage_update',
+        used: 165,
+        size: expect.any(Number),
+      },
+    });
   });
 
   it('should pass current session information directly onto geminiClient.sendMessageStream', async () => {
@@ -368,7 +535,20 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: '/memory view' }],
     });
 
-    expect(result).toMatchObject({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({
+      stopReason: 'end_turn',
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+      },
+      _meta: {
+        quota: {
+          token_count: { input_tokens: 0, output_tokens: 0 },
+          model_usage: [],
+        },
+      },
+    });
     expect(handleCommandSpy).toHaveBeenCalledWith(
       '/memory view',
       expect.any(Object),
@@ -405,7 +585,22 @@ describe('Session', () => {
     });
 
     expect(mockToolRegistry.getTool).toHaveBeenCalledWith('test_tool');
-    expect(result).toMatchObject({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({
+      stopReason: 'end_turn',
+      usage: {
+        inputTokens: 10,
+        outputTokens: 20,
+        totalTokens: 30,
+      },
+      _meta: {
+        quota: {
+          token_count: {
+            input_tokens: 10,
+            output_tokens: 20,
+          },
+        },
+      },
+    });
   });
 
   it('should handle tool call permission request', async () => {
@@ -636,6 +831,118 @@ describe('Session', () => {
     );
   });
 
+  it('should resolve @directory resource_link without eagerly reading directory contents via ReadManyFilesTool', async () => {
+    const mockBuild = vi.fn();
+    (ReadManyFilesTool as unknown as Mock).mockImplementation(() => ({
+      name: 'read_many_files',
+      kind: 'read',
+      build: mockBuild,
+    }));
+
+    (path.resolve as unknown as Mock).mockReturnValue(
+      '/tmp/Documents/internal',
+    );
+    (fs.stat as unknown as Mock).mockResolvedValue({
+      isDirectory: () => true,
+      isFile: () => false,
+    });
+
+    const stream = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: 'Listed files',
+      },
+    ]);
+    mockSendMessageStream.mockReturnValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [
+        { type: 'text', text: 'List all files stored in ' },
+        {
+          type: 'resource_link',
+          uri: 'file://Documents/internal/',
+          mimeType: 'inode/directory',
+          name: 'Documents/internal/',
+        },
+      ],
+    });
+
+    expect(mockBuild).not.toHaveBeenCalled();
+    expect(mockSendMessageStream).toHaveBeenCalledWith(
+      [{ text: 'List all files stored in @Documents/internal/' }],
+      expect.any(AbortSignal),
+      expect.any(String),
+    );
+  });
+
+  it('should read @file resource_link while skipping ReadManyFilesTool for @directory resource_link in mixed prompts', async () => {
+    const mockBuild = vi.fn().mockReturnValue({
+      getDescription: () => 'Read files',
+      toolLocations: () => [],
+      execute: vi.fn().mockResolvedValue({
+        llmContent: ['--- file.txt ---\n\nFile content\n\n'],
+      }),
+    });
+    (ReadManyFilesTool as unknown as Mock).mockImplementation(() => ({
+      name: 'read_many_files',
+      kind: 'read',
+      build: mockBuild,
+    }));
+
+    (path.resolve as unknown as Mock).mockImplementation(
+      (_dir: string, p: string) => `/tmp/${p}`,
+    );
+    (fs.stat as unknown as Mock).mockImplementation((p: string) =>
+      Promise.resolve({
+        isDirectory: () => p.includes('Documents/internal'),
+        isFile: () => !p.includes('Documents/internal'),
+      }),
+    );
+
+    const stream = createMockStream([
+      {
+        type: GeminiEventType.Content,
+        value: 'Compared files',
+      },
+    ]);
+    mockSendMessageStream.mockReturnValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [
+        { type: 'text', text: 'Compare ' },
+        {
+          type: 'resource_link',
+          uri: 'file://file.txt',
+          mimeType: 'text/plain',
+          name: 'file.txt',
+        },
+        { type: 'text', text: ' with ' },
+        {
+          type: 'resource_link',
+          uri: 'file://Documents/internal/',
+          mimeType: 'inode/directory',
+          name: 'Documents/internal/',
+        },
+      ],
+    });
+
+    expect(mockBuild).toHaveBeenCalledWith({
+      include: ['file.txt'],
+    });
+    expect(mockSendMessageStream).toHaveBeenCalledWith(
+      [
+        { text: 'Compare @file.txt with @Documents/internal/' },
+        { text: '\n--- Content from referenced files ---' },
+        { text: '\nContent from @file.txt:\n' },
+        { text: 'File content' },
+      ],
+      expect.any(AbortSignal),
+      expect.any(String),
+    );
+  });
+
   it('should handle rate limit error', async () => {
     const error = new Error('Rate limit');
     const customError = error as { status?: number; message?: string };
@@ -770,6 +1077,47 @@ describe('Session', () => {
     });
   });
 
+  it('should send sessionUpdate with agent_thought_chunk when a retry attempt occurs for this session', async () => {
+    const { coreEvents, CoreEvent } = await import('@google/gemini-cli-core');
+
+    coreEvents.emit(CoreEvent.RetryAttempt, {
+      attempt: 1,
+      maxAttempts: 3,
+      delayMs: 2500,
+      error: 'RESOURCE_EXHAUSTED',
+      model: 'gemini-2.5-pro',
+      sessionId: 'session-1',
+    });
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'agent_thought_chunk',
+        content: {
+          type: 'text',
+          text: '[Retry 1/3] RESOURCE_EXHAUSTED. Retrying in 3s...',
+        },
+      },
+    });
+  });
+
+  it('should not send sessionUpdate when a retry attempt occurs for a different session', async () => {
+    const { coreEvents, CoreEvent } = await import('@google/gemini-cli-core');
+
+    mockConnection.sessionUpdate.mockClear();
+
+    coreEvents.emit(CoreEvent.RetryAttempt, {
+      attempt: 1,
+      maxAttempts: 3,
+      delayMs: 2000,
+      error: 'RESOURCE_EXHAUSTED',
+      model: 'gemini-2.5-pro',
+      sessionId: 'different-session',
+    });
+
+    expect(mockConnection.sessionUpdate).not.toHaveBeenCalled();
+  });
+
   it('should add explanation to tool call content instead of thought chunk', async () => {
     mockTool.build.mockReturnValue({
       getDescription: () => 'Test Tool',
@@ -837,6 +1185,115 @@ describe('Session', () => {
         }),
       }),
     );
+  });
+
+  describe('MCP permission identity', () => {
+    async function requestToolPermission(
+      serverName?: string,
+    ): Promise<acp.RequestPermissionRequest> {
+      const tool = {
+        kind: 'other',
+        build: vi.fn().mockReturnValue({
+          getDescription: () => 'list_items',
+          toolLocations: () => [],
+          shouldConfirmExecute: vi.fn().mockResolvedValue(
+            serverName === undefined
+              ? {
+                  type: 'info',
+                  title: 'Confirm tool execution',
+                  prompt: 'Run tool?',
+                  onConfirm: vi.fn(),
+                }
+              : {
+                  type: 'mcp',
+                  title: 'Confirm MCP Tool Execution',
+                  serverName,
+                  toolName: 'list_items',
+                  toolDisplayName: 'list_items',
+                  toolArgs: {},
+                  onConfirm: vi.fn(),
+                },
+          ),
+          execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+        }),
+      };
+      mockToolRegistry.getTool.mockReturnValue(tool);
+      mockConnection.requestPermission.mockResolvedValue({
+        outcome: { outcome: 'selected', optionId: 'proceed_once' },
+      });
+      mockSendMessageStream
+        .mockReturnValueOnce(
+          createMockStream([
+            {
+              type: GeminiEventType.ToolCallRequest,
+              value: {
+                callId: 'call-mcp-1',
+                name: 'mcp_server_list_items',
+                args: {},
+                isClientInitiated: false,
+                prompt_id: 'prompt-1',
+              },
+            },
+          ]),
+        )
+        .mockReturnValueOnce(
+          createMockStream([{ type: GeminiEventType.Content, value: '' }]),
+        );
+
+      await session.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Call tool' }],
+      });
+
+      expect(mockConnection.requestPermission).toHaveBeenCalledOnce();
+      return mockConnection.requestPermission.mock.calls[0][0];
+    }
+
+    it.each(['my-server', 'my server.name'])(
+      'includes raw MCP identity and descriptive option names for server %s',
+      async (serverName) => {
+        const request = await requestToolPermission(serverName);
+        expect(request.toolCall._meta).toEqual({
+          'gemini-cli': {
+            mcp: { server_name: serverName, tool_name: 'list_items' },
+          },
+        });
+        expect(request.options).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              optionId: 'proceed_always_server',
+              name: `Allow all "${serverName}" server tools for this session`,
+            }),
+            expect.objectContaining({
+              optionId: 'proceed_always_tool',
+              name: 'Allow tool "list_items" for this session',
+            }),
+          ]),
+        );
+      },
+    );
+
+    it('leaves non-MCP permission requests without tool metadata', async () => {
+      const request = await requestToolPermission();
+      expect(request.toolCall).not.toHaveProperty('_meta');
+    });
+
+    it('falls back to generic_server when serverName is whitespace-only', async () => {
+      const request = await requestToolPermission('   ');
+      expect(request.toolCall._meta).toEqual({
+        'gemini-cli': {
+          mcp: { server_name: 'generic_server', tool_name: 'list_items' },
+        },
+      });
+      expect(request.options).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            optionId: 'proceed_always_server',
+            name: 'Allow all "generic_server" server tools for this session',
+          }),
+        ]),
+      );
+    });
   });
 
   it('should include both diff and explanation in request_permission content for edit tools', async () => {
@@ -1276,6 +1733,108 @@ describe('Session', () => {
           requiresUserConfirmation: false,
         }),
       );
+    });
+  });
+
+  it.each<{
+    description: string;
+    fileName: string;
+    fileContent: string;
+  }>([
+    {
+      description: 'leading indentation and trailing newline',
+      fileName: 'indented.py',
+      fileContent: '    print("hello")\n',
+    },
+    {
+      description: 'leading and trailing blank lines',
+      fileName: 'blank-lines.txt',
+      fileContent: '\n\nfirst line\nsecond line\n\n',
+    },
+    {
+      description: 'whitespace-only content',
+      fileName: 'whitespace.txt',
+      fileContent: '    \n\t\n  ',
+    },
+    {
+      description: 'empty content',
+      fileName: 'empty.txt',
+      fileContent: '',
+    },
+  ])(
+    'should preserve $description in @file resource_link content (#29934)',
+    async ({
+      fileName,
+      fileContent,
+    }: {
+      description: string;
+      fileName: string;
+      fileContent: string;
+    }) => {
+      const mockBuild = vi.fn().mockReturnValue({
+        getDescription: () => 'Read files',
+        toolLocations: () => [],
+        execute: vi.fn().mockResolvedValue({
+          llmContent: [`--- ${fileName} ---\n\n${fileContent}\n\n`],
+        }),
+      });
+      (ReadManyFilesTool as unknown as Mock).mockImplementation(() => ({
+        name: 'read_many_files',
+        kind: 'read',
+        build: mockBuild,
+      }));
+
+      (path.resolve as unknown as Mock).mockReturnValue(`/tmp/${fileName}`);
+      (fs.stat as unknown as Mock).mockResolvedValue({
+        isDirectory: () => false,
+        isFile: () => true,
+      });
+
+      const stream = createMockStream([
+        {
+          type: GeminiEventType.Content,
+          value: 'Done',
+        },
+      ]);
+      mockSendMessageStream.mockReturnValue(stream);
+
+      await session.prompt({
+        sessionId: 'session-1',
+        prompt: [
+          { type: 'text', text: 'Explain ' },
+          {
+            type: 'resource_link',
+            uri: `file://${fileName}`,
+            mimeType: 'text/plain',
+            name: fileName,
+          },
+        ],
+      });
+
+      expect(mockSendMessageStream).toHaveBeenCalledWith(
+        [
+          { text: `Explain @${fileName}` },
+          { text: '\n--- Content from referenced files ---' },
+          { text: `\nContent from @${fileName}:\n` },
+          ...(fileContent !== '' ? [{ text: fileContent }] : []),
+        ],
+        expect.any(AbortSignal),
+        expect.any(String),
+      );
+    },
+  );
+
+  describe('dispose', () => {
+    it('should safely dispose without throwing when config.dispose is undefined', async () => {
+      delete (mockConfig as { dispose?: unknown }).dispose;
+      await expect(session.dispose()).resolves.toBeUndefined();
+    });
+
+    it('should catch rejection when config.dispose rejects', async () => {
+      mockConfig.dispose = vi
+        .fn()
+        .mockRejectedValue(new Error('Disposal failed'));
+      await expect(session.dispose()).resolves.toBeUndefined();
     });
   });
 });

@@ -39,6 +39,10 @@ import { GlobTool } from '../tools/glob.js';
 import { ActivateSkillTool } from '../tools/activate-skill.js';
 import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
+import {
+  resetAcknowledgedUntrustedFlags,
+  resetModifiedBuildFiles,
+} from '../utils/untrustedContextTracker.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import {
@@ -222,6 +226,7 @@ export interface TelemetrySettings {
   target?: TelemetryTarget;
   otlpEndpoint?: string;
   otlpProtocol?: 'grpc' | 'http';
+  otlpHeaders?: Record<string, string>;
   logPrompts?: boolean;
   outfile?: string;
   useCollector?: boolean;
@@ -647,6 +652,7 @@ export interface ConfigParameters {
   model: string;
   disableLoopDetection?: boolean;
   maxSessionTurns?: number;
+  requestTimeoutMs?: number;
   acpMode?: boolean;
   listSessions?: boolean;
   deleteSession?: string;
@@ -846,6 +852,7 @@ export class Config implements McpContext, AgentLoopContext {
   private _activeModel: string;
   private fallbackOverrides = new Map<string, string>();
   private readonly maxSessionTurns: number;
+  private readonly requestTimeoutMs: number | undefined;
   private readonly listSessions: boolean;
   private readonly deleteSession: string | undefined;
   private readonly listExtensions: boolean;
@@ -1096,6 +1103,7 @@ export class Config implements McpContext, AgentLoopContext {
       target: params.telemetry?.target ?? DEFAULT_TELEMETRY_TARGET,
       otlpEndpoint: params.telemetry?.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT,
       otlpProtocol: params.telemetry?.otlpProtocol,
+      otlpHeaders: params.telemetry?.otlpHeaders,
       logPrompts: params.telemetry?.logPrompts ?? true,
       outfile: params.telemetry?.outfile,
       useCollector: params.telemetry?.useCollector,
@@ -1248,6 +1256,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
     ExecutionLifecycleService.setInjectionService(this.injectionService);
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
+    this.requestTimeoutMs = params.requestTimeoutMs;
     this.acpMode = params.acpMode ?? false;
     this.listSessions = params.listSessions ?? false;
     this.deleteSession = params.deleteSession;
@@ -1414,6 +1423,11 @@ export class Config implements McpContext, AgentLoopContext {
     if (this.telemetrySettings.enabled) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       initializeTelemetry(this);
+    }
+
+    const initialRequestTimeoutMs = this.getRequestTimeoutMs();
+    if (initialRequestTimeoutMs !== undefined) {
+      updateGlobalFetchTimeouts(initialRequestTimeoutMs);
     }
 
     const proxy = this.getProxy();
@@ -1845,6 +1859,8 @@ export class Config implements McpContext, AgentLoopContext {
     this.approvedPlanPath = undefined;
     this.topicState.reset();
     this.skillManager.reset();
+    resetModifiedBuildFiles(this);
+    resetAcknowledgedUntrustedFlags(this);
     this.latestApiRequest = undefined;
     this.lastModeSwitchTime = performance.now();
     this.compressionTruncationCounter = 0;
@@ -2007,6 +2023,7 @@ export class Config implements McpContext, AgentLoopContext {
 
   resetTurn(): void {
     this.modelAvailabilityService.resetTurn();
+    this._activeModel = this.model;
   }
 
   /** Resets billing state (overageStrategy, creditsNotificationShown) once per user prompt. */
@@ -2922,6 +2939,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.telemetrySettings.otlpProtocol ?? 'grpc';
   }
 
+  getTelemetryOtlpHeaders(): Record<string, string> {
+    return this.telemetrySettings.otlpHeaders ?? {};
+  }
+
   getTelemetryTarget(): TelemetryTarget {
     return this.telemetrySettings.target ?? DEFAULT_TELEMETRY_TARGET;
   }
@@ -3663,13 +3684,31 @@ export class Config implements McpContext, AgentLoopContext {
 
   /**
    * Returns the configured default request timeout in milliseconds.
+   *
+   * Precedence:
+   * 1. `GEMINI_API_HEADERS_TIMEOUT_MS` environment variable
+   * 2. `model.requestTimeoutMs` setting (`ConfigParameters.requestTimeoutMs`)
+   * 3. `DEFAULT_REQUEST_TIMEOUT` experiment flag (in seconds, converted to ms)
    */
   getRequestTimeoutMs(): number | undefined {
+    const envTimeout = Number(process.env['GEMINI_API_HEADERS_TIMEOUT_MS']);
+    if (Number.isFinite(envTimeout) && envTimeout > 0) {
+      return envTimeout;
+    }
+
+    if (
+      this.requestTimeoutMs !== undefined &&
+      Number.isFinite(this.requestTimeoutMs) &&
+      this.requestTimeoutMs > 0
+    ) {
+      return this.requestTimeoutMs;
+    }
+
     const flag =
       this.experiments?.flags?.[ExperimentFlags.DEFAULT_REQUEST_TIMEOUT];
     if (flag?.intValue !== undefined) {
       const seconds = parseInt(flag.intValue, 10);
-      if (Number.isInteger(seconds) && seconds >= 0) {
+      if (Number.isInteger(seconds) && seconds > 0) {
         return seconds * 1000; // Convert seconds to milliseconds
       }
     }

@@ -577,6 +577,271 @@ describe('useSlashCompletion', () => {
       unmount();
     });
 
+    it('should not set insertValue to parent name for auto-list suggestion (reproducing /chat chat bug)', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'chat',
+          description: 'Manage chat history',
+          subCommands: [
+            createTestCommand({ name: 'list', description: 'List chats' }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/chat ',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        const autoSuggestion = result.current.suggestions.find(
+          (s) => s.sectionTitle === 'auto',
+        );
+        expect(autoSuggestion).toBeDefined();
+        // BUG: autoSuggestion currently has insertValue === 'chat', causing Tab to insert 'chat' instead of 'list'
+        expect(autoSuggestion?.insertValue).toBeUndefined();
+      });
+      unmount();
+    });
+
+    it('should autocomplete "/chat " to "/chat list" instead of "/chat chat"', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'chat',
+          description: 'Manage chat history',
+          subCommands: [
+            createTestCommand({ name: 'list', description: 'List chats' }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/chat ',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      const autoSuggestion = result.current.suggestions[0];
+      const suggestionText = autoSuggestion.insertValue ?? autoSuggestion.value;
+      const completedText =
+        '/chat '.substring(0, result.current.completionStart) +
+        suggestionText +
+        '/chat '.substring(result.current.completionEnd);
+
+      // Should complete to '/chat list', not '/chat chat'
+      expect(completedText).toBe('/chat list');
+      unmount();
+    });
+
+    it('should not set insertValue to parent name for /resume auto-list suggestion', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'resume',
+          description: 'Resume chats',
+          subCommands: [
+            createTestCommand({ name: 'list', description: 'List chats' }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/resume ',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        const autoSuggestion = result.current.suggestions.find(
+          (s) => s.sectionTitle === 'auto',
+        );
+        expect(autoSuggestion).toBeDefined();
+        expect(autoSuggestion?.insertValue).toBeUndefined();
+      });
+      unmount();
+    });
+
+    it('should autocomplete "/chat l" to "/chat list"', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'chat',
+          description: 'Manage chat history',
+          subCommands: [
+            createTestCommand({ name: 'list', description: 'List chats' }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/chat l',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      const autoSuggestion = result.current.suggestions[0];
+      const suggestionText = autoSuggestion.insertValue ?? autoSuggestion.value;
+      const completedText =
+        '/chat l'.substring(0, result.current.completionStart) +
+        suggestionText +
+        '/chat l'.substring(result.current.completionEnd);
+
+      expect(completedText).toBe('/chat list');
+      unmount();
+    });
+
+    it('should autocomplete "/resume " to "/resume list" with tab', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'resume',
+          description: 'Resume chats',
+          subCommands: [
+            createTestCommand({ name: 'list', description: 'List chats' }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/resume ',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      const autoSuggestion = result.current.suggestions[0];
+      const suggestionText = autoSuggestion.insertValue ?? autoSuggestion.value;
+      const completedText =
+        '/resume '.substring(0, result.current.completionStart) +
+        suggestionText +
+        '/resume '.substring(result.current.completionEnd);
+
+      expect(completedText).toBe('/resume list');
+      expect(autoSuggestion.submitValue).toBe('/resume');
+      unmount();
+    });
+
+    it('should autocomplete "/resume l" to "/resume list" with tab', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'resume',
+          description: 'Resume chats',
+          subCommands: [
+            createTestCommand({ name: 'list', description: 'List chats' }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/resume l',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      const autoSuggestion = result.current.suggestions[0];
+      const suggestionText = autoSuggestion.insertValue ?? autoSuggestion.value;
+      const completedText =
+        '/resume l'.substring(0, result.current.completionStart) +
+        suggestionText +
+        '/resume l'.substring(result.current.completionEnd);
+
+      expect(completedText).toBe('/resume list');
+      unmount();
+    });
+
+    it('should preserve submitValue on auto suggestion while completing to list for Tab', async () => {
+      const checkpointSubCommands = [
+        createTestCommand({
+          name: 'list',
+          description: 'List checkpoints',
+          suggestionGroup: 'checkpoints',
+        }),
+      ];
+
+      const slashCommands = [
+        createTestCommand({
+          name: 'chat',
+          description: 'Chat command',
+          subCommands: checkpointSubCommands,
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/chat ',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(2);
+      });
+
+      const autoSuggestion = result.current.suggestions[0];
+      const checkpointSuggestion = result.current.suggestions[1];
+
+      // Auto suggestion opens session browser on Enter
+      expect(autoSuggestion.sectionTitle).toBe('auto');
+      expect(autoSuggestion.submitValue).toBe('/chat');
+      expect(autoSuggestion.insertValue ?? autoSuggestion.value).toBe('list');
+
+      // Checkpoint suggestion lists checkpoints on Enter/Tab
+      expect(checkpointSuggestion.sectionTitle).toBe('checkpoints');
+      expect(checkpointSuggestion.submitValue).toBeUndefined();
+      expect(
+        checkpointSuggestion.insertValue ?? checkpointSuggestion.value,
+      ).toBe('list');
+
+      unmount();
+    });
+
     it('should sort exact altName matches to the top', async () => {
       const slashCommands = [
         createTestCommand({

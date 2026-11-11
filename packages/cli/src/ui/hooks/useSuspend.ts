@@ -13,6 +13,7 @@ import {
   exitAlternateScreen,
   enableLineWrapping,
   disableLineWrapping,
+  shouldDisableLineWrapping,
 } from '@google/gemini-cli-core';
 import process from 'node:process';
 import {
@@ -68,8 +69,15 @@ export function useSuspend({
       if (shouldUseAlternateScreen) {
         // Leave alternate buffer before suspension so the shell stays usable.
         exitAlternateScreen();
-        enableLineWrapping();
         writeToStdout('\x1b[2J\x1b[H');
+      }
+      const lineWrappingDisabled = shouldDisableLineWrapping(
+        shouldUseAlternateScreen,
+        terminalCapabilityManager.areAmbiguousCharactersWide(),
+      );
+      if (lineWrappingDisabled) {
+        // Give the shell its normal auto-wrap back while we are suspended.
+        enableLineWrapping();
       }
 
       // Cleanup before suspend.
@@ -94,8 +102,10 @@ export function useSuspend({
 
           if (shouldUseAlternateScreen) {
             enterAlternateScreen();
-            disableLineWrapping();
             writeToStdout('\x1b[2J\x1b[H');
+          }
+          if (lineWrappingDisabled) {
+            disableLineWrapping();
           }
 
           terminalCapabilityManager.enableSupportedModes();

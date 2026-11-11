@@ -235,6 +235,9 @@ describe('CoderAgentExecutor', () => {
       ).executingTasks.has(taskId),
     ).toBe(false);
     expect(wrapper?.task.dispose).toHaveBeenCalled();
+    expect(
+      (mockEventBus as unknown as EventEmitter).listenerCount('event'),
+    ).toBe(0);
   });
 
   it('should evict task from cache when it reaches terminal state', async () => {
@@ -583,5 +586,123 @@ describe('CoderAgentExecutor', () => {
     // Clean up Request 2
     mockSocket2.emit('end');
     await secondaryPromise;
+  });
+
+  it('should safely handle synchronous final event emission during eventBus.on registration without TDZ error', async () => {
+    const taskId = 'test-sync-event-bus';
+    const contextId = 'test-context';
+
+    const mockSocket = new EventEmitter();
+    (requestStorage.getStore as Mock).mockReturnValue({
+      req: { socket: mockSocket },
+    });
+
+    const syncEventBus = new EventEmitter() as unknown as ExecutionEventBus;
+    syncEventBus.publish = vi.fn();
+    syncEventBus.finished = vi.fn();
+    const originalOn = syncEventBus.on.bind(syncEventBus);
+    vi.spyOn(syncEventBus, 'on').mockImplementation((event, listener) => {
+      const res = originalOn(event, listener);
+      if (event === 'event') {
+        listener({ kind: 'status-update', final: true } as never);
+      }
+      return res;
+    });
+
+    const requestContext = {
+      userMessage: {
+        messageId: 'msg-sync',
+        taskId,
+        contextId,
+        parts: [{ kind: 'confirmation', callId: '1', outcome: 'proceed' }],
+        metadata: {
+          coderAgent: { kind: 'agent-settings', workspacePath: '/tmp' },
+        },
+      },
+    } as unknown as RequestContext;
+
+    await expect(
+      executor.execute(requestContext, syncEventBus),
+    ).resolves.toBeUndefined();
+    expect(
+      (syncEventBus as unknown as EventEmitter).listenerCount('event'),
+    ).toBe(0);
+  });
+
+  it('should sanitize client-supplied isTrusted to undefined in execute and reconstruct so setIsTrusted evaluates server environment', async () => {
+    const { setIsTrusted } = await import('../config/config.js');
+    vi.mocked(setIsTrusted).mockReturnValue(true);
+
+    const taskId = 'test-sanitize-is-trusted';
+    const contextId = 'test-context';
+
+    const mockSocket = new EventEmitter();
+    (requestStorage.getStore as Mock).mockReturnValue({
+      req: { socket: mockSocket },
+    });
+
+    const requestContext = {
+      userMessage: {
+        messageId: 'msg-trust',
+        taskId,
+        contextId,
+        parts: [{ kind: 'confirmation', callId: '1', outcome: 'proceed' }],
+        metadata: {
+          coderAgent: {
+            kind: 'agent-settings',
+            workspacePath: '/tmp',
+            isTrusted: true,
+          },
+        },
+      },
+    } as unknown as RequestContext;
+
+    await executor.execute(requestContext, mockEventBus);
+
+    expect(setIsTrusted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspacePath: '/tmp',
+        isTrusted: undefined,
+      }),
+      '/tmp',
+    );
+  });
+
+  it('should clean up already-registered socket listeners if a subsequent listener registration throws synchronously', async () => {
+    const taskId = 'test-partial-socket-registration-cleanup';
+    const contextId = 'test-context';
+
+    const mockSocket = new EventEmitter();
+    vi.spyOn(mockSocket, 'once').mockImplementation(() => {
+      throw new Error('Simulated socket.once registration failure');
+    });
+
+    (requestStorage.getStore as Mock).mockReturnValue({
+      req: { socket: mockSocket },
+    });
+
+    const requestContext = {
+      userMessage: {
+        messageId: 'msg-socket-err',
+        taskId,
+        contextId,
+        parts: [{ kind: 'text', text: 'hello' }],
+        metadata: {
+          coderAgent: {
+            kind: 'agent-settings',
+            workspacePath: '/tmp',
+          },
+        },
+      },
+    } as unknown as RequestContext;
+
+    await expect(
+      executor.execute(requestContext, mockEventBus),
+    ).rejects.toThrow('Simulated socket.once registration failure');
+
+    expect(mockSocket.listenerCount('end')).toBe(0);
+    expect(
+      (mockEventBus as unknown as EventEmitter).listenerCount('event'),
+    ).toBe(0);
   });
 });

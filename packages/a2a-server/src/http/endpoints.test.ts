@@ -150,6 +150,12 @@ describe('Agent Server Endpoints', () => {
     expect(response.body).toBeTypeOf('string'); // Should return the task ID
   }, 7000);
 
+  it('should create a new task via POST /tasks when request body is empty', async () => {
+    const response = await request(app).post('/tasks');
+    expect(response.status).toBe(201);
+    expect(response.body).toBeTypeOf('string');
+  }, 7000);
+
   it('should get metadata for a specific task via GET /tasks/:taskId/metadata', async () => {
     const createResponse = await createTask('test-context-2');
     const taskId = createResponse.body;

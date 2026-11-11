@@ -233,9 +233,11 @@ export class LegacyAgentProtocol implements AgentProtocol {
             finishedReason = event.value.reason;
             break;
           case GeminiEventType.AgentExecutionStopped:
-          case GeminiEventType.UserCancelled:
           case GeminiEventType.MaxSessionTurns:
             this._clearActiveStream();
+            return;
+          case GeminiEventType.UserCancelled:
+            this._finishStream('aborted');
             return;
           default:
             break;
@@ -271,6 +273,17 @@ export class LegacyAgentProtocol implements AgentProtocol {
       );
 
       if (this._abortController.signal.aborted) {
+        try {
+          const currentModel =
+            this._client.getCurrentSequenceModel() ?? this._config.getModel();
+          this._client
+            .getChat()
+            .recordCompletedToolCalls(currentModel, completedToolCalls);
+        } catch (error) {
+          debugLogger.error(
+            `Error recording completed tool call information: ${error}`,
+          );
+        }
         this._finishStream('aborted');
         return;
       }

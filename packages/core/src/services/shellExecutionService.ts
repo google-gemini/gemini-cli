@@ -17,6 +17,8 @@ import type { IPty } from '@lydell/node-pty';
 import {
   getShellConfiguration,
   resolveExecutable,
+  GEMINI_CLI_IN_SHELL_ENV_VAR,
+  GEMINI_CLI_IN_SHELL_ENV_VAR_VALUE,
   type ShellType,
 } from '../utils/shell-utils.js';
 import { isBinary, truncateString } from '../utils/textUtils.js';
@@ -50,6 +52,24 @@ const { Terminal } = pkg;
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 
 const PTY_ORPHAN_FD_SEARCH_RANGE = 8;
+const DARWIN_DEV_MAJOR_SHIFT = 24;
+const DARWIN_DEV_MAJOR_MASK = 0xff;
+const STDERR_FILENO = 2;
+
+/**
+ * Internal/undocumented properties of `@lydell/node-pty`'s Unix implementation.
+ *
+ * Rationale & Why Public API Is Insufficient:
+ * The public `IPty` interface does not expose the underlying master file descriptor (`fd`)
+ * or the slave pseudo-terminal device path (`ptsName`). Accessing these properties is
+ * required to perform synchronous cleanup of leaked/orphan file descriptors (both master
+ * and slave) on macOS immediately after spawning, preventing system-wide PTY descriptor
+ * exhaustion.
+ */
+export interface UnixPtyInternal {
+  fd?: number;
+  ptsName?: string;
+}
 
 /**
  * An environment variable that is set for shell executions. This can be used
@@ -177,10 +197,11 @@ export interface WindowsPtyAgentInternal {
   _$onProcessExit?: (exitCode: number) => void;
 }
 
-export type DestroyablePty = IPty & {
-  destroy?: () => void;
-  _agent?: WindowsPtyAgentInternal;
-};
+export type DestroyablePty = IPty &
+  UnixPtyInternal & {
+    destroy?: () => void;
+    _agent?: WindowsPtyAgentInternal;
+  };
 
 interface ActivePty {
   ptyProcess: DestroyablePty;
@@ -583,6 +604,7 @@ export class ShellExecutionService {
       ...sanitizedEnv,
       [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
         GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
+      [GEMINI_CLI_IN_SHELL_ENV_VAR]: GEMINI_CLI_IN_SHELL_ENV_VAR_VALUE,
       TERM: 'xterm-256color',
       PAGER: shellExecutionConfig.pager ?? 'cat',
       GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
@@ -593,16 +615,18 @@ export class ShellExecutionService {
       baseEnv[key] = sourceEnv[key];
     }
 
+    if (!baseEnv['GIT_CONFIG_GLOBAL']) {
+      delete baseEnv['GIT_CONFIG_GLOBAL'];
+    }
+
     let gitConfigCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
     const devNullPath = os.platform() === 'win32' ? 'NUL' : '/dev/null';
 
-    baseEnv['GIT_CONFIG_GLOBAL'] = devNullPath;
     baseEnv['GIT_CONFIG_SYSTEM'] = devNullPath;
     baseEnv['GIT_CONFIG_NOSYSTEM'] = '1';
 
     sanitizationConfig.allowedEnvironmentVariables.push(
       'GIT_CONFIG_COUNT',
-      'GIT_CONFIG_GLOBAL',
       'GIT_CONFIG_SYSTEM',
       'GIT_CONFIG_NOSYSTEM',
     );
@@ -1043,6 +1067,100 @@ export class ShellExecutionService {
   }
 
   /**
+   * Synchronously closes the orphan dummy `/dev/ptmx` master file descriptor
+   * (`low_fds[0]`) leaked in the parent process by `@lydell/node-pty` on macOS
+   * (`darwin`).
+   *
+   * In `@lydell/node-pty`'s `pty_posix_spawn`, a `low_fds` loop calls
+   * `posix_openpt(O_RDWR)` before allocating `*master` to guard `stdin`,
+   * `stdout`, and `stderr` (`0..2`). When `low_fds[0] >= STDERR_FILENO`, the
+   * loop breaks with `count === 0` and the cleanup loop
+   * `for (; count > 0; count--) close(low_fds[count]);` never closes
+   * `low_fds[0]`. This leaks one `/dev/ptmx` master FD (`masterFd - 1`) per
+   * spawned PTY until `kern.tty.ptmx_max` is exhausted.
+   *
+   * Must be called immediately and synchronously on the same JS tick as
+   * `pty.spawn()` while `masterFd` is open and before the new PTY entry is
+   * added to `activePtys`.
+   */
+  private static closeOrphanMasterFd(
+    masterFd: number | undefined,
+  ): number | undefined {
+    if (os.platform() !== 'darwin') {
+      return undefined;
+    }
+    if (
+      typeof masterFd !== 'number' ||
+      !Number.isFinite(masterFd) ||
+      masterFd <= STDERR_FILENO + 1
+    ) {
+      return undefined;
+    }
+
+    let masterStat: fs.Stats | undefined;
+    try {
+      masterStat = fs.fstatSync(masterFd);
+    } catch {
+      return undefined;
+    }
+    if (
+      !masterStat ||
+      typeof masterStat.rdev !== 'number' ||
+      typeof masterStat.isCharacterDevice !== 'function' ||
+      !masterStat.isCharacterDevice()
+    ) {
+      return undefined;
+    }
+
+    const masterMajor =
+      (masterStat.rdev >>> DARWIN_DEV_MAJOR_SHIFT) & DARWIN_DEV_MAJOR_MASK;
+    if (masterMajor === 0) {
+      return undefined;
+    }
+
+    const activeMasterFds = new Set<number>();
+    for (const entry of this.activePtys.values()) {
+      const activeFd = entry.ptyProcess?.fd;
+      if (typeof activeFd === 'number') {
+        activeMasterFds.add(activeFd);
+      }
+    }
+
+    const candidateFd = masterFd - 1;
+    if (candidateFd > STDERR_FILENO && !activeMasterFds.has(candidateFd)) {
+      try {
+        const candidateStat = fs.fstatSync(candidateFd);
+        if (
+          candidateStat &&
+          typeof candidateStat.rdev === 'number' &&
+          typeof candidateStat.isCharacterDevice === 'function' &&
+          candidateStat.isCharacterDevice() &&
+          candidateStat.rdev !== masterStat.rdev
+        ) {
+          const candidateMajor =
+            (candidateStat.rdev >>> DARWIN_DEV_MAJOR_SHIFT) &
+            DARWIN_DEV_MAJOR_MASK;
+          if (
+            candidateMajor === masterMajor &&
+            (typeof masterStat.ino !== 'number' ||
+              masterStat.ino <= 0 ||
+              typeof candidateStat.ino !== 'number' ||
+              candidateStat.ino <= 0 ||
+              candidateStat.ino === masterStat.ino)
+          ) {
+            fs.closeSync(candidateFd);
+            return candidateFd;
+          }
+        }
+      } catch {
+        // ignored
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
    * Synchronously closes the orphan slave PTY file descriptor leaked in the
    * parent process by @lydell/node-pty on macOS (darwin).
    *
@@ -1209,10 +1327,9 @@ export class ShellExecutionService {
       const assignedPid = Number(pty.pid);
       ptyPid = assignedPid;
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const masterFd = (ptyProcess as unknown as { fd?: number }).fd;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const ptsName = (ptyProcess as unknown as { ptsName?: string }).ptsName;
+      const masterFd = pty.fd;
+      const ptsName = pty.ptsName;
+      ShellExecutionService.closeOrphanMasterFd(masterFd);
       ShellExecutionService.closeOrphanSlaveFd(masterFd, ptsName);
 
       const agent = pty._agent;
@@ -1829,13 +1946,14 @@ export class ShellExecutionService {
    * @param sessionId Optional session ID for process history tracking.
    * @param command Optional command string for display.
    * @param tempDir Optional temporary directory path owned by this execution to clean up on exit.
+   * @returns true if the process was successfully moved to the background; false otherwise.
    */
   static background(
     pid: number,
     sessionId?: string,
     command?: string,
     tempDir?: string,
-  ): void {
+  ): boolean {
     const activePty = this.activePtys.get(pid);
     const activeChild = this.activeChildProcesses.get(pid);
 
@@ -1860,15 +1978,25 @@ export class ShellExecutionService {
           .rm(resolvedTempDir, { recursive: true, force: true })
           .catch(() => {});
       }
-      return;
+      return false;
+    }
+
+    if (this.backgroundLogPids.has(pid)) {
+      return false;
+    }
+
+    const backgrounded = ExecutionLifecycleService.background(pid);
+    if (!backgrounded) {
+      if (resolvedTempDir) {
+        fsPromises
+          .rm(resolvedTempDir, { recursive: true, force: true })
+          .catch(() => {});
+      }
+      return false;
     }
 
     if (resolvedTempDir) {
       this.backgroundTempDirs.set(pid, resolvedTempDir);
-    }
-
-    if (this.backgroundLogPids.has(pid)) {
-      return;
     }
 
     const MAX_BACKGROUND_PROCESS_HISTORY_SIZE = 100;
@@ -1916,7 +2044,7 @@ export class ShellExecutionService {
 
     this.backgroundLogPids.add(pid);
 
-    ExecutionLifecycleService.background(pid);
+    return true;
   }
 
   static subscribe(
@@ -2047,6 +2175,44 @@ export class ShellExecutionService {
       exitCode: info.exitCode,
       signal: info.signal,
     }));
+  }
+
+  /**
+   * Terminates all active child shell process groups and PTYs before process exit.
+   */
+  static async cleanupAllActiveProcesses(): Promise<void> {
+    const terminationPromises: Array<Promise<void>> = [];
+
+    for (const [pid, entry] of this.activeChildProcesses.entries()) {
+      const proc = entry.process;
+      if (proc?.pid) {
+        terminationPromises.push(
+          killProcessGroup({
+            pid: proc.pid,
+            escalate: true,
+            isExited: () =>
+              !this.activeChildProcesses.has(pid) ||
+              proc.exitCode !== null ||
+              proc.signalCode !== null,
+          }).catch(() => {}),
+        );
+      }
+    }
+
+    for (const [pid, entry] of this.activePtys.entries()) {
+      terminationPromises.push(
+        killProcessGroup({
+          pid,
+          escalate: true,
+          pty: entry.ptyProcess,
+          isExited: () => !this.isPtyActive(pid),
+        }).catch(() => {}),
+      );
+    }
+
+    await Promise.all(terminationPromises);
+    this.activeChildProcesses.clear();
+    this.activePtys.clear();
   }
 
   /**

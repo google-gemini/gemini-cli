@@ -6,11 +6,13 @@
 
 import {
   render as inkRenderDirect,
+  setStringWidthFunction,
   type Instance as InkInstance,
   type RenderOptions,
 } from 'ink';
 import { EventEmitter } from 'node:events';
 import { Box } from 'ink';
+import { getCachedStringWidth } from '../ui/utils/textUtils.js';
 import { Terminal } from '@xterm/headless';
 import { vi } from 'vitest';
 import stripAnsi from 'strip-ansi';
@@ -422,6 +424,7 @@ export const render = async (
 
   let instance!: InkInstance;
   stdout.clear();
+  setStringWidthFunction(getCachedStringWidth);
   act(() => {
     instance = inkRenderDirect(tree, {
       stdout: stdout as unknown as NodeJS.WriteStream,

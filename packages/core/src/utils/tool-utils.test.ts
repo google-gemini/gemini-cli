@@ -8,12 +8,19 @@ import { expect, describe, it } from 'vitest';
 import {
   doesToolInvocationMatch,
   getToolSuggestion,
+  isParallelizable,
   truncateToolOutput,
   truncateFunctionResponsePart,
 } from './tool-utils.js';
 import type { Part } from '@google/genai';
 import { MAX_STORED_TOOL_OUTPUT_BYTES } from './constants.js';
-import { ReadFileTool, type AnyToolInvocation, type Config } from '../index.js';
+import {
+  ReadFileTool,
+  UPDATE_TOPIC_TOOL_NAME,
+  type AnyToolInvocation,
+  type Config,
+  type ToolCallRequestInfo,
+} from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 describe('getToolSuggestion', () => {
@@ -360,5 +367,37 @@ describe('truncateFunctionResponsePart', () => {
     expect(Buffer.byteLength(strRes, 'utf8')).toBeLessThanOrEqual(
       MAX_STORED_TOOL_OUTPUT_BYTES,
     );
+  });
+});
+
+describe('isParallelizable', () => {
+  const makeRequest = (
+    name: string,
+    args: Record<string, unknown> = {},
+  ): ToolCallRequestInfo => ({
+    callId: 'call-1',
+    name,
+    args,
+    isClientInitiated: false,
+    prompt_id: 'prompt-1',
+  });
+
+  it('returns false for update_topic and edit tools', () => {
+    expect(isParallelizable(makeRequest(UPDATE_TOPIC_TOOL_NAME))).toBe(false);
+    expect(isParallelizable(makeRequest('write_file'))).toBe(false);
+    expect(isParallelizable(makeRequest('replace'))).toBe(false);
+  });
+
+  it('respects wait_for_previous boolean argument on non-edit tools', () => {
+    expect(
+      isParallelizable(makeRequest('read_file', { wait_for_previous: true })),
+    ).toBe(false);
+    expect(
+      isParallelizable(makeRequest('read_file', { wait_for_previous: false })),
+    ).toBe(true);
+  });
+
+  it('defaults to true for non-edit tools when wait_for_previous is omitted', () => {
+    expect(isParallelizable(makeRequest('read_file'))).toBe(true);
   });
 });

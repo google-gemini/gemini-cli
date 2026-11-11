@@ -979,6 +979,9 @@ describe('ShellExecutionService', () => {
         command: 'cmd-101',
         sessionId: 'default',
       });
+      ExecutionLifecycleService.attachExecution(101, {
+        executionMethod: 'child_process',
+      });
 
       ShellExecutionService.background(101, 'default', 'cmd-101');
 
@@ -1515,6 +1518,15 @@ describe('ShellExecutionService', () => {
   });
 
   describe('Orphan PTY slave FD cleanup', () => {
+    const closeOrphanMasterFd = (
+      masterFd: number | undefined,
+    ): number | undefined =>
+      (
+        ShellExecutionService as unknown as {
+          closeOrphanMasterFd: (fd: number | undefined) => number | undefined;
+        }
+      ).closeOrphanMasterFd(masterFd);
+
     const closeOrphanSlaveFd = (
       masterFd: number | undefined,
       ptsName: string | undefined,
@@ -1579,6 +1591,163 @@ describe('ShellExecutionService', () => {
       expect(mockCloseSync).not.toHaveBeenCalled();
     });
 
+    it('synchronously closes the orphan /dev/ptmx master fd (low_fds[0]) when platform is darwin', () => {
+      mockPlatform.mockReturnValue('darwin');
+      mockCloseSync.mockClear();
+      const ptmxMajor = 15 << 24;
+      const ptmxIno = 643;
+      mockFstatSync.mockImplementation((fd: number) => {
+        if (fd === 19) {
+          return {
+            rdev: ptmxMajor | 3,
+            ino: ptmxIno,
+            isCharacterDevice: () => true,
+          };
+        }
+        if (fd === 18) {
+          return {
+            rdev: ptmxMajor | 2,
+            ino: ptmxIno,
+            isCharacterDevice: () => true,
+          };
+        }
+        return {
+          rdev: (16 << 24) | 1,
+          ino: 999,
+          isCharacterDevice: () => true,
+        };
+      });
+
+      const result = closeOrphanMasterFd(19);
+      expect(result).toBe(18);
+      expect(mockCloseSync).toHaveBeenCalledTimes(1);
+      expect(mockCloseSync).toHaveBeenCalledWith(18);
+    });
+
+    it('skips active PTY master fds and returns undefined if masterFd - 1 is active', () => {
+      mockPlatform.mockReturnValue('darwin');
+      mockCloseSync.mockClear();
+      const ptmxMajor = 15 << 24;
+      const ptmxIno = 643;
+
+      const activePtys = (
+        ShellExecutionService as unknown as {
+          activePtys: Map<number, unknown>;
+        }
+      ).activePtys;
+      activePtys.set(99999, {
+        ptyProcess: { fd: 18, destroy: vi.fn() },
+        headlessTerminal: { dispose: vi.fn() },
+      });
+
+      try {
+        mockFstatSync.mockImplementation((fd: number) => {
+          if (fd === 19) {
+            return {
+              rdev: ptmxMajor | 3,
+              ino: ptmxIno,
+              isCharacterDevice: () => true,
+            };
+          }
+          if (fd === 18) {
+            return {
+              rdev: ptmxMajor | 2,
+              ino: ptmxIno,
+              isCharacterDevice: () => true,
+            };
+          }
+          throw new Error('EBADF');
+        });
+
+        const result = closeOrphanMasterFd(19);
+        expect(result).toBeUndefined();
+        expect(mockCloseSync).not.toHaveBeenCalled();
+      } finally {
+        activePtys.delete(99999);
+      }
+    });
+
+    it('returns undefined on non-darwin platforms without probing fds for master cleanup', () => {
+      mockPlatform.mockReturnValue('linux');
+      mockFstatSync.mockClear();
+      mockCloseSync.mockClear();
+
+      const result = closeOrphanMasterFd(19);
+      expect(result).toBeUndefined();
+      expect(mockFstatSync).not.toHaveBeenCalled();
+      expect(mockCloseSync).not.toHaveBeenCalled();
+    });
+
+    it('does not check or close any fd other than masterFd - 1', () => {
+      mockPlatform.mockReturnValue('darwin');
+      mockCloseSync.mockClear();
+      const ptmxMajor = 15 << 24;
+      const ptmxIno = 643;
+      mockFstatSync.mockImplementation((fd: number) => {
+        if (fd === 20) {
+          return {
+            rdev: ptmxMajor | 5,
+            ino: ptmxIno,
+            isCharacterDevice: () => true,
+          };
+        }
+        if (fd === 18) {
+          return {
+            rdev: ptmxMajor | 2,
+            ino: ptmxIno,
+            isCharacterDevice: () => true,
+          };
+        }
+        throw new Error('EBADF');
+      });
+
+      const result = closeOrphanMasterFd(20);
+      expect(result).toBeUndefined();
+      expect(mockCloseSync).not.toHaveBeenCalled();
+    });
+
+    it('does not close stdio fds or non-matching character devices', () => {
+      mockPlatform.mockReturnValue('darwin');
+      mockCloseSync.mockClear();
+      const ptmxMajor = 15 << 24;
+      mockFstatSync.mockImplementation((fd: number) => {
+        if (fd === 5) {
+          return {
+            rdev: ptmxMajor | 3,
+            ino: 643,
+            isCharacterDevice: () => true,
+          };
+        }
+        if (fd === 4) {
+          // Different major (e.g. slave tty)
+          return {
+            rdev: (16 << 24) | 2,
+            ino: 643,
+            isCharacterDevice: () => true,
+          };
+        }
+        if (fd === 3) {
+          // Different inode
+          return {
+            rdev: ptmxMajor | 2,
+            ino: 700,
+            isCharacterDevice: () => true,
+          };
+        }
+        // Even if fd <= 2 matched, must not probe or close STDERR_FILENO (2)
+        return {
+          rdev: ptmxMajor | 1,
+          ino: 643,
+          isCharacterDevice: () => true,
+        };
+      });
+
+      expect(closeOrphanMasterFd(5)).toBeUndefined();
+      expect(closeOrphanMasterFd(4)).toBeUndefined();
+      expect(closeOrphanMasterFd(3)).toBeUndefined();
+      expect(mockCloseSync).not.toHaveBeenCalled();
+    });
+
     it('destroyPtyProcess destroys the PTY process without closing arbitrary fds', () => {
       mockCloseSync.mockClear();
       const destroy = vi.fn();
@@ -1625,18 +1794,60 @@ describe('ShellExecutionService', () => {
         shellExecutionConfig,
       );
 
-      ShellExecutionService.background(
+      const firstResult = ShellExecutionService.background(
         handle.pid!,
         'default',
         'double-background',
       );
-      ShellExecutionService.background(
+      const secondResult = ShellExecutionService.background(
         handle.pid!,
         'default',
         'double-background',
       );
 
+      expect(firstResult).toBe(true);
+      expect(secondResult).toBe(false);
       expect(mockCreateWriteStream).toHaveBeenCalledTimes(1);
+
+      await ShellExecutionService.kill(handle.pid!);
+    });
+
+    it('does not create a log stream when execution is already settled', async () => {
+      const abortController = new AbortController();
+      const handle = await ShellExecutionService.execute(
+        'already-settled-command',
+        '/',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      // Settle the execution lifecycle before calling background()
+      ExecutionLifecycleService.completeExecution(handle.pid!);
+
+      mockCreateWriteStream.mockClear();
+
+      const success = ShellExecutionService.background(
+        handle.pid!,
+        'default',
+        'already-settled-command',
+      );
+
+      expect(success).toBe(false);
+      expect(mockCreateWriteStream).not.toHaveBeenCalled();
+      const backgroundLogStreams = (
+        ShellExecutionService as unknown as {
+          backgroundLogStreams: Map<number, unknown>;
+        }
+      ).backgroundLogStreams;
+      expect(backgroundLogStreams.has(handle.pid!)).toBe(false);
+      const backgroundLogPids = (
+        ShellExecutionService as unknown as {
+          backgroundLogPids: Set<number>;
+        }
+      ).backgroundLogPids;
+      expect(backgroundLogPids.has(handle.pid!)).toBe(false);
 
       await ShellExecutionService.kill(handle.pid!);
     });
@@ -2319,6 +2530,54 @@ describe('ShellExecutionService execution method selection', () => {
     expect(mockCpSpawn).toHaveBeenCalled();
     expect(result.executionMethod).toBe('child_process');
   });
+
+  it('cleanupAllActiveProcesses should terminate active child processes and PTYs', async () => {
+    mockPlatform.mockReturnValue('linux');
+    Object.assign(mockChildProcess, {
+      killed: false,
+      exitCode: null,
+      signalCode: null,
+    });
+    mockProcessKill.mockImplementation(
+      (pid: number, signal?: string | number) => {
+        if (signal === 0) {
+          throw Object.assign(new Error('ESRCH'), { code: 'ESRCH' });
+        }
+        if (pid === -54321 && signal === 'SIGTERM') {
+          Object.assign(mockChildProcess, { signalCode: 'SIGTERM' });
+        }
+        return true;
+      },
+    );
+
+    const abortController1 = new AbortController();
+    void ShellExecutionService.execute(
+      'sleep 10',
+      '/test/dir',
+      onOutputEventMock,
+      abortController1.signal,
+      false,
+      shellExecutionConfig,
+    );
+
+    const abortController2 = new AbortController();
+    void ShellExecutionService.execute(
+      'sleep 20',
+      '/test/dir',
+      onOutputEventMock,
+      abortController2.signal,
+      true,
+      shellExecutionConfig,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    await ShellExecutionService.cleanupAllActiveProcesses();
+
+    expect(mockProcessKill).toHaveBeenCalledWith(-54321, 'SIGTERM');
+    expect(mockProcessKill).not.toHaveBeenCalledWith(-54321, 'SIGKILL');
+    expect(mockPtyProcess.kill).toHaveBeenCalledWith('SIGTERM');
+  });
 });
 
 describe('ShellExecutionService environment variables', () => {
@@ -2615,6 +2874,7 @@ describe('ShellExecutionService environment variables', () => {
 
   it('should include headless git and gh environment variables in non-interactive mode and append git config safely', async () => {
     vi.resetModules();
+    vi.stubEnv('GIT_CONFIG_GLOBAL', '');
     vi.stubEnv('GIT_CONFIG_COUNT', '2');
     vi.stubEnv('GIT_CONFIG_KEY_0', 'core.editor');
     vi.stubEnv('GIT_CONFIG_VALUE_0', 'vim');
@@ -2645,9 +2905,9 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).toHaveProperty('DISPLAY', '');
     expect(cpEnv).toHaveProperty('DBUS_SESSION_BUS_ADDRESS', '');
 
-    // Global / system config neutralization paths
+    // System config neutralization paths (while preserving user global ~/.gitconfig)
     const devNullPath = os.platform() === 'win32' ? 'NUL' : '/dev/null';
-    expect(cpEnv).toHaveProperty('GIT_CONFIG_GLOBAL', devNullPath);
+    expect(cpEnv.GIT_CONFIG_GLOBAL).toBeUndefined();
     expect(cpEnv).toHaveProperty('GIT_CONFIG_SYSTEM', devNullPath);
     expect(cpEnv).toHaveProperty('GIT_CONFIG_NOSYSTEM', '1');
 
@@ -2718,6 +2978,38 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).toHaveProperty('GIT_CONFIG_COUNT');
 
     // Ensure child_process exits
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
+
+    vi.unstubAllEnvs();
+  });
+
+  it('should preserve user-specified GIT_CONFIG_GLOBAL when set in environment', async () => {
+    vi.resetModules();
+    vi.stubEnv('GIT_CONFIG_GLOBAL', '/custom/user/.gitconfig');
+
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
+
+    mockGetPty.mockResolvedValue(null);
+    await ShellExecutionService.execute(
+      'test-cp-custom-git-global',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      false,
+      shellExecutionConfig,
+    );
+
+    expect(mockCpSpawn).toHaveBeenCalled();
+    const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+    expect(cpEnv).toHaveProperty(
+      'GIT_CONFIG_GLOBAL',
+      '/custom/user/.gitconfig',
+    );
+
     mockChildProcess.emit('exit', 0, null);
     mockChildProcess.emit('close', 0, null);
     await new Promise(process.nextTick);
@@ -2942,5 +3234,29 @@ describe('Windows ConPTY exit desynchronization and hang regression (#25166)', (
 
     expect(outcome).not.toBe('timeout');
     expect((outcome as { exitCode: number }).exitCode).toBe(0);
+  });
+
+  it('should inject GEMINI_CLI_IN_SHELL=1 into the child process environment', async () => {
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'echo $GEMINI_CLI_IN_SHELL',
+      '/test/dir',
+      onOutputEventMock,
+      abortController.signal,
+      true,
+      shellExecutionConfig,
+    );
+    mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+    await handle.result;
+
+    expect(mockPtySpawn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({
+        env: expect.objectContaining({
+          GEMINI_CLI_IN_SHELL: '1',
+        }),
+      }),
+    );
   });
 });

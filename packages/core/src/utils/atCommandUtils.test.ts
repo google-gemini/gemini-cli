@@ -8,7 +8,10 @@ import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import * as path from 'node:path';
 import * as fsPromises from 'node:fs/promises';
 import type { Stats } from 'node:fs';
-import { resolveAtCommandPath } from './atCommandUtils.js';
+import {
+  resolveAtCommandPath,
+  stripLineNumberSuffix,
+} from './atCommandUtils.js';
 import { type Config } from '../config/config.js';
 
 vi.mock('node:fs/promises');
@@ -273,6 +276,66 @@ describe('atCommandUtils', () => {
       );
       expect(result.resolved.relativePath).toBe(buriedFile);
     }
+  });
+
+  describe('Line and range suffix handling', () => {
+    const mockFile = 'src/app.js';
+    const absMockFile = path.resolve('/mock/root', mockFile);
+    const mockStats = { isDirectory: () => false, isFile: () => true };
+
+    beforeEach(() => {
+      vi.mocked(fsPromises.stat).mockImplementation(async (p) => {
+        if (p === absMockFile) return mockStats as unknown as Stats;
+        throw new Error('ENOENT');
+      });
+    });
+
+    it.each([
+      ['src/app.js:10', 'src/app.js'],
+      ['src/app.js:10-20', 'src/app.js'],
+      ['src/app.js:10:5', 'src/app.js'],
+      ['src/app.js:10:5-20:10', 'src/app.js'],
+      ['src/app.js#L10', 'src/app.js'],
+      ['src/app.js#L10-L25', 'src/app.js'],
+      ['src/app.js#L10-25', 'src/app.js'],
+      ['src/app.js#L10-#L25', 'src/app.js'],
+    ])('stripLineNumberSuffix(%s) returns %s', (input, expected) => {
+      expect(stripLineNumberSuffix(input)).toBe(expected);
+    });
+
+    it.each([
+      'src/app.js:10',
+      'src/app.js:10-20',
+      'src/app.js:10:5',
+      'src/app.js#L10',
+      'src/app.js#L10-L25',
+      'src/app.js#L10-#L25',
+    ])(
+      'should resolve relative path with line/range suffix: %s',
+      async (pathWithSuffix) => {
+        const result = await resolveAtCommandPath(
+          pathWithSuffix,
+          mockConfig as unknown as Config,
+        );
+        expect(result.status).toBe('resolved');
+        if (result.status === 'resolved') {
+          expect(result.resolved.absolutePath).toBe(absMockFile);
+          expect(result.resolved.relativePath).toBe(mockFile);
+        }
+      },
+    );
+
+    it('should resolve absolute path with line/range suffix', async () => {
+      const result = await resolveAtCommandPath(
+        `${absMockFile}:15-25`,
+        mockConfig as unknown as Config,
+      );
+      expect(result.status).toBe('resolved');
+      if (result.status === 'resolved') {
+        expect(result.resolved.absolutePath).toBe(absMockFile);
+        expect(result.resolved.relativePath).toBe(path.join('src', 'app.js'));
+      }
+    });
   });
 
   describe('Best-Effort Path Extraction (tryExtractPath)', () => {

@@ -10,7 +10,12 @@ import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { start_sandbox } from './sandbox.js';
+import { isPodmanRootless, start_sandbox } from './sandbox.js';
+import { IdeBridge, resolveIdeBridgeUpstream } from './ideBridge.js';
+import {
+  IDE_BRIDGE_HELPER_FILENAME,
+  IDE_BRIDGE_SOCKET_PATH,
+} from './ideBridgeHelper.js';
 import {
   FatalSandboxError,
   homedir,
@@ -20,12 +25,18 @@ import {
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { EventEmitter } from 'node:events';
 
-const { mockedHomedir, mockedGetContainerPath, mockedExecCommands } =
-  vi.hoisted(() => ({
-    mockedHomedir: vi.fn().mockReturnValue('/home/user'),
-    mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
-    mockedExecCommands: [] as string[],
-  }));
+const {
+  mockedHomedir,
+  mockedGetContainerPath,
+  mockedExecCommands,
+  mockedPodmanExecFile,
+} = vi.hoisted(() => ({
+  mockedHomedir: vi.fn().mockReturnValue('/home/user'),
+  mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
+  mockedExecCommands: [] as string[],
+  // Backs promisify(execFile) calls for `podman` (see the node:util mock).
+  mockedPodmanExecFile: vi.fn(),
+}));
 
 vi.mock('./sandboxUtils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./sandboxUtils.js')>();
@@ -38,6 +49,7 @@ vi.mock('./sandboxUtils.js', async (importOriginal) => {
 vi.mock('node:child_process');
 vi.mock('node:os');
 vi.mock('node:fs');
+vi.mock('./ideBridge.js');
 vi.mock('node:crypto', () => ({
   randomBytes: vi.fn().mockReturnValue(Buffer.from('a1b2c3d4e5f6', 'hex')),
 }));
@@ -62,7 +74,10 @@ vi.mock('node:util', async (importOriginal) => {
         };
       }
       if (fn === execFile) {
-        return async (file: string, args: string[]) => {
+        return async (file: string, args: string[], options?: unknown) => {
+          if (file === 'podman') {
+            return mockedPodmanExecFile(file, args, options);
+          }
           if (file === 'lxc' && args[0] === 'list') {
             const output = process.env['TEST_LXC_LIST_OUTPUT'];
             if (output === 'throw') {
@@ -1797,6 +1812,516 @@ describe('sandbox', () => {
         expect.arrayContaining(['run', '--runtime=runsc']),
         expect.objectContaining({ stdio: 'inherit' }),
       );
+    });
+  });
+
+  describe('IDE bridge', () => {
+    const upstream = {
+      port: '45678',
+      authToken: 'host-only-token',
+      workspacePaths: ['/test/project'],
+    };
+
+    interface MockProcessWithStdout extends EventEmitter {
+      stdout: EventEmitter;
+    }
+
+    /** Mocks the image check and the container run, like the other tests. */
+    function mockContainerRun() {
+      const imageCheck = new EventEmitter() as MockProcessWithStdout;
+      imageCheck.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          imageCheck.stdout.emit('data', Buffer.from('image-id'));
+          imageCheck.emit('close', 0);
+        }, 1);
+        return imageCheck as unknown as ReturnType<typeof spawn>;
+      });
+      const container = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      > & { exitCode: number | null; signalCode: string | null };
+      container.exitCode = null;
+      container.signalCode = null;
+      container.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return container;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => container);
+      return container;
+    }
+
+    function containerArgs(): string[] {
+      const call = vi
+        .mocked(spawn)
+        .mock.calls.find((c) => Array.isArray(c[1]) && c[1][0] === 'run');
+      return (call?.[1] as string[]) ?? [];
+    }
+
+    beforeEach(() => {
+      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '45678';
+      process.env['GEMINI_CLI_IDE_AUTH_TOKEN'] = 'host-only-token';
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/project';
+      process.env['TERM_PROGRAM'] = 'vscode';
+      vi.mocked(resolveIdeBridgeUpstream).mockResolvedValue(upstream);
+      vi.mocked(IdeBridge.prototype.connectUpstream).mockResolvedValue(
+        undefined,
+      );
+      vi.mocked(IdeBridge.prototype.attach).mockResolvedValue(undefined);
+      vi.mocked(IdeBridge.prototype.stop).mockResolvedValue(undefined);
+    });
+
+    it('bridges the IDE connection over exec instead of forwarding the port or token', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs();
+      const envs = args.filter((_, i) => args[i - 1] === '--env');
+      // The companion's port and token stay on the host.
+      expect(
+        envs.some((e) => e.startsWith('GEMINI_CLI_IDE_SERVER_PORT=')),
+      ).toBe(false);
+      expect(envs.some((e) => e.startsWith('GEMINI_CLI_IDE_AUTH_TOKEN='))).toBe(
+        false,
+      );
+      // The CLI inside reaches the bridge through its stdio transport.
+      expect(envs).toContain('GEMINI_CLI_IDE_SERVER_STDIO_COMMAND=node');
+      expect(envs).toContain(
+        `GEMINI_CLI_IDE_SERVER_STDIO_ARGS=${JSON.stringify([
+          `/home/node/.gemini/${IDE_BRIDGE_HELPER_FILENAME}`,
+          'connect',
+          IDE_BRIDGE_SOCKET_PATH,
+        ])}`,
+      );
+      expect(envs).toContain('GEMINI_CLI_IDE_WORKSPACE_PATH=/test/project');
+      expect(envs).toContain('TERM_PROGRAM=vscode');
+      // The helper is delivered through the mounted sandbox temp directory.
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`${IDE_BRIDGE_HELPER_FILENAME}$`)),
+        expect.stringContaining('gemini-ide-bridge'),
+        { mode: 0o600 },
+      );
+      expect(IdeBridge).toHaveBeenCalledWith({
+        upstream,
+        helperPathInContainer: `/home/node/.gemini/${IDE_BRIDGE_HELPER_FILENAME}`,
+        socketPathInContainer: IDE_BRIDGE_SOCKET_PATH,
+      });
+      expect(IdeBridge.prototype.connectUpstream).toHaveBeenCalled();
+      const containerName = args[args.indexOf('--name') + 1];
+      const attachOptions = vi.mocked(IdeBridge.prototype.attach).mock
+        .calls[0]?.[0];
+      // `<command> exec -i [--user uid:gid] <container>`; the bridge appends
+      // the helper invocation itself.
+      expect(attachOptions?.execCommand.slice(0, 3)).toEqual([
+        'docker',
+        'exec',
+        '-i',
+      ]);
+      expect(attachOptions?.execCommand.at(-1)).toBe(containerName);
+      expect(attachOptions?.isSandboxAlive()).toBe(true);
+      expect(IdeBridge.prototype.stop).toHaveBeenCalled();
+    });
+
+    it('passes the mapped uid/gid to exec when the sandbox runs as the current user', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      process.env['SANDBOX_SET_UID_GID'] = 'true';
+      mockedExecCommands.length = 0;
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const attachOptions = vi.mocked(IdeBridge.prototype.attach).mock
+        .calls[0]?.[0];
+      expect(attachOptions?.execCommand.slice(0, 5)).toEqual([
+        'docker',
+        'exec',
+        '-i',
+        '--user',
+        '1000:1000',
+      ]);
+    });
+
+    it('does not set the bridge up when the companion is unreachable from the host', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      vi.mocked(IdeBridge.prototype.connectUpstream).mockRejectedValue(
+        new Error('ECONNREFUSED'),
+      );
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const envs = containerArgs().filter(
+        (a, i, all) => all[i - 1] === '--env',
+      );
+      expect(
+        envs.some((e) => e.startsWith('GEMINI_CLI_IDE_SERVER_STDIO')),
+      ).toBe(false);
+      expect(
+        envs.some((e) => e.startsWith('GEMINI_CLI_IDE_SERVER_PORT=')),
+      ).toBe(false);
+      expect(envs).toContain('TERM_PROGRAM=vscode');
+      expect(IdeBridge.prototype.attach).not.toHaveBeenCalled();
+    });
+
+    it('does nothing IDE-specific when no companion is advertised', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      vi.mocked(resolveIdeBridgeUpstream).mockResolvedValue(undefined);
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      expect(IdeBridge).not.toHaveBeenCalled();
+      const envs = containerArgs().filter(
+        (a, i, all) => all[i - 1] === '--env',
+      );
+      expect(envs.some((e) => e.startsWith('GEMINI_CLI_IDE_SERVER_'))).toBe(
+        false,
+      );
+    });
+  });
+
+  describe('Podman rootless user namespace mapping', () => {
+    interface MockProcessWithStdout extends EventEmitter {
+      stdout: EventEmitter;
+    }
+
+    function mockContainerRun() {
+      const imageCheck = new EventEmitter() as MockProcessWithStdout;
+      imageCheck.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          imageCheck.stdout.emit('data', Buffer.from('image-id'));
+          imageCheck.emit('close', 0);
+        }, 1);
+        return imageCheck as unknown as ReturnType<typeof spawn>;
+      });
+      const container = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      > & { exitCode: number | null; signalCode: string | null };
+      container.exitCode = null;
+      container.signalCode = null;
+      container.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return container;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => container);
+      return container;
+    }
+
+    function containerArgs(cmd = 'podman'): string[] {
+      const call = vi
+        .mocked(spawn)
+        .mock.calls.find(
+          (c) => c[0] === cmd && Array.isArray(c[1]) && c[1][0] === 'run',
+        );
+      return (call?.[1] as string[]) ?? [];
+    }
+
+    function podmanInfoResult(stdout: string) {
+      return { stdout, stderr: '' };
+    }
+
+    /** Mirrors the error execFile reports when podman exits non-zero. */
+    function podmanExitError(exitCode: number) {
+      return Object.assign(new Error('Command failed: podman info'), {
+        code: exitCode,
+        killed: false,
+        signal: null,
+      });
+    }
+
+    beforeEach(() => {
+      vi.stubEnv('SANDBOX_FLAGS', '');
+      // Exercise the path where the sandbox runs as the host UID/GID.
+      vi.stubEnv('SANDBOX_SET_UID_GID', 'true');
+      vi.stubEnv('GEMINI_CLI_INTEGRATION_TEST', '');
+      mockedPodmanExecFile.mockReset();
+    });
+
+    describe('isPodmanRootless', () => {
+      it('returns true when Host.Security.Rootless is true', async () => {
+        mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+
+        await expect(isPodmanRootless()).resolves.toBe(true);
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(1);
+        expect(mockedPodmanExecFile).toHaveBeenCalledWith(
+          'podman',
+          ['info', '--format', '{{.Host.Security.Rootless}}'],
+          expect.objectContaining({ encoding: 'utf-8' }),
+        );
+      });
+
+      it('bounds podman info with a timeout', async () => {
+        mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+
+        await isPodmanRootless();
+
+        expect(mockedPodmanExecFile).toHaveBeenCalledWith(
+          'podman',
+          ['info', '--format', '{{.Host.Security.Rootless}}'],
+          expect.objectContaining({
+            timeout: expect.any(Number),
+            killSignal: 'SIGKILL',
+          }),
+        );
+      });
+
+      it('returns false when Host.Security.Rootless is false without calling fallback', async () => {
+        mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('false\n'));
+
+        await expect(isPodmanRootless()).resolves.toBe(false);
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(1);
+      });
+
+      it('falls back to Host.ServiceIsRootless when Host.Security.Rootless is empty', async () => {
+        mockedPodmanExecFile
+          .mockResolvedValueOnce(podmanInfoResult('\n'))
+          .mockResolvedValueOnce(podmanInfoResult('true\n'));
+
+        await expect(isPodmanRootless()).resolves.toBe(true);
+        expect(mockedPodmanExecFile).toHaveBeenNthCalledWith(
+          1,
+          'podman',
+          ['info', '--format', '{{.Host.Security.Rootless}}'],
+          expect.objectContaining({ encoding: 'utf-8' }),
+        );
+        expect(mockedPodmanExecFile).toHaveBeenNthCalledWith(
+          2,
+          'podman',
+          ['info', '--format', '{{.Host.ServiceIsRootless}}'],
+          expect.objectContaining({ encoding: 'utf-8' }),
+        );
+      });
+
+      it('falls back to Host.ServiceIsRootless when Host.Security.Rootless is unsupported and fails', async () => {
+        mockedPodmanExecFile
+          .mockRejectedValueOnce(podmanExitError(125))
+          .mockResolvedValueOnce(podmanInfoResult('true\n'));
+
+        await expect(isPodmanRootless()).resolves.toBe(true);
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(2);
+      });
+
+      it('returns false when podman info fails with an error', async () => {
+        mockedPodmanExecFile.mockRejectedValue(podmanExitError(125));
+
+        await expect(isPodmanRootless()).resolves.toBe(false);
+        // A generic failure may mean the property is unsupported, so the
+        // fallback query is still attempted.
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(2);
+      });
+
+      it('stops without running the fallback query when podman is not installed', async () => {
+        mockedPodmanExecFile.mockRejectedValue(
+          Object.assign(new Error('spawn podman ENOENT'), { code: 'ENOENT' }),
+        );
+
+        await expect(isPodmanRootless()).resolves.toBe(false);
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(1);
+      });
+
+      it('stops without running the fallback query when podman info times out', async () => {
+        // execFile reports a timeout by killing the process, so the error has
+        // `killed: true` and no ETIMEDOUT code.
+        mockedPodmanExecFile.mockRejectedValue(
+          Object.assign(new Error('Command failed: podman info'), {
+            code: null,
+            killed: true,
+            signal: 'SIGKILL',
+          }),
+        );
+
+        await expect(isPodmanRootless()).resolves.toBe(false);
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('adds --userns=keep-id for rootless Podman when the sandbox runs as the host user', async () => {
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      expect(args).toEqual(
+        expect.arrayContaining(['--user', 'root', '--userns=keep-id']),
+      );
+      // The flag must precede the image name to be parsed as a podman option.
+      expect(args.indexOf('--userns=keep-id')).toBeLessThan(
+        args.lastIndexOf('gemini-cli-sandbox'),
+      );
+      expect(mockedPodmanExecFile).toHaveBeenCalledWith(
+        'podman',
+        ['info', '--format', '{{.Host.Security.Rootless}}'],
+        expect.objectContaining({ encoding: 'utf-8' }),
+      );
+    });
+
+    it('does not add --userns=keep-id for integration test runs that stay as container root', async () => {
+      vi.stubEnv('GEMINI_CLI_INTEGRATION_TEST', 'true');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      expect(args).toEqual(expect.arrayContaining(['--user', 'root']));
+      expect(args).not.toContain('--userns=keep-id');
+      expect(mockedPodmanExecFile).not.toHaveBeenCalled();
+    });
+
+    it('does not add --userns=keep-id when host UID/GID mapping is disabled', async () => {
+      vi.stubEnv('SANDBOX_SET_UID_GID', 'false');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      expect(args).not.toContain('--userns=keep-id');
+      expect(mockedPodmanExecFile).not.toHaveBeenCalled();
+    });
+
+    it('does not add --userns=keep-id when running rootful Podman', async () => {
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('false\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      expect(args).not.toContain('--userns=keep-id');
+    });
+
+    it('preserves user-supplied --userns=host in SANDBOX_FLAGS without adding --userns=keep-id', async () => {
+      vi.stubEnv('SANDBOX_FLAGS', '--userns=host');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      expect(args).toContain('--userns=host');
+      expect(args).not.toContain('--userns=keep-id');
+      expect(mockedPodmanExecFile).not.toHaveBeenCalled();
+    });
+
+    it('preserves space-separated --userns keep-id in SANDBOX_FLAGS without duplicating --userns=keep-id', async () => {
+      vi.stubEnv('SANDBOX_FLAGS', '--userns keep-id');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      const usernsIdx = args.indexOf('--userns');
+      expect(usernsIdx).toBeGreaterThan(-1);
+      expect(args[usernsIdx + 1]).toBe('keep-id');
+      expect(args).not.toContain('--userns=keep-id');
+    });
+
+    it('still adds --userns=keep-id for rootless Podman when SANDBOX_FLAGS has unrelated flags', async () => {
+      vi.stubEnv('SANDBOX_FLAGS', '--security-opt label=disable');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      expect(args).toEqual(
+        expect.arrayContaining([
+          '--security-opt',
+          'label=disable',
+          '--userns=keep-id',
+        ]),
+      );
+    });
+
+    it('does not invoke rootless check or add --userns=keep-id when runtime is docker', async () => {
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('docker');
+      expect(mockedPodmanExecFile).not.toHaveBeenCalled();
+      expect(args).not.toContain('--userns=keep-id');
+    });
+
+    it('does not invoke rootless check or add --userns=keep-id when runtime is macOS seatbelt', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config, [], undefined, ['arg1']);
+      setTimeout(() => mockSpawnProcess.emit('close', 0), 10);
+      await expect(promise).resolves.toBe(0);
+
+      const spawnArgs = vi.mocked(spawn).mock.calls[0]?.[1] as string[];
+      expect(mockedPodmanExecFile).not.toHaveBeenCalled();
+      expect(spawnArgs).not.toContain('--userns=keep-id');
     });
   });
 });

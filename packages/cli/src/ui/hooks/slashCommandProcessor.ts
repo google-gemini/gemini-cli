@@ -35,6 +35,7 @@ import {
   removeMCPStatusChangeListener,
   MCPDiscoveryState,
   CoreToolCallStatus,
+  formatLocalDateKey,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
@@ -187,6 +188,17 @@ export const useSlashCommandProcessor = (
       } else if (message.type === MessageType.TOOL_STATS) {
         historyItemContent = {
           type: 'tool_stats',
+        };
+      } else if (message.type === MessageType.HEATMAP_STATS) {
+        historyItemContent = {
+          type: 'heatmap_stats',
+          dailyUsage: {},
+          totalWindowTokens: 0,
+          totalWindowSessions: 0,
+          totalWindowTurns: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          today: formatLocalDateKey(message.timestamp),
         };
       } else if (message.type === MessageType.QUIT) {
         historyItemContent = {
@@ -411,6 +423,7 @@ export const useSlashCommandProcessor = (
       }
 
       let hasError = false;
+      let shouldLogCompletion = true;
 
       const subcommand =
         resolvedCommandPath.length > 1
@@ -641,6 +654,7 @@ export const useSlashCommandProcessor = (
                     );
                   }
 
+                  shouldLogCompletion = false;
                   return await handleSlashCommand(
                     result.originalInvocation.raw,
                     // Pass the approved commands as a one-time grant for this execution.
@@ -673,10 +687,12 @@ export const useSlashCommandProcessor = (
                     return { type: 'handled' };
                   }
 
+                  shouldLogCompletion = false;
                   return await handleSlashCommand(
                     result.originalInvocation.raw,
                     undefined,
                     true,
+                    false, // Do not add to history again
                   );
                 }
                 case 'custom_dialog': {
@@ -727,7 +743,12 @@ export const useSlashCommandProcessor = (
         );
         return { type: 'handled' };
       } finally {
-        if (config && resolvedCommandPath[0] && !hasError) {
+        if (
+          config &&
+          resolvedCommandPath[0] &&
+          !hasError &&
+          shouldLogCompletion
+        ) {
           const event = makeSlashCommandEvent({
             command: resolvedCommandPath[0],
             subcommand,

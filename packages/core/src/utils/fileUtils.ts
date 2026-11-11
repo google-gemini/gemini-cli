@@ -124,8 +124,12 @@ export function detectBOM(buf: Buffer): BOMInfo | null {
  * (Node has 'utf16le' but not 'utf16be'.)
  */
 function decodeUTF16BE(buf: Buffer): string {
-  if (buf.length === 0) return '';
-  const swapped = Buffer.from(buf); // swap16 mutates in place, so copy
+  // Ignore a partial trailing code unit (swap16 throws on an odd length),
+  // matching how Node's utf16le decoder and decodeUTF32 treat partial units.
+  const usable = buf.length - (buf.length % 2);
+  if (usable === 0) return '';
+  // swap16 mutates in place, so copy
+  const swapped = Buffer.from(buf.subarray(0, usable));
   swapped.swap16();
   return swapped.toString('utf16le');
 }
@@ -161,6 +165,56 @@ function decodeUTF32(buf: Buffer, littleEndian: boolean): string {
 }
 
 /**
+ * Decode a buffer that starts with a detected BOM: skips the BOM and decodes
+ * the remaining bytes according to the BOM's encoding.
+ */
+function decodeBOMContent(buffer: Buffer, bom: BOMInfo): string {
+  const content = buffer.subarray(bom.bomLength);
+  switch (bom.encoding) {
+    case 'utf8':
+      return content.toString('utf8');
+    case 'utf16le':
+      return content.toString('utf16le');
+    case 'utf16be':
+      return decodeUTF16BE(content);
+    case 'utf32le':
+      return decodeUTF32(content, true);
+    case 'utf32be':
+      return decodeUTF32(content, false);
+    default:
+      // Defensive fallback; should be unreachable
+      return content.toString('utf8');
+  }
+}
+
+/**
+ * Compares two `fs.Stats` snapshots to detect whether the underlying file
+ * device (`dev`) or inode (`ino`) changed.
+ */
+function hasFileIdentityChanged(
+  a: fs.Stats | undefined,
+  b: fs.Stats | undefined,
+): boolean {
+  if (
+    !a ||
+    !b ||
+    a.dev === undefined ||
+    a.ino === undefined ||
+    b.dev === undefined ||
+    b.ino === undefined
+  ) {
+    return false;
+  }
+
+  // Work around upstream libuv 1.49.x-1.50.0 issue on Windows (Node 22.12-22.16)
+  // where path-based stat() reports dev: 0 while fstat() reports the volume serial number.
+  const isWin32ZeroDev =
+    process.platform === 'win32' && (a.dev === 0 || b.dev === 0);
+  const devChanged = !isWin32ZeroDev && a.dev !== b.dev;
+  return devChanged || a.ino !== b.ino;
+}
+
+/**
  * Reads a file as a Buffer while verifying device and inode (dev + ino) before,
  * during (via fstat on the opened file descriptor), and after reading to ensure
  * file consistency.
@@ -171,6 +225,7 @@ export async function readSecureFileBuffer(
 ): Promise<Buffer> {
   const initialStats = expectedStats ?? (await fs.promises.stat(filePath));
   let fileHandle: fs.promises.FileHandle | undefined;
+  let handleStats: fs.Stats | undefined;
 
   try {
     if (typeof fs.promises.open === 'function') {
@@ -180,16 +235,8 @@ export async function readSecureFileBuffer(
         // If opening file descriptor failed or is mocked without stat, continue to readFile
       }
       if (fileHandle && typeof fileHandle.stat === 'function') {
-        const handleStats = await fileHandle.stat();
-        if (
-          initialStats.dev !== undefined &&
-          initialStats.ino !== undefined &&
-          handleStats &&
-          handleStats.dev !== undefined &&
-          handleStats.ino !== undefined &&
-          (initialStats.dev !== handleStats.dev ||
-            initialStats.ino !== handleStats.ino)
-        ) {
+        handleStats = await fileHandle.stat();
+        if (hasFileIdentityChanged(initialStats, handleStats)) {
           throw new Error(
             `File device or inode changed during read: ${filePath}`,
           );
@@ -209,12 +256,8 @@ export async function readSecureFileBuffer(
       // If post-stat failed due to file removal, ignore here
     }
     if (
-      postStats &&
-      initialStats.dev !== undefined &&
-      initialStats.ino !== undefined &&
-      postStats.dev !== undefined &&
-      postStats.ino !== undefined &&
-      (initialStats.dev !== postStats.dev || initialStats.ino !== postStats.ino)
+      hasFileIdentityChanged(initialStats, postStats) ||
+      hasFileIdentityChanged(handleStats, postStats)
     ) {
       throw new Error(`File device or inode changed during read: ${filePath}`);
     }
@@ -246,22 +289,7 @@ export async function readFileWithEncoding(
   }
 
   // Strip BOM and decode per encoding
-  const content = full.subarray(bom.bomLength);
-  switch (bom.encoding) {
-    case 'utf8':
-      return content.toString('utf8');
-    case 'utf16le':
-      return content.toString('utf16le');
-    case 'utf16be':
-      return decodeUTF16BE(content);
-    case 'utf32le':
-      return decodeUTF32(content, true);
-    case 'utf32be':
-      return decodeUTF32(content, false);
-    default:
-      // Defensive fallback; should be unreachable
-      return content.toString('utf8');
-  }
+  return decodeBOMContent(full, bom);
 }
 
 /**
@@ -365,20 +393,32 @@ export function isWithinRoot(
   pathToCheck: string,
   rootDirectory: string,
 ): boolean {
-  const normalizedPathToCheck = canonicalizeMacosPath(
-    path.resolve(pathToCheck),
+  const isWindows = process.platform === 'win32';
+  const pathModule = isWindows ? path.win32 : path;
+
+  const resolvedPathToCheck = canonicalizeMacosPath(
+    pathModule.resolve(pathToCheck),
   );
-  const normalizedRootDirectory = canonicalizeMacosPath(
-    path.resolve(rootDirectory),
+  const resolvedRootDirectory = canonicalizeMacosPath(
+    pathModule.resolve(rootDirectory),
   );
+
+  // Windows (NTFS/Win32) treats paths case-insensitively, so normalize casing
+  // before prefix comparison while preserving case sensitivity on Linux/macOS.
+  const normalizedPathToCheck = isWindows
+    ? resolvedPathToCheck.toLowerCase()
+    : resolvedPathToCheck;
+  const normalizedRootDirectory = isWindows
+    ? resolvedRootDirectory.toLowerCase()
+    : resolvedRootDirectory;
 
   // Ensure the rootDirectory path ends with a separator for correct startsWith comparison,
   // unless it's the root path itself (e.g., '/' or 'C:\').
   const rootWithSeparator =
-    normalizedRootDirectory === path.sep ||
-    normalizedRootDirectory.endsWith(path.sep)
+    normalizedRootDirectory === pathModule.sep ||
+    normalizedRootDirectory.endsWith(pathModule.sep)
       ? normalizedRootDirectory
-      : normalizedRootDirectory + path.sep;
+      : normalizedRootDirectory + pathModule.sep;
 
   if (
     normalizedPathToCheck === normalizedRootDirectory ||
@@ -445,7 +485,7 @@ export async function isEmpty(filePath: string): Promise<boolean> {
 
       const bom = detectBOM(buffer);
       const content = bom
-        ? buffer.subarray(bom.bomLength).toString('utf8')
+        ? decodeBOMContent(buffer, bom)
         : buffer.toString('utf8');
 
       return content.trim().length === 0;
@@ -776,7 +816,7 @@ export function formatTruncatedToolOutput(
   outputFile: string,
   maxChars: number,
 ): string {
-  if (contentStr.length <= maxChars) return contentStr;
+  if (maxChars <= 0 || contentStr.length <= maxChars) return contentStr;
 
   const headChars = Math.floor(maxChars * 0.2);
   const tailChars = maxChars - headChars;

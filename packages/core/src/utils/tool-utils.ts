@@ -10,10 +10,35 @@ import {
   type AnyToolInvocation,
 } from '../index.js';
 import { SHELL_TOOL_NAMES } from './shell-utils.js';
+import {
+  UPDATE_TOPIC_TOOL_NAME,
+  EDIT_TOOL_NAMES,
+} from '../tools/tool-names.js';
 import levenshtein from 'fast-levenshtein';
-import type { ToolCallResponseInfo } from '../scheduler/types.js';
+import type {
+  ToolCallRequestInfo,
+  ToolCallResponseInfo,
+} from '../scheduler/types.js';
 import type { Part } from '@google/genai';
 import { MAX_STORED_TOOL_OUTPUT_BYTES } from './constants.js';
+
+/**
+ * Determines whether a tool call request can be executed in parallel with
+ * other parallelizable tool calls in the same scheduler wave.
+ */
+export function isParallelizable(request: ToolCallRequestInfo): boolean {
+  if (
+    request.name === UPDATE_TOPIC_TOOL_NAME ||
+    EDIT_TOOL_NAMES.has(request.name)
+  ) {
+    return false;
+  }
+  const wait = request.args?.['wait_for_previous'];
+  if (typeof wait === 'boolean') {
+    return !wait;
+  }
+  return true;
+}
 
 /**
  * Validates if an object is a ToolCallResponseInfo.

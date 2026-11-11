@@ -91,4 +91,23 @@ describe('OverrideStrategy', () => {
     expect(decision).not.toBeNull();
     expect(decision?.model).toBe(requestedModel);
   });
+
+  it('should resolve gemini-3.1-pro-preview-customtools when custom tools are enabled', async () => {
+    const mockConfig = {
+      getModel: () => 'pro',
+      getGemini31LaunchedSync: () => true,
+      getUseCustomToolModelSync: () => true,
+      getHasAccessToPreviewModel: () => true,
+    } as unknown as Config;
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    expect(decision).not.toBeNull();
+    expect(decision?.model).toBe('gemini-3.1-pro-preview-customtools');
+  });
 });

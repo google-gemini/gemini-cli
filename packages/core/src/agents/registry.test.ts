@@ -268,6 +268,131 @@ describe('AgentRegistry', () => {
       ).toHaveBeenCalledTimes(2);
     });
 
+    it('should NOT load project agents or emit duplicate warning when workspace is the user home directory', async () => {
+      mockConfig = makeMockedConfig({ enableAgents: true });
+      vi.spyOn(mockConfig.storage, 'isWorkspaceHomeDir').mockReturnValue(true);
+
+      const feedbackSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
+        .mockImplementation(() => {});
+
+      const homeAgent = {
+        ...MOCK_AGENT_V1,
+        name: 'home-agent',
+        description: 'Home agent',
+      };
+
+      vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValue({
+        agents: [homeAgent],
+        errors: [],
+      });
+
+      registry = new TestableAgentRegistry(mockConfig);
+      await registry.initialize();
+
+      // Only user agents directory should be loaded (1 time), not both project and user (2 times)
+      expect(
+        vi.mocked(tomlLoader.loadAgentsFromDirectory),
+      ).toHaveBeenCalledTimes(1);
+
+      // Verify the agent was successfully registered as a user agent
+      expect(registry.getDefinition('home-agent')).toBeDefined();
+
+      // No duplicate agent warning should be emitted
+      expect(feedbackSpy).not.toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining("Duplicate agent name 'home-agent' detected"),
+      );
+    });
+
+    it('should NOT emit untrusted folder warning when workspace is the user home directory even if folder trust is enabled and untrusted', async () => {
+      mockConfig = makeMockedConfig({ enableAgents: true });
+      vi.spyOn(mockConfig.storage, 'isWorkspaceHomeDir').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'getFolderTrust').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'isTrustedFolder').mockReturnValue(false);
+
+      const feedbackSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
+        .mockImplementation(() => {});
+
+      const homeAgent = {
+        ...MOCK_AGENT_V1,
+        name: 'home-agent',
+        description: 'Home agent',
+      };
+
+      vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValue({
+        agents: [homeAgent],
+        errors: [],
+      });
+
+      registry = new TestableAgentRegistry(mockConfig);
+      await registry.initialize();
+
+      // Only user agents directory should be loaded
+      expect(
+        vi.mocked(tomlLoader.loadAgentsFromDirectory),
+      ).toHaveBeenCalledTimes(1);
+
+      // Should NOT emit untrusted folder info feedback
+      expect(feedbackSpy).not.toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining(
+          'Skipping project agents due to untrusted folder',
+        ),
+      );
+
+      // Verify the home agent was still loaded from user directory
+      expect(registry.getDefinition('home-agent')).toBeDefined();
+    });
+
+    it('should NOT load project agents or emit duplicate warning upon reload when workspace is the user home directory', async () => {
+      mockConfig = makeMockedConfig({ enableAgents: true });
+      vi.spyOn(mockConfig.storage, 'isWorkspaceHomeDir').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'getA2AClientManager').mockReturnValue({
+        clearCache: vi.fn(),
+        loadAgent: vi.fn(),
+      } as unknown as A2AClientManager);
+
+      const feedbackSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
+        .mockImplementation(() => {});
+
+      const homeAgent = {
+        ...MOCK_AGENT_V1,
+        name: 'home-agent',
+        description: 'Home agent',
+      };
+
+      vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValue({
+        agents: [homeAgent],
+        errors: [],
+      });
+
+      registry = new TestableAgentRegistry(mockConfig);
+      await registry.initialize();
+
+      // Initial load should call loadAgentsFromDirectory once
+      expect(
+        vi.mocked(tomlLoader.loadAgentsFromDirectory),
+      ).toHaveBeenCalledTimes(1);
+
+      // Reload
+      const reloadSummary = await registry.reload();
+      expect(reloadSummary.errors).toHaveLength(0);
+
+      // Reload should only have invoked loadAgentsFromDirectory once more (total 2 times, 1 per reload)
+      expect(
+        vi.mocked(tomlLoader.loadAgentsFromDirectory),
+      ).toHaveBeenCalledTimes(2);
+
+      // No duplicate agent warning should be emitted during reload
+      expect(feedbackSpy).not.toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining("Duplicate agent name 'home-agent' detected"),
+      );
+    });
+
     it('should NOT load TOML agents when enableAgents is false', async () => {
       const disabledConfig = makeMockedConfig({
         enableAgents: false,

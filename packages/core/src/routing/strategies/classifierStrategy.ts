@@ -27,6 +27,7 @@ import { LlmRole } from '../../telemetry/types.js';
 // The number of recent history turns to provide to the router for context.
 const HISTORY_TURNS_FOR_CONTEXT = 4;
 const HISTORY_SEARCH_WINDOW = 20;
+const CLASSIFIER_MAX_ATTEMPTS = 2;
 
 const FLASH_MODEL = 'flash';
 const PRO_MODEL = 'pro';
@@ -176,6 +177,7 @@ export class ClassifierStrategy implements RoutingStrategy {
         abortSignal: context.signal,
         promptId,
         role: LlmRole.UTILITY_ROUTER,
+        maxAttempts: CLASSIFIER_MAX_ATTEMPTS,
       });
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);

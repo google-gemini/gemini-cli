@@ -27,7 +27,10 @@ import {
   formatTruncatedToolOutput,
 } from '../utils/fileUtils.js';
 import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
-import { truncateToolOutput } from '../utils/tool-utils.js';
+import {
+  truncateFunctionResponsePart,
+  truncateToolOutput,
+} from '../utils/tool-utils.js';
 import { MAX_STORED_TOOL_OUTPUT_BYTES } from '../utils/constants.js';
 import {
   CoreToolCallStatus,
@@ -38,7 +41,7 @@ import {
   type SuccessfulToolCall,
   type CancelledToolCall,
 } from './types.js';
-import type { PartListUnion, Part } from '@google/genai';
+import type { PartListUnion, Part, PartUnion } from '@google/genai';
 import {
   GeminiCliOperation,
   GEN_AI_TOOL_CALL_ID,
@@ -119,7 +122,12 @@ export class ToolExecutor {
             signal,
             tool,
             liveOutputCallback,
-            { shellExecutionConfig, setExecutionIdCallback },
+            {
+              shellExecutionConfig,
+              setExecutionIdCallback,
+              isClientInitiated: request.isClientInitiated,
+              isUserConfirmed: request.isUserConfirmed ?? false,
+            },
             this.config,
             request.originalRequestName,
             true, // skipBeforeHook
@@ -350,39 +358,78 @@ export class ToolExecutor {
         );
       }
     } else if (Array.isArray(finalContent)) {
-      finalContent = await Promise.all(
-        finalContent.map(async (part) => {
-          if (
-            typeof part === 'string' &&
-            Buffer.byteLength(part, 'utf8') > MAX_STORED_TOOL_OUTPUT_BYTES
-          ) {
+      const textParts: string[] = [];
+      let totalBytes = 0;
+      for (const part of finalContent) {
+        const text =
+          typeof part === 'string'
+            ? part
+            : typeof part === 'object' &&
+                part !== null &&
+                'text' in part &&
+                typeof part.text === 'string'
+              ? part.text
+              : undefined;
+        if (text !== undefined) {
+          if (textParts.length > 0) {
+            totalBytes += 1;
+          }
+          textParts.push(text);
+          totalBytes += Buffer.byteLength(text, 'utf8');
+        }
+      }
+      if (totalBytes > MAX_STORED_TOOL_OUTPUT_BYTES) {
+        await ensureOutputFile(textParts.join('\n'));
+      }
+
+      let remainingBytes = MAX_STORED_TOOL_OUTPUT_BYTES;
+      let budgetExhausted = false;
+      const processedParts: PartUnion[] = [];
+
+      for (const part of finalContent) {
+        if (typeof part === 'string') {
+          if (budgetExhausted) {
+            continue;
+          }
+          const partBytes = Buffer.byteLength(part, 'utf8');
+          if (partBytes > remainingBytes) {
             const savedPath = await ensureOutputFile(part);
-            return truncateToolOutput(
-              part,
-              MAX_STORED_TOOL_OUTPUT_BYTES,
-              savedPath,
+            processedParts.push(
+              truncateToolOutput(part, remainingBytes, savedPath),
             );
+            budgetExhausted = true;
+            remainingBytes = 0;
+          } else {
+            processedParts.push(part);
+            remainingBytes = Math.max(0, remainingBytes - partBytes - 1);
           }
-          if (
-            typeof part === 'object' &&
-            part !== null &&
-            'text' in part &&
-            typeof part.text === 'string' &&
-            Buffer.byteLength(part.text, 'utf8') > MAX_STORED_TOOL_OUTPUT_BYTES
-          ) {
+        } else if (
+          typeof part === 'object' &&
+          part !== null &&
+          'text' in part &&
+          typeof part.text === 'string'
+        ) {
+          if (budgetExhausted) {
+            continue;
+          }
+          const partBytes = Buffer.byteLength(part.text, 'utf8');
+          if (partBytes > remainingBytes) {
             const savedPath = await ensureOutputFile(part.text);
-            return {
+            processedParts.push({
               ...part,
-              text: truncateToolOutput(
-                part.text,
-                MAX_STORED_TOOL_OUTPUT_BYTES,
-                savedPath,
-              ),
-            };
+              text: truncateToolOutput(part.text, remainingBytes, savedPath),
+            });
+            budgetExhausted = true;
+            remainingBytes = 0;
+          } else {
+            processedParts.push(part);
+            remainingBytes = Math.max(0, remainingBytes - partBytes - 1);
           }
-          return part;
-        }),
-      );
+        } else {
+          processedParts.push(part);
+        }
+      }
+      finalContent = processedParts;
     } else if (
       typeof finalContent === 'object' &&
       finalContent !== null &&
@@ -436,6 +483,15 @@ export class ToolExecutor {
         this.config.getActiveModel(),
         this.config,
       );
+      if (!this.config.isContextManagementEnabled()) {
+        responseParts = responseParts.map((part) =>
+          truncateFunctionResponsePart(
+            part,
+            MAX_STORED_TOOL_OUTPUT_BYTES,
+            outputFile,
+          ),
+        );
+      }
 
       // Inject the cancellation error into the response object
       const mainPart = responseParts[0];
@@ -487,13 +543,22 @@ export class ToolExecutor {
     const toolName = call.request.originalRequestName || call.request.name;
     const callId = call.request.callId;
 
-    const response = convertToFunctionResponse(
+    const rawResponse = convertToFunctionResponse(
       toolName,
       callId,
       content,
       this.config.getActiveModel(),
       this.config,
     );
+    const response = this.config.isContextManagementEnabled()
+      ? rawResponse
+      : rawResponse.map((part) =>
+          truncateFunctionResponsePart(
+            part,
+            MAX_STORED_TOOL_OUTPUT_BYTES,
+            outputFile,
+          ),
+        );
 
     const successResponse: ToolCallResponseInfo = {
       callId,

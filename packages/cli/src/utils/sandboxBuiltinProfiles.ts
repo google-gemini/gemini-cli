@@ -89,6 +89,9 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (global-name "com.apple.SystemConfiguration.DNSConfiguration")
     (global-name "com.apple.SystemConfiguration.configd")
 )
+(allow mach-lookup
+    (global-name "com.apple.FSEvents")
+)
 (allow system-socket
     (require-all
         (socket-domain AF_SYSTEM)
@@ -256,6 +259,9 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (global-name "com.apple.SystemConfiguration.DNSConfiguration")
     (global-name "com.apple.SystemConfiguration.configd")
 )
+(allow mach-lookup
+    (global-name "com.apple.FSEvents")
+)
 (allow system-socket
     (require-all
         (socket-domain AF_SYSTEM)
@@ -345,6 +351,7 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
 (allow file-read*
     (literal (string-append (param "HOME_DIR") "/.gemini/settings.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/keybindings.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/theme.json"))
 )
 (allow process-exec)
 (allow process-fork)
@@ -493,6 +500,7 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
 (allow file-read*
     (literal (string-append (param "HOME_DIR") "/.gemini/settings.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/keybindings.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/theme.json"))
 )
 (allow process-exec)
 (allow process-fork)
@@ -644,6 +652,7 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (subpath (param "CACHE_DIR"))
     (literal (string-append (param "HOME_DIR") "/.gemini/settings.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/keybindings.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/theme.json"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (literal (string-append (param "HOME_DIR") "/.gitconfig"))
@@ -818,6 +827,7 @@ export const BUILTIN_SEATBELT_PROFILE_CONTENTS: Record<string, string> = {
     (subpath (param "CACHE_DIR"))
     (literal (string-append (param "HOME_DIR") "/.gemini/settings.json"))
     (literal (string-append (param "HOME_DIR") "/.gemini/keybindings.json"))
+    (literal (string-append (param "HOME_DIR") "/.gemini/theme.json"))
     (subpath (string-append (param "HOME_DIR") "/.npm"))
     (subpath (string-append (param "HOME_DIR") "/.cache"))
     (literal (string-append (param "HOME_DIR") "/.gitconfig"))

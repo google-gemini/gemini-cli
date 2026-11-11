@@ -25,6 +25,7 @@ import {
   FatalSandboxError,
   GEMINI_DIR,
   homedir,
+  isNodeError,
   resolveToRealPath,
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
@@ -44,6 +45,12 @@ import {
   sanitizeSettingsForSandbox,
 } from './sandboxUtils.js';
 import { BUILTIN_SEATBELT_PROFILE_CONTENTS } from './sandboxBuiltinProfiles.js';
+import { IdeBridge, resolveIdeBridgeUpstream } from './ideBridge.js';
+import {
+  IDE_BRIDGE_HELPER_FILENAME,
+  IDE_BRIDGE_HELPER_SOURCE,
+  IDE_BRIDGE_SOCKET_PATH,
+} from './ideBridgeHelper.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -51,6 +58,64 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
+
+// Upper bound for `podman info` so an unresponsive Podman service cannot
+// stall sandbox startup.
+const PODMAN_INFO_TIMEOUT_MS = 5000;
+
+/**
+ * Checks whether Podman is running in rootless mode.
+ * Queries `{{.Host.Security.Rootless}}` first and falls back to
+ * `{{.Host.ServiceIsRootless}}` if empty or unsupported.
+ */
+export async function isPodmanRootless(): Promise<boolean> {
+  const formats = [
+    '{{.Host.Security.Rootless}}',
+    '{{.Host.ServiceIsRootless}}',
+  ];
+
+  for (const format of formats) {
+    try {
+      const { stdout } = await execFileAsync(
+        'podman',
+        ['info', '--format', format],
+        {
+          encoding: 'utf-8',
+          timeout: PODMAN_INFO_TIMEOUT_MS,
+          killSignal: 'SIGKILL',
+        },
+      );
+      const trimmed = String(stdout ?? '')
+        .trim()
+        .toLowerCase();
+      if (trimmed === 'true') {
+        return true;
+      }
+      if (trimmed === 'false') {
+        return false;
+      }
+    } catch (err) {
+      // A missing podman binary or a timed-out query would fail the fallback
+      // query the same way, so stop instead of running podman again. When
+      // execFile kills the process on timeout, the error reports
+      // `killed: true` rather than an ETIMEDOUT code.
+      const isMissingBinary = isNodeError(err) && err.code === 'ENOENT';
+      const timedOut = isRecord(err) && err['killed'] === true;
+      if (isMissingBinary || timedOut) {
+        break;
+      }
+      // Property may be unsupported or podman execution failed; try fallback if available.
+    }
+  }
+
+  return false;
+}
+
+function hasUsernsFlag(flags: string[]): boolean {
+  return flags.some(
+    (flag) => flag === '--userns' || flag.startsWith('--userns='),
+  );
+}
 
 export async function start_sandbox(
   config: SandboxConfig,
@@ -65,10 +130,20 @@ export async function start_sandbox(
   patcher.patch();
 
   let stopProxy: (() => void) | undefined = undefined;
+  let stopIdeBridge: (() => void) | undefined = undefined;
   let tempProfileFile: string | null = null;
   let sandboxTmpDir: string | null = null;
 
   const cleanup = () => {
+    if (stopIdeBridge) {
+      const stop = stopIdeBridge;
+      stopIdeBridge = undefined;
+      try {
+        stop();
+      } catch {
+        // ignore
+      }
+    }
     if (sandboxTmpDir) {
       const dirToDelete = sandboxTmpDir;
       sandboxTmpDir = null;
@@ -481,13 +556,12 @@ export async function start_sandbox(
     }
 
     // add custom flags from SANDBOX_FLAGS
-    if (process.env['SANDBOX_FLAGS']) {
-      const flags = parse(process.env['SANDBOX_FLAGS'], process.env).filter(
-        (f): f is string => typeof f === 'string',
-      );
-
-      args.push(...flags);
-    }
+    const customFlags = process.env['SANDBOX_FLAGS']
+      ? parse(process.env['SANDBOX_FLAGS'], process.env).filter(
+          (f): f is string => typeof f === 'string',
+        )
+      : [];
+    args.push(...customFlags);
 
     // add TTY only if stdin is TTY as well, i.e. for piped input don't init TTY in container
     if (process.stdin.isTTY) {
@@ -790,15 +864,61 @@ export async function start_sandbox(
       args.push('--env', `COLORTERM=${process.env['COLORTERM']}`);
     }
 
-    // Pass through IDE mode environment variables
-    for (const envVar of [
-      'GEMINI_CLI_IDE_SERVER_PORT',
-      'GEMINI_CLI_IDE_WORKSPACE_PATH',
-      'TERM_PROGRAM',
-    ]) {
-      if (process.env[envVar]) {
-        args.push('--env', `${envVar}=${process.env[envVar]}`);
+    // IDE integration. The companion extension listens on the host loopback
+    // interface and requires a per-window token, neither of which is reachable
+    // or appropriate from inside the container (under gVisor the loopback
+    // interface is private to the sandbox). Instead, this host process bridges
+    // the MCP connection over `<command> exec` (see ./ideBridge.ts): the token
+    // stays on the host, and the CLI inside the container talks to the bridge
+    // through its stdio transport. `TERM_PROGRAM` still lets the CLI detect
+    // the IDE, and the workspace path drives its directory check.
+    let ideBridge: IdeBridge | undefined;
+    const ideBridgeUpstream = await resolveIdeBridgeUpstream();
+    if (ideBridgeUpstream) {
+      const bridge = new IdeBridge({
+        upstream: ideBridgeUpstream,
+        helperPathInContainer: `${userSettingsDirInSandbox}/${IDE_BRIDGE_HELPER_FILENAME}`,
+        socketPathInContainer: IDE_BRIDGE_SOCKET_PATH,
+      });
+      try {
+        await bridge.connectUpstream();
+        ideBridge = bridge;
+        // Registered now, not after spawn, so a failure anywhere between here
+        // and the container start still closes the companion connection.
+        stopIdeBridge = () => {
+          void bridge.stop();
+        };
+      } catch (err) {
+        debugLogger.debug(
+          'IDE companion is not reachable from the host; IDE integration will be unavailable inside the sandbox:',
+          err,
+        );
       }
+    }
+    if (process.env['TERM_PROGRAM']) {
+      args.push('--env', `TERM_PROGRAM=${process.env['TERM_PROGRAM']}`);
+    }
+    const ideWorkspacePath =
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] ??
+      ideBridgeUpstream?.workspacePaths.join(path.delimiter);
+    if (ideWorkspacePath) {
+      args.push('--env', `GEMINI_CLI_IDE_WORKSPACE_PATH=${ideWorkspacePath}`);
+    }
+    if (ideBridge) {
+      fs.writeFileSync(
+        path.join(sandboxTmpDir, IDE_BRIDGE_HELPER_FILENAME),
+        IDE_BRIDGE_HELPER_SOURCE,
+        { mode: 0o600 },
+      );
+      args.push('--env', 'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND=node');
+      args.push(
+        '--env',
+        `GEMINI_CLI_IDE_SERVER_STDIO_ARGS=${JSON.stringify([
+          `${userSettingsDirInSandbox}/${IDE_BRIDGE_HELPER_FILENAME}`,
+          'connect',
+          IDE_BRIDGE_SOCKET_PATH,
+        ])}`,
+      );
     }
 
     // copy VIRTUAL_ENV if under working directory
@@ -873,6 +993,19 @@ export async function start_sandbox(
       // For the user-creation logic to work, the container must start as root.
       // The entrypoint script then handles dropping privileges to the correct user.
       args.push('--user', 'root');
+
+      // Under rootless Podman, container UIDs other than root map to
+      // subordinate host UIDs, so files the sandbox user creates in bind
+      // mounts would not be owned by the host user. --userns=keep-id maps the
+      // host UID to the same UID inside the container. Skip it when the user
+      // already configured --userns via SANDBOX_FLAGS.
+      if (
+        command === 'podman' &&
+        !hasUsernsFlag(customFlags) &&
+        (await isPodmanRootless())
+      ) {
+        args.push('--userns=keep-id');
+      }
 
       const uid = (await execAsync('id -u')).stdout.trim();
       const gid = (await execAsync('id -g')).stdout.trim();
@@ -1005,6 +1138,21 @@ export async function start_sandbox(
       stdio: 'inherit',
     });
 
+    if (ideBridge) {
+      const container = sandboxProcess;
+      void ideBridge.attach({
+        execCommand: [
+          command,
+          'exec',
+          '-i',
+          ...(userFlag ? userFlag.split(' ') : []),
+          containerName,
+        ],
+        isSandboxAlive: () =>
+          container.exitCode === null && container.signalCode === null,
+      });
+    }
+
     return await new Promise<number>((resolve, reject) => {
       sandboxProcess?.on('error', (err) => {
         coreEvents.emitFeedback('error', 'Sandbox process error', err);
@@ -1013,6 +1161,7 @@ export async function start_sandbox(
 
       sandboxProcess?.on('close', (code, signal) => {
         process.stdin.resume();
+        void ideBridge?.stop();
         if (code !== 0 && code !== null) {
           debugLogger.log(
             `Sandbox process exited with code: ${code}, signal: ${signal}`,
