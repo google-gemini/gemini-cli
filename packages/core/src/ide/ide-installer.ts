@@ -11,6 +11,7 @@ import * as fs from 'node:fs';
 import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
 import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from './constants.js';
 import { homedir } from '../utils/paths.js';
+import { quoteCmdArg } from '../utils/editor.js';
 
 export interface IdeInstaller {
   install(): Promise<InstallResult>;
@@ -145,6 +146,33 @@ async function findCommand(
   return null;
 }
 
+const COMPANION_INSTALL_ARGS: readonly string[] = [
+  '--install-extension',
+  'google.gemini-cli-vscode-ide-companion',
+  '--force',
+];
+
+/**
+ * Runs `<cli> --install-extension <companion> --force` for a VS Code-family
+ * CLI.
+ *
+ * On Windows these CLIs are `.cmd` scripts, which Node can only start through
+ * a shell. With `shell: true`, Node does not quote the command or its
+ * arguments; it joins them with spaces, so cmd.exe would split a path such as
+ * `C:\Program Files\Microsoft VS Code\bin\code.cmd` at the first space.
+ * Quoting each part for cmd.exe keeps the path in one piece.
+ */
+function runCompanionInstall(commandPath: string, platform: NodeJS.Platform) {
+  const isWindows = platform === 'win32';
+  return child_process.spawnSync(
+    isWindows ? quoteCmdArg(commandPath) : commandPath,
+    isWindows
+      ? COMPANION_INSTALL_ARGS.map(quoteCmdArg)
+      : COMPANION_INSTALL_ARGS,
+    { stdio: 'pipe', shell: isWindows },
+  );
+}
+
 class VsCodeInstaller implements IdeInstaller {
   private vsCodeCommand: Promise<string | null>;
 
@@ -166,15 +194,7 @@ class VsCodeInstaller implements IdeInstaller {
     }
 
     try {
-      const result = child_process.spawnSync(
-        commandPath,
-        [
-          '--install-extension',
-          'google.gemini-cli-vscode-ide-companion',
-          '--force',
-        ],
-        { stdio: 'pipe', shell: this.platform === 'win32' },
-      );
+      const result = runCompanionInstall(commandPath, this.platform);
 
       if (result.status !== 0) {
         throw new Error(
@@ -216,15 +236,7 @@ class PositronInstaller implements IdeInstaller {
     }
 
     try {
-      const result = child_process.spawnSync(
-        commandPath,
-        [
-          '--install-extension',
-          'google.gemini-cli-vscode-ide-companion',
-          '--force',
-        ],
-        { stdio: 'pipe', shell: this.platform === 'win32' },
-      );
+      const result = runCompanionInstall(commandPath, this.platform);
 
       if (result.status !== 0) {
         throw new Error(
@@ -286,15 +298,7 @@ class AntigravityInstaller implements IdeInstaller {
     }
 
     try {
-      const result = child_process.spawnSync(
-        commandPath,
-        [
-          '--install-extension',
-          'google.gemini-cli-vscode-ide-companion',
-          '--force',
-        ],
-        { stdio: 'pipe', shell: this.platform === 'win32' },
-      );
+      const result = runCompanionInstall(commandPath, this.platform);
 
       if (result.status !== 0) {
         throw new Error(
