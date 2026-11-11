@@ -695,7 +695,7 @@ describe('scrubHistory', () => {
     });
   });
 
-  it('still drops synthetic binary acknowledgment thought turns so functionResponse and inlineData coalesce', () => {
+  it('keeps the synthetic binary acknowledgment as plain text so injected media stays in its own user turn', () => {
     const contents: Content[] = [
       {
         role: 'user',
@@ -726,9 +726,20 @@ describe('scrubHistory', () => {
     ];
 
     const scrubbed = scrubContents(contents);
-    expect(scrubbed).toHaveLength(1);
-    expect(scrubbed[0].role).toBe('user');
-    expect(scrubbed[0].parts).toHaveLength(2);
+    expect(scrubbed).toHaveLength(3);
+    expect(scrubbed[0].parts).toHaveLength(1);
+    expect(scrubbed[1]).toEqual({
+      role: 'model',
+      parts: [{ text: SYNTHETIC_BINARY_ACK_TEXT }],
+    });
+    expect(scrubbed[2].parts).toEqual([
+      { inlineData: { mimeType: 'image/png', data: 'abc' } },
+    ]);
+
+    const turns = scrubHistory(
+      contents.map((content, i) => ({ id: `t${i}`, content })),
+    );
+    expect(turns.map((t) => t.content)).toEqual(scrubbed);
   });
 
   it('handles nullish Part entries safely across isEmptyTextOnlyPart, hardenHistory, scrubHistory, and scrubContents', () => {
@@ -881,34 +892,46 @@ describe('scrubHistory', () => {
     ];
 
     const hardened = hardenHistory(history);
-    expect(hardened).toHaveLength(5);
+    expect(hardened).toHaveLength(7);
     expect(hardened[3].content).toEqual({
+      role: 'model',
+      parts: [{ text: SYNTHETIC_BINARY_ACK_TEXT }],
+    });
+    expect(hardened[5].content).toEqual({
       role: 'model',
       parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
     });
-    expect(hardened[4].content).toEqual({
+    expect(hardened[6].content).toEqual({
       role: 'user',
       parts: [{ text: 'What is in this image?' }],
     });
 
     const scrubbed = scrubHistory(history);
-    expect(scrubbed).toHaveLength(5);
+    expect(scrubbed).toHaveLength(7);
     expect(scrubbed[3].content).toEqual({
+      role: 'model',
+      parts: [{ text: SYNTHETIC_BINARY_ACK_TEXT }],
+    });
+    expect(scrubbed[5].content).toEqual({
       role: 'model',
       parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
     });
-    expect(scrubbed[4].content).toEqual({
+    expect(scrubbed[6].content).toEqual({
       role: 'user',
       parts: [{ text: 'What is in this image?' }],
     });
 
     const scrubbedRaw = scrubContents(history.map((h) => h.content));
-    expect(scrubbedRaw).toHaveLength(5);
+    expect(scrubbedRaw).toHaveLength(7);
     expect(scrubbedRaw[3]).toEqual({
+      role: 'model',
+      parts: [{ text: SYNTHETIC_BINARY_ACK_TEXT }],
+    });
+    expect(scrubbedRaw[5]).toEqual({
       role: 'model',
       parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
     });
-    expect(scrubbedRaw[4]).toEqual({
+    expect(scrubbedRaw[6]).toEqual({
       role: 'user',
       parts: [{ text: 'What is in this image?' }],
     });

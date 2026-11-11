@@ -65,7 +65,9 @@ import {
   scrubHistory,
   scrubContents,
   INTERRUPTED_RESPONSE_PLACEHOLDER,
+  isBinaryAckTurn,
   isSyntheticBinaryAckTurn,
+  plainBinaryAckContent,
 } from '../utils/historyHardening.js';
 export { INTERRUPTED_RESPONSE_PLACEHOLDER };
 import {
@@ -257,7 +259,7 @@ function isToolResponseTurnAt(
       }
       continue;
     }
-    if (isSyntheticBinaryAckTurn(content)) {
+    if (isBinaryAckTurn(content)) {
       continue;
     }
     return false;
@@ -2145,13 +2147,19 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
 
     if (parts.length === 0) {
       let hasToolResponseUserTurn = false;
-      for (let i = stripped.length - 1; i >= 0; i--) {
-        const prev = stripped[i];
-        if (prev.role !== 'user') {
-          break;
-        }
-        if (prev.parts?.some((part) => !!part.functionResponse)) {
-          hasToolResponseUserTurn = true;
+      if (stripped.at(-1)?.role === 'user') {
+        for (let i = stripped.length - 1; i >= 0; i--) {
+          const prev = stripped[i];
+          if (prev.role === 'user') {
+            if (prev.parts?.some((part) => !!part.functionResponse)) {
+              hasToolResponseUserTurn = true;
+              break;
+            }
+            continue;
+          }
+          if (isBinaryAckTurn(prev)) {
+            continue;
+          }
           break;
         }
       }
@@ -2224,6 +2232,10 @@ export function coalesceConsecutiveRoles(
 export function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
   const result: HistoryTurn[] = [];
   for (const turn of history) {
+    if (isSyntheticBinaryAckTurn(turn.content)) {
+      result.push({ id: turn.id, content: plainBinaryAckContent() });
+      continue;
+    }
     if (!turn.content.parts) {
       result.push(turn);
       continue;
@@ -2241,7 +2253,6 @@ export function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
     if (nonThoughtParts.length === 0) {
       if (
         turn.content.role === 'model' &&
-        !isSyntheticBinaryAckTurn(turn.content) &&
         isToolResponseTurnAt(result, result.length - 1)
       ) {
         result.push({
