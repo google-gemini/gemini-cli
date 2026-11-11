@@ -126,6 +126,24 @@ export function isSyntheticBinaryAckTurn(content: Content): boolean {
   );
 }
 
+function hasTrailingToolResponseUserTurn(
+  turns: readonly HistoryTurn[],
+): boolean {
+  if (turns.at(-1)?.content?.role !== 'user') {
+    return false;
+  }
+  for (
+    let i = turns.length - 1;
+    i >= 0 && turns[i]?.content?.role === 'user';
+    i--
+  ) {
+    if ((turns[i]?.content?.parts ?? []).some((p) => !!p?.functionResponse)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Removes parts that represent thoughts (where part.thought === true).
  * Empty turns resulting from thought removal are handled in subsequent coalescing passes,
@@ -138,9 +156,11 @@ function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
       result.push(turn);
       continue;
     }
-    const hasThoughtOrEmpty = turn.content.parts.some(
-      (p) => !p || isInternalThought(p) || isEmptyTextOnlyPart(p),
-    );
+    const hasThoughtOrEmpty =
+      turn.content.parts.length === 0 ||
+      turn.content.parts.some(
+        (p) => !p || isInternalThought(p) || isEmptyTextOnlyPart(p),
+      );
     if (!hasThoughtOrEmpty) {
       result.push(turn);
       continue;
@@ -149,15 +169,11 @@ function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
     const nonThoughtParts = turn.content.parts.filter(
       (p) => p && !isInternalThought(p) && !isEmptyTextOnlyPart(p),
     );
-    if (
-      nonThoughtParts.length === 0 &&
-      turn.content.role === 'model' &&
-      !isSyntheticBinaryAckTurn(turn.content)
-    ) {
-      const prev = result.at(-1);
+    if (nonThoughtParts.length === 0) {
       if (
-        prev?.content.role === 'user' &&
-        (prev.content.parts ?? []).some((p) => !!p?.functionResponse)
+        turn.content.role === 'model' &&
+        !isSyntheticBinaryAckTurn(turn.content) &&
+        hasTrailingToolResponseUserTurn(result)
       ) {
         result.push({
           id: turn.id,
@@ -166,8 +182,8 @@ function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
             parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
           },
         });
-        continue;
       }
+      continue;
     }
     result.push({
       id: turn.id,

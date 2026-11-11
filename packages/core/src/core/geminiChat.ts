@@ -239,6 +239,32 @@ function validateHistory(history: Array<Content | HistoryTurn>) {
   }
 }
 
+function isToolResponseTurnAt(
+  turns: readonly HistoryTurn[],
+  idx: number,
+): boolean {
+  if (turns[idx]?.content?.role !== 'user') {
+    return false;
+  }
+  for (let i = idx; i >= 0; i--) {
+    const content = turns[i]?.content;
+    if (!content) {
+      return false;
+    }
+    if (content.role === 'user') {
+      if (content.parts?.some((part) => !!part?.functionResponse)) {
+        return true;
+      }
+      continue;
+    }
+    if (isSyntheticBinaryAckTurn(content)) {
+      continue;
+    }
+    return false;
+  }
+  return false;
+}
+
 /**
  * Extracts the curated (valid) history from a comprehensive history.
  *
@@ -272,6 +298,17 @@ function extractCuratedHistory(
       }
       if (isValid) {
         curatedHistory.push(...modelOutput);
+      } else if (
+        !modelOutput.every((turn) => isSyntheticBinaryAckTurn(turn.content)) &&
+        isToolResponseTurnAt(curatedHistory, curatedHistory.length - 1)
+      ) {
+        curatedHistory.push({
+          ...modelOutput[0],
+          content: {
+            ...modelOutput[0].content,
+            parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+          },
+        });
       }
     }
   }
@@ -922,19 +959,17 @@ export class GeminiChat {
    */
   private closeUnansweredToolResponseTurn(): void {
     const turns = this.agentHistory.get();
-    let targetTurn = turns[turns.length - 1];
+    let targetIdx = turns.length - 1;
     let hadEmptyTrailingModelTurn = false;
     if (
-      targetTurn?.content.role === 'model' &&
-      !hasNonThoughtContent(targetTurn.content)
+      turns[targetIdx]?.content?.role === 'model' &&
+      !isSyntheticBinaryAckTurn(turns[targetIdx].content) &&
+      !hasNonThoughtContent(turns[targetIdx].content)
     ) {
       hadEmptyTrailingModelTurn = true;
-      targetTurn = turns[turns.length - 2];
+      targetIdx = turns.length - 2;
     }
-    if (
-      targetTurn?.content.role !== 'user' ||
-      !targetTurn.content.parts?.some((part) => !!part.functionResponse)
-    ) {
+    if (!isToolResponseTurnAt(turns, targetIdx)) {
       return;
     }
     if (hadEmptyTrailingModelTurn) {
@@ -1379,6 +1414,15 @@ export class GeminiChat {
    * Adds a new entry to the chat history.
    */
   addHistory(content: Content | HistoryTurn): void {
+    const incomingContent =
+      'id' in content && 'content' in content ? content.content : content;
+    if (
+      incomingContent.role === 'user' &&
+      !(incomingContent.parts ?? []).some((part) => !!part?.functionResponse)
+    ) {
+      this.closeUnansweredToolCallsTurn();
+      this.closeUnansweredToolResponseTurn();
+    }
     if ('id' in content && 'content' in content) {
       this.agentHistory.push(content);
     } else {
@@ -2100,12 +2144,18 @@ export function stripToolCallIdPrefixes(contents: Content[]): Content[] {
       .filter((part) => !isEmptyTextPart(part));
 
     if (parts.length === 0) {
-      const prev = stripped.at(-1);
-      if (
-        content.role === 'model' &&
-        prev?.role === 'user' &&
-        prev.parts?.some((part) => !!part.functionResponse)
-      ) {
+      let hasToolResponseUserTurn = false;
+      for (let i = stripped.length - 1; i >= 0; i--) {
+        const prev = stripped[i];
+        if (prev.role !== 'user') {
+          break;
+        }
+        if (prev.parts?.some((part) => !!part.functionResponse)) {
+          hasToolResponseUserTurn = true;
+          break;
+        }
+      }
+      if (content.role === 'model' && hasToolResponseUserTurn) {
         stripped.push({
           ...content,
           parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
@@ -2179,22 +2229,20 @@ export function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
       continue;
     }
     const hasThought = turn.content.parts.some((p) => p && p.thought);
-    if (!hasThought) {
-      if (turn.content.parts.length > 0) {
-        result.push(turn);
-      }
+    if (!hasThought && hasNonThoughtContent(turn.content)) {
+      result.push(turn);
       continue;
     }
 
-    const nonThoughtParts = turn.content.parts.filter((p) => p && !p.thought);
+    const nonThoughtParts = turn.content.parts.filter(
+      (p) => p && !p.thought && !isEmptyTextPart(p),
+    );
 
     if (nonThoughtParts.length === 0) {
-      const prev = result.at(-1);
       if (
         turn.content.role === 'model' &&
         !isSyntheticBinaryAckTurn(turn.content) &&
-        prev?.content.role === 'user' &&
-        (prev.content.parts ?? []).some((p) => !!p?.functionResponse)
+        isToolResponseTurnAt(result, result.length - 1)
       ) {
         result.push({
           ...turn,
