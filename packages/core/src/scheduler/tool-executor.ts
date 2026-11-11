@@ -16,6 +16,7 @@ import {
   type Config,
   type AgentLoopContext,
   type ToolLiveOutput,
+  type AnyDeclarativeTool,
 } from '../index.js';
 import { isAbortError } from '../utils/errors.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
@@ -207,8 +208,12 @@ export class ToolExecutor {
     );
   }
 
-  private async truncateOutputIfNeeded(
-    call: ToolCall,
+  /**
+   * Bounds a large tool output before it reaches the model. Public so that the
+   * ACP agent, which runs tools without the scheduler, applies the same rule.
+   */
+  async truncateOutputIfNeeded(
+    call: Pick<ToolCall, 'request'> & { tool?: AnyDeclarativeTool },
     content: PartListUnion,
   ): Promise<{ truncatedContent: PartListUnion; outputFile?: string }> {
     if (this.config.isContextManagementEnabled()) {

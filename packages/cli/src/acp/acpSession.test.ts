@@ -35,6 +35,8 @@ import type { LoadedSettings } from '../config/settings.js';
 import { type Part, FinishReason } from '@google/genai';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import * as os from 'node:os';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import type { CommandHandler } from './acpCommandHandler.js';
 
 vi.mock('node:fs/promises');
@@ -154,6 +156,10 @@ describe('Session', () => {
       waitForMcpInit: vi.fn(),
       getDisableAlwaysAllow: vi.fn().mockReturnValue(false),
       getMaxSessionTurns: vi.fn().mockReturnValue(-1),
+      isContextManagementEnabled: vi.fn().mockReturnValue(false),
+      getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
+      getTruncateToolOutputThreshold: vi.fn().mockReturnValue(40_000),
+      storage: { getProjectTempDir: vi.fn().mockReturnValue('/tmp/project') },
       geminiClient: {
         sendMessageStream: mockSendMessageStream,
         getChat: vi.fn().mockReturnValue(mockChat),
@@ -601,6 +607,61 @@ describe('Session', () => {
         },
       },
     });
+  });
+
+  it('should truncate a large shell output for the model like the CLI scheduler', async () => {
+    const output = 'a'.repeat(100) + 'MIDDLE' + 'z'.repeat(100);
+    const projectTempDir = mkdtempSync(
+      path.join(os.tmpdir(), 'acp-tool-output-'),
+    );
+    vi.mocked(mockConfig.storage.getProjectTempDir).mockReturnValue(
+      projectTempDir,
+    );
+    mockConfig.getTruncateToolOutputThreshold.mockReturnValue(50);
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Run shell',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: vi.fn().mockResolvedValue({ llmContent: output }),
+    });
+    mockSendMessageStream
+      .mockReturnValueOnce(
+        createMockStream([
+          {
+            type: GeminiEventType.ToolCallRequest,
+            value: {
+              callId: 'call-1',
+              name: 'run_shell_command',
+              args: { command: 'cat big.log' },
+              isClientInitiated: false,
+              prompt_id: 'prompt-1',
+            },
+          },
+        ]),
+      )
+      .mockReturnValueOnce(
+        createMockStream([{ type: GeminiEventType.Content, value: 'Done' }]),
+      );
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Show the log' }],
+    });
+
+    try {
+      const sent = JSON.stringify(mockSendMessageStream.mock.calls[1][0]);
+      expect(sent).toContain('Output too large.');
+      expect(sent).not.toContain('MIDDLE');
+      const savedPath = path.join(
+        projectTempDir,
+        'tool-outputs',
+        'run_shell_command_call-1.txt',
+      );
+      expect(sent).toContain(savedPath);
+      expect(readFileSync(savedPath, 'utf8')).toBe(output);
+    } finally {
+      rmSync(projectTempDir, { recursive: true, force: true });
+    }
   });
 
   it('should handle tool call permission request', async () => {
