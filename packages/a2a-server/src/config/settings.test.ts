@@ -500,5 +500,20 @@ describe('loadSettings', () => {
 
       vi.unstubAllEnvs();
     });
+
+    it('should use default value in resolveEnvVarsInString when variable is set but empty', async () => {
+      const { resolveEnvVarsInString } = await import('./settings.js');
+      vi.stubEnv('A2A_EMPTY_VAR', '');
+
+      expect(
+        resolveEnvVarsInString('${A2A_EMPTY_VAR:-http://localhost:8080}'),
+      ).toBe('http://localhost:8080');
+      expect(
+        resolveEnvVarsInString('${A2A_UNSET_VAR:-http://localhost:8080}'),
+      ).toBe('http://localhost:8080');
+      expect(resolveEnvVarsInString('${A2A_EMPTY_VAR}')).toBe('');
+
+      vi.unstubAllEnvs();
+    });
   });
 });

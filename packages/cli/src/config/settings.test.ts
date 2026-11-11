@@ -575,6 +575,32 @@ describe('Settings Loading and Merging', () => {
       expect(settings.errors).toHaveLength(0);
     });
 
+    it('should use default values from environment variable placeholders when variable is set but empty', () => {
+      vi.stubEnv('TEST_AUTO_THEME', '');
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (
+            path.normalize(p.toString()) === path.normalize(USER_SETTINGS_PATH)
+          ) {
+            return JSON.stringify({
+              ui: { autoThemeSwitching: '${TEST_AUTO_THEME:-true}' },
+            });
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.ui.autoThemeSwitching).toBe(true);
+      expect(settings.errors).toHaveLength(0);
+    });
+
     it('should record validation errors if expansion result is invalid', () => {
       vi.stubEnv('TEST_MAX_TURNS', 'not-a-number');
 
