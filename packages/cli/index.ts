@@ -7,12 +7,15 @@
  */
 
 import { spawn } from 'node:child_process';
+import { realpath } from 'node:fs/promises';
 import os from 'node:os';
+import { isAbsolute, resolve } from 'node:path';
 import v8 from 'node:v8';
 import {
   RELAUNCH_EXIT_CODE,
   getSpawnConfig,
   getScriptArgs,
+  isSeaEnvironment,
   setupSignalForwarding,
   handleChildProcessClose,
 } from './src/utils/processUtils.js';
@@ -58,11 +61,20 @@ async function run() {
     // --- Lightweight Parent Process / Daemon ---
     // We avoid importing heavy dependencies here to save ~1.5s of startup time.
 
+    if (
+      !isSeaEnvironment() &&
+      process.argv[1] &&
+      !isAbsolute(process.argv[1])
+    ) {
+      process.argv[1] = resolve(process.argv[1]);
+    }
+
     const scriptArgs = getScriptArgs();
     const memoryArgs = await getMemoryNodeArgs();
     const { spawnArgs, env: newEnv } = getSpawnConfig(memoryArgs, scriptArgs);
 
     let latestAdminSettings: unknown = undefined;
+    let selectedWorktreePath: string | undefined = undefined;
 
     const runner = () => {
       process.stdin.pause();
@@ -70,6 +82,7 @@ async function run() {
       const child = spawn(process.execPath, spawnArgs, {
         stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
         env: newEnv,
+        ...(selectedWorktreePath ? { cwd: selectedWorktreePath } : {}),
       });
 
       // Clear one-time auth override from supervisor environment after passing to child
@@ -82,13 +95,33 @@ async function run() {
 
       child.on(
         'message',
-        (msg: { type?: string; settings?: unknown; authType?: string }) => {
-          if (msg.type === 'admin-settings-update' && msg.settings) {
+        async (msg: {
+          type?: string;
+          settings?: unknown;
+          authType?: string;
+          path?: string;
+        }) => {
+          if (msg?.type === 'admin-settings-update' && msg.settings) {
             latestAdminSettings = msg.settings;
           }
-          if (msg.type === 'auth-selected-type' && msg.authType) {
+          if (msg?.type === 'auth-selected-type' && msg.authType) {
             process.env['GEMINI_CLI_AUTH_OVERRIDE'] = msg.authType;
             newEnv['GEMINI_CLI_AUTH_OVERRIDE'] = msg.authType;
+          }
+          if (
+            msg?.type === 'worktree-selected' &&
+            typeof msg.path === 'string' &&
+            msg.path.length > 0
+          ) {
+            try {
+              const resolvedWorktreePath = await realpath(resolve(msg.path));
+              process.chdir(resolvedWorktreePath);
+              selectedWorktreePath = resolvedWorktreePath;
+              process.env['GEMINI_CLI_WORKTREE_HANDLED'] = '1';
+              newEnv['GEMINI_CLI_WORKTREE_HANDLED'] = '1';
+            } catch {
+              // Ignore chdir or path validation errors if path is inaccessible
+            }
           }
         },
       );
