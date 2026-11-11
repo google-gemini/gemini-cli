@@ -27,7 +27,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 describe('setupWorktree', () => {
-  const originalEnv = { ...process.env };
   const originalCwd = process.cwd;
 
   const mockService = {
@@ -37,7 +36,7 @@ describe('setupWorktree', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env = { ...originalEnv };
+    vi.stubEnv('GEMINI_CLI_WORKTREE_HANDLED', '');
 
     // Mock process.cwd and process.chdir
     let currentPath = '/mock/project';
@@ -61,7 +60,7 @@ describe('setupWorktree', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
+    vi.unstubAllEnvs();
     process.cwd = originalCwd;
     delete (process as { chdir?: typeof process.chdir }).chdir;
   });
@@ -95,7 +94,7 @@ describe('setupWorktree', () => {
   });
 
   it('should skip worktree creation if GEMINI_CLI_WORKTREE_HANDLED is set', async () => {
-    process.env['GEMINI_CLI_WORKTREE_HANDLED'] = '1';
+    vi.stubEnv('GEMINI_CLI_WORKTREE_HANDLED', '1');
 
     await setupWorktree('my-feature');
 

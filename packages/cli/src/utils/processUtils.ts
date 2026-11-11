@@ -109,7 +109,6 @@ export function isIPCAvailable(): boolean {
   return (
     typeof process.send === 'function' &&
     (!process.env['VITEST'] ||
-      process.env['GEMINI_CLI_NO_RELAUNCH'] === 'true' ||
       process.send !== initialProcessSend ||
       'mock' in process.send)
   );
