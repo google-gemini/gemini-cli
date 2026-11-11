@@ -42,6 +42,7 @@ describe('ide-installer', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   describe('getIdeInstaller', () => {
