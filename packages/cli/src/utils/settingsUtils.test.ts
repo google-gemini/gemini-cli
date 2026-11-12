@@ -26,6 +26,7 @@ import {
   TEST_ONLY,
   isInSettingsScope,
   getDisplayValue,
+  parseEditedValue,
 } from './settingsUtils.js';
 import {
   getSettingsSchema,
@@ -836,6 +837,38 @@ describe('SettingsUtils', () => {
           makeMockSettings({}),
         );
         expect(result).toBe('30s*');
+      });
+    });
+
+    describe('parseEditedValue', () => {
+      describe('number type', () => {
+        it.each([
+          ['42', 42],
+          ['3.14', 3.14],
+          ['-100', -100],
+          ['1e10', 1e10],
+          ['  42  ', 42],
+        ])('should parse %j as %d', (input, expected) => {
+          expect(parseEditedValue('number', input)).toBe(expected);
+        });
+
+        it.each(['1e309', '-1e309', 'Infinity', '-Infinity', 'NaN'])(
+          'should return null for non-finite input %j',
+          (input) => {
+            expect(parseEditedValue('number', input)).toBeNull();
+          },
+        );
+
+        it.each(['', '   ', 'abc'])(
+          'should return null for empty or non-numeric input %j',
+          (input) => {
+            expect(parseEditedValue('number', input)).toBeNull();
+          },
+        );
+      });
+
+      it('should not apply numeric validation to string settings', () => {
+        expect(parseEditedValue('string', 'Infinity')).toBe('Infinity');
       });
     });
   });

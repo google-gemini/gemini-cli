@@ -14,13 +14,21 @@ import {
   enableBracketedPasteMode,
   disableBracketedPasteMode,
   disableMouseEvents,
+  enableLineWrapping,
 } from '@google/gemini-cli-core';
 import { parseColor } from '../themes/color-utils.js';
 
 export type TerminalBackgroundColor = string | undefined;
 
+const ESC = '\x1b';
+
+// Resets every terminal mode the CLI may have switched on, in one synchronous
+// write, so that abrupt exits (signals, process.exit() from error paths) do
+// not leave the user's shell in a broken state. Auto-wrap (DECAWM, `?7h`) is
+// restored last because it is turned off in the alternate buffer and on
+// terminals that render ambiguous-width characters as wide.
 const TERMINAL_CLEANUP_SEQUENCE =
-  '\x1b[<u\x1b[>4;0m\x1b[?2004l\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l';
+  '\x1b[<u\x1b[>4;0m\x1b[?2004l\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?7h';
 
 export function cleanupTerminalOnExit() {
   try {
@@ -36,6 +44,7 @@ export function cleanupTerminalOnExit() {
   disableModifyOtherKeys();
   disableBracketedPasteMode();
   disableMouseEvents();
+  enableLineWrapping();
 }
 
 export class TerminalCapabilityManager {
@@ -46,6 +55,11 @@ export class TerminalCapabilityManager {
   private static readonly TERMINAL_NAME_QUERY = '\x1b[>q';
   private static readonly DEVICE_ATTRIBUTES_QUERY = '\x1b[c';
   private static readonly MODIFY_OTHER_KEYS_QUERY = '\x1b[>4;?m';
+  // Prints a box-drawing character (East Asian Width: Ambiguous) at column 1
+  // and asks for the cursor position (DSR 6). The reported column reveals
+  // whether the terminal renders ambiguous-width characters in one cell or two.
+  // The glyph is written in hidden mode and the line is cleared afterwards.
+  private static readonly AMBIGUOUS_WIDTH_PROBE = '\r\u2500\x1b[6n';
   private static readonly HIDDEN_MODE = '\x1b[8m';
   private static readonly CLEAR_LINE_AND_RETURN = '\x1b[2K\r';
   private static readonly RESET_ATTRIBUTES = '\x1b[0m';
@@ -76,6 +90,15 @@ export class TerminalCapabilityManager {
   // modifyOtherKeys response: CSI > 4 ; level m
   // eslint-disable-next-line no-control-regex
   private static readonly MODIFY_OTHER_KEYS_REGEX = /\x1b\[>4;(\d+)m/;
+  // Cursor Position Report: CSI row ; column R. Built from the ESC constant
+  // instead of a regex literal so the control character needs no
+  // `no-control-regex` suppression; compiled once here. Global so that every
+  // report in the buffer can be inspected (a stray one may precede the
+  // probe's answer).
+  private static readonly CURSOR_POSITION_REGEX = new RegExp(
+    String.raw`${ESC}\[(\d+);(\d+)R`,
+    'g',
+  );
 
   private detectionComplete = false;
   private terminalBackgroundColor: TerminalBackgroundColor;
@@ -83,6 +106,7 @@ export class TerminalCapabilityManager {
   private kittyEnabled = false;
   private modifyOtherKeysSupported = false;
   private terminalName: string | undefined;
+  private ambiguousCharactersWide = false;
 
   private constructor() {}
 
@@ -99,7 +123,7 @@ export class TerminalCapabilityManager {
 
   /**
    * Detects terminal capabilities (Kitty protocol support, terminal name,
-   * background color).
+   * background color, ambiguous-width character rendering).
    * This should be called once at app startup.
    */
   async detectCapabilities(): Promise<void> {
@@ -130,6 +154,7 @@ export class TerminalCapabilityManager {
       let deviceAttributesReceived = false;
       let bgReceived = false;
       let modifyOtherKeysReceived = false;
+      let cursorPositionReceived = false;
       // eslint-disable-next-line prefer-const
       let timeoutId: NodeJS.Timeout;
 
@@ -222,6 +247,30 @@ export class TerminalCapabilityManager {
           }
         }
 
+        // Check the cursor position reported after the ambiguous-width probe.
+        if (!cursorPositionReceived) {
+          for (const match of buffer.matchAll(
+            TerminalCapabilityManager.CURSOR_POSITION_REGEX,
+          )) {
+            const column = parseInt(match[2], 10);
+            // The probe glyph is printed at column 1, so the cursor ends up on
+            // column 2 when it occupies one cell and column 3 when it occupies
+            // two. Anything else (e.g. a stray report left over from the
+            // shell) is not a response to our probe, so keep looking.
+            if (column !== 2 && column !== 3) {
+              continue;
+            }
+            cursorPositionReceived = true;
+            this.ambiguousCharactersWide = column === 3;
+            debugLogger.log(
+              `Detected ambiguous-width characters as ${
+                this.ambiguousCharactersWide ? 'wide' : 'narrow'
+              } (cursor column ${column})`,
+            );
+            break;
+          }
+        }
+
         // We use the Primary Device Attributes response as a sentinel to know
         // that the terminal has processed all our queries. Since we send it
         // last, receiving it means we can stop waiting.
@@ -251,6 +300,7 @@ export class TerminalCapabilityManager {
             TerminalCapabilityManager.OSC_11_QUERY +
             TerminalCapabilityManager.TERMINAL_NAME_QUERY +
             TerminalCapabilityManager.MODIFY_OTHER_KEYS_QUERY +
+            TerminalCapabilityManager.AMBIGUOUS_WIDTH_PROBE +
             TerminalCapabilityManager.DEVICE_ATTRIBUTES_QUERY +
             TerminalCapabilityManager.CLEAR_LINE_AND_RETURN +
             TerminalCapabilityManager.RESET_ATTRIBUTES,
@@ -285,6 +335,15 @@ export class TerminalCapabilityManager {
 
   getTerminalName(): string | undefined {
     return this.terminalName;
+  }
+
+  /**
+   * Whether the terminal renders East Asian Ambiguous-width characters (e.g.
+   * box-drawing borders) in two cells instead of one. Defaults to `false` when
+   * the terminal did not answer the probe.
+   */
+  areAmbiguousCharactersWide(): boolean {
+    return this.ambiguousCharactersWide;
   }
 
   isKittyProtocolEnabled(): boolean {

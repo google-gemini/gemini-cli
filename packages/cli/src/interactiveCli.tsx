@@ -5,10 +5,11 @@
  */
 
 import React from 'react';
-import { render } from 'ink';
+import { render, setStringWidthFunction } from 'ink';
 import { basename } from 'node:path';
 import { AppContainer } from './ui/AppContainer.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
+import { getCachedStringWidth } from './ui/utils/textUtils.js';
 import {
   registerCleanup,
   removeCleanup,
@@ -25,6 +26,7 @@ import {
   enableMouseEvents,
   disableLineWrapping,
   enableLineWrapping,
+  shouldDisableLineWrapping,
   shouldEnterAlternateScreen,
   recordSlowRender,
   writeToStdout,
@@ -51,6 +53,7 @@ import { TerminalProvider } from './ui/contexts/TerminalContext.js';
 import { OverflowProvider } from './ui/contexts/OverflowContext.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 import { initializeConsoleStore } from './ui/hooks/useConsoleMessages.js';
+import { terminalCapabilityManager } from './ui/utils/terminalCapabilityManager.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -63,6 +66,7 @@ export async function startInteractiveUI(
   initializationResult: InitializationResult,
 ) {
   initializeConsoleStore();
+  setStringWidthFunction(getCachedStringWidth);
   // Never enter Ink alternate buffer mode when screen reader mode is enabled
   // as there is no benefit of alternate buffer mode when using a screen reader
   // and the Ink alternate buffer mode requires line wrapping harmful to
@@ -174,7 +178,12 @@ export async function startInteractiveUI(
   );
 
   let cleanupLineWrapping: (() => void) | undefined;
-  if (useAlternateBuffer) {
+  if (
+    shouldDisableLineWrapping(
+      useAlternateBuffer,
+      terminalCapabilityManager.areAmbiguousCharactersWide(),
+    )
+  ) {
     disableLineWrapping();
     cleanupLineWrapping = () => enableLineWrapping();
     registerCleanup(cleanupLineWrapping);

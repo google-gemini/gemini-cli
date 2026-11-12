@@ -18,9 +18,11 @@ import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import {
   SlashCommandStatus,
   MCPDiscoveryState,
+  ToolConfirmationOutcome,
   makeFakeConfig,
   coreEvents,
   type GeminiClient,
+  type SerializableConfirmationDetails,
 } from '@google/gemini-cli-core';
 
 const {
@@ -106,6 +108,18 @@ const { mockRunExitCleanup } = vi.hoisted(() => ({
 vi.mock('../../utils/cleanup.js', () => ({
   runExitCleanup: mockRunExitCleanup,
 }));
+
+function hasOnConfirm(
+  details: SerializableConfirmationDetails | undefined,
+): details is SerializableConfirmationDetails & {
+  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+} {
+  return (
+    !!details &&
+    'onConfirm' in details &&
+    typeof details.onConfirm === 'function'
+  );
+}
 
 function createTestCommand(
   overrides: Partial<SlashCommand>,
@@ -814,6 +828,348 @@ describe('useSlashCommandProcessor', () => {
         { type: MessageType.USER, text: '/mcpcmd' },
         expect.any(Number),
       );
+    });
+
+    describe('confirm_action', () => {
+      it('re-executes with overwriteConfirmed without re-adding user history or double-firing telemetry', async () => {
+        const saveAction = vi.fn(async (context) => {
+          if (!context.overwriteConfirmed) {
+            return {
+              type: 'confirm_action' as const,
+              prompt: 'Overwrite existing checkpoint?',
+              originalInvocation: {
+                raw: context.invocation?.raw ?? '/chat save my-tag',
+              },
+            };
+          }
+          return {
+            type: 'message' as const,
+            messageType: 'info' as const,
+            content: 'Checkpoint saved.',
+          };
+        });
+
+        const chatCommand = createTestCommand({
+          name: 'chat',
+          subCommands: [
+            createTestCommand({
+              name: 'save',
+              action: saveAction,
+            }),
+          ],
+        });
+
+        const result = await setupProcessorHook({
+          builtinCommands: [chatCommand],
+        });
+        await waitFor(() =>
+          expect(result.current.slashCommands).toHaveLength(1),
+        );
+
+        let commandPromise!: Promise<unknown>;
+        await act(async () => {
+          commandPromise =
+            result.current.handleSlashCommand('/chat save my-tag');
+        });
+
+        await waitFor(() => {
+          expect(result.current.confirmationRequest).not.toBeNull();
+        });
+
+        await act(async () => {
+          result.current.confirmationRequest?.onConfirm(true);
+        });
+        await act(async () => {
+          await commandPromise;
+        });
+
+        expect(saveAction).toHaveBeenCalledTimes(2);
+        expect(result.current.confirmationRequest).toBeNull();
+
+        const userHistoryCalls = mockAddItem.mock.calls.filter(
+          ([item]) => item.type === MessageType.USER,
+        );
+        expect(userHistoryCalls).toHaveLength(1);
+        expect(userHistoryCalls[0]?.[0]).toEqual({
+          type: MessageType.USER,
+          text: '/chat save my-tag',
+        });
+        expect(mockAddItem).toHaveBeenCalledWith(
+          { type: MessageType.INFO, text: 'Checkpoint saved.' },
+          expect.any(Number),
+        );
+
+        expect(logSlashCommand).toHaveBeenCalledTimes(1);
+        expect(logSlashCommand).toHaveBeenCalledWith(
+          mockConfig,
+          expect.objectContaining({
+            command: 'chat',
+            subcommand: 'save',
+            status: SlashCommandStatus.SUCCESS,
+          }),
+        );
+      });
+
+      it('cancels without re-executing when confirmation is declined and logs telemetry once', async () => {
+        const saveAction = vi.fn().mockResolvedValue({
+          type: 'confirm_action',
+          prompt: 'Overwrite existing checkpoint?',
+          originalInvocation: { raw: '/chat save my-tag' },
+        });
+
+        const chatCommand = createTestCommand({
+          name: 'chat',
+          subCommands: [
+            createTestCommand({
+              name: 'save',
+              action: saveAction,
+            }),
+          ],
+        });
+
+        const result = await setupProcessorHook({
+          builtinCommands: [chatCommand],
+        });
+        await waitFor(() =>
+          expect(result.current.slashCommands).toHaveLength(1),
+        );
+
+        let commandPromise!: Promise<unknown>;
+        await act(async () => {
+          commandPromise =
+            result.current.handleSlashCommand('/chat save my-tag');
+        });
+
+        await waitFor(() => {
+          expect(result.current.confirmationRequest).not.toBeNull();
+        });
+
+        await act(async () => {
+          result.current.confirmationRequest?.onConfirm(false);
+        });
+        await act(async () => {
+          await commandPromise;
+        });
+
+        expect(saveAction).toHaveBeenCalledTimes(1);
+        expect(mockAddItem).toHaveBeenCalledTimes(2);
+        expect(mockAddItem).toHaveBeenNthCalledWith(
+          1,
+          { type: MessageType.USER, text: '/chat save my-tag' },
+          expect.any(Number),
+        );
+        expect(mockAddItem).toHaveBeenNthCalledWith(
+          2,
+          { type: MessageType.INFO, text: 'Operation cancelled.' },
+          expect.any(Number),
+        );
+        expect(logSlashCommand).toHaveBeenCalledTimes(1);
+        expect(logSlashCommand).toHaveBeenCalledWith(
+          mockConfig,
+          expect.objectContaining({
+            command: 'chat',
+            subcommand: 'save',
+            status: SlashCommandStatus.SUCCESS,
+          }),
+        );
+      });
+
+      it('logs only a single ERROR telemetry event if confirmed re-execution throws', async () => {
+        const saveAction = vi.fn(async (context) => {
+          if (!context.overwriteConfirmed) {
+            return {
+              type: 'confirm_action' as const,
+              prompt: 'Overwrite existing checkpoint?',
+              originalInvocation: { raw: '/chat save my-tag' },
+            };
+          }
+          throw new Error('Disk write failed');
+        });
+
+        const chatCommand = createTestCommand({
+          name: 'chat',
+          subCommands: [
+            createTestCommand({
+              name: 'save',
+              action: saveAction,
+            }),
+          ],
+        });
+
+        const result = await setupProcessorHook({
+          builtinCommands: [chatCommand],
+        });
+        await waitFor(() =>
+          expect(result.current.slashCommands).toHaveLength(1),
+        );
+
+        let commandPromise!: Promise<unknown>;
+        await act(async () => {
+          commandPromise =
+            result.current.handleSlashCommand('/chat save my-tag');
+        });
+
+        await waitFor(() => {
+          expect(result.current.confirmationRequest).not.toBeNull();
+        });
+
+        await act(async () => {
+          result.current.confirmationRequest?.onConfirm(true);
+        });
+        await act(async () => {
+          await commandPromise;
+        });
+
+        expect(mockAddItem).toHaveBeenCalledWith(
+          { type: MessageType.ERROR, text: 'Disk write failed' },
+          expect.any(Number),
+        );
+        expect(logSlashCommand).toHaveBeenCalledTimes(1);
+        expect(logSlashCommand).toHaveBeenCalledWith(
+          mockConfig,
+          expect.objectContaining({
+            command: 'chat',
+            subcommand: 'save',
+            status: SlashCommandStatus.ERROR,
+          }),
+        );
+      });
+    });
+
+    describe('confirm_shell_commands', () => {
+      it('re-executes with approved commands without re-adding user history or double-firing telemetry', async () => {
+        const shellCmdAction = vi.fn(async (context) => {
+          if (!context.session.sessionShellAllowlist.has('git status')) {
+            return {
+              type: 'confirm_shell_commands' as const,
+              commandsToConfirm: ['git status'],
+              originalInvocation: { raw: '/customcmd' },
+            };
+          }
+          return {
+            type: 'message' as const,
+            messageType: 'info' as const,
+            content: 'Shell command ran.',
+          };
+        });
+
+        const customCommand = createTestCommand(
+          {
+            name: 'customcmd',
+            action: shellCmdAction,
+          },
+          CommandKind.USER_FILE,
+        );
+
+        const result = await setupProcessorHook({
+          fileCommands: [customCommand],
+        });
+        await waitFor(() =>
+          expect(result.current.slashCommands).toHaveLength(1),
+        );
+
+        let commandPromise!: Promise<unknown>;
+        await act(async () => {
+          commandPromise = result.current.handleSlashCommand('/customcmd');
+        });
+
+        await waitFor(() => {
+          expect(result.current.pendingHistoryItems).toHaveLength(1);
+        });
+
+        const pendingItem = result.current.pendingHistoryItems[0];
+        expect(pendingItem?.type).toBe('tool_group');
+        if (pendingItem?.type === 'tool_group') {
+          const details = pendingItem.tools[0]?.confirmationDetails;
+          expect(hasOnConfirm(details)).toBe(true);
+          if (hasOnConfirm(details)) {
+            await act(async () => {
+              await details.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+            });
+          }
+        }
+        await act(async () => {
+          await commandPromise;
+        });
+
+        expect(shellCmdAction).toHaveBeenCalledTimes(2);
+        expect(result.current.pendingHistoryItems).toHaveLength(0);
+
+        const userHistoryCalls = mockAddItem.mock.calls.filter(
+          ([item]) => item.type === MessageType.USER,
+        );
+        expect(userHistoryCalls).toHaveLength(1);
+        expect(logSlashCommand).toHaveBeenCalledTimes(1);
+        expect(logSlashCommand).toHaveBeenCalledWith(
+          mockConfig,
+          expect.objectContaining({
+            command: 'customcmd',
+            status: SlashCommandStatus.SUCCESS,
+          }),
+        );
+      });
+
+      it('declines shell execution without re-executing and logs telemetry once', async () => {
+        const shellCmdAction = vi.fn().mockResolvedValue({
+          type: 'confirm_shell_commands',
+          commandsToConfirm: ['git status'],
+          originalInvocation: { raw: '/customcmd' },
+        });
+
+        const customCommand = createTestCommand(
+          {
+            name: 'customcmd',
+            action: shellCmdAction,
+          },
+          CommandKind.USER_FILE,
+        );
+
+        const result = await setupProcessorHook({
+          fileCommands: [customCommand],
+        });
+        await waitFor(() =>
+          expect(result.current.slashCommands).toHaveLength(1),
+        );
+
+        let commandPromise!: Promise<unknown>;
+        await act(async () => {
+          commandPromise = result.current.handleSlashCommand('/customcmd');
+        });
+
+        await waitFor(() => {
+          expect(result.current.pendingHistoryItems).toHaveLength(1);
+        });
+
+        const pendingItem = result.current.pendingHistoryItems[0];
+        if (pendingItem?.type === 'tool_group') {
+          const details = pendingItem.tools[0]?.confirmationDetails;
+          if (hasOnConfirm(details)) {
+            await act(async () => {
+              await details.onConfirm(ToolConfirmationOutcome.Cancel);
+            });
+          }
+        }
+        await act(async () => {
+          await commandPromise;
+        });
+
+        expect(shellCmdAction).toHaveBeenCalledTimes(1);
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Slash command shell execution declined.',
+          },
+          expect.any(Number),
+        );
+        expect(logSlashCommand).toHaveBeenCalledTimes(1);
+        expect(logSlashCommand).toHaveBeenCalledWith(
+          mockConfig,
+          expect.objectContaining({
+            command: 'customcmd',
+            status: SlashCommandStatus.SUCCESS,
+          }),
+        );
+      });
     });
   });
 

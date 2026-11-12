@@ -148,6 +148,7 @@ export default tseslint.config(
       'no-debugger': 'error',
       'no-duplicate-case': 'error',
       'no-restricted-syntax': ['error', ...commonRestrictedSyntaxRules],
+      'no-sequences': ['error', { allowInParentheses: false }],
       'no-unsafe-finally': 'error',
       'no-unused-expressions': 'off', // Disable base rule
       '@typescript-eslint/no-unused-expressions': [

@@ -14,6 +14,7 @@ import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
 import { gemmaCommand } from '../commands/gemma.js';
+import { modelsCommand } from '../commands/models.js';
 import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   resetGeminiMdFilename,
@@ -42,6 +43,9 @@ import {
   getProjectRootForWorktree,
   isGeminiWorktree,
   getSafeGitEnv,
+  GEMINI_CLI_IN_SHELL_ENV_VAR,
+  GEMINI_CLI_NESTED_SESSION_ENV_VAR,
+  NESTED_INTERACTIVE_SESSION_ERROR,
   type WorktreeSettings,
   type HookDefinition,
   type HookEventName,
@@ -94,6 +98,7 @@ export interface CliArgs {
   experimentalAcp?: boolean;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
+  listModels?: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
   sessionFile?: string | undefined;
   sessionId: string | undefined;
@@ -187,6 +192,7 @@ export async function parseArguments(
         skillsCommand,
         hooksCommand,
         gemmaCommand,
+        modelsCommand,
       ];
 
       const subcommands = commandModules.flatMap((mod) => {
@@ -219,6 +225,9 @@ export async function parseArguments(
 
       const firstArg = argv._[0];
       if (typeof firstArg === 'string' && subcommands.includes(firstArg)) {
+        argv['isCommand'] = true;
+      }
+      if (argv['list-models']) {
         argv['isCommand'] = true;
       }
     }, true)
@@ -277,6 +286,7 @@ export async function parseArguments(
   yargsInstance.command(skillsCommand);
   yargsInstance.command(hooksCommand);
   yargsInstance.command(gemmaCommand);
+  yargsInstance.command(modelsCommand);
 
   yargsInstance
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
@@ -397,6 +407,10 @@ export async function parseArguments(
           alias: 'l',
           type: 'boolean',
           description: 'List all available extensions and exit.',
+        })
+        .option('list-models', {
+          type: 'boolean',
+          description: 'List available Gemini models and exit.',
         })
         .option('resume', {
           alias: 'r',
@@ -537,6 +551,72 @@ export async function parseArguments(
     q = queryArg.join(' ');
   } else if (typeof queryArg === 'string') {
     q = queryArg;
+  }
+  const trimmedQuery = q?.trim() ?? '';
+  const rawQueryTokens =
+    trimmedQuery.length > 0 ? trimmedQuery.split(/\s+/) : [];
+
+  const firstQueryToken = rawQueryTokens[0]?.toLowerCase();
+  const secondQueryToken = rawQueryTokens[1]?.toLowerCase();
+  const isQuotedPrompt =
+    rawQueryTokens.length > 1 &&
+    process.argv.some((arg) => arg.trim() === trimmedQuery);
+  const isInvalidConfigSubcommand =
+    !result['isCommand'] &&
+    ((firstQueryToken === 'config' &&
+      (secondQueryToken === undefined ||
+        secondQueryToken.startsWith('-') ||
+        [
+          'set',
+          'get',
+          'list',
+          'delete',
+          'unset',
+          'edit',
+          'show',
+          'default-model',
+          'model',
+        ].includes(secondQueryToken))) ||
+      ((firstQueryToken === 'set' || firstQueryToken === 'model') &&
+        secondQueryToken !== undefined &&
+        ['set', 'get', 'list', 'default-model', 'model'].includes(
+          secondQueryToken,
+        ))) &&
+    !isQuotedPrompt;
+
+  const isInNestedShell =
+    process.env[GEMINI_CLI_IN_SHELL_ENV_VAR] === '1' ||
+    process.env[GEMINI_CLI_NESTED_SESSION_ENV_VAR] === '1';
+
+  if (isInNestedShell) {
+    const isAllowedNonInteractive =
+      Boolean(result['isCommand']) ||
+      Boolean(result['listModels']) ||
+      Boolean(result['list-models']) ||
+      Boolean(result['listExtensions']) ||
+      Boolean(result['list-extensions']) ||
+      Boolean(result['listSessions']) ||
+      Boolean(result['list-sessions']) ||
+      Boolean(result['deleteSession']) ||
+      Boolean(result['delete-session']) ||
+      (Boolean(result['prompt']) &&
+        !result['promptInteractive'] &&
+        !result['prompt-interactive'] &&
+        !isInvalidConfigSubcommand);
+
+    if (!isAllowedNonInteractive) {
+      debugLogger.error(NESTED_INTERACTIVE_SESSION_ERROR);
+      await runExitCleanup();
+      process.exit(1);
+    }
+  }
+
+  if (isInvalidConfigSubcommand) {
+    debugLogger.error(
+      `Error: Unknown command "${rawQueryTokens[0]}". To switch models or update settings, use built-in slash commands (/model, /settings).`,
+    );
+    await runExitCleanup();
+    process.exit(1);
   }
 
   // -p/--prompt forces non-interactive mode; positional args default to interactive in TTY
@@ -1029,12 +1109,15 @@ export async function loadCliConfig(
       process.env['HTTPS_PROXY'] ||
       process.env['https_proxy'] ||
       process.env['HTTP_PROXY'] ||
-      process.env['http_proxy'],
+      process.env['http_proxy'] ||
+      process.env['ALL_PROXY'] ||
+      process.env['all_proxy'],
     cwd,
     fileDiscoveryService: fileService,
     bugCommand: settings.advanced?.bugCommand,
     model: resolvedModel,
     maxSessionTurns: settings.model?.maxSessionTurns,
+    requestTimeoutMs: settings.model?.requestTimeoutMs,
 
     listExtensions: argv.listExtensions || false,
     listSessions: argv.listSessions || false,

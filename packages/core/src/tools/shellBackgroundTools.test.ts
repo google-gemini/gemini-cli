@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
+import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 import {
   ListBackgroundProcessesTool,
   ReadBackgroundOutputTool,
@@ -59,6 +60,9 @@ describe('Background Tools', () => {
       state: { output: '' },
       command: 'unknown command',
       sessionId: 'default',
+    });
+    ExecutionLifecycleService.attachExecution(pid, {
+      executionMethod: 'child_process',
     });
 
     ShellExecutionService.background(pid, 'default', 'unknown command');

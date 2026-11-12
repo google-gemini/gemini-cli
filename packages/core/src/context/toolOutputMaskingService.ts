@@ -194,8 +194,17 @@ export class ToolOutputMaskingService {
         (part.functionResponse.response as Record<string, unknown>) || {};
 
       const totalLines = content.split('\n').length;
+      const nestedBytes =
+        part.functionResponse.parts?.reduce(
+          (sum, p) =>
+            sum +
+            (p?.inlineData?.data
+              ? Buffer.byteLength(p.inlineData.data, 'utf8')
+              : 0),
+          0,
+        ) ?? 0;
       const fileSizeMB = (
-        Buffer.byteLength(content, 'utf8') /
+        (Buffer.byteLength(content, 'utf8') + nestedBytes) /
         1024 /
         1024
       ).toFixed(2);
@@ -221,11 +230,11 @@ export class ToolOutputMaskingService {
         preview,
       });
 
+      const { parts: _parts, ...cleanFunctionResponse } = part.functionResponse;
       const maskedPart = {
         ...part,
         functionResponse: {
-          // eslint-disable-next-line @typescript-eslint/no-misused-spread
-          ...part.functionResponse,
+          ...cleanFunctionResponse,
           response: { output: maskedSnippet },
         },
       };

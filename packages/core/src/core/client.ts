@@ -35,6 +35,7 @@ import {
   type RetryAvailabilityContext,
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
+import { getErrorStatus } from '../utils/httpErrors.js';
 import { getErrorMessage, isAbortError } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
 import type {
@@ -43,7 +44,12 @@ import type {
 } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
-import { ChatCompressionService } from '../context/chatCompressionService.js';
+import {
+  ChatCompressionService,
+  calculateHistoryByteSize,
+  COLLAPSE_HISTORY_BYTE_THRESHOLD,
+  collapseOlderFunctionResponses,
+} from '../context/chatCompressionService.js';
 import { AgentHistoryProvider } from '../context/agentHistoryProvider.js';
 import type { ContextManager } from '../context/contextManager.js';
 import type { HistoryTurn } from './agentChatHistory.js';
@@ -299,6 +305,7 @@ export class GeminiClient {
     this.getChat().setHistory(history);
     this.updateTelemetryTokenCount();
     this.forceFullIdeContext = true;
+    this.currentSequenceModel = null;
   }
 
   /**
@@ -634,10 +641,13 @@ export class GeminiClient {
     return resolveModel(
       this.config.getActiveModel(),
       this.config.getGemini31LaunchedSync?.() ?? false,
-      false,
+      this.config.getUseCustomToolModelSync?.() ?? false,
       this.config.getHasAccessToPreviewModel?.() ?? true,
       this.config,
-      this.config.hasGemini35FlashGAAccess?.() ?? false,
+      this.config.hasLatestFlashGAAccess?.() ??
+        this.config.hasGemini35FlashGAAccess?.() ??
+        false,
+      this.config.hasLatestFlashLiteGAAccess?.() ?? false,
     );
   }
 
@@ -696,9 +706,12 @@ export class GeminiClient {
             ? pendingApiHistory[0]
             : rawPendingRequest;
 
-        // Late-bind the prompt: Append the active request to the managed history
-        // only for the purpose of the upcoming API call.
-        apiHistoryOverride = [...apiHistory, finalPendingContent];
+        // Late-bind the prompt: Append all hardened pending turns (including any
+        // trailing sentinel user turn) to the managed history for the API call.
+        apiHistoryOverride =
+          pendingApiHistory.length > 0
+            ? [...apiHistory, ...pendingApiHistory]
+            : [...apiHistory, finalPendingContent];
 
         this.getChat().setHistory(newHistory);
 
@@ -1065,12 +1078,18 @@ export class GeminiClient {
       }
     } catch (error) {
       if (signal?.aborted || isAbortError(error)) {
+        this.currentSequenceModel = null;
+        this.config.resetTurn();
         yield { type: GeminiEventType.UserCancelled };
         return turn;
       }
       throw error;
     } finally {
       if (!continuationHandled) {
+        if (signal?.aborted) {
+          this.currentSequenceModel = null;
+          this.config.resetTurn();
+        }
         const hookState = this.hookStateMap.get(prompt_id);
         if (hookState) {
           hookState.activeCalls--;
@@ -1124,8 +1143,11 @@ export class GeminiClient {
         );
 
       let initialActiveModel = this.config.getActiveModel();
+      let isFirstAttempt = true;
 
       const apiCall = () => {
+        const firstAttempt = isFirstAttempt;
+        isFirstAttempt = false;
         // AvailabilityService
         const active = this.config.getActiveModel();
         if (active !== initialActiveModel) {
@@ -1138,6 +1160,19 @@ export class GeminiClient {
             });
           currentAttemptModel = resolvedModel;
           currentAttemptGenerateContentConfig = generateContentConfig;
+        } else if (
+          !firstAttempt &&
+          (this.config
+            .getModelAvailabilityService?.()
+            ?.snapshot(currentAttemptModel)?.available ?? true) === false
+        ) {
+          const { model: reselectedModel, config: reselectedConfig } =
+            applyModelSelection(this.config, modelConfigKey);
+          currentAttemptModel = reselectedModel;
+          if (reselectedConfig) {
+            currentAttemptGenerateContentConfig = reselectedConfig;
+          }
+          initialActiveModel = this.config.getActiveModel();
         }
 
         const requestConfig: GenerateContentConfig = {
@@ -1198,6 +1233,8 @@ export class GeminiClient {
             delayMs,
             error: error instanceof Error ? error.message : String(error),
             model: getDisplayString(currentAttemptModel),
+            status: getErrorStatus(error),
+            sessionId: this.config.getSessionId?.(),
           });
         },
       });
@@ -1251,10 +1288,12 @@ export class GeminiClient {
         this.hasFailedCompressionAttempt || !force;
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
-        // capture current session data before resetting
+        // capture current session data before resetting using non-blocking async I/O
         const currentRecordingService =
           this.getChat().getChatRecordingService();
-        const conversation = currentRecordingService.getConversation();
+        const conversation = await (currentRecordingService.getConversationAsync
+          ? currentRecordingService.getConversationAsync()
+          : currentRecordingService.getConversation());
         const filePath = currentRecordingService.getConversationFilePath();
 
         let resumedData: ResumedSessionData | undefined;
@@ -1285,12 +1324,33 @@ export class GeminiClient {
    * Masks bulky tool outputs to save context window space.
    */
   private async tryMaskToolOutputs(history: readonly Content[]): Promise<void> {
+    const chat = this.getChat();
     const result = await this.toolOutputMaskingService.mask(
       history,
       this.config,
     );
-    if (result.maskedCount > 0) {
-      this.getChat().setHistory(result.newHistory);
+    let updatedHistory: readonly Content[] =
+      result.maskedCount > 0 ? result.newHistory : history;
+    if (
+      calculateHistoryByteSize(updatedHistory) >=
+      COLLAPSE_HISTORY_BYTE_THRESHOLD
+    ) {
+      const collapsedHistory = collapseOlderFunctionResponses(updatedHistory);
+      if (collapsedHistory !== updatedHistory) {
+        updatedHistory = collapsedHistory;
+      }
+    }
+    if (updatedHistory !== history) {
+      const existingTurns = chat.getHistoryTurns?.(false);
+      if (existingTurns) {
+        const turns = updatedHistory.map((c, idx) => ({
+          id: existingTurns[idx]?.id ?? randomUUID(),
+          content: c,
+        }));
+        chat.setHistory(turns);
+      } else {
+        chat.setHistory([...updatedHistory]);
+      }
     }
   }
 

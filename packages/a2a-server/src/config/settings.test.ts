@@ -8,7 +8,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { loadSettings, USER_SETTINGS_PATH } from './settings.js';
+import {
+  loadSettings,
+  USER_SETTINGS_PATH,
+  resolveEnvVarsInString,
+} from './settings.js';
 import { debugLogger, checkPathTrust } from '@google/gemini-cli-core';
 
 const mocks = vi.hoisted(() => {
@@ -89,6 +93,7 @@ describe('loadSettings', () => {
       debugLogger.error('Failed to cleanup temp dirs', e);
     }
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('should load other top-level settings correctly', () => {
@@ -499,6 +504,18 @@ describe('loadSettings', () => {
       expect(merged.nested.pattern).toBeInstanceOf(RegExp);
 
       vi.unstubAllEnvs();
+    });
+
+    it('should use default value in resolveEnvVarsInString when variable is set but empty', () => {
+      vi.stubEnv('A2A_EMPTY_VAR', '');
+
+      expect(
+        resolveEnvVarsInString('${A2A_EMPTY_VAR:-http://localhost:8080}'),
+      ).toBe('http://localhost:8080');
+      expect(
+        resolveEnvVarsInString('${A2A_UNSET_VAR:-http://localhost:8080}'),
+      ).toBe('http://localhost:8080');
+      expect(resolveEnvVarsInString('${A2A_EMPTY_VAR}')).toBe('');
     });
   });
 });

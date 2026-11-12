@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MessageBus } from './message-bus.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { PolicyDecision } from '../policy/types.js';
@@ -449,6 +449,304 @@ describe('MessageBus', () => {
         'abort',
         expect.any(Function),
       );
+    });
+  });
+
+  describe('request', () => {
+    const defaultTimeoutMs = 60_000;
+    const toolRequest: Omit<ToolConfirmationRequest, 'correlationId'> = {
+      type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+      toolCall: { name: 'test-tool', args: {} },
+    };
+
+    interface Settlement {
+      status: 'pending' | 'resolved' | 'rejected';
+      value?: ToolConfirmationResponse;
+      error?: unknown;
+    }
+
+    // Sends a request and records how it settles, so tests can check the
+    // outcome without awaiting it.
+    const sendRequest = (
+      bus: MessageBus,
+      request: Omit<ToolConfirmationRequest, 'correlationId'> = toolRequest,
+    ): Settlement => {
+      const settlement: Settlement = { status: 'pending' };
+      bus
+        .request<
+          ToolConfirmationRequest,
+          ToolConfirmationResponse
+        >(request, MessageBusType.TOOL_CONFIRMATION_RESPONSE)
+        .then(
+          (value) => {
+            settlement.status = 'resolved';
+            settlement.value = value;
+          },
+          (error: unknown) => {
+            settlement.status = 'rejected';
+            settlement.error = error;
+          },
+        );
+      return settlement;
+    };
+
+    // Timers and response listeners held at the time of the call.
+    const heldResources = () => ({
+      timers: vi.getTimerCount(),
+      responseListeners: messageBus.listenerCount(
+        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+      ),
+    });
+
+    const captureConfirmationRequests = () => {
+      const requests: ToolConfirmationRequest[] = [];
+      messageBus.subscribe<ToolConfirmationRequest>(
+        MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        (message) => {
+          requests.push(message);
+        },
+      );
+      return requests;
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('should resolve with the correlated response when the policy allows the call', async () => {
+      vi.spyOn(policyEngine, 'check').mockResolvedValue({
+        decision: PolicyDecision.ALLOW,
+      });
+      const publishSpy = vi.spyOn(messageBus, 'publish');
+      const before = heldResources();
+
+      const settlement = sendRequest(messageBus);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(settlement.status).toBe('resolved');
+      expect(settlement.value).toEqual({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: expect.any(String),
+        confirmed: true,
+      });
+      expect(publishSpy).toHaveBeenCalledWith({
+        ...toolRequest,
+        correlationId: settlement.value?.correlationId,
+      });
+      expect(heldResources()).toEqual(before);
+    });
+
+    it('should reject with a timeout error only after the timeout elapses without a response', async () => {
+      vi.spyOn(policyEngine, 'check').mockResolvedValue({
+        decision: PolicyDecision.ASK_USER,
+      });
+      // A confirmation subscriber that never answers.
+      messageBus.subscribe(MessageBusType.TOOL_CONFIRMATION_REQUEST, vi.fn());
+      const before = heldResources();
+
+      const settlement = sendRequest(messageBus);
+      await vi.advanceTimersByTimeAsync(defaultTimeoutMs - 1);
+
+      expect(settlement.status).toBe('pending');
+
+      await vi.advanceTimersByTimeAsync(1);
+
+      expect(settlement.status).toBe('rejected');
+      expect(settlement.error).toEqual(
+        new Error('Request timed out waiting for tool-confirmation-response'),
+      );
+      expect(heldResources()).toEqual(before);
+    });
+
+    it('should reject immediately with the original error when the policy check fails and an error listener is registered', async () => {
+      const failure = new Error('Policy check failed');
+      vi.spyOn(policyEngine, 'check').mockRejectedValue(failure);
+      const errorListener = vi.fn();
+      messageBus.on('error', errorListener);
+      const before = heldResources();
+
+      const settlement = sendRequest(messageBus);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(settlement.status).toBe('rejected');
+      expect(settlement.error).toBe(failure);
+      expect(errorListener).toHaveBeenCalledWith(failure);
+      expect(heldResources()).toEqual(before);
+    });
+
+    it('should reject immediately with the original error when the policy check fails and no error listener is registered', async () => {
+      const failure = new Error('Policy check failed');
+      vi.spyOn(policyEngine, 'check').mockRejectedValue(failure);
+      const before = heldResources();
+
+      const settlement = sendRequest(messageBus);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(settlement.status).toBe('rejected');
+      expect(settlement.error).toBe(failure);
+      expect(heldResources()).toEqual(before);
+    });
+
+    it('should reject immediately with a validation error when the request has no type', async () => {
+      const errorListener = vi.fn();
+      messageBus.on('error', errorListener);
+      const before = heldResources();
+
+      // @ts-expect-error - Testing a request without a type
+      const settlement = sendRequest(messageBus, {
+        toolCall: { name: 'test-tool', args: {} },
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(settlement.status).toBe('rejected');
+      expect(settlement.error).toEqual(
+        expect.objectContaining({
+          message: expect.stringContaining('Invalid message structure'),
+        }),
+      );
+      expect(errorListener).toHaveBeenCalledWith(settlement.error);
+      expect(heldResources()).toEqual(before);
+    });
+
+    it('should reject immediately with the subscriber error when a response subscriber throws during dispatch', async () => {
+      const failure = new Error('Response subscriber failed');
+      vi.spyOn(policyEngine, 'check').mockResolvedValue({
+        decision: PolicyDecision.ALLOW,
+      });
+      // Registered before the request, so it runs before the request's handler.
+      messageBus.subscribe(MessageBusType.TOOL_CONFIRMATION_RESPONSE, () => {
+        throw failure;
+      });
+      messageBus.on('error', vi.fn());
+      const before = heldResources();
+
+      const settlement = sendRequest(messageBus);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(settlement.status).toBe('rejected');
+      expect(settlement.error).toBe(failure);
+      expect(heldResources()).toEqual(before);
+    });
+
+    it('should reject immediately on a derived bus and pass the subagent name to the policy check', async () => {
+      const failure = new Error('Policy check failed');
+      const checkSpy = vi
+        .spyOn(policyEngine, 'check')
+        .mockRejectedValue(failure);
+      messageBus.on('error', vi.fn());
+      const subagentBus = messageBus.derive('test-subagent');
+      const before = heldResources();
+
+      const settlement = sendRequest(subagentBus);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(settlement.status).toBe('rejected');
+      expect(settlement.error).toBe(failure);
+      expect(checkSpy).toHaveBeenCalledWith(
+        toolRequest.toolCall,
+        undefined,
+        undefined,
+        'test-subagent',
+      );
+      expect(heldResources()).toEqual(before);
+    });
+
+    it('should reject immediately with the original error when publish() rejects', async () => {
+      const failure = new Error('Publish failed');
+      vi.spyOn(messageBus, 'publish').mockRejectedValue(failure);
+      const before = heldResources();
+
+      const settlement = sendRequest(messageBus);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(settlement.status).toBe('rejected');
+      expect(settlement.error).toBe(failure);
+      expect(heldResources()).toEqual(before);
+    });
+
+    it('should reject immediately with the original error when publish() throws synchronously', async () => {
+      const failure = new Error('Publish failed');
+      vi.spyOn(messageBus, 'publish').mockImplementation(() => {
+        throw failure;
+      });
+      const before = heldResources();
+
+      const settlement = sendRequest(messageBus);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(settlement.status).toBe('rejected');
+      expect(settlement.error).toBe(failure);
+      expect(heldResources()).toEqual(before);
+    });
+
+    it('should keep overlapping requests independent when one of them fails', async () => {
+      const failure = new Error('Policy check failed');
+      vi.spyOn(policyEngine, 'check')
+        .mockResolvedValueOnce({ decision: PolicyDecision.ASK_USER })
+        .mockRejectedValueOnce(failure);
+      const confirmationRequests = captureConfirmationRequests();
+      messageBus.on('error', vi.fn());
+      const before = heldResources();
+
+      const healthy = sendRequest(messageBus);
+      const failing = sendRequest(messageBus);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(failing.status).toBe('rejected');
+      expect(failing.error).toBe(failure);
+      expect(healthy.status).toBe('pending');
+
+      const response: ToolConfirmationResponse = {
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: confirmationRequests[0].correlationId,
+        confirmed: true,
+      };
+      await messageBus.publish(response);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(healthy.status).toBe('resolved');
+      expect(healthy.value).toEqual(response);
+      expect(heldResources()).toEqual(before);
+    });
+
+    it('should not be affected by an unrelated publish() failure while it waits for its response', async () => {
+      const failure = new Error('Policy check failed');
+      vi.spyOn(policyEngine, 'check')
+        .mockResolvedValueOnce({ decision: PolicyDecision.ASK_USER })
+        .mockRejectedValueOnce(failure);
+      const confirmationRequests = captureConfirmationRequests();
+      const errorListener = vi.fn();
+      messageBus.on('error', errorListener);
+      const before = heldResources();
+
+      const settlement = sendRequest(messageBus);
+      await vi.advanceTimersByTimeAsync(0);
+      await messageBus.publish({
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        toolCall: { name: 'other-tool', args: {} },
+        correlationId: 'unrelated-request',
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(errorListener).toHaveBeenCalledWith(failure);
+      expect(settlement.status).toBe('pending');
+
+      const response: ToolConfirmationResponse = {
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: confirmationRequests[0].correlationId,
+        confirmed: true,
+      };
+      await messageBus.publish(response);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(settlement.status).toBe('resolved');
+      expect(settlement.value).toEqual(response);
+      expect(heldResources()).toEqual(before);
     });
   });
 });
