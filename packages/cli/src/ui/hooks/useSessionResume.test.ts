@@ -163,6 +163,56 @@ describe('useSessionResume', () => {
       expect(mockGeminiClient.resumeChat).not.toHaveBeenCalled();
     });
 
+    it('should emit error and not mutate UI history or directories if getGeminiClient returns undefined', async () => {
+      const mockAddDirectories = vi.fn();
+      const mockWorkspaceContext = {
+        addDirectories: mockAddDirectories,
+      };
+      const configWithoutClient = {
+        ...mockConfig,
+        getGeminiClient: vi.fn().mockReturnValue(undefined),
+        getWorkspaceContext: vi.fn().mockReturnValue(mockWorkspaceContext),
+      };
+
+      const { result } = await renderHook(() =>
+        useSessionResume({
+          ...getDefaultProps(),
+          config: configWithoutClient as unknown as Config,
+          isGeminiClientInitialized: true,
+        }),
+      );
+
+      const uiHistory: HistoryItemWithoutId[] = [
+        { type: 'user', text: 'Hello' },
+      ];
+      const clientHistory = [
+        { role: 'user' as const, parts: [{ text: 'Hello' }] },
+      ];
+      const resumedData: ResumedSessionData = {
+        conversation: {
+          sessionId: 'test-123',
+          projectHash: 'project-123',
+          startTime: '2025-01-01T00:00:00Z',
+          lastUpdated: '2025-01-01T01:00:00Z',
+          messages: [] as MessageRecord[],
+          directories: ['/restored/dir1'],
+        },
+        filePath: '/path/to/session.json',
+      };
+
+      await act(async () => {
+        await result.current.loadHistoryForResume(
+          uiHistory,
+          clientHistory,
+          resumedData,
+        );
+      });
+
+      expect(mockHistoryManager.clearItems).not.toHaveBeenCalled();
+      expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
+      expect(mockAddDirectories).not.toHaveBeenCalled();
+    });
+
     it('should handle empty history arrays', async () => {
       const { result } = await renderHook(() =>
         useSessionResume(getDefaultProps()),

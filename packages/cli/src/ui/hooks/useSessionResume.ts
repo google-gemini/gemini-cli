@@ -70,7 +70,11 @@ export function useSessionResume({
       setIsResuming(true);
       try {
         // Give the history to the Gemini client first.
-        await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
+        const client = config.getGeminiClient();
+        if (!client) {
+          throw new Error('Gemini client is not initialized');
+        }
+        await client.resumeChat(clientHistory, resumedData);
 
         // Now that we have successfully resumed, load the history into the UI.
         setQuittingMessages(null);
