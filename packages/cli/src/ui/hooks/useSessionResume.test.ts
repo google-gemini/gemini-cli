@@ -13,6 +13,7 @@ import { waitFor } from '../../test-utils/async.js';
 import { useSessionResume } from './useSessionResume.js';
 import {
   WorkspaceContext,
+  resolveToRealPath,
   type Config,
   type ResumedSessionData,
   type ConversationRecord,
@@ -407,7 +408,7 @@ describe('useSessionResume', () => {
     });
 
     it('should filter out stale saved directories that no longer exist when restoring', async () => {
-      const tempDir = fs.realpathSync(
+      const tempDir = resolveToRealPath(
         fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-test-ws-')),
       );
       try {
@@ -415,6 +416,7 @@ describe('useSessionResume', () => {
         const missingDir = path.join(tempDir, 'missing');
         fs.mkdirSync(existingDir);
 
+        const expectedExistingDir = resolveToRealPath(existingDir);
         const workspaceContext = new WorkspaceContext(tempDir);
         const configWithWorkspace = {
           ...mockConfig,
@@ -445,7 +447,7 @@ describe('useSessionResume', () => {
         });
 
         const dirs = workspaceContext.getDirectories();
-        expect(dirs).toContain(existingDir);
+        expect(dirs).toContain(expectedExistingDir);
         expect(dirs).not.toContain(missingDir);
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
