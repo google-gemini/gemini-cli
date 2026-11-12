@@ -3,7 +3,7 @@
   "policies": {
     "branch": {
       "enabled": true,
-      "requireCodeOwnerReviews": false,
+      "requireCodeOwnerReviews": true,
       "dismissStaleReviews": true,
       "requireStatusChecks": true,
       "requireBranchesToBeUpToDate": true,
