@@ -8,6 +8,7 @@ import {
   CommandKind,
   type CommandContext,
   type SlashCommand,
+  type SlashCommandActionReturn,
 } from './types.js';
 import { RewindViewer } from '../components/RewindViewer.js';
 import { type HistoryItem } from '../types.js';
@@ -44,7 +45,9 @@ async function rewindConversation(
   newText: string,
 ) {
   try {
-    const conversation = recordingService.rewindTo(messageId);
+    const conversation = await (recordingService.rewindToAsync
+      ? recordingService.rewindToAsync(messageId)
+      : recordingService.rewindTo(messageId));
     if (!conversation) {
       const errorMsg = 'Could not fetch conversation file';
       debugLogger.error(errorMsg);
@@ -54,8 +57,9 @@ async function rewindConversation(
     }
 
     // Convert to UI and Client formats
-    const { uiHistory } = convertSessionToHistoryFormats(conversation.messages);
-    const clientHistory = convertSessionToClientHistory(conversation.messages);
+    const messages = conversation.messages ?? [];
+    const { uiHistory } = convertSessionToHistoryFormats(messages);
+    const clientHistory = convertSessionToClientHistory(messages);
 
     client.setHistory(clientHistory);
     client.clearCurrentSequenceModel?.();
@@ -127,79 +131,90 @@ export const rewindCommand: SlashCommand = {
         content: 'Recording service unavailable',
       };
 
-    const conversation = recordingService.getConversation();
-    if (!conversation)
-      return {
-        type: 'message',
-        messageType: 'info',
-        content: 'No conversation found.',
-      };
+    const buildRewindActionReturn = (
+      conversation: ReturnType<ChatRecordingService['getConversation']>,
+    ): SlashCommandActionReturn => {
+      if (!conversation)
+        return {
+          type: 'message',
+          messageType: 'info',
+          content: 'No conversation found.',
+        };
 
-    const hasUserInteractions = conversation.messages.some(
-      (msg) => msg.type === 'user',
-    );
-    if (!hasUserInteractions) {
+      const hasUserInteractions = (conversation.messages ?? []).some(
+        (msg) => msg.type === 'user',
+      );
+      if (!hasUserInteractions) {
+        return {
+          type: 'message',
+          messageType: 'info',
+          content: 'Nothing to rewind to.',
+        };
+      }
+
       return {
-        type: 'message',
-        messageType: 'info',
-        content: 'Nothing to rewind to.',
+        type: 'custom_dialog',
+        component: (
+          <RewindViewer
+            conversation={conversation}
+            onExit={() => {
+              context.ui.removeComponent();
+            }}
+            onRewind={async (messageId, newText, outcome) => {
+              if (outcome !== RewindOutcome.Cancel) {
+                logRewind(config, new RewindEvent(outcome));
+              }
+              switch (outcome) {
+                case RewindOutcome.Cancel:
+                  context.ui.removeComponent();
+                  return;
+
+                case RewindOutcome.RevertOnly:
+                  if (conversation) {
+                    await revertFileChanges(conversation, messageId);
+                  }
+                  context.ui.removeComponent();
+                  coreEvents.emitFeedback('info', 'File changes reverted.');
+                  return;
+
+                case RewindOutcome.RewindAndRevert:
+                  if (conversation) {
+                    await revertFileChanges(conversation, messageId);
+                  }
+                  await rewindConversation(
+                    context,
+                    client,
+                    recordingService,
+                    messageId,
+                    newText,
+                  );
+                  return;
+
+                case RewindOutcome.RewindOnly:
+                  await rewindConversation(
+                    context,
+                    client,
+                    recordingService,
+                    messageId,
+                    newText,
+                  );
+                  return;
+
+                default:
+                  checkExhaustive(outcome);
+              }
+            }}
+          />
+        ),
       };
+    };
+
+    if (recordingService.getConversationAsync) {
+      return recordingService
+        .getConversationAsync()
+        .then(buildRewindActionReturn);
     }
 
-    return {
-      type: 'custom_dialog',
-      component: (
-        <RewindViewer
-          conversation={conversation}
-          onExit={() => {
-            context.ui.removeComponent();
-          }}
-          onRewind={async (messageId, newText, outcome) => {
-            if (outcome !== RewindOutcome.Cancel) {
-              logRewind(config, new RewindEvent(outcome));
-            }
-            switch (outcome) {
-              case RewindOutcome.Cancel:
-                context.ui.removeComponent();
-                return;
-
-              case RewindOutcome.RevertOnly:
-                if (conversation) {
-                  await revertFileChanges(conversation, messageId);
-                }
-                context.ui.removeComponent();
-                coreEvents.emitFeedback('info', 'File changes reverted.');
-                return;
-
-              case RewindOutcome.RewindAndRevert:
-                if (conversation) {
-                  await revertFileChanges(conversation, messageId);
-                }
-                await rewindConversation(
-                  context,
-                  client,
-                  recordingService,
-                  messageId,
-                  newText,
-                );
-                return;
-
-              case RewindOutcome.RewindOnly:
-                await rewindConversation(
-                  context,
-                  client,
-                  recordingService,
-                  messageId,
-                  newText,
-                );
-                return;
-
-              default:
-                checkExhaustive(outcome);
-            }
-          }}
-        />
-      ),
-    };
+    return buildRewindActionReturn(recordingService.getConversation());
   },
 };

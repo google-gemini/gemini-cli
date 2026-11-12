@@ -108,6 +108,7 @@ let keychainAvailabilityListener:
 let tokenStorageTypeListener:
   | ((event: TokenStorageInitializationEvent) => void)
   | undefined = undefined;
+const MAX_TELEMETRY_BUFFER_SIZE = 100;
 const telemetryBuffer: Array<() => void | Promise<void>> = [];
 let activeTelemetryEmail: string | undefined;
 
@@ -115,13 +116,34 @@ export function isTelemetrySdkInitialized(): boolean {
   return telemetryInitialized;
 }
 
-export function bufferTelemetryEvent(fn: () => void | Promise<void>): void {
-  if (telemetryInitialized) {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    fn();
-  } else {
-    telemetryBuffer.push(fn);
+export function bufferTelemetryEvent(
+  fn: () => void | Promise<void>,
+  config?: Config,
+): void {
+  if (
+    config &&
+    typeof config.getTelemetryEnabled === 'function' &&
+    !config.getTelemetryEnabled()
+  ) {
+    return;
   }
+  if (telemetryInitialized) {
+    try {
+      const result = fn();
+      if (result instanceof Promise) {
+        result.catch((e) => {
+          debugLogger.error('Error executing telemetry event promise', e);
+        });
+      }
+    } catch (e) {
+      debugLogger.error('Error executing telemetry event', e);
+    }
+    return;
+  }
+  if (telemetryBuffer.length >= MAX_TELEMETRY_BUFFER_SIZE) {
+    telemetryBuffer.shift();
+  }
+  telemetryBuffer.push(fn);
 }
 
 async function flushTelemetryBuffer(): Promise<void> {
@@ -459,6 +481,7 @@ export async function shutdownTelemetry(
     debugLogger.error('Error shutting down SDK:', error);
   } finally {
     telemetryInitialized = false;
+    telemetryBuffer.length = 0;
     sdk = undefined;
     // Fully reset the global APIs to allow for re-initialization.
     // This is primarily for testing environments where the SDK is started

@@ -737,6 +737,16 @@ export class Scheduler {
       });
       outcome = result.outcome;
       lastDetails = result.lastDetails;
+      if (
+        (result.confirmedByUser ?? false) &&
+        outcome !== ToolConfirmationOutcome.Cancel
+      ) {
+        toolCall.request.isUserConfirmed = true;
+        const updatedCall = this.state.getToolCall(callId);
+        if (updatedCall) {
+          updatedCall.request.isUserConfirmed = true;
+        }
+      }
     }
 
     this.state.setOutcome(callId, outcome);

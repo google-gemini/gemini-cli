@@ -14,7 +14,11 @@ import {
   type Mock,
 } from 'vitest';
 import { mockControl } from '../__mocks__/fs/promises.js';
-import { ReadManyFilesTool } from './read-many-files.js';
+import {
+  ReadManyFilesTool,
+  isAssetExplicitlyRequested,
+} from './read-many-files.js';
+import { LRUCache } from 'mnemonist';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import path from 'node:path';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
@@ -533,6 +537,79 @@ describe('ReadManyFilesTool', () => {
       ]);
     });
 
+    it('should skip binary asset if matched only by directory substring overlap (issue #29045)', async () => {
+      createBinaryFile(
+        'reports/report.png',
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
+      createFile('reports/summary.txt', 'report summary');
+      const params = { include: ['reports/**'], useDefaultExcludes: false };
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      // reports/report.png should NOT be treated as explicitly requested just because directory name contains "report"
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
+        '- `reports/report.png` (Reason: asset file (image/pdf/audio) was not explicitly requested by name or extension)',
+      );
+      const inlinedParts = Array.isArray(result.llmContent)
+        ? result.llmContent.filter(
+            (c) => typeof c !== 'string' && 'inlineData' in c,
+          )
+        : [];
+      expect(inlinedParts).toHaveLength(0);
+    });
+
+    it('should not inline unrequested images in another glob when an image is explicitly requested elsewhere in include (issue #29045)', async () => {
+      createBinaryFile(
+        'assets/logo.png',
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
+      createBinaryFile(
+        'src/diagram.png',
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
+      createFile('src/index.ts', 'console.log("hello");');
+      const params = {
+        include: ['assets/logo.png', 'src/**'],
+        useDefaultExcludes: false,
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+
+      // assets/logo.png was explicitly requested, but src/diagram.png was NOT
+      expect((result.returnDisplay as ReadManyFilesResult).summary).toContain(
+        '- `src/diagram.png` (Reason: asset file (image/pdf/audio) was not explicitly requested by name or extension)',
+      );
+      const inlinedParts = Array.isArray(result.llmContent)
+        ? result.llmContent.filter(
+            (c) => typeof c !== 'string' && 'inlineData' in c,
+          )
+        : [];
+      expect(inlinedParts).toHaveLength(1);
+    });
+
+    it('should include image when explicitly requested with wildcard extension matching case-insensitively (issue #29045)', async () => {
+      createBinaryFile(
+        'assets/Logo.PNG',
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
+      const params = { include: ['assets/Logo.*'] };
+      const invocation = tool.build(params);
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      const inlinedParts = Array.isArray(result.llmContent)
+        ? result.llmContent.filter(
+            (c) => typeof c !== 'string' && 'inlineData' in c,
+          )
+        : [];
+      expect(inlinedParts).toHaveLength(1);
+    });
+
     it('should return error if path is ignored by a .geminiignore pattern', async () => {
       createFile('foo.bar', '');
       createFile('bar.ts', '');
@@ -970,6 +1047,288 @@ Content of file[1]
       // Parent context should appear only once (from the first call), not duplicated
       const parentMatches = llmContent.match(/Parent context/g);
       expect(parentMatches).toHaveLength(1);
+    });
+  });
+
+  describe('isAssetExplicitlyRequested', () => {
+    it('should reject generic directory globs and wildcards', () => {
+      expect(
+        isAssetExplicitlyRequested(
+          ['reports/**'],
+          'reports/report.png',
+          '/root/reports/report.png',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['reports/*'],
+          'reports/report.png',
+          '/root/reports/report.png',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['**/*report*/**'],
+          'reports/report.png',
+          '/root/reports/report.png',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(['src/**'], 'src/s.png', '/root/src/s.png'),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(['*'], 'document.pdf', '/root/document.pdf'),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['**/*'],
+          'nested/document.pdf',
+          '/root/nested/document.pdf',
+        ),
+      ).toBe(false);
+    });
+
+    it('should reject directory paths containing an extension-like segment', () => {
+      expect(
+        isAssetExplicitlyRequested(
+          ['backup.png/**'],
+          'backup.png/image.png',
+          '/root/backup.png/image.png',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['docs.pdf/*'],
+          'docs.pdf/notes.pdf',
+          '/root/docs.pdf/notes.pdf',
+        ),
+      ).toBe(false);
+    });
+
+    it('should isolate pattern evaluation across multiple include patterns', () => {
+      const include = ['assets/logo.png', 'src/**'];
+      expect(
+        isAssetExplicitlyRequested(
+          include,
+          'assets/logo.png',
+          '/root/assets/logo.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          include,
+          'src/diagram.png',
+          '/root/src/diagram.png',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          include,
+          'src/screenshot.png',
+          '/root/src/screenshot.png',
+        ),
+      ).toBe(false);
+    });
+
+    it('should accept explicit extension globs', () => {
+      expect(
+        isAssetExplicitlyRequested(['*.png'], 'image.png', '/root/image.png'),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['**/*.png'],
+          'sub/nested/image.png',
+          '/root/sub/nested/image.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/*.pdf'],
+          'assets/manual.pdf',
+          '/root/assets/manual.pdf',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/*.pdf'],
+          'other/manual.pdf',
+          '/root/other/manual.pdf',
+        ),
+      ).toBe(false);
+    });
+
+    it('should support brace-expanded extensions', () => {
+      const include = ['**/*.{png,jpg,jpeg}'];
+      expect(
+        isAssetExplicitlyRequested(
+          include,
+          'assets/photo.jpg',
+          '/root/assets/photo.jpg',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          include,
+          'assets/photo.png',
+          '/root/assets/photo.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          include,
+          'assets/doc.pdf',
+          '/root/assets/doc.pdf',
+        ),
+      ).toBe(false);
+    });
+
+    it('should accept explicit filename and stem requests case-insensitively', () => {
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/Logo.*'],
+          'assets/Logo.PNG',
+          '/root/assets/Logo.PNG',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/logo.*'],
+          'assets/Logo.PNG',
+          '/root/assets/Logo.PNG',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['report-final.pdf'],
+          'report-final.pdf',
+          '/root/report-final.pdf',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['./assets/logo.png'],
+          'assets/logo.png',
+          '/root/assets/logo.png',
+        ),
+      ).toBe(true);
+    });
+
+    it('should handle filenames with multiple dots', () => {
+      expect(
+        isAssetExplicitlyRequested(
+          ['quarterly.report.final.pdf'],
+          'quarterly.report.final.pdf',
+          '/root/quarterly.report.final.pdf',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['quarterly.report.final.*'],
+          'quarterly.report.final.pdf',
+          '/root/quarterly.report.final.pdf',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['reports/**'],
+          'reports/quarterly.report.final.pdf',
+          '/root/reports/quarterly.report.final.pdf',
+        ),
+      ).toBe(false);
+    });
+
+    it('should correctly handle Windows path backslashes and drive letters', () => {
+      expect(
+        isAssetExplicitlyRequested(
+          ['reports\\**'],
+          'reports\\report.png',
+          'C:\\workspace\\reports\\report.png',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets\\logo.png'],
+          'assets\\logo.png',
+          'C:\\workspace\\assets\\logo.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets\\Logo.*'],
+          'assets\\Logo.PNG',
+          'D:\\repos\\project\\assets\\Logo.PNG',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/logo.png'],
+          'assets\\logo.png',
+          'C:\\workspace\\assets\\logo.png',
+        ),
+      ).toBe(true);
+    });
+
+    it('should support explicit wildcard patterns like logo-* or image-*.png and reject generic *.*', () => {
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/logo-*'],
+          'assets/logo-header.png',
+          '/root/assets/logo-header.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/logo-*.*'],
+          'assets/logo-header.png',
+          '/root/assets/logo-header.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['image-*.png'],
+          'image-01.png',
+          '/root/image-01.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['*.*'],
+          'document.pdf',
+          '/root/document.pdf',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['reports/*.*'],
+          'reports/summary.pdf',
+          '/root/reports/summary.pdf',
+        ),
+      ).toBe(false);
+    });
+
+    it('should use and populate matcherCache when provided', () => {
+      const cache = new LRUCache<string, (target: string) => boolean>(10);
+      expect(cache.size).toBe(0);
+
+      const res1 = isAssetExplicitlyRequested(
+        ['assets/*.png'],
+        'assets/logo.png',
+        '/root/assets/logo.png',
+        cache,
+      );
+      expect(res1).toBe(true);
+      expect(cache.size).toBe(1);
+      expect(cache.has('assets/*.png')).toBe(true);
+
+      const res2 = isAssetExplicitlyRequested(
+        ['assets/*.png'],
+        'other/doc.png',
+        '/root/other/doc.png',
+        cache,
+      );
+      expect(res2).toBe(false);
+      // Size remains 1 because pattern was already compiled and cached
+      expect(cache.size).toBe(1);
     });
   });
 });

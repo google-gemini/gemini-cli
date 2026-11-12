@@ -168,6 +168,13 @@ export class LoggingContentGenerator implements ContentGenerator {
     return this.wrapped.paidTier;
   }
 
+  private shouldRecordPromptPayloads(): boolean {
+    return (
+      Boolean(this.config.getTelemetryLogPromptsEnabled?.()) &&
+      Boolean(this.config.getTelemetryTracesEnabled?.())
+    );
+  }
+
   private logApiRequest(
     contents: Content[],
     model: string,
@@ -176,14 +183,16 @@ export class LoggingContentGenerator implements ContentGenerator {
     generationConfig?: GenerateContentConfig,
     serverDetails?: ServerDetails,
   ): void {
-    const requestText = JSON.stringify(contents);
+    const requestText = this.config.getTelemetryLogPromptsEnabled?.()
+      ? safeJsonStringify(contents)
+      : undefined;
     logApiRequest(
       this.config,
       new ApiRequestEvent(
         model,
         {
           prompt_id: promptId,
-          contents,
+          contents: this.shouldRecordPromptPayloads() ? contents : [],
           generate_content_config: generationConfig,
           server: serverDetails,
         },
@@ -244,7 +253,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       durationMs,
       {
         prompt_id,
-        contents: requestContents,
+        contents: this.shouldRecordPromptPayloads() ? requestContents : [],
         generate_content_config: generationConfig,
         server: serverDetails,
       },
@@ -337,7 +346,7 @@ export class LoggingContentGenerator implements ContentGenerator {
         durationMs,
         {
           prompt_id,
-          contents: requestContents,
+          contents: this.shouldRecordPromptPayloads() ? requestContents : [],
           generate_content_config: generationConfig,
           server: serverDetails,
         },
@@ -408,13 +417,15 @@ export class LoggingContentGenerator implements ContentGenerator {
             response.responseId,
             response.candidates,
             response.usageMetadata,
-            JSON.stringify({
-              candidates: response.candidates,
-              usageMetadata: response.usageMetadata,
-              responseId: response.responseId,
-              modelVersion: response.modelVersion,
-              promptFeedback: response.promptFeedback,
-            }),
+            this.config.getTelemetryLogPromptsEnabled?.()
+              ? safeJsonStringify({
+                  candidates: response.candidates,
+                  usageMetadata: response.usageMetadata,
+                  responseId: response.responseId,
+                  modelVersion: response.modelVersion,
+                  promptFeedback: response.promptFeedback,
+                })
+              : undefined,
             req.config,
             serverDetails,
           );
@@ -557,15 +568,17 @@ export class LoggingContentGenerator implements ContentGenerator {
         responses[0]?.responseId,
         responses.flatMap((response) => response.candidates || []),
         lastUsageMetadata,
-        JSON.stringify(
-          responses.map((r) => ({
-            candidates: r.candidates,
-            usageMetadata: r.usageMetadata,
-            responseId: r.responseId,
-            modelVersion: r.modelVersion,
-            promptFeedback: r.promptFeedback,
-          })),
-        ),
+        this.config.getTelemetryLogPromptsEnabled?.()
+          ? safeJsonStringify(
+              responses.map((r) => ({
+                candidates: r.candidates,
+                usageMetadata: r.usageMetadata,
+                responseId: r.responseId,
+                modelVersion: r.modelVersion,
+                promptFeedback: r.promptFeedback,
+              })),
+            )
+          : undefined,
         req.config,
         serverDetails,
       );

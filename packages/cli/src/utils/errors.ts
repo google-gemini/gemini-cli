@@ -167,8 +167,11 @@ export function handleToolError(
 /**
  * Handles cancellation/abort signals consistently.
  */
-export function handleCancellationError(config: Config): never {
-  const cancellationError = new FatalCancellationError('Operation cancelled.');
+export function handleCancellationError(config: Config, exitCode = 130): never {
+  const cancellationError = new FatalCancellationError(
+    'Operation cancelled.',
+    exitCode,
+  );
 
   if (config.getOutputFormat() === OutputFormat.STREAM_JSON) {
     const streamFormatter = new StreamJsonFormatter();

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content } from '@google/genai';
+import type { Content, Part } from '@google/genai';
 import type { Config } from '../config/config.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { type ChatCompressionInfo, CompressionStatus } from '../core/turn.js';
@@ -88,6 +88,21 @@ export function isExemptRetrievalTool(
 export const COLLAPSED_FUNCTION_RESPONSE_MAX_BYTES = 2048; // 2 KB
 
 /**
+ * Maximum cumulative bytes of older retrieval tool outputs (beyond the recent protected
+ * turns) that may remain uncollapsed before older retrieval turns are also collapsed.
+ */
+export const MAX_EXEMPT_RETRIEVAL_HISTORY_BYTES = 64 * 1024; // 64 KB
+
+/**
+ * History byte size threshold at which older function responses are collapsed
+ * even if estimated token counts have not yet reached the model compression threshold.
+ */
+export const COLLAPSE_HISTORY_BYTE_THRESHOLD = 256 * 1024; // 256 KB
+
+const OMITTED_BINARY_MESSAGE =
+  '[Binary content omitted from previous turn to conserve memory]';
+
+/**
  * Computes the total byte size of text and payload content across all turns in history.
  */
 export function calculateHistoryByteSize(history: readonly Content[]): number {
@@ -110,6 +125,22 @@ export function calculateHistoryByteSize(history: readonly Content[]): number {
             }
           }
         }
+        if (part.functionResponse?.parts) {
+          for (const nestedPart of part.functionResponse.parts) {
+            if (nestedPart && typeof nestedPart === 'object') {
+              if (
+                'text' in nestedPart &&
+                typeof nestedPart.text === 'string' &&
+                nestedPart.text
+              ) {
+                bytes += Buffer.byteLength(nestedPart.text, 'utf8');
+              }
+              if (nestedPart.inlineData?.data) {
+                bytes += Buffer.byteLength(nestedPart.inlineData.data, 'utf8');
+              }
+            }
+          }
+        }
         if (part.inlineData?.data) {
           bytes += Buffer.byteLength(part.inlineData.data, 'utf8');
         }
@@ -125,16 +156,31 @@ const defaultGraphemeSegmenter = new Intl.Segmenter(undefined, {
 
 /**
  * Collapses detailed logs in older functionResponse payloads from completed previous turns.
- * The most recent N tool response turns (default 3) and retrieval tools (read_file, etc.)
- * are preserved intact for immediate context fidelity and multi-step reasoning.
+ * The most recent N tool response turns (default 3) and recent retrieval tools (within
+ * MAX_EXEMPT_RETRIEVAL_HISTORY_BYTES) are preserved intact for immediate context fidelity
+ * and multi-step reasoning.
  */
 export function collapseOlderFunctionResponses(
   history: Content[],
+  maxBytesPerOldResponse?: number,
+  segmenter?: Intl.Segmenter,
+  protectedTurns?: number,
+  exemptTools?: ReadonlySet<string>,
+): Content[];
+export function collapseOlderFunctionResponses(
+  history: readonly Content[],
+  maxBytesPerOldResponse?: number,
+  segmenter?: Intl.Segmenter,
+  protectedTurns?: number,
+  exemptTools?: ReadonlySet<string>,
+): readonly Content[];
+export function collapseOlderFunctionResponses(
+  history: readonly Content[],
   maxBytesPerOldResponse: number = COLLAPSED_FUNCTION_RESPONSE_MAX_BYTES,
   segmenter: Intl.Segmenter = defaultGraphemeSegmenter,
   protectedTurns: number = RECENT_TURNS_PROTECTED,
   exemptTools: ReadonlySet<string> = RETRIEVAL_TOOL_NAMES_EXEMPT_FROM_COLLAPSE,
-): Content[] {
+): readonly Content[] {
   // Find all indices of user messages that contain functionResponse
   const toolIndices: number[] = [];
   for (let i = 0; i < history.length; i++) {
@@ -153,6 +199,35 @@ export function collapseOlderFunctionResponses(
   // The last N tool indices represent recent tool turns that must be protected.
   // Only prior tool indices are older completed turns eligible for collapsing.
   const cutoffToolIndex = toolIndices[toolIndices.length - protectedTurns];
+
+  // Prioritize preserving the most recent older retrieval tool turns up to MAX_EXEMPT_RETRIEVAL_HISTORY_BYTES.
+  let remainingExemptBytes = MAX_EXEMPT_RETRIEVAL_HISTORY_BYTES;
+  const preservedExemptTurns = new Set<number>();
+  for (let i = cutoffToolIndex - 1; i >= 0; i--) {
+    if (remainingExemptBytes <= 0) {
+      break;
+    }
+    const turn = history[i];
+    if (turn.role !== 'user' || !turn.parts) {
+      continue;
+    }
+    const hasExemptPart = turn.parts.some(
+      (p) =>
+        p.functionResponse &&
+        isExemptRetrievalTool(p.functionResponse.name, exemptTools),
+    );
+    if (!hasExemptPart) {
+      continue;
+    }
+    const turnBytes = calculateHistoryByteSize([turn]);
+    if (turnBytes <= remainingExemptBytes) {
+      preservedExemptTurns.add(i);
+      remainingExemptBytes -= turnBytes;
+    } else {
+      remainingExemptBytes = 0;
+      break;
+    }
+  }
 
   const collapseString = (str: string): string => {
     const totalBytes = Buffer.byteLength(str, 'utf8');
@@ -224,25 +299,48 @@ export function collapseOlderFunctionResponses(
 
     let partsModified = false;
     const newParts = content.parts.map((part) => {
+      if (part.inlineData) {
+        partsModified = true;
+        return {
+          text: OMITTED_BINARY_MESSAGE,
+        };
+      }
+
       if (!part.functionResponse?.response) {
         return part;
       }
 
-      // Exempt retrieval and file reading tools from collapsing
-      if (isExemptRetrievalTool(part.functionResponse.name, exemptTools)) {
+      const hasNestedParts = Boolean(part.functionResponse.parts?.length);
+
+      // Exempt retrieval and file reading tools from text collapsing while within the exempt byte budget,
+      // but still strip any nested multimodal inlineData parts from older turns.
+      if (
+        isExemptRetrievalTool(part.functionResponse.name, exemptTools) &&
+        preservedExemptTurns.has(idx)
+      ) {
+        if (hasNestedParts) {
+          partsModified = true;
+          const { parts: _parts, ...cleanFunctionResponse } =
+            part.functionResponse;
+          return {
+            ...part,
+            functionResponse: cleanFunctionResponse,
+          };
+        }
         return part;
       }
 
       const resp: unknown = part.functionResponse.response;
       const newResp = collapseValue(resp);
 
-      if (newResp !== resp) {
+      if (newResp !== resp || hasNestedParts) {
         partsModified = true;
+        const { parts: _parts, ...cleanFunctionResponse } =
+          part.functionResponse;
         return {
           ...part,
           functionResponse: {
-            // eslint-disable-next-line @typescript-eslint/no-misused-spread
-            ...part.functionResponse,
+            ...cleanFunctionResponse,
             // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             response: newResp as Record<string, unknown>,
           },
@@ -405,47 +503,103 @@ async function truncateHistoryToBudget(
             contentStr = JSON.stringify(responseObj, null, 2);
           }
 
-          const tokens = estimateTokenCountSync([{ text: contentStr }]);
+          contentStr = contentStr ?? '';
+          const nestedParts: Part[] = part.functionResponse.parts ?? [];
+          if (!contentStr && nestedParts.length > 0) {
+            contentStr =
+              nestedParts
+                .map(
+                  (p) =>
+                    p.text ||
+                    (p.inlineData
+                      ? `[Inline Data: ${p.inlineData.mimeType}]`
+                      : ''),
+                )
+                .filter(Boolean)
+                .join('\n') || JSON.stringify(nestedParts, null, 2);
+          }
+          const nestedTokens =
+            nestedParts.length > 0 ? estimateTokenCountSync(nestedParts) : 0;
+          const textTokens = estimateTokenCountSync([{ text: contentStr }]);
+          const tokens = textTokens + nestedTokens;
 
           if (
             functionResponseTokenCounter + tokens >
             COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET
           ) {
-            try {
-              // Budget exceeded: Truncate this response.
-              const { outputFile } = await saveTruncatedToolOutput(
-                contentStr,
-                part.functionResponse.name ?? 'unknown_tool',
-                config.getNextCompressionTruncationId(),
-                config.storage.getProjectTempDir(),
-              );
-
-              const truncatedMessage = formatTruncatedToolOutput(
-                contentStr,
-                outputFile,
-                config.getTruncateToolOutputThreshold(),
-              );
-
+            const toolName =
+              part.functionResponse.name?.trim() || 'generic_tool';
+            if (
+              part.functionResponse.response !== undefined &&
+              nestedParts.length > 0 &&
+              functionResponseTokenCounter + textTokens <=
+                COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET
+            ) {
               newParts.unshift({
                 functionResponse: {
-                  // eslint-disable-next-line @typescript-eslint/no-misused-spread
-                  ...part.functionResponse,
-                  response: { output: truncatedMessage },
+                  id: part.functionResponse.id,
+                  name: toolName,
+                  response: part.functionResponse.response,
                 },
               });
+              functionResponseTokenCounter += textTokens;
+            } else {
+              try {
+                // Budget exceeded: Truncate this response.
+                const { outputFile } = await saveTruncatedToolOutput(
+                  contentStr,
+                  toolName,
+                  config.getNextCompressionTruncationId(),
+                  config.storage.getProjectTempDir(),
+                );
 
-              // Count the small truncated placeholder towards the budget.
-              functionResponseTokenCounter += estimateTokenCountSync([
-                { text: truncatedMessage },
-              ]);
-            } catch (error) {
-              // Fallback: if truncation fails, keep the original part to avoid data loss in the chat.
-              debugLogger.debug('Failed to truncate history to budget:', error);
-              newParts.unshift(part);
-              functionResponseTokenCounter += tokens;
+                const truncatedMessage = formatTruncatedToolOutput(
+                  contentStr,
+                  outputFile,
+                  config.getTruncateToolOutputThreshold(),
+                );
+
+                newParts.unshift({
+                  functionResponse: {
+                    id: part.functionResponse.id,
+                    name: toolName,
+                    response: { output: truncatedMessage },
+                  },
+                });
+
+                // Count the small truncated placeholder towards the budget.
+                functionResponseTokenCounter += estimateTokenCountSync([
+                  { text: truncatedMessage },
+                ]);
+              } catch (error) {
+                // Fallback: if truncation fails, keep the original part to avoid data loss in the chat.
+                debugLogger.debug(
+                  'Failed to truncate history to budget:',
+                  error,
+                );
+                newParts.unshift(part);
+                functionResponseTokenCounter += tokens;
+              }
             }
           } else {
             // Within budget: keep the full response.
+            functionResponseTokenCounter += tokens;
+            newParts.unshift(part);
+          }
+        } else if (part.inlineData) {
+          const tokens = estimateTokenCountSync([part]);
+          if (
+            functionResponseTokenCounter + tokens >
+            COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET
+          ) {
+            const omittedPart: Part = {
+              text: OMITTED_BINARY_MESSAGE,
+            };
+            newParts.unshift(omittedPart);
+            functionResponseTokenCounter += estimateTokenCountSync([
+              omittedPart,
+            ]);
+          } else {
             functionResponseTokenCounter += tokens;
             newParts.unshift(part);
           }

@@ -2092,6 +2092,54 @@ describe('useGeminiStream', () => {
       );
     });
 
+    it('should not cancel an ongoing stream on escape when isEditorDialogOpen is true', async () => {
+      const cancelSubmitSpy = vi.fn();
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Part 1' };
+        await new Promise(() => {});
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = await renderHookWithProviders(() =>
+        useGeminiStream(
+          mockConfig.getGeminiClient(),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          cancelSubmitSpy,
+          () => {},
+          80,
+          24,
+          false,
+          undefined,
+          true, // isEditorDialogOpen = true
+        ),
+      );
+
+      await act(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        result.current.submitQuery('test query');
+      });
+
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      simulateEscapeKeyPress();
+
+      expect(cancelSubmitSpy).not.toHaveBeenCalled();
+      expect(result.current.streamingState).toBe(StreamingState.Responding);
+    });
+
     it('should prevent further processing after cancellation', async () => {
       let continueStream: () => void;
       const streamPromise = new Promise<void>((resolve) => {
@@ -5282,6 +5330,24 @@ describe('useGeminiStream', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  describe('shellModeActive query isolation', () => {
+    it('should never fall through to sending an LLM query when shellModeActive is true', async () => {
+      const { result } = await renderHookWithDefaults({
+        shellModeActive: true,
+      });
+
+      await act(async () => {
+        await result.current.submitQuery('gemini');
+      });
+
+      expect(mockSendMessageStream).not.toHaveBeenCalled();
+      expect(mockAddItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: MessageType.USER, text: 'gemini' }),
+        expect.any(Number),
+      );
     });
   });
 });
