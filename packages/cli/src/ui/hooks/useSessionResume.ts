@@ -69,16 +69,16 @@ export function useSessionResume({
 
       setIsResuming(true);
       try {
-        // Now that we have the client, load the history into the UI and the client.
+        // Give the history to the Gemini client first.
+        await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
+
+        // Now that we have successfully resumed, load the history into the UI.
         setQuittingMessages(null);
         historyManagerRef.current.clearItems();
         uiHistory.forEach((item, index) => {
           historyManagerRef.current.addItem(item, index, true);
         });
         refreshStaticRef.current(); // Force Static component to re-render with the updated history.
-
-        // Give the history to the Gemini client.
-        await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
 
         // Restore directories from the resumed session
         if (
