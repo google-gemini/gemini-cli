@@ -407,7 +407,9 @@ describe('useSessionResume', () => {
     });
 
     it('should filter out stale saved directories that no longer exist when restoring', async () => {
-      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-test-ws-'));
+      const tempDir = fs.realpathSync(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-test-ws-')),
+      );
       try {
         const existingDir = path.join(tempDir, 'existing');
         const missingDir = path.join(tempDir, 'missing');
