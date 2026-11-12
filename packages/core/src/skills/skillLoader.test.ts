@@ -272,6 +272,38 @@ description: Test sanitization
     expect(skills[0].name).toBe('gke-prs-troubleshooter');
   });
 
+  it('should discover skill with single-line description (issue #25693)', async () => {
+    const skillDir = path.join(testRootDir, 'single-line-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    await fs.writeFile(
+      path.join(skillDir, 'SKILL.md'),
+      `---\nname: single-line-skill\ndescription: A single line description that is relatively long and contains some punctuation.\n---\n# Instructions\nDo something.\n`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('single-line-skill');
+    expect(skills[0].description).toBe(
+      'A single line description that is relatively long and contains some punctuation.',
+    );
+  });
+
+  it('should discover skill whose description contains a colon (issue #25693)', async () => {
+    const skillDir = path.join(testRootDir, 'colon-desc-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    await fs.writeFile(
+      path.join(skillDir, 'SKILL.md'),
+      `---\nname: colon-desc-skill\ndescription: Handles requests: fast and reliable.\n---\n# Instructions\nDo something.\n`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('colon-desc-skill');
+    expect(skills[0].description).toBe('Handles requests: fast and reliable.');
+  });
+
   it('should load real built-in antigravity-support skill successfully', async () => {
     const { fileURLToPath } = await import('node:url');
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
