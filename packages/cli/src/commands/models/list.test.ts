@@ -101,15 +101,18 @@ describe('models list command', () => {
         description: 'Automatic model selection',
         contextLimits: {
           inputTokens: 1_048_576,
-          outputTokens: 8192,
+          outputTokens: 65_536,
         },
       });
       expect(listings[1].modelId).toBe('gemini-2.5-pro');
       expect(listings[1].contextLimits.inputTokens).toBe(1_048_576);
-      expect(listings[1].contextLimits.outputTokens).toBe(8192);
+      expect(listings[1].contextLimits.outputTokens).toBe(65_536);
+      expect(listings[2].modelId).toBe('gemini-2.5-flash');
+      expect(listings[2].contextLimits.inputTokens).toBe(1_048_576);
+      expect(listings[2].contextLimits.outputTokens).toBe(65_536);
     });
 
-    it('should fall back to DEFAULT_TOKEN_LIMIT for unknown or custom models', () => {
+    it('should fall back to DEFAULT_TOKEN_LIMIT and omit outputTokens for unknown or custom models', () => {
       mockBuildAvailableModels.mockReturnValue({
         availableModels: [
           {
@@ -128,8 +131,10 @@ describe('models list command', () => {
 
       expect(listings).toHaveLength(1);
       expect(listings[0].modelId).toBe('custom-new-model');
-      expect(listings[0].contextLimits.inputTokens).toBe(1_048_576);
-      expect(listings[0].contextLimits.outputTokens).toBe(8192);
+      expect(listings[0].contextLimits).toEqual({
+        inputTokens: 1_048_576,
+      });
+      expect(listings[0].contextLimits.outputTokens).toBeUndefined();
     });
 
     it('should fall back to modelId when name is undefined', () => {
@@ -184,7 +189,31 @@ describe('models list command', () => {
       expect(output).toContain('Automatic model selection');
       expect(output).toContain('gemini-2.5-pro (Gemini 2.5 Pro)');
       expect(output).toContain('1,048,576 input tokens');
-      expect(output).toContain('8,192 output tokens');
+      expect(output).toContain('65,536 output tokens');
+    });
+
+    it('should omit output tokens in text format when outputTokens is unknown', async () => {
+      mockBuildAvailableModels.mockReturnValue({
+        availableModels: [
+          {
+            modelId: 'custom-new-model',
+            name: 'Custom New Model',
+            description: 'Custom model test',
+          },
+        ],
+        currentModelId: 'custom-new-model',
+      });
+
+      await handleList({ outputFormat: 'text' });
+
+      const rawOutput = stdoutWriteSpy.mock.calls
+        .map((call) => call[0].toString())
+        .join('');
+      const output = stripAnsi(rawOutput);
+
+      expect(output).toContain('custom-new-model (Custom New Model)');
+      expect(output).toContain('Context limit: 1,048,576 input tokens\n');
+      expect(output).not.toContain('output tokens');
     });
 
     it('should output models in JSON format when outputFormat is json', async () => {
@@ -202,7 +231,9 @@ describe('models list command', () => {
       expect(parsed[0].id).toBe('auto');
       expect(parsed[0].displayName).toBe('Auto');
       expect(parsed[0].contextLimits.inputTokens).toBe(1_048_576);
-      expect(parsed[0].contextLimits.outputTokens).toBe(8192);
+      expect(parsed[0].contextLimits.outputTokens).toBe(65_536);
+      expect(parsed[1].modelId).toBe('gemini-2.5-pro');
+      expect(parsed[1].contextLimits.outputTokens).toBe(65_536);
     });
 
     it('should pass custom argv and initialize storage when handleList is called', async () => {

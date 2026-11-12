@@ -8,6 +8,7 @@ import type { CommandModule } from 'yargs';
 import {
   type Config,
   tokenLimit,
+  outputTokenLimit,
   DEFAULT_TOKEN_LIMIT,
 } from '@google/gemini-cli-core';
 import chalk from 'chalk';
@@ -26,7 +27,7 @@ export interface ModelListing {
   tier?: string;
   contextLimits: {
     inputTokens: number;
-    outputTokens: number;
+    outputTokens?: number;
   };
 }
 
@@ -76,7 +77,7 @@ export function getModelListings(
 
   return (availableModels ?? []).map((m) => {
     const inputTokens = tokenLimit(m.modelId) ?? DEFAULT_TOKEN_LIMIT;
-    const outputTokens = 8192;
+    const outputTokens = outputTokenLimit(m.modelId);
     return {
       modelId: m.modelId,
       id: m.modelId,
@@ -85,7 +86,7 @@ export function getModelListings(
       description: m.description ?? '',
       contextLimits: {
         inputTokens,
-        outputTokens,
+        ...(outputTokens !== undefined ? { outputTokens } : {}),
       },
     };
   });
@@ -129,8 +130,12 @@ export async function handleList(
     if (model.description) {
       process.stdout.write(`  Description:   ${model.description}\n`);
     }
+    const outputLimitText =
+      model.contextLimits.outputTokens !== undefined
+        ? ` / ${model.contextLimits.outputTokens.toLocaleString()} output tokens`
+        : '';
     process.stdout.write(
-      `  Context limit: ${model.contextLimits.inputTokens.toLocaleString()} input tokens / ${model.contextLimits.outputTokens.toLocaleString()} output tokens\n\n`,
+      `  Context limit: ${model.contextLimits.inputTokens.toLocaleString()} input tokens${outputLimitText}\n\n`,
     );
   }
 }
