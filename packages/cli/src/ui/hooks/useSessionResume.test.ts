@@ -377,7 +377,7 @@ describe('useSessionResume', () => {
         getWorkspaceContext: vi.fn().mockReturnValue(mockWorkspaceContext),
       };
 
-      mockGeminiClient.resumeChat.mockImplementation(async () => {
+      mockGeminiClient.resumeChat.mockImplementationOnce(async () => {
         callOrder.push('resumeChat');
       });
 
