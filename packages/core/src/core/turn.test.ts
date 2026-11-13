@@ -196,6 +196,43 @@ describe('Turn', () => {
       expect(turn.getDebugResponses().length).toBe(1);
     });
 
+    it('should mutate function call name to trimmed name when padded with whitespace', async () => {
+      const paddedFunctionCall = {
+        id: 'fc_padded',
+        name: ' update_topic ',
+        args: { topic: 'test' },
+        isClientInitiated: false,
+      };
+      const mockResponseStream = (async function* () {
+        yield {
+          type: StreamEventType.CHUNK,
+          value: {
+            functionCalls: [paddedFunctionCall],
+          } as unknown as GenerateContentResponse,
+        };
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      const events = [];
+      const reqParts: Part[] = [{ text: 'Update topic' }];
+      for await (const event of turn.run(
+        { model: 'gemini' },
+        reqParts,
+        new AbortController().signal,
+      )) {
+        events.push(event);
+      }
+
+      expect(events.length).toBe(1);
+      const event = events[0] as ServerGeminiToolCallRequestEvent;
+      expect(event.type).toBe(GeminiEventType.ToolCallRequest);
+      expect(event.value.name).toBe('update_topic');
+      expect(event.value.callId).toBe('update_topic__fc_padded');
+      // Verify that the underlying functionCall object has been mutated with the trimmed name
+      expect(paddedFunctionCall.name).toBe('update_topic');
+      expect(paddedFunctionCall.id).toBe('update_topic__fc_padded');
+    });
+
     it('should yield UserCancelled event if signal is aborted', async () => {
       const abortController = new AbortController();
       const mockResponseStream = (async function* () {
