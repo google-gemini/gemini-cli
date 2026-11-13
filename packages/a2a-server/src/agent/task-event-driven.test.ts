@@ -759,4 +759,107 @@ describe('Task Event-Driven Scheduler', () => {
     // Should not publish anything to the message bus
     expect(messageBus.publish).not.toHaveBeenCalled();
   });
+
+  it('should transition to input-required for sequential edit tool calls when queued calls are validating', async () => {
+    // @ts-expect-error - Calling private constructor
+    const task = new Task('task-id', 'context-id', mockConfig, mockEventBus);
+    const setTaskStateSpy = vi.spyOn(task, 'setTaskStateAndPublishUpdate');
+
+    task['_registerToolCall']('1', 'scheduled');
+    task['_registerToolCall']('2', 'scheduled');
+
+    const toolCall1 = {
+      request: { callId: '1', name: 'write_file', args: {} },
+      status: 'awaiting_approval',
+      correlationId: 'corr-1',
+      confirmationDetails: {
+        type: 'edit',
+        title: 'Write file 1',
+        fileName: 'file1.txt',
+        fileDiff: '',
+        filePath: '/tmp/file1.txt',
+        originalContent: '',
+        newContent: 'hello',
+      },
+    };
+
+    const toolCall2 = {
+      request: { callId: '2', name: 'write_file', args: {} },
+      status: 'validating',
+    };
+
+    const handler = (messageBus.subscribe as Mock).mock.calls.find(
+      (call: unknown[]) => call[0] === MessageBusType.TOOL_CALLS_UPDATE,
+    )?.[1];
+
+    handler({
+      type: MessageBusType.TOOL_CALLS_UPDATE,
+      toolCalls: [toolCall1, toolCall2],
+      schedulerId: 'task-id',
+    });
+
+    // Even though toolCall2 is 'validating' in the queue behind non-parallelizable toolCall1,
+    // the task must transition to 'input-required' with final: true so the client can respond.
+    expect(setTaskStateSpy).toHaveBeenCalledWith(
+      'input-required',
+      expect.anything(),
+      undefined,
+      undefined,
+      true,
+    );
+    expect(task.taskState).toBe('input-required');
+
+    setTaskStateSpy.mockClear();
+
+    // User rejects toolCall1
+    const handled1 = await (
+      task as unknown as {
+        _handleToolConfirmationPart: (part: unknown) => Promise<boolean>;
+      }
+    )._handleToolConfirmationPart({
+      kind: 'data',
+      data: { callId: '1', outcome: 'cancel' },
+    });
+    expect(handled1).toBe(true);
+    expect(task.taskState).toBe('working');
+
+    // Now toolCall1 is cancelled and toolCall2 transitions to awaiting_approval
+    const toolCall1Cancelled = {
+      request: { callId: '1', name: 'write_file', args: {} },
+      status: 'cancelled',
+      response: {
+        callId: '1',
+        responseParts: [],
+      },
+    };
+    const toolCall2Awaiting = {
+      request: { callId: '2', name: 'write_file', args: {} },
+      status: 'awaiting_approval',
+      correlationId: 'corr-2',
+      confirmationDetails: {
+        type: 'edit',
+        title: 'Write file 2',
+        fileName: 'file2.txt',
+        fileDiff: '',
+        filePath: '/tmp/file2.txt',
+        originalContent: '',
+        newContent: 'world',
+      },
+    };
+
+    handler({
+      type: MessageBusType.TOOL_CALLS_UPDATE,
+      toolCalls: [toolCall1Cancelled, toolCall2Awaiting],
+      schedulerId: 'task-id',
+    });
+
+    // Task must transition to 'input-required' with final: true again for toolCall2
+    expect(setTaskStateSpy).toHaveBeenCalledWith(
+      'input-required',
+      expect.anything(),
+      undefined,
+      undefined,
+      true,
+    );
+  });
 });

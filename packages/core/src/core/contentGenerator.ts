@@ -31,7 +31,7 @@ import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 import { ModelMappingContentGenerator } from './modelMappingContentGenerator.js';
-import { CCPA_AI_MODEL_MAPPINGS } from '../config/models.js';
+import { getBackendModelMappings } from '../config/models.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -303,7 +303,7 @@ export async function createContentGenerator(
             gcConfig,
             sessionId,
           ),
-          CCPA_AI_MODEL_MAPPINGS,
+          () => getBackendModelMappings(gcConfig, true),
         ),
         gcConfig,
       );
@@ -407,7 +407,12 @@ export async function createContentGenerator(
           },
         }),
       });
-      return new LoggingContentGenerator(googleGenAI.models, gcConfig);
+      return new LoggingContentGenerator(
+        new ModelMappingContentGenerator(googleGenAI.models, () =>
+          getBackendModelMappings(gcConfig, false),
+        ),
+        gcConfig,
+      );
     }
     throw new Error(
       `Error creating contentGenerator: Unsupported authType: ${config.authType}`,

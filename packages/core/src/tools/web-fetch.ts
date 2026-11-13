@@ -32,6 +32,7 @@ import { LlmRole } from '../telemetry/llmRole.js';
 import { WEB_FETCH_TOOL_NAME, WEB_FETCH_DISPLAY_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
+import { promptIdContext } from '../utils/promptIdContext.js';
 import { retryWithBackoff, getRetryErrorType } from '../utils/retry.js';
 import { WEB_FETCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
@@ -253,6 +254,9 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       delayMs,
       error: errorType,
       model: modelName,
+      sessionId: this.context.config.getSessionId?.(),
+      role: LlmRole.UTILITY_TOOL,
+      promptId: promptIdContext.getStore(),
     });
 
     logNetworkRetryAttempt(
@@ -267,14 +271,20 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     );
   }
 
-  private isBlockedHost(urlStr: string): boolean {
+  private async isBlockedHost(urlStr: string): Promise<boolean> {
     try {
       const url = new URL(urlStr);
       const hostname = url.hostname.toLowerCase();
-      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      if (
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname.endsWith('.localhost') ||
+        hostname.endsWith('.local') ||
+        hostname.endsWith('.internal')
+      ) {
         return true;
       }
-      return isPrivateIp(urlStr);
+      return await isPrivateIp(urlStr);
     } catch {
       return true;
     }
@@ -285,7 +295,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     signal: AbortSignal,
   ): Promise<string> {
     const url = convertGithubUrlToRaw(urlStr);
-    if (this.isBlockedHost(url)) {
+    if (await this.isBlockedHost(url)) {
       debugLogger.warn(`[WebFetchTool] Blocked access to host: ${url}`);
       throw new Error(
         `Access to blocked or private host ${url} is not allowed.`,
@@ -350,16 +360,16 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     return textContent;
   }
 
-  private filterAndValidateUrls(urls: string[]): {
+  private async filterAndValidateUrls(urls: string[]): Promise<{
     toFetch: string[];
     skipped: string[];
-  } {
+  }> {
     const uniqueUrls = [...new Set(urls.map(normalizeUrl))];
     const toFetch: string[] = [];
     const skipped: string[] = [];
 
     for (const url of uniqueUrls) {
-      if (this.isBlockedHost(url)) {
+      if (await this.isBlockedHost(url)) {
         debugLogger.warn(
           `[WebFetchTool] Skipped private or local host: ${url}`,
         );
@@ -615,7 +625,7 @@ ${aggregatedContent}
     // Convert GitHub blob URL to raw URL
     url = convertGithubUrlToRaw(url);
 
-    if (this.isBlockedHost(url)) {
+    if (await this.isBlockedHost(url)) {
       const errorMessage = `Access to blocked or private host ${url} is not allowed.`;
       debugLogger.warn(
         `[WebFetchTool] Blocked experimental fetch to host: ${url}`,
@@ -769,7 +779,7 @@ Response: ${rawResponseText}`;
     const userPrompt = this.params.prompt!;
     const { validUrls } = parsePrompt(userPrompt);
 
-    const { toFetch, skipped } = this.filterAndValidateUrls(validUrls);
+    const { toFetch, skipped } = await this.filterAndValidateUrls(validUrls);
 
     // If everything was skipped, fail early
     if (toFetch.length === 0 && skipped.length > 0) {

@@ -62,6 +62,13 @@ vi.mock('fs', async (importOriginal) => {
     pathMod.join(MOCK_CWD2, 'settings', 'path3'),
   ]);
 
+  const mockedRealpath = vi.fn((p) => p);
+  Object.defineProperty(mockedRealpath, 'native', {
+    value: (p: Parameters<typeof actualFs.realpathSync>[0]) =>
+      mockedRealpath(p),
+    writable: true,
+  });
+
   return {
     ...actualFs,
     mkdirSync: vi.fn((p) => {
@@ -75,7 +82,7 @@ vi.mock('fs', async (importOriginal) => {
       }
       return actualFs.statSync(p as unknown as string);
     }),
-    realpathSync: vi.fn((p) => p),
+    realpathSync: mockedRealpath,
   };
 });
 
@@ -877,28 +884,18 @@ describe('loadCliConfig', () => {
   });
 
   describe('Proxy configuration', () => {
-    const originalProxyEnv: { [key: string]: string | undefined } = {};
     const proxyEnvVars = [
       'HTTP_PROXY',
       'HTTPS_PROXY',
+      'ALL_PROXY',
       'http_proxy',
       'https_proxy',
+      'all_proxy',
     ];
 
     beforeEach(() => {
       for (const key of proxyEnvVars) {
-        originalProxyEnv[key] = process.env[key];
-        delete process.env[key];
-      }
-    });
-
-    afterEach(() => {
-      for (const key of proxyEnvVars) {
-        if (originalProxyEnv[key]) {
-          process.env[key] = originalProxyEnv[key];
-        } else {
-          delete process.env[key];
-        }
+        vi.stubEnv(key, '');
       }
     });
 
@@ -936,6 +933,20 @@ describe('loadCliConfig', () => {
       {
         input: {
           env_name: 'HTTP_PROXY',
+          proxy_url,
+        },
+        expected: proxy_url,
+      },
+      {
+        input: {
+          env_name: 'ALL_PROXY',
+          proxy_url,
+        },
+        expected: proxy_url,
+      },
+      {
+        input: {
+          env_name: 'all_proxy',
           proxy_url,
         },
         expected: proxy_url,
@@ -2091,6 +2102,33 @@ describe('loadCliConfig compressionThreshold', () => {
     const settings = createTestMergedSettings();
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(await config.getCompressionThreshold()).toBe(0.5);
+  });
+});
+
+describe('loadCliConfig requestTimeoutMs', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.stubEnv('GEMINI_API_HEADERS_TIMEOUT_MS', '');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should pass model.requestTimeoutMs from settings to the core config', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      model: {
+        requestTimeoutMs: 180000,
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getRequestTimeoutMs()).toBe(180000);
   });
 });
 
@@ -3882,5 +3920,143 @@ describe('loadCliConfig acpMode and clientName', () => {
     );
     expect(config.getAcpMode()).toBe(false);
     expect(config.getClientName()).toBe('tui');
+  });
+});
+
+describe('nested interactive session and invalid config subcommand guards', () => {
+  let originalArgv: string[];
+
+  beforeEach(() => {
+    originalArgv = [...process.argv];
+    vi.stubEnv('GEMINI_CLI_IN_SHELL', '');
+    vi.stubEnv('GEMINI_CLI_NESTED_SESSION', '');
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should abort with exit code 1 when starting a nested interactive session via GEMINI_CLI_IN_SHELL=1', async () => {
+    vi.stubEnv('GEMINI_CLI_IN_SHELL', '1');
+    process.argv = ['node', 'script.js'];
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(mockExit).toHaveBeenCalledWith(1);
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      'Error: Starting a nested interactive Gemini CLI session inside Gemini CLI Shell Mode is not supported. To switch models or update settings, exit Shell Mode (!) and use /model or /settings.',
+    );
+  });
+
+  it('should abort with exit code 1 when invoking gemini config set inside GEMINI_CLI_IN_SHELL=1', async () => {
+    vi.stubEnv('GEMINI_CLI_IN_SHELL', '1');
+    process.argv = [
+      'node',
+      'script.js',
+      'config',
+      'set',
+      'default-model',
+      'gemini-2.5',
+      '-y',
+    ];
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(mockExit).toHaveBeenCalledWith(1);
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      'Error: Starting a nested interactive Gemini CLI session inside Gemini CLI Shell Mode is not supported. To switch models or update settings, exit Shell Mode (!) and use /model or /settings.',
+    );
+  });
+
+  it('should allow --version and --help when GEMINI_CLI_IN_SHELL=1', async () => {
+    vi.stubEnv('GEMINI_CLI_IN_SHELL', '1');
+    process.argv = ['node', 'script.js', '--version'];
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit 0');
+    });
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit 0',
+    );
+    expect(mockExit).toHaveBeenCalledWith(0);
+  });
+
+  it('should allow explicit headless -p prompt and subcommands when GEMINI_CLI_IN_SHELL=1', async () => {
+    vi.stubEnv('GEMINI_CLI_IN_SHELL', '1');
+    process.argv = ['node', 'script.js', '-p', 'summarize this'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.prompt).toBe('summarize this');
+  });
+
+  it('should reject invalid gemini config subcommand with exit code 1 outside nested shell', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      'config',
+      'set',
+      'default-model',
+      'gemini-2.5',
+      '-y',
+    ];
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(mockExit).toHaveBeenCalledWith(1);
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('/model'),
+    );
+  });
+
+  it('should reject quoted multi-word "config set" positional argument with exit code 1', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      'config set',
+      'default-model',
+      'gemini-2.5',
+    ];
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(mockExit).toHaveBeenCalledWith(1);
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('/model'),
+    );
+  });
+
+  it('should allow multi-word natural language prompts passed as a single argument starting with "set model"', async () => {
+    process.argv = ['node', 'script.js', 'set model'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.query).toBe('set model');
   });
 });

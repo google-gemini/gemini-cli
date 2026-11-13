@@ -415,6 +415,29 @@ describe('setupUser', () => {
         'LoadCodeAssist returned empty response',
       );
     });
+
+    it('should bound verification retries and throw ValidationRequiredError if verification repeatedly fails', async () => {
+      mockLoad.mockResolvedValue({
+        currentTier: null,
+        ineligibleTiers: [
+          {
+            reasonMessage: 'Verify please',
+            reasonCode: 'VALIDATION_REQUIRED',
+            tierId: UserTierId.STANDARD,
+            tierName: 'standard',
+            validationUrl: 'https://verify',
+          },
+        ],
+      });
+
+      mockValidationHandler.mockResolvedValue('verify');
+
+      await expect(setupUser({} as OAuth2Client, mockConfig)).rejects.toThrow(
+        ValidationRequiredError,
+      );
+      expect(mockValidationHandler).toHaveBeenCalledTimes(3);
+      expect(mockLoad).toHaveBeenCalledTimes(4);
+    });
   });
 });
 

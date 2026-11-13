@@ -70,8 +70,56 @@ describe('expandEnvVars', () => {
         { ...defaultEnv, PATH: '/usr/bin' },
         '/home/morty/bin:/usr/bin',
       ],
+      [
+        '__GCLI_EXPAND_TARGET__ collision in env when expanding variables',
+        'Hello $USER',
+        { ...defaultEnv, __GCLI_EXPAND_TARGET__: 'unexpected override' },
+        'Hello morty',
+      ],
+      [
+        '__GCLI_EXPAND_TARGET__ collision in env with literal input',
+        'Bearer static-token',
+        { ...defaultEnv, __GCLI_EXPAND_TARGET__: 'unexpected override' },
+        'Bearer static-token',
+      ],
+      [
+        'cascading __GCLI_EXPAND_TARGET__ collisions in env',
+        'Hello $USER',
+        {
+          ...defaultEnv,
+          __GCLI_EXPAND_TARGET__: 'override-base',
+          __GCLI_EXPAND_TARGET_0__: 'override-0',
+          __GCLI_EXPAND_TARGET_1__: 'override-1',
+        },
+        'Hello morty',
+      ],
+      [
+        'explicit reference to $__GCLI_EXPAND_TARGET__ in input when defined',
+        'Target is $__GCLI_EXPAND_TARGET__ and ${__GCLI_EXPAND_TARGET__}',
+        { ...defaultEnv, __GCLI_EXPAND_TARGET__: 'explicit-target' },
+        'Target is explicit-target and explicit-target',
+      ],
+      [
+        'explicit reference to $__GCLI_EXPAND_TARGET__ in input when undefined',
+        'Target is $__GCLI_EXPAND_TARGET__',
+        defaultEnv,
+        'Target is ',
+      ],
     ])('should handle %s', (_, input, env, expected) => {
       expect(expandEnvVars(input, env)).toBe(expected);
+    });
+
+    it('should not mutate the caller-provided env object', () => {
+      const callerEnv: Record<string, string | undefined> = {
+        USER: 'morty',
+        __GCLI_EXPAND_TARGET__: 'existing-value',
+        UNDEFINED_KEY: undefined,
+      };
+      const snapshot = { ...callerEnv };
+
+      expect(expandEnvVars('Hello $USER', callerEnv)).toBe('Hello morty');
+      expect(callerEnv).toEqual(snapshot);
+      expect('__GCLI_EXPAND_TARGET_0__' in callerEnv).toBe(false);
     });
   });
 
@@ -109,6 +157,18 @@ describe('expandEnvVars', () => {
         'Missing $UNDEFINED and ${NONE} and %MISSING%',
         defaultEnv,
         'Missing  and  and ',
+      ],
+      [
+        '__GCLI_EXPAND_TARGET__ collision in env on Windows',
+        '$USER uses %TEMP%',
+        { ...defaultEnv, __GCLI_EXPAND_TARGET__: 'unexpected override' },
+        'morty uses C:\\Temp',
+      ],
+      [
+        'explicit %__GCLI_EXPAND_TARGET__% on Windows',
+        'Target is %__GCLI_EXPAND_TARGET__%',
+        { ...defaultEnv, __GCLI_EXPAND_TARGET__: 'win-target' },
+        'Target is win-target',
       ],
     ])('should handle %s', (_, input, env, expected) => {
       expect(expandEnvVars(input, env)).toBe(expected);

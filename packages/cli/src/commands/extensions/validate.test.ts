@@ -27,7 +27,10 @@ vi.mock('../utils.js', () => ({
 
 describe('extensions validate command', () => {
   it('should fail if no path is provided', () => {
-    const validationParser = yargs([]).command(validateCommand).fail(false);
+    const validationParser = yargs([])
+      .locale('en')
+      .command(validateCommand)
+      .fail(false);
     expect(() => validationParser.parse('validate')).toThrow(
       'Not enough non-option arguments: got 0, need at least 1',
     );
@@ -128,6 +131,232 @@ describe('handleValidate', () => {
       expect.stringContaining(
         'The following context files referenced in gemini-extension.json are missing: contextFile.md',
       ),
+    );
+    expect(processSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('should throw an error if context file uses relative parent directory navigation', async () => {
+    createExtension({
+      extensionsDir: tempWorkspaceDir,
+      name: 'parent-nav-ext',
+      version: '1.0.0',
+      contextFileName: '../secret.txt',
+    });
+    await handleValidate({
+      path: 'parent-nav-ext',
+    });
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Invalid context file path: "../secret.txt". Relative parent directory references ("..") are not allowed.',
+      ),
+    );
+    expect(processSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('should throw an error if context file uses URL-encoded relative parent directory navigation', async () => {
+    createExtension({
+      extensionsDir: tempWorkspaceDir,
+      name: 'encoded-nav-ext',
+      version: '1.0.0',
+      contextFileName: '%2e%2e/secret.txt',
+    });
+    await handleValidate({
+      path: 'encoded-nav-ext',
+    });
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Invalid context file path: "%2e%2e/secret.txt". Relative parent directory references ("..") are not allowed.',
+      ),
+    );
+    expect(processSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('should throw an error if context file uses absolute path', async () => {
+    createExtension({
+      extensionsDir: tempWorkspaceDir,
+      name: 'abs-path-ext',
+      version: '1.0.0',
+      contextFileName: '/etc/hosts',
+    });
+    await handleValidate({
+      path: 'abs-path-ext',
+    });
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Invalid context file path: "/etc/hosts". Absolute paths are not allowed.',
+      ),
+    );
+    expect(processSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('should successfully validate an extension with context file containing percent characters', async () => {
+    createExtension({
+      extensionsDir: tempWorkspaceDir,
+      name: 'percent-name-ext',
+      version: '1.0.0',
+      contextFileName: '100%_complete.md',
+    });
+    await handleValidate({
+      path: 'percent-name-ext',
+    });
+    expect(debugLoggerLogSpy).toHaveBeenCalledWith(
+      'Extension percent-name-ext has been successfully validated.',
+    );
+  });
+
+  it('should validate an extension with a valid stdio MCP server', async () => {
+    createExtension({
+      extensionsDir: tempWorkspaceDir,
+      name: 'stdio-ext',
+      version: '1.0.0',
+      mcpServers: {
+        myServer: {
+          command: 'node',
+          args: ['server.js'],
+        },
+      },
+    });
+    await handleValidate({
+      path: 'stdio-ext',
+    });
+    expect(debugLoggerLogSpy).toHaveBeenCalledWith(
+      'Extension stdio-ext has been successfully validated.',
+    );
+  });
+
+  it('should validate an extension with a valid remote MCP server using url and type', async () => {
+    createExtension({
+      extensionsDir: tempWorkspaceDir,
+      name: 'remote-ext',
+      version: '1.0.0',
+      mcpServers: {
+        remoteServer: {
+          url: 'https://example.com/mcp',
+          type: 'http',
+        },
+      },
+    });
+    await handleValidate({
+      path: 'remote-ext',
+    });
+    expect(debugLoggerLogSpy).toHaveBeenCalledWith(
+      'Extension remote-ext has been successfully validated.',
+    );
+  });
+
+  it('should warn when an MCP server uses deprecated httpUrl but succeed validation', async () => {
+    createExtension({
+      extensionsDir: tempWorkspaceDir,
+      name: 'deprecated-http-ext',
+      version: '1.0.0',
+      mcpServers: {
+        myServer: {
+          httpUrl: 'https://example.com/mcp',
+        },
+      },
+    });
+    await handleValidate({
+      path: 'deprecated-http-ext',
+    });
+    expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'MCP server "myServer" uses deprecated "httpUrl". Consider using "url" with "type": "http" instead.',
+      ),
+    );
+    expect(debugLoggerLogSpy).toHaveBeenCalledWith(
+      'Extension deprecated-http-ext has been successfully validated.',
+    );
+  });
+
+  it('should successfully validate the citlyze-mcp extension configuration with deprecation warning', async () => {
+    createExtension({
+      extensionsDir: tempWorkspaceDir,
+      name: 'citlyze',
+      version: '1.0.0',
+      contextFileName: 'GEMINI.md',
+      mcpServers: {
+        citlyze: {
+          httpUrl: 'https://app.citlyze.com/api/mcp',
+          headers: {
+            Authorization: 'Bearer ${CITLYZE_API_KEY}',
+          },
+          timeout: 30000,
+        },
+      },
+    });
+    await handleValidate({
+      path: 'citlyze',
+    });
+    expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'MCP server "citlyze" uses deprecated "httpUrl". Consider using "url" with "type": "http" instead.',
+      ),
+    );
+    expect(debugLoggerLogSpy).toHaveBeenCalledWith(
+      'Extension citlyze has been successfully validated.',
+    );
+  });
+
+  it('should throw an error if an MCP server does not specify a transport', async () => {
+    createExtension({
+      extensionsDir: tempWorkspaceDir,
+      name: 'missing-transport-ext',
+      version: '1.0.0',
+      mcpServers: {
+        invalidServer: {
+          timeout: 5000,
+        },
+      },
+    });
+    await handleValidate({
+      path: 'missing-transport-ext',
+    });
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'MCP server "invalidServer" must specify a transport (e.g., "command", "url", or "httpUrl").',
+      ),
+    );
+    expect(processSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('should throw an error if an MCP server specifies an invalid URL', async () => {
+    createExtension({
+      extensionsDir: tempWorkspaceDir,
+      name: 'invalid-url-ext',
+      version: '1.0.0',
+      mcpServers: {
+        invalidServer: {
+          url: 'not-a-valid-url',
+        },
+      },
+    });
+    await handleValidate({
+      path: 'invalid-url-ext',
+    });
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'MCP server "invalidServer" specifies an invalid URL: "not-a-valid-url".',
+      ),
+    );
+    expect(processSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('should throw an error if mcpServers is not an object', async () => {
+    const extDir = path.join(tempWorkspaceDir, 'bad-mcp-ext');
+    fs.mkdirSync(extDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(extDir, 'gemini-extension.json'),
+      JSON.stringify({
+        name: 'bad-mcp-ext',
+        version: '1.0.0',
+        mcpServers: 'not-an-object',
+      }),
+    );
+    await handleValidate({
+      path: 'bad-mcp-ext',
+    });
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('The "mcpServers" field must be an object.'),
     );
     expect(processSpy).toHaveBeenCalledWith(1);
   });

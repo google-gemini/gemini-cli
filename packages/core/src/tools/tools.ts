@@ -22,6 +22,10 @@ import {
 } from '../confirmation-bus/types.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { SubagentProgress } from '../agents/types.js';
+import {
+  isBuildFile,
+  extractFilePathFromArgs,
+} from '../utils/buildFileUtils.js';
 
 /**
 /**
@@ -38,6 +42,8 @@ export interface ExecuteOptions {
   updateOutput?: (output: ToolLiveOutput) => void;
   shellExecutionConfig?: ShellExecutionConfig;
   setExecutionIdCallback?: (executionId: number) => void;
+  isClientInitiated?: boolean;
+  isUserConfirmed?: boolean;
 }
 
 /**
@@ -149,6 +155,7 @@ export interface PolicyUpdateOptions {
   mcpName?: string;
   toolName?: string;
   allowRedirection?: boolean;
+  allowCommandSubstitution?: boolean;
 }
 
 /**
@@ -188,7 +195,11 @@ export abstract class BaseToolInvocation<
     abortSignal: AbortSignal,
     forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
+    const filePath = extractFilePathFromArgs(this.params);
+    const isTargetingBuildFile = Boolean(filePath && isBuildFile(filePath));
+
     if (
+      !isTargetingBuildFile &&
       this.respectsAutoEdit &&
       this.getApprovalMode() === ApprovalMode.AUTO_EDIT &&
       forcedDecision !== 'ask_user'
@@ -954,6 +965,7 @@ export interface FileDiff {
   newContent: string;
   diffStat?: DiffStat;
   isNewFile?: boolean;
+  isBuildFile?: boolean;
 }
 
 export const isFileDiff = (res: unknown): res is FileDiff =>
@@ -990,6 +1002,7 @@ export interface ToolEditConfirmationDetails {
   isModifying?: boolean;
   diffStat?: DiffStat;
   ideConfirmation?: Promise<DiffUpdateResult>;
+  isBuildFile?: boolean;
 }
 
 export interface ToolEditConfirmationPayload {
@@ -1033,6 +1046,8 @@ export interface ToolExecuteConfirmationDetails {
   rootCommand: string;
   rootCommands: string[];
   commands?: string[];
+  untrustedFlags?: string[];
+  modifiedBuildFiles?: string[];
 }
 
 export interface ToolMcpConfirmationDetails {

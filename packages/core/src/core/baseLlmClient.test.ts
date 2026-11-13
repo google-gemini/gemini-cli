@@ -29,6 +29,16 @@ import { reportError } from '../utils/errorReporting.js';
 import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { MalformedJsonResponseEvent, LlmRole } from '../telemetry/types.js';
+import {
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+} from '../config/models.js';
+import * as policyCatalog from '../availability/policyCatalog.js';
+import {
+  coreEvents,
+  CoreEvent,
+  type RetryAttemptPayload,
+} from '../utils/events.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { ModelConfigService } from '../services/modelConfigService.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
@@ -155,12 +165,13 @@ describe('BaseLlmClient', () => {
 
       expect(result).toEqual({ color: 'blue' });
 
-      // Ensure the retry mechanism was engaged with shouldRetryOnContent
+      // Ensure the retry mechanism was engaged with shouldRetryOnContent and signal
       expect(retryWithBackoff).toHaveBeenCalledTimes(1);
       expect(retryWithBackoff).toHaveBeenCalledWith(
         expect.any(Function),
         expect.objectContaining({
           shouldRetryOnContent: expect.any(Function),
+          signal: defaultOptions.abortSignal,
         }),
       );
 
@@ -549,12 +560,13 @@ describe('BaseLlmClient', () => {
 
       expect(result).toBe(mockResponse);
 
-      // Ensure the retry mechanism was engaged
+      // Ensure the retry mechanism was engaged with signal
       expect(retryWithBackoff).toHaveBeenCalledTimes(1);
       expect(retryWithBackoff).toHaveBeenCalledWith(
         expect.any(Function),
         expect.objectContaining({
           shouldRetryOnContent: expect.any(Function),
+          signal: options.abortSignal,
         }),
       );
 
@@ -872,6 +884,278 @@ describe('BaseLlmClient', () => {
       ).toHaveBeenCalledWith({ model: fallbackModel });
       expect(secondCall?.model).toBe(fallbackModel);
       expect(secondCall?.config?.temperature).toBe(0.9);
+    });
+
+    it('should re-select fallback model mid-retry when retry_once marks model unavailable without changing activeModel', async () => {
+      const firstModel = 'gemini-pro';
+      const fallbackModel = 'gemini-flash';
+
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockImplementation((key) => {
+        if (key.model === fallbackModel) {
+          return makeResolvedModelConfig(fallbackModel, { temperature: 0.7 });
+        }
+        return makeResolvedModelConfig(firstModel, { temperature: 0.1 });
+      });
+
+      vi.mocked(mockAvailabilityService.selectFirstAvailable)
+        .mockReturnValueOnce({ selectedModel: firstModel, skipped: [] })
+        .mockReturnValueOnce({ selectedModel: fallbackModel, skipped: [] });
+      vi.mocked(mockAvailabilityService.snapshot).mockImplementation(
+        (model) => ({
+          available: model !== firstModel,
+        }),
+      );
+
+      mockConfig.getActiveModel.mockReturnValue(firstModel);
+      mockGenerateContent
+        .mockResolvedValueOnce(createMockResponse(''))
+        .mockResolvedValueOnce(createMockResponse('fallback-response'));
+
+      vi.mocked(retryWithBackoff).mockImplementation(async (fn, options) => {
+        const first = (await fn()) as GenerateContentResponse;
+        if (options?.shouldRetryOnContent?.(first)) {
+          return (await fn()) as GenerateContentResponse;
+        }
+        return first;
+      });
+
+      await client.generateContent({
+        ...contentOptions,
+        modelConfigKey: { model: firstModel },
+        maxAttempts: 2,
+        role: LlmRole.UTILITY_TOOL,
+      });
+
+      expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+      expect(mockGenerateContent.mock.calls[0]?.[0]?.model).toBe(firstModel);
+      expect(mockGenerateContent.mock.calls[1]?.[0]?.model).toBe(fallbackModel);
+      expect(mockGenerateContent.mock.calls[1]?.[0]?.config?.temperature).toBe(
+        0.7,
+      );
+    });
+
+    it('should include immutable role and promptId in emitted RetryAttempt events across concurrent requests', async () => {
+      const emittedRetries: RetryAttemptPayload[] = [];
+      const listener = (payload: RetryAttemptPayload) => {
+        emittedRetries.push(payload);
+      };
+      coreEvents.on(CoreEvent.RetryAttempt, listener);
+
+      try {
+        const { retryWithBackoff: actualRetryWithBackoff } =
+          await vi.importActual<typeof import('../utils/retry.js')>(
+            '../utils/retry.js',
+          );
+        vi.mocked(retryWithBackoff).mockImplementation((fn, options) =>
+          actualRetryWithBackoff(fn, {
+            ...options,
+            initialDelayMs: 1,
+            maxDelayMs: 2,
+          }),
+        );
+
+        const attemptsByPrompt = new Map<string, number>();
+        mockGenerateContent.mockImplementation(
+          async (_params, promptId: string) => {
+            const count = (attemptsByPrompt.get(promptId) ?? 0) + 1;
+            attemptsByPrompt.set(promptId, count);
+            if (count === 1) {
+              throw Object.assign(new Error('Service Unavailable'), {
+                status: 503,
+              });
+            }
+            return createMockResponse('recovered');
+          },
+        );
+
+        await Promise.all([
+          client.generateContent({
+            ...contentOptions,
+            promptId: 'prompt-main',
+            role: LlmRole.MAIN,
+          }),
+          client.generateContent({
+            ...contentOptions,
+            promptId: 'prompt-subagent',
+            role: LlmRole.SUBAGENT,
+          }),
+          client.generateContent({
+            ...contentOptions,
+            promptId: 'prompt-utility',
+            role: LlmRole.UTILITY_ROUTER,
+            maxAttempts: 2,
+          }),
+        ]);
+
+        expect(emittedRetries).toHaveLength(3);
+        expect(emittedRetries).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              role: LlmRole.MAIN,
+              promptId: 'prompt-main',
+              status: 503,
+            }),
+            expect.objectContaining({
+              role: LlmRole.SUBAGENT,
+              promptId: 'prompt-subagent',
+              status: 503,
+            }),
+            expect.objectContaining({
+              role: LlmRole.UTILITY_ROUTER,
+              promptId: 'prompt-utility',
+              maxAttempts: 2,
+              status: 503,
+            }),
+          ]),
+        );
+      } finally {
+        coreEvents.off(CoreEvent.RetryAttempt, listener);
+      }
+    });
+
+    it('should override request fallback maxAttempts with policy budget and update budget when active model changes', async () => {
+      const emittedRetries: RetryAttemptPayload[] = [];
+      const listener = (payload: RetryAttemptPayload) => {
+        emittedRetries.push(payload);
+      };
+      coreEvents.on(CoreEvent.RetryAttempt, listener);
+
+      try {
+        const { retryWithBackoff: actualRetryWithBackoff } =
+          await vi.importActual<typeof import('../utils/retry.js')>(
+            '../utils/retry.js',
+          );
+        vi.mocked(retryWithBackoff).mockImplementation((fn, options) =>
+          actualRetryWithBackoff(fn, {
+            ...options,
+            initialDelayMs: 1,
+            maxDelayMs: 2,
+          }),
+        );
+
+        let activeModel = DEFAULT_GEMINI_MODEL;
+        vi.mocked(mockConfig.getActiveModel).mockImplementation(
+          () => activeModel,
+        );
+        vi.mocked(mockConfig.getModel).mockReturnValue(
+          DEFAULT_GEMINI_MODEL_AUTO,
+        );
+
+        // Subcase A: Policy budget of 4 overrides request maxAttempts of 2 and bounds exhaustion at 4 calls
+        vi.spyOn(policyCatalog, 'getModelPolicyChain').mockReturnValue([
+          {
+            model: DEFAULT_GEMINI_MODEL,
+            maxAttempts: 4,
+            isLastResort: true,
+            actions: {},
+            stateTransitions: {},
+          },
+        ]);
+        vi.mocked(
+          mockAvailabilityService.selectFirstAvailable,
+        ).mockImplementation((models: readonly string[]) => ({
+          selectedModel: models[0],
+          skipped: [],
+        }));
+
+        mockGenerateContent.mockRejectedValue(
+          Object.assign(new Error('Service Unavailable'), { status: 503 }),
+        );
+
+        await expect(
+          client.generateContent({
+            ...contentOptions,
+            modelConfigKey: { model: DEFAULT_GEMINI_MODEL },
+            promptId: 'prompt-budget-override',
+            role: LlmRole.MAIN,
+            maxAttempts: 2,
+          }),
+        ).rejects.toThrow();
+
+        expect(mockGenerateContent).toHaveBeenCalledTimes(4);
+        expect(emittedRetries).toHaveLength(3);
+        expect(
+          emittedRetries.map((r) => ({
+            attempt: r.attempt,
+            maxAttempts: r.maxAttempts,
+          })),
+        ).toEqual([
+          { attempt: 1, maxAttempts: 4 },
+          { attempt: 2, maxAttempts: 4 },
+          { attempt: 3, maxAttempts: 4 },
+        ]);
+
+        // Subcase B: Active-model change reports Pro policy's 2 then Flash's 4
+        emittedRetries.length = 0;
+        mockGenerateContent.mockReset();
+        activeModel = DEFAULT_GEMINI_MODEL;
+
+        vi.spyOn(policyCatalog, 'getModelPolicyChain').mockReturnValue([
+          {
+            model: DEFAULT_GEMINI_MODEL,
+            maxAttempts: 2,
+            actions: {},
+            stateTransitions: {},
+          },
+          {
+            model: 'gemini-2.5-flash',
+            maxAttempts: 4,
+            isLastResort: true,
+            actions: {},
+            stateTransitions: {},
+          },
+        ]);
+
+        let callCount = 0;
+        mockGenerateContent.mockImplementation(async () => {
+          callCount++;
+          if (callCount === 1) {
+            activeModel = 'gemini-2.5-flash';
+            throw Object.assign(new Error('Service Unavailable'), {
+              status: 503,
+            });
+          }
+          if (callCount === 2) {
+            throw Object.assign(new Error('Service Unavailable'), {
+              status: 503,
+            });
+          }
+          return createMockResponse('recovered on flash');
+        });
+
+        await client.generateContent({
+          ...contentOptions,
+          modelConfigKey: { model: DEFAULT_GEMINI_MODEL },
+          promptId: 'prompt-model-switch',
+          role: LlmRole.MAIN,
+        });
+
+        expect(emittedRetries).toHaveLength(2);
+        expect(emittedRetries[0]).toEqual(
+          expect.objectContaining({
+            attempt: 1,
+            model: DEFAULT_GEMINI_MODEL,
+            maxAttempts: 2,
+            role: LlmRole.MAIN,
+            promptId: 'prompt-model-switch',
+            status: 503,
+          }),
+        );
+        expect(emittedRetries[1]).toEqual(
+          expect.objectContaining({
+            attempt: 2,
+            model: 'gemini-2.5-flash',
+            maxAttempts: 4,
+            role: LlmRole.MAIN,
+            promptId: 'prompt-model-switch',
+            status: 503,
+          }),
+        );
+      } finally {
+        coreEvents.off(CoreEvent.RetryAttempt, listener);
+      }
     });
   });
 });

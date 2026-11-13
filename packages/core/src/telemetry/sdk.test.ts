@@ -17,6 +17,7 @@ import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-grpc';
 import { OTLPTraceExporter as OTLPTraceExporterHttp } from '@opentelemetry/exporter-trace-otlp-http';
 import { OTLPLogExporter as OTLPLogExporterHttp } from '@opentelemetry/exporter-logs-otlp-http';
 import { OTLPMetricExporter as OTLPMetricExporterHttp } from '@opentelemetry/exporter-metrics-otlp-http';
+import { Metadata } from '@grpc/grpc-js';
 import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-node';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { GoogleAuth, type JWTInput } from 'google-auth-library';
@@ -68,6 +69,7 @@ describe('Telemetry SDK', () => {
       getTelemetryEnabled: () => true,
       getTelemetryOtlpEndpoint: () => 'http://localhost:4317',
       getTelemetryOtlpProtocol: () => 'grpc',
+      getTelemetryOtlpHeaders: () => ({}),
       getTelemetryTarget: () => 'local',
       getTelemetryUseCollector: () => false,
       getTelemetryOutfile: () => undefined,
@@ -122,6 +124,99 @@ describe('Telemetry SDK', () => {
       url: 'http://localhost:4318/v1/metrics',
     });
     expect(NodeSDK.prototype.start).toHaveBeenCalled();
+  });
+
+  it('should pass custom headers to HTTP exporters when otlpHeaders is configured', async () => {
+    const customHeaders = {
+      Authorization: 'Bearer secret-token',
+      'x-api-key': 'my-api-key',
+    };
+    vi.spyOn(mockConfig, 'getTelemetryOtlpProtocol').mockReturnValue('http');
+    vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue(
+      'http://localhost:4318',
+    );
+    vi.spyOn(mockConfig, 'getTelemetryOtlpHeaders').mockReturnValue(
+      customHeaders,
+    );
+
+    await initializeTelemetry(mockConfig);
+
+    expect(OTLPTraceExporterHttp).toHaveBeenCalledWith({
+      url: 'http://localhost:4318/v1/traces',
+      headers: customHeaders,
+    });
+    expect(OTLPLogExporterHttp).toHaveBeenCalledWith({
+      url: 'http://localhost:4318/v1/logs',
+      headers: customHeaders,
+    });
+    expect(OTLPMetricExporterHttp).toHaveBeenCalledWith({
+      url: 'http://localhost:4318/v1/metrics',
+      headers: customHeaders,
+    });
+  });
+
+  it('should pass custom metadata to gRPC exporters when otlpHeaders is configured', async () => {
+    const customHeaders = {
+      Authorization: 'Bearer secret-token',
+      'x-api-key': 'my-api-key',
+    };
+    vi.spyOn(mockConfig, 'getTelemetryOtlpProtocol').mockReturnValue('grpc');
+    vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue(
+      'http://localhost:4317',
+    );
+    vi.spyOn(mockConfig, 'getTelemetryOtlpHeaders').mockReturnValue(
+      customHeaders,
+    );
+
+    await initializeTelemetry(mockConfig);
+
+    for (const ExporterMock of [
+      OTLPTraceExporter,
+      OTLPLogExporter,
+      OTLPMetricExporter,
+    ]) {
+      expect(ExporterMock).toHaveBeenCalledTimes(1);
+      const callArg = vi.mocked(ExporterMock).mock.calls[0]?.[0] as {
+        url?: string;
+        compression?: string;
+        metadata?: Metadata;
+      };
+      expect(callArg?.url).toBe('http://localhost:4317');
+      expect(callArg?.compression).toBe('gzip');
+      expect(callArg?.metadata).toBeInstanceOf(Metadata);
+      expect(callArg?.metadata?.get('authorization')).toEqual([
+        'Bearer secret-token',
+      ]);
+      expect(callArg?.metadata?.get('x-api-key')).toEqual(['my-api-key']);
+    }
+  });
+
+  it('should skip invalid gRPC metadata keys and log a warning without crashing', async () => {
+    const customHeaders = {
+      bad$key: 'invalid-for-grpc',
+      'x-valid-key': 'valid-value',
+    };
+    vi.spyOn(mockConfig, 'getTelemetryOtlpProtocol').mockReturnValue('grpc');
+    vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue(
+      'http://localhost:4317',
+    );
+    vi.spyOn(mockConfig, 'getTelemetryOtlpHeaders').mockReturnValue(
+      customHeaders,
+    );
+
+    await initializeTelemetry(mockConfig);
+
+    expect(debugLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '[Telemetry] Skipping invalid gRPC metadata key "bad$key":',
+      ),
+      expect.any(Error),
+    );
+    const callArg = vi.mocked(OTLPTraceExporter).mock.calls[0]?.[0] as {
+      metadata?: Metadata;
+    };
+    expect(callArg?.metadata).toBeInstanceOf(Metadata);
+    expect(callArg?.metadata?.get('x-valid-key')).toEqual(['valid-value']);
   });
 
   it('should parse gRPC endpoint correctly', async () => {
@@ -358,6 +453,43 @@ describe('Telemetry SDK', () => {
       await initializeTelemetry(mockConfig);
       await new Promise((resolve) => setTimeout(resolve, 10));
       expect(callback).toHaveBeenCalled();
+    });
+
+    it('should drop events and not buffer if telemetry is disabled in config', async () => {
+      vi.spyOn(mockConfig, 'getTelemetryEnabled').mockReturnValue(false);
+      const callback = vi.fn();
+      bufferTelemetryEvent(callback, mockConfig);
+      expect(callback).not.toHaveBeenCalled();
+
+      // Re-enable and initialize to verify nothing was queued in telemetryBuffer
+      vi.spyOn(mockConfig, 'getTelemetryEnabled').mockReturnValue(true);
+      await initializeTelemetry(mockConfig);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(callback).not.toHaveBeenCalled();
+
+      // If telemetry is subsequently disabled at runtime, events must not execute even when initialized
+      vi.spyOn(mockConfig, 'getTelemetryEnabled').mockReturnValue(false);
+      bufferTelemetryEvent(callback, mockConfig);
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('should cap buffered events at MAX_TELEMETRY_BUFFER_SIZE before SDK initialization', async () => {
+      const callbacks = Array.from({ length: 120 }, () => vi.fn());
+      for (const cb of callbacks) {
+        bufferTelemetryEvent(cb, mockConfig);
+      }
+
+      await initializeTelemetry(mockConfig);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const calledCount = callbacks.filter(
+        (cb) => cb.mock.calls.length > 0,
+      ).length;
+      expect(calledCount).toBe(100);
+      expect(callbacks[0]).not.toHaveBeenCalled();
+      expect(callbacks[19]).not.toHaveBeenCalled();
+      expect(callbacks[20]).toHaveBeenCalled();
+      expect(callbacks[119]).toHaveBeenCalled();
     });
   });
 

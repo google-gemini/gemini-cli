@@ -103,10 +103,16 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
   useEffect(() => {
     if (totalHiddenLines > 0) {
       addOverflowingId?.(id);
-    } else {
+    } else if (effectiveMaxHeight !== undefined) {
       removeOverflowingId?.(id);
     }
-  }, [id, totalHiddenLines, addOverflowingId, removeOverflowingId]);
+  }, [
+    id,
+    totalHiddenLines,
+    effectiveMaxHeight,
+    addOverflowingId,
+    removeOverflowingId,
+  ]);
 
   useEffect(
     () => () => {

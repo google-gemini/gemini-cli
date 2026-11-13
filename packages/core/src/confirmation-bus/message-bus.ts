@@ -17,6 +17,11 @@ export class MessageBus extends EventEmitter {
     object,
     Map<string, () => void>
   >();
+  // State of pending request() calls by correlationId, updated by publish().
+  private pendingRequests = new Map<
+    string,
+    { failed: boolean; error?: unknown }
+  >();
 
   constructor(
     private readonly policyEngine: PolicyEngine,
@@ -86,6 +91,8 @@ export class MessageBus extends EventEmitter {
     bus.once = this.once.bind(this);
     bus.removeListener = this.removeListener.bind(this);
     bus.listenerCount = this.listenerCount.bind(this);
+    // Share pending request state so the parent's publish() can update it
+    bus.pendingRequests = this.pendingRequests;
 
     return bus;
   }
@@ -160,6 +167,18 @@ export class MessageBus extends EventEmitter {
         this.emitMessage(message);
       }
     } catch (error) {
+      // Record the failure for a pending request() with this correlationId
+      if (
+        message &&
+        typeof message === 'object' &&
+        'correlationId' in message
+      ) {
+        const pending = this.pendingRequests.get(message.correlationId);
+        if (pending) {
+          pending.failed = true;
+          pending.error = error;
+        }
+      }
       this.emit('error', error);
     }
   }
@@ -239,6 +258,12 @@ export class MessageBus extends EventEmitter {
       const cleanup = () => {
         clearTimeout(timeoutId);
         this.unsubscribe(responseType, responseHandler);
+        this.pendingRequests.delete(correlationId);
+      };
+
+      const fail = (error: unknown) => {
+        cleanup();
+        reject(error);
       };
 
       const responseHandler = (response: TResponse) => {
@@ -255,9 +280,19 @@ export class MessageBus extends EventEmitter {
       // Subscribe to responses
       this.subscribe<TResponse>(responseType, responseHandler);
 
-      // Publish the request with correlation ID
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises, @typescript-eslint/no-unsafe-type-assertion
-      this.publish({ ...request, correlationId } as TRequest);
+      // Track the request so publish() can record a failure for it
+      this.pendingRequests.set(correlationId, { failed: false });
+
+      // Publish the request with correlation ID and reject if publishing fails
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        this.publish({ ...request, correlationId } as TRequest).then(() => {
+          const pending = this.pendingRequests.get(correlationId);
+          if (pending?.failed) fail(pending.error);
+        }, fail);
+      } catch (error) {
+        fail(error);
+      }
     });
   }
 }

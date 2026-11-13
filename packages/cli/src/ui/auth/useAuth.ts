@@ -13,6 +13,8 @@ import {
   debugLogger,
   isAccountSuspendedError,
   ProjectIdRequiredError,
+  ChangeAuthRequestedError,
+  ValidationCancelledError,
 } from '@google/gemini-cli-core';
 import { getErrorMessage } from '@google/gemini-cli-core';
 import { AuthState } from '../types.js';
@@ -141,6 +143,14 @@ export const useAuthCommand = (
         setAuthError(null);
         setAuthState(AuthState.Authenticated);
       } catch (e) {
+        if (
+          e instanceof ChangeAuthRequestedError ||
+          e instanceof ValidationCancelledError
+        ) {
+          setAuthError(null);
+          setAuthState(AuthState.Updating);
+          return;
+        }
         const suspendedError = isAccountSuspendedError(e);
         if (suspendedError) {
           setAccountSuspensionInfo({

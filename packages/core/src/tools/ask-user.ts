@@ -20,6 +20,7 @@ import { QuestionType, type Question } from '../confirmation-bus/types.js';
 import { ASK_USER_TOOL_NAME, ASK_USER_DISPLAY_NAME } from './tool-names.js';
 import { ASK_USER_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { normalizeEscapedNewlines } from '../utils/textUtils.js';
 
 export interface AskUserParams {
   questions: Question[];
@@ -93,8 +94,7 @@ export class AskUserTool extends BaseDeclarativeTool<
     toolName: string,
     toolDisplayName: string,
   ): AskUserInvocation {
-    const unescape = (str: string): string =>
-      str.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n');
+    const unescape = normalizeEscapedNewlines;
 
     const normalizedParams: AskUserParams = {
       questions: params.questions.map((q) => {
@@ -212,16 +212,30 @@ export class AskUserInvocation extends BaseToolInvocation<
       },
     };
 
+    // The UI hides the tool description once the dialog closes, so this
+    // display is the only record of the question the user answered. Keep the
+    // full question text (not just the short header chip) for context.
     const returnDisplay = hasAnswers
       ? `**User answered:**\n${answerEntries
           .map(([index, answer]) => {
             const question = this.params.questions[parseInt(index, 10)];
-            const category = question?.header ?? `Q${index}`;
-            const prefix = `  ${category} → `;
-            const indent = ' '.repeat(prefix.length);
+            const header = question?.header?.trim() || `Q${index}`;
+            const questionText = question?.question
+              ? `${header}: ${question.question}`
+              : header;
+            const questionIndent = '  ';
+            const answerPrefix = '    → ';
+            const answerIndent = ' '.repeat(answerPrefix.length);
 
-            const lines = answer.split('\n');
-            return prefix + lines.join('\n' + indent);
+            const questionLines = questionText.split('\n');
+            const answerLines = (answer ?? '').split('\n');
+            return (
+              questionIndent +
+              questionLines.join('\n' + questionIndent) +
+              '\n' +
+              answerPrefix +
+              answerLines.join('\n' + answerIndent)
+            );
           })
           .join('\n')}`
       : 'User submitted without answering questions.';

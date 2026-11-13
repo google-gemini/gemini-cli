@@ -326,9 +326,25 @@ describe('useAuth', () => {
       });
 
       expect(result.current.authError).toBe(
-        'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://goo.gle/gemini-cli-auth-docs#workspace-gca',
+        'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://geminicli.com/docs/get-started/authentication/#set-gcp',
       );
       expect(result.current.authError).not.toContain('Failed to login');
+      expect(result.current.authState).toBe(AuthState.Updating);
+    });
+
+    it('should transition to Updating without setting authError on ChangeAuthRequestedError or ValidationCancelledError', async () => {
+      const { ChangeAuthRequestedError } = await import(
+        '@google/gemini-cli-core'
+      );
+      const { result } = await renderHook(() =>
+        useAuthCommand(createSettings(AuthType.LOGIN_WITH_GOOGLE), mockConfig),
+      );
+
+      await act(async () => {
+        deferredRefreshAuth.reject(new ChangeAuthRequestedError());
+      });
+
+      expect(result.current.authError).toBeNull();
       expect(result.current.authState).toBe(AuthState.Updating);
     });
   });

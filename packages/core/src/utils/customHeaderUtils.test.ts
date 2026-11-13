@@ -88,4 +88,33 @@ describe('parseCustomHeaders', () => {
       Authorization: 'Bearer abc',
     });
   });
+
+  it('should preserve JSON payload in header value and produce valid Headers', () => {
+    const input = 'x-portkey-metadata: {"_user":"alice","env":"prod"}';
+    const result = parseCustomHeaders(input);
+    expect(result).toEqual({
+      'x-portkey-metadata': '{"_user":"alice","env":"prod"}',
+    });
+    expect(() => new Headers(result)).not.toThrow();
+  });
+
+  it('should preserve Link headers with multiple comma-separated URLs and produce valid Headers', () => {
+    const input =
+      'Link: <https://a.example>; rel="a", <https://b.example>; rel="b"';
+    const result = parseCustomHeaders(input);
+    expect(result).toEqual({
+      Link: '<https://a.example>; rel="a", <https://b.example>; rel="b"',
+    });
+    expect(() => new Headers(result)).not.toThrow();
+  });
+
+  it('should parse multiple valid distinct headers separated by commas', () => {
+    const input = 'x-custom-one: foo, x-custom-two: bar';
+    const result = parseCustomHeaders(input);
+    expect(result).toEqual({
+      'x-custom-one': 'foo',
+      'x-custom-two': 'bar',
+    });
+    expect(() => new Headers(result)).not.toThrow();
+  });
 });

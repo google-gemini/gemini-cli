@@ -7,7 +7,11 @@ description: Generates a structured Workable Spec JSON to guide a Developer Work
 Extract key technical details from the issue and organize them according to the following strict JSON schema.
 
 ### Critical Rules:
-1. **Codebase Verification:** Rely on file paths and locations found during your codebase exploration. Ensure all files mentioned in `files_to_modify` and `test_file` actually exist in the repository. Do not make up file paths.
+1. **Codebase Verification:** Rely on file paths and locations found during your codebase exploration. Ensure all files mentioned in `files_to_modify` actually exist in the repository. Do not make up file paths.
+2. **Target File Selection:** List all source code files in `files_to_modify` where code changes belong.
+   - Fix config or state issues early at their setup/hook entrypoint rather than refactoring low-level utilities.
+   - Strictly do NOT list test files or files that were only inspected without requiring code changes.
+3. **Strict JSON Escaping:** Ensure the generated output is standard, valid JSON. In JSON string values (such as summary fields or verification steps), do NOT escape single quotes with backslashes. Write them directly as `'` (not `\\'`).
 
 > [!IMPORTANT]
 > The output MUST strictly adhere to this schema. Deviations (like putting objects inside arrays instead of strings) will break the downstream automated code generation pipeline.
@@ -45,7 +49,7 @@ The final `workable_spec` object must conform strictly to this JSON Schema speci
       "properties": {
         "files_to_modify": {
           "type": "array",
-          "description": "List of paths to files requiring changes relative to the repository root (e.g. ['src/cli.ts']).",
+          "description": "List of source code files requiring changes relative to the repository root (e.g. ['src/cli.ts']). Strictly do NOT include test files (*.test.ts, *.spec.ts) here; test files must go into testing_strategy.test_file.",
           "items": {
             "type": "string"
           }
@@ -80,7 +84,8 @@ The final `workable_spec` object must conform strictly to this JSON Schema speci
         },
         "framework": {
           "type": "string",
-          "description": "Testing framework used (e.g., 'Vitest', 'Pytest', etc.)."
+          "description": "Testing framework used.",
+          "enum": ["Vitest", "N/A"]
         }
       }
     }

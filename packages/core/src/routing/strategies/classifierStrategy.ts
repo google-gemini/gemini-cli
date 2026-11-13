@@ -27,6 +27,7 @@ import { LlmRole } from '../../telemetry/types.js';
 // The number of recent history turns to provide to the router for context.
 const HISTORY_TURNS_FOR_CONTEXT = 4;
 const HISTORY_SEARCH_WINDOW = 20;
+const CLASSIFIER_MAX_ATTEMPTS = 2;
 
 const FLASH_MODEL = 'flash';
 const PRO_MODEL = 'pro';
@@ -176,6 +177,7 @@ export class ClassifierStrategy implements RoutingStrategy {
         abortSignal: context.signal,
         promptId,
         role: LlmRole.UTILITY_ROUTER,
+        maxAttempts: CLASSIFIER_MAX_ATTEMPTS,
       });
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
@@ -186,7 +188,8 @@ export class ClassifierStrategy implements RoutingStrategy {
         config.getGemini31Launched(),
         config.getUseCustomToolModel(),
       ]);
-      const useGemini3_5Flash = config.hasGemini35FlashGAAccess?.() ?? false;
+      const useLatestFlash = config.hasLatestFlashGAAccess?.() ?? false;
+      const useLatestFlashLite = config.hasLatestFlashLiteGAAccess?.() ?? false;
       const selectedModel = normalizeModelId(
         resolveClassifierModel(
           normalizeModelId(model),
@@ -195,7 +198,8 @@ export class ClassifierStrategy implements RoutingStrategy {
           useCustomToolModel,
           config.getHasAccessToPreviewModel?.() ?? true,
           config,
-          useGemini3_5Flash,
+          useLatestFlash,
+          useLatestFlashLite,
         ),
       );
 

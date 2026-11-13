@@ -278,6 +278,29 @@ allowRedirection = true
       expect(result.rules[0].allowRedirection).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
+
+    it('should parse and transform allowCommandSubstitution and allow_command_substitution', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "echo"
+decision = "allow"
+priority = 100
+allowCommandSubstitution = true
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "git"
+decision = "allow"
+priority = 100
+allow_command_substitution = false
+`);
+
+      expect(result.rules).toHaveLength(2);
+      expect(result.rules[0].allowCommandSubstitution).toBe(true);
+      expect(result.rules[1].allowCommandSubstitution).toBe(false);
+      expect(result.errors).toHaveLength(0);
+    });
     it('should parse deny_message property', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
@@ -473,6 +496,47 @@ name = "allowed-path"
       expect(result.checkers).toHaveLength(1);
       expect(result.checkers[0].priority).toBe(1.1); // tier 1 + 100/1000
       expect(result.checkers[0].source).toBe('Default: test.toml');
+    });
+
+    it('should load AllowedPathChecker from default write.toml policy file for write and replace tools', async () => {
+      const defaultWritePolicyPath = path.join(
+        __dirname,
+        'policies',
+        'write.toml',
+      );
+      const result = await loadPoliciesFromToml(
+        [defaultWritePolicyPath],
+        (_dir) => 1,
+      );
+
+      const writeCheckers = result.checkers.filter(
+        (c) => c.toolName === 'write_file' || c.toolName === 'replace',
+      );
+
+      expect(writeCheckers).toHaveLength(2);
+      expect(writeCheckers).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            toolName: 'replace',
+            priority: 1.015,
+            modes: ['autoEdit'],
+            checker: expect.objectContaining({
+              name: 'allowed-path',
+              type: 'in-process',
+            }),
+          }),
+          expect.objectContaining({
+            toolName: 'write_file',
+            priority: 1.015,
+            modes: ['autoEdit'],
+            checker: expect.objectContaining({
+              name: 'allowed-path',
+              type: 'in-process',
+            }),
+          }),
+        ]),
+      );
+      expect(getErrors(result)).toHaveLength(0);
     });
   });
 

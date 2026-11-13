@@ -6,26 +6,26 @@
 [![License](https://img.shields.io/github/license/google-gemini/gemini-cli)](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE)
 [![View Code Wiki](https://assets.codewiki.google/readme-badge/static.svg)](https://codewiki.google/github.com/google-gemini/gemini-cli?utm_source=badge&utm_medium=github&utm_campaign=github.com/google-gemini/gemini-cli)
 
-![Gemini CLI Screenshot](/docs/assets/gemini-screenshot.png)
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> **Read before installing — Gemini CLI status & tool guide**
+>
+> - **Enterprise Code Assist only:** Designed for **Gemini Code Assist Standard / Enterprise** licenses and **Code Assist for GitHub** on Google Cloud (your access remains unchanged).
+> - **No free tier or Google AI plans:** Free individual access and **Google AI Pro / Ultra** (Google One) moved to [Antigravity CLI](https://antigravity.google/product/antigravity-cli) on June 18, 2026 ([transition post](https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli/)).
+> - **Not optimized for Gemini 4+:** Not tuned for the **Gemini 4** series (for example, [Gemini 4 Argon](https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-argon/)) or future releases in this or later generations.
+> - **Not for model benchmarks:** Don't use Gemini CLI to benchmark Gemini models—its harness isn't tuned for Gemini 4+ and produces unrepresentative scores.
+>
+> **Which Google CLI do you need?**
+>
+> | Tool | Best for | Links |
+> | :--- | :--- | :--- |
+> | **[Antigravity CLI](https://antigravity.google/product/antigravity-cli)** (`agy`) | Interactive multi-agent coding terminal. Use for **Gemini 4 Argon**+, free / **Google AI Pro & Ultra** accounts, or Google Cloud. | [Download](https://antigravity.google/download) · [Migrate](https://antigravity.google/docs/cli/gcli-migration) · [Argon post](https://antigravity.google/blog/gemini-4-argon-in-google-antigravity) |
+> | **[Gemini API CLI](https://github.com/google-gemini/gemini-api-cli)** (`gemini-api`) | Stateless API CLI *(not a coding harness)*. Gives agents (`agy`, Claude Code, Codex), scripts, and CI direct commands for Gemini models, media gen, file analysis, and managed agents. | [GitHub](https://github.com/google-gemini/gemini-api-cli) · [Releases](https://github.com/google-gemini/gemini-api-cli/releases) · [API docs](https://ai.google.dev/gemini-api/docs) |
+> | **Gemini CLI** (`gemini`, *this repo*) | Organizations with **Gemini Code Assist Standard / Enterprise** or **Code Assist for GitHub** on Google Cloud *(plus legacy paid API / Vertex keys)*. | [Docs](https://geminicli.com/docs/) |
 
-Gemini CLI is an open-source AI agent that brings the power of Gemini directly
-into your terminal. It provides lightweight access to Gemini, giving you the
-most direct path from your prompt to our model.
-
-Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
-
-## 🚀 Why Gemini CLI?
-
-- **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google
-  account.
-- **🧠 Powerful Gemini 3 models**: Access to improved reasoning and 1M token
-  context window.
-- **🔧 Built-in tools**: Google Search grounding, file operations, shell
-  commands, web fetching.
-- **🔌 Extensible**: MCP (Model Context Protocol) support for custom
-  integrations.
-- **💻 Terminal-first**: Designed for developers who live in the command line.
-- **🛡️ Open source**: Apache 2.0 licensed.
+Gemini CLI (`gemini`) is an open-source terminal agent maintained for enterprise
+Gemini Code Assist workflows on Google Cloud. Learn more in the
+[Gemini CLI documentation](https://geminicli.com/docs/).
 
 ## 📦 Installation
 
@@ -121,53 +121,13 @@ npm install -g @google/gemini-cli@nightly
   [media generation with Imagen, Veo or Lyria](https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/tree/main/experiments/mcp-genmedia)
 - Run non-interactively in scripts for workflow automation
 
-### Advanced Capabilities
-
-- Ground your queries with built-in
-  [Google Search](https://ai.google.dev/gemini-api/docs/grounding) for real-time
-  information
-- Conversation checkpointing to save and resume complex sessions
-- Custom context files (GEMINI.md) to tailor behavior for your projects
-
-### GitHub Integration
-
-Integrate Gemini CLI directly into your GitHub workflows with
-[**Gemini CLI GitHub Action**](https://github.com/google-github-actions/run-gemini-cli):
-
-- **Pull Request Reviews**: Automated code review with contextual feedback and
-  suggestions
-- **Issue Triage**: Automated labeling and prioritization of GitHub issues based
-  on content analysis
-- **On-demand Assistance**: Mention `@gemini-cli` in issues and pull requests
-  for help with debugging, explanations, or task delegation
-- **Custom Workflows**: Build automated, scheduled and on-demand workflows
-  tailored to your team's needs
-
 ## 🔐 Authentication Options
 
 Choose the authentication method that best fits your needs:
 
 ### Option 1: Sign in with Google (OAuth login using your Google Account)
 
-**✨ Best for:** Individual developers as well as anyone who has a Gemini Code
-Assist License. (see
-[quota limits and terms of service](https://cloud.google.com/gemini/docs/quotas)
-for details)
-
-**Benefits:**
-
-- **Free tier**: 60 requests/min and 1,000 requests/day
-- **Gemini 3 models** with 1M token context window
-- **No API key management** - just sign in with your Google account
-- **Automatic updates** to latest models
-
-#### Start Gemini CLI, then choose _Sign in with Google_ and follow the browser authentication flow when prompted
-
-```bash
-gemini
-```
-
-#### If you are using a paid Code Assist License from your organization, remember to set the Google Cloud Project
+#### When using a paid Code Assist License from your organization, remember to set the Google Cloud Project
 
 ```bash
 # Set your Google Cloud Project
@@ -181,7 +141,6 @@ gemini
 
 **Benefits:**
 
-- **Free tier**: 1000 requests/day with Gemini 3 (mix of flash and pro)
 - **Model selection**: Choose specific Gemini models
 - **Usage-based billing**: Upgrade for higher limits when needed
 

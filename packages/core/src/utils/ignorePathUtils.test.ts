@@ -4,9 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as path from 'node:path';
-import { getNormalizedRelativePath } from './ignorePathUtils.js';
+import ignorePkg, { type Ignore } from 'ignore';
+const ignore = ((ignorePkg as unknown as { default?: () => Ignore }).default ??
+  ignorePkg) as () => Ignore;
+import {
+  getNormalizedRelativePath,
+  expandWildcardDirectoryPatterns,
+} from './ignorePathUtils.js';
 
 vi.mock('node:path', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:path')>();
@@ -125,5 +131,202 @@ describe('ignorePathUtils', () => {
     expect(
       getNormalizedRelativePath('C:\\project', 'D:\\outside', false),
     ).toBeNull();
+  });
+
+  describe('on Windows (win32)', () => {
+    const winRoot = 'C:\\Users\\user\\project';
+
+    beforeEach(() => {
+      vi.stubGlobal(
+        'process',
+        Object.create(process, { platform: { get: () => 'win32' } }),
+      );
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('should normalize in-root paths when drive-letter or directory casing differs', () => {
+      expect(
+        getNormalizedRelativePath(
+          winRoot,
+          'c:\\users\\user\\project\\src\\index.ts',
+          false,
+        ),
+      ).toBe('src/index.ts');
+      expect(
+        getNormalizedRelativePath(
+          'c:\\Users\\user\\project',
+          'C:\\Users\\user\\project\\dist',
+          true,
+        ),
+      ).toBe('dist/');
+      expect(
+        getNormalizedRelativePath(winRoot, 'c:\\users\\user\\project', true),
+      ).toBe('/');
+      expect(
+        getNormalizedRelativePath(winRoot, 'c:\\users\\user\\project', false),
+      ).toBe('');
+    });
+
+    it('should return null for outside-root and sibling-prefix paths regardless of casing', () => {
+      expect(
+        getNormalizedRelativePath(
+          winRoot,
+          'c:\\Users\\user\\project-other\\file.ts',
+          false,
+        ),
+      ).toBeNull();
+      expect(
+        getNormalizedRelativePath(
+          winRoot,
+          'd:\\Users\\user\\project\\file.ts',
+          false,
+        ),
+      ).toBeNull();
+    });
+  });
+
+  describe('expandWildcardDirectoryPatterns', () => {
+    it('should expand basic wildcard directory patterns', () => {
+      expect(expandWildcardDirectoryPatterns(['node_modules/**'])).toEqual([
+        'node_modules/**',
+        '/node_modules/',
+      ]);
+      expect(expandWildcardDirectoryPatterns(['dist/**', 'build/**'])).toEqual([
+        'dist/**',
+        '/dist/',
+        'build/**',
+        '/build/',
+      ]);
+    });
+
+    it('should expand single-segment patterns as anchored so they do not match nested directories', () => {
+      const patterns = expandWildcardDirectoryPatterns(['build/**']);
+      expect(patterns).toEqual(['build/**', '/build/']);
+      const ig = ignore().add(patterns);
+      expect(ig.ignores('build/')).toBe(true);
+      expect(ig.ignores('build/output.js')).toBe(true);
+      expect(ig.ignores('src/build/')).toBe(false);
+      expect(ig.ignores('src/build/index.ts')).toBe(false);
+    });
+
+    it('should preserve leading slash for anchored patterns', () => {
+      expect(expandWildcardDirectoryPatterns(['/dist/**'])).toEqual([
+        '/dist/**',
+        '/dist/',
+      ]);
+    });
+
+    it('should not expand patterns with exact directory negations (!dir)', () => {
+      expect(expandWildcardDirectoryPatterns(['dir/**', '!dir'])).toEqual([
+        'dir/**',
+        '!dir',
+      ]);
+      expect(expandWildcardDirectoryPatterns(['/dir/**', '!/dir'])).toEqual([
+        '/dir/**',
+        '!/dir',
+      ]);
+    });
+
+    it('should not expand patterns with nested child negations (!dir/keep.txt)', () => {
+      expect(
+        expandWildcardDirectoryPatterns(['dir/**', '!dir/keep.txt']),
+      ).toEqual(['dir/**', '!dir/keep.txt']);
+    });
+
+    it('should not expand wildcard parent patterns (e.g. packages/*/**)', () => {
+      expect(
+        expandWildcardDirectoryPatterns([
+          'packages/*/**',
+          '!packages/foo/keep.txt',
+        ]),
+      ).toEqual(['packages/*/**', '!packages/foo/keep.txt']);
+      expect(expandWildcardDirectoryPatterns(['**/**'])).toEqual(['**/**']);
+    });
+
+    it('should not expand wildcard patterns with character classes (e.g. dir[0-9]/**)', () => {
+      expect(
+        expandWildcardDirectoryPatterns(['dir[0-9]/**', '!dir5/keep.txt']),
+      ).toEqual(['dir[0-9]/**', '!dir5/keep.txt']);
+      expect(expandWildcardDirectoryPatterns(['dir[a-z]/**'])).toEqual([
+        'dir[a-z]/**',
+      ]);
+    });
+
+    it('should not expand root wildcard pattern (/**)', () => {
+      expect(expandWildcardDirectoryPatterns(['/**'])).toEqual(['/**']);
+    });
+
+    it('should not expand patterns with unanchored negations (!*.keep, !keep.txt)', () => {
+      expect(expandWildcardDirectoryPatterns(['build/**', '!*.keep'])).toEqual([
+        'build/**',
+        '!*.keep',
+      ]);
+      expect(
+        expandWildcardDirectoryPatterns(['build/**', '!keep.txt']),
+      ).toEqual(['build/**', '!keep.txt']);
+      expect(
+        expandWildcardDirectoryPatterns(['build/**', '!keep.txt   ']),
+      ).toEqual(['build/**', '!keep.txt   ']);
+    });
+
+    it('should not expand patterns with wildcard negations (!**/keep.txt, !packages/*/keep.txt)', () => {
+      expect(
+        expandWildcardDirectoryPatterns(['build/**', '!**/keep.txt']),
+      ).toEqual(['build/**', '!**/keep.txt']);
+      expect(
+        expandWildcardDirectoryPatterns([
+          'packages/foo/**',
+          '!packages/*/keep.txt',
+        ]),
+      ).toEqual(['packages/foo/**', '!packages/*/keep.txt']);
+    });
+
+    it('should expand directory pattern when wildcard negation is in a disjoint directory', () => {
+      expect(
+        expandWildcardDirectoryPatterns(['build/**', '!packages/*/keep.txt']),
+      ).toEqual(['build/**', '/build/', '!packages/*/keep.txt']);
+    });
+
+    it('should support extraRawPatterns parameter for cross-file negations', () => {
+      expect(
+        expandWildcardDirectoryPatterns(['build/**'], ['!build/important.js']),
+      ).toEqual(['build/**']);
+      expect(
+        expandWildcardDirectoryPatterns(['build/**'], ['!*.keep']),
+      ).toEqual(['build/**']);
+      expect(
+        expandWildcardDirectoryPatterns(['build/**'], ['!docs/readme.md']),
+      ).toEqual(['build/**', '/build/']);
+    });
+
+    it('should ignore empty negation patterns (!, !   ) and still expand directory patterns', () => {
+      expect(expandWildcardDirectoryPatterns(['build/**', '!'])).toEqual([
+        'build/**',
+        '/build/',
+        '!',
+      ]);
+      expect(expandWildcardDirectoryPatterns(['build/**', '!   '])).toEqual([
+        'build/**',
+        '/build/',
+        '!   ',
+      ]);
+      expect(expandWildcardDirectoryPatterns(['build/**'], ['!'])).toEqual([
+        'build/**',
+        '/build/',
+      ]);
+    });
+
+    it('should ignore comments and negated patterns', () => {
+      expect(
+        expandWildcardDirectoryPatterns([
+          '# a comment /**',
+          '!foo/**',
+          'normal/file.txt',
+        ]),
+      ).toEqual(['# a comment /**', '!foo/**', 'normal/file.txt']);
+    });
   });
 });

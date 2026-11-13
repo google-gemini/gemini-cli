@@ -10,21 +10,33 @@ import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { start_sandbox } from './sandbox.js';
+import { isPodmanRootless, start_sandbox } from './sandbox.js';
+import { IdeBridge, resolveIdeBridgeUpstream } from './ideBridge.js';
+import {
+  IDE_BRIDGE_HELPER_FILENAME,
+  IDE_BRIDGE_SOCKET_PATH,
+} from './ideBridgeHelper.js';
 import {
   FatalSandboxError,
   homedir,
+  type Config,
   type SandboxConfig,
 } from '@google/gemini-cli-core';
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { EventEmitter } from 'node:events';
 
-const { mockedHomedir, mockedGetContainerPath, mockedExecCommands } =
-  vi.hoisted(() => ({
-    mockedHomedir: vi.fn().mockReturnValue('/home/user'),
-    mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
-    mockedExecCommands: [] as string[],
-  }));
+const {
+  mockedHomedir,
+  mockedGetContainerPath,
+  mockedExecCommands,
+  mockedPodmanExecFile,
+} = vi.hoisted(() => ({
+  mockedHomedir: vi.fn().mockReturnValue('/home/user'),
+  mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
+  mockedExecCommands: [] as string[],
+  // Backs promisify(execFile) calls for `podman` (see the node:util mock).
+  mockedPodmanExecFile: vi.fn(),
+}));
 
 vi.mock('./sandboxUtils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./sandboxUtils.js')>();
@@ -37,6 +49,7 @@ vi.mock('./sandboxUtils.js', async (importOriginal) => {
 vi.mock('node:child_process');
 vi.mock('node:os');
 vi.mock('node:fs');
+vi.mock('./ideBridge.js');
 vi.mock('node:crypto', () => ({
   randomBytes: vi.fn().mockReturnValue(Buffer.from('a1b2c3d4e5f6', 'hex')),
 }));
@@ -61,7 +74,10 @@ vi.mock('node:util', async (importOriginal) => {
         };
       }
       if (fn === execFile) {
-        return async (file: string, args: string[]) => {
+        return async (file: string, args: string[], options?: unknown) => {
+          if (file === 'podman') {
+            return mockedPodmanExecFile(file, args, options);
+          }
           if (file === 'lxc' && args[0] === 'list') {
             const output = process.env['TEST_LXC_LIST_OUTPUT'];
             if (output === 'throw') {
@@ -137,7 +153,13 @@ describe('sandbox', () => {
     vi.mocked(os.tmpdir).mockReturnValue('/tmp');
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.realpathSync).mockImplementation((p) => p as string);
+    vi.mocked(fs.mkdtempSync).mockImplementation(
+      (prefix) => `${prefix}test-tmp`,
+    );
+    vi.mocked(fs.chmodSync).mockImplementation(() => {});
+    vi.mocked(fs.rmSync).mockImplementation(() => {});
     vi.mocked(execSync).mockReturnValue(Buffer.from(''));
+    mockedHomedir.mockReturnValue('/home/user');
   });
 
   afterEach(() => {
@@ -180,6 +202,121 @@ describe('sandbox', () => {
         ]),
         expect.objectContaining({ stdio: 'inherit' }),
       );
+    });
+
+    it('should isolate temporary directory for macOS seatbelt (sandbox-exec)', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.mocked(os.tmpdir).mockReturnValue('/var/folders/test/T');
+      vi.mocked(fs.realpathSync).mockImplementation((p) => p as string);
+      vi.mocked(fs.mkdtempSync).mockReturnValue(
+        '/var/folders/test/T/gemini-sandbox-tmp-123456',
+      );
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const onSpy = vi.spyOn(process, 'on');
+      const offSpy = vi.spyOn(process, 'off');
+
+      const promise = start_sandbox(config, [], undefined, ['arg1']);
+
+      setTimeout(() => {
+        mockSpawnProcess.emit('close', 0);
+      }, 10);
+
+      await expect(promise).resolves.toBe(0);
+
+      // Verify that an isolated temporary directory was created
+      expect(fs.mkdtempSync).toHaveBeenCalledWith(
+        expect.stringContaining(
+          path.join('/var/folders/test/T', 'gemini-sandbox-'),
+        ),
+      );
+
+      const spawnCalls = vi.mocked(spawn).mock.calls;
+      const spawnArgs = spawnCalls[0]?.[1] as string[];
+
+      // Verify that TMP_DIR argument passed to seatbelt is the isolated temp directory, NOT host tmpdir
+      expect(spawnArgs).toContain(
+        'TMP_DIR=/var/folders/test/T/gemini-sandbox-tmp-123456',
+      );
+      expect(spawnArgs).not.toContain('TMP_DIR=/var/folders/test/T');
+
+      // Verify that TMPDIR environment variable is set in the sandboxed shell execution
+      const shCommand = spawnArgs[spawnArgs.indexOf('sh') + 2];
+      expect(shCommand).toContain('TMPDIR=');
+      expect(shCommand).toContain(
+        '/var/folders/test/T/gemini-sandbox-tmp-123456',
+      );
+
+      // Verify cleanup of the isolated temporary directory
+      expect(fs.rmSync).toHaveBeenCalledWith(
+        '/var/folders/test/T/gemini-sandbox-tmp-123456',
+        expect.objectContaining({ recursive: true, force: true }),
+      );
+
+      // Verify that exit and signal cleanup hooks are registered and unregistered
+      expect(onSpy).toHaveBeenCalledWith('exit', expect.any(Function));
+      expect(onSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+      expect(onSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+
+      expect(offSpy).toHaveBeenCalledWith('exit', expect.any(Function));
+      expect(offSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+      expect(offSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+
+      onSpy.mockRestore();
+      offSpy.mockRestore();
+    });
+
+    it('should safely swallow errors if fs.rmSync fails during cleanup', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.mocked(os.tmpdir).mockReturnValue('/var/folders/test/T');
+      vi.mocked(fs.realpathSync).mockImplementation((p) => p as string);
+      vi.mocked(fs.mkdtempSync).mockReturnValue(
+        '/var/folders/test/T/gemini-sandbox-tmp-error',
+      );
+      vi.mocked(fs.rmSync).mockImplementation(() => {
+        throw new Error('EPERM: operation not permitted');
+      });
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config, [], undefined, ['arg1']);
+
+      setTimeout(() => {
+        mockSpawnProcess.emit('close', 0);
+      }, 10);
+
+      // Even if fs.rmSync throws, start_sandbox should resolve successfully and not crash
+      await expect(promise).resolves.toBe(0);
+      expect(fs.rmSync).toHaveBeenCalled();
     });
 
     it('should resolve custom seatbelt profile from user home directory', async () => {
@@ -292,6 +429,140 @@ describe('sandbox', () => {
       await expect(start_sandbox(config)).rejects.toThrow(FatalSandboxError);
     });
 
+    it('should fall back to embedded profile if the .sb file is missing on disk', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.mocked(fs.existsSync).mockImplementation((p) =>
+        String(p).includes(
+          'gemini-sandbox-macos-permissive-open-a1b2c3d4e5f6.sb',
+        ),
+      );
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+
+      const onSpy = vi.spyOn(process, 'on');
+      const offSpy = vi.spyOn(process, 'off');
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config, [], undefined, ['arg1']);
+
+      setTimeout(() => {
+        mockSpawnProcess.emit('close', 0);
+      }, 10);
+
+      await expect(promise).resolves.toBe(0);
+
+      // Verify fs.writeFileSync was called with the temp profile file, content, and 0o600 permissions
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'gemini-sandbox-macos-permissive-open-a1b2c3d4e5f6.sb',
+        ),
+        expect.stringContaining('deny default'),
+        expect.objectContaining({
+          encoding: 'utf8',
+          mode: 0o600,
+        }),
+      );
+
+      // Verify spawn was called with the temp profile file
+      expect(spawn).toHaveBeenCalledWith(
+        'sandbox-exec',
+        expect.arrayContaining([
+          '-f',
+          expect.stringContaining(
+            'gemini-sandbox-macos-permissive-open-a1b2c3d4e5f6.sb',
+          ),
+        ]),
+        expect.objectContaining({ stdio: 'inherit' }),
+      );
+
+      // Verify process on/off hooks were called for exit, SIGINT, and SIGTERM cleanups
+      expect(onSpy).toHaveBeenCalledWith('exit', expect.any(Function));
+      expect(onSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+      expect(onSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+
+      expect(offSpy).toHaveBeenCalledWith('exit', expect.any(Function));
+      expect(offSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+      expect(offSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+
+      // Verify fs.unlinkSync was called to clean up the temp file
+      expect(fs.unlinkSync).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'gemini-sandbox-macos-permissive-open-a1b2c3d4e5f6.sb',
+        ),
+      );
+    });
+
+    it.each([
+      'permissive-open',
+      'permissive-closed',
+      'permissive-proxied',
+      'restrictive-open',
+      'restrictive-closed',
+      'restrictive-proxied',
+      'strict-open',
+      'strict-proxied',
+    ])(
+      'should fall back to embedded content successfully for profile "%s"',
+      async (profile) => {
+        vi.mocked(os.platform).mockReturnValue('darwin');
+        // Mock existsSync to return false for the profile file but true for temp directories
+        vi.mocked(fs.existsSync).mockImplementation((p) =>
+          String(p).includes('gemini-sandbox-macos-'),
+        );
+
+        vi.stubEnv('SEATBELT_PROFILE', profile);
+
+        const config: SandboxConfig = createMockSandboxConfig({
+          command: 'sandbox-exec',
+          image: 'some-image',
+        });
+
+        interface MockProcess extends EventEmitter {
+          stdout: EventEmitter;
+          stderr: EventEmitter;
+        }
+        const mockSpawnProcess = new EventEmitter() as MockProcess;
+        mockSpawnProcess.stdout = new EventEmitter();
+        mockSpawnProcess.stderr = new EventEmitter();
+        vi.mocked(spawn).mockReturnValue(
+          mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+        );
+
+        const promise = start_sandbox(config, [], undefined, ['arg1']);
+
+        setTimeout(() => {
+          mockSpawnProcess.emit('close', 0);
+        }, 10);
+
+        await expect(promise).resolves.toBe(0);
+
+        // Verify fs.writeFileSync was called with the correct file mode and content for the profile
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+          expect.stringContaining(`gemini-sandbox-macos-${profile}-`),
+          expect.stringContaining('deny default'),
+          expect.objectContaining({
+            encoding: 'utf8',
+            mode: 0o600,
+          }),
+        );
+
+        vi.unstubAllEnvs();
+      },
+    );
+
     it('should handle Docker execution', async () => {
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'docker',
@@ -365,6 +636,178 @@ describe('sandbox', () => {
         ]),
         expect.objectContaining({ stdio: 'inherit' }),
       );
+    });
+
+    it('should not attempt to create a temporary settings directory when homedir is empty', async () => {
+      mockedHomedir.mockReturnValue('');
+      vi.mocked(os.tmpdir).mockReturnValue('/mock/tmp');
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await expect(
+        start_sandbox(config, [], undefined, ['arg1']),
+      ).resolves.toBe(0);
+
+      // Should only create the sandbox temp directory, not the settings fallback directory
+      expect(fs.mkdtempSync).toHaveBeenCalledTimes(1);
+      expect(fs.mkdtempSync).toHaveBeenCalledWith(
+        path.join('/mock/tmp', 'gemini-sandbox-'),
+      );
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringMatching(/settings\.json$/),
+        expect.any(String),
+        { mode: 0o600 },
+      );
+
+      const dockerCall = vi.mocked(spawn).mock.calls.find((call) => {
+        const args = call[1] as string[];
+        return args && args.includes('run');
+      });
+      expect(dockerCall).toBeDefined();
+      const dockerArgs = dockerCall![1] as string[];
+      expect(dockerArgs.some((arg) => arg.includes('.config/gcloud'))).toBe(
+        false,
+      );
+    });
+
+    it('should not mount gcloud config directory when homedir is empty even if relative path exists', async () => {
+      mockedHomedir.mockReturnValue('');
+      vi.mocked(os.tmpdir).mockReturnValue('/mock/tmp');
+
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        if (typeof p === 'string' && p.includes('.config')) {
+          return true;
+        }
+        return false;
+      });
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await expect(
+        start_sandbox(config, [], undefined, ['arg1']),
+      ).resolves.toBe(0);
+
+      const dockerCall = vi.mocked(spawn).mock.calls.find((call) => {
+        const args = call[1] as string[];
+        return args && args.includes('run');
+      });
+      expect(dockerCall).toBeDefined();
+      const dockerArgs = dockerCall![1] as string[];
+      expect(dockerArgs.some((arg) => arg.includes('.config/gcloud'))).toBe(
+        false,
+      );
+    });
+
+    it('should mount gcloud config directory when homedir is defined and config exists', async () => {
+      mockedHomedir.mockReturnValue('/home/user');
+      vi.mocked(os.tmpdir).mockReturnValue('/mock/tmp');
+
+      const expectedConfigDir = path.join('/home/user', '.config', 'gcloud');
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        if (typeof p === 'string' && p === expectedConfigDir) {
+          return true;
+        }
+        return false;
+      });
+
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await expect(
+        start_sandbox(config, [], undefined, ['arg1']),
+      ).resolves.toBe(0);
+
+      const dockerCall = vi.mocked(spawn).mock.calls.find((call) => {
+        const args = call[1] as string[];
+        return args && args.includes('run');
+      });
+      expect(dockerCall).toBeDefined();
+      const dockerArgs = dockerCall![1] as string[];
+      expect(
+        dockerArgs.some(
+          (arg) => arg.includes(expectedConfigDir) && arg.endsWith(':ro'),
+        ),
+      ).toBe(true);
     });
 
     it('should preserve the integration-test prefix for random container names', async () => {
@@ -574,13 +1017,113 @@ describe('sandbox', () => {
         'docker',
         expect.arrayContaining([
           'run',
+          '--env',
+          'HOME=/home/node',
           '--volume',
           '/host/path:/container/path:ro',
           '--volume',
-          expect.stringMatching(/[\\/]home[\\/]user[\\/]\.gemini/),
+          expect.stringMatching(/[\\/]home[\\/]node[\\/]\.gemini:rw$/),
         ]),
         expect.any(Object),
       );
+    });
+
+    it('should mount an isolated settings directory rather than exposing host credentials', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      // Verify that docker run does NOT mount the raw host settings directory directly
+      expect(spawn).toHaveBeenNthCalledWith(
+        2,
+        'docker',
+        expect.not.arrayContaining(['/home/user/.gemini:/home/node/.gemini']),
+        expect.any(Object),
+      );
+
+      // Verify that docker run mounts the isolated sanitized settings directory
+      expect(spawn).toHaveBeenNthCalledWith(
+        2,
+        'docker',
+        expect.arrayContaining([
+          '--volume',
+          expect.stringMatching(
+            /gemini-sandbox.*:[\\/]home[\\/]node[\\/]\.gemini:rw$/,
+          ),
+        ]),
+        expect.any(Object),
+      );
+
+      // Verify that ephemeral sandbox directory permissions are restricted to owner (0o700)
+      expect(fs.chmodSync).toHaveBeenCalledWith(
+        expect.stringContaining('gemini-sandbox-'),
+        0o700,
+      );
+    });
+
+    it('should tolerate chmod errors on non-POSIX filesystems without crashing', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.chmodSync).mockImplementationOnce(() => {
+        throw new Error('EPERM: operation not permitted');
+      });
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await expect(start_sandbox(config)).resolves.toBe(0);
     });
 
     it('should handle allowedPaths in Docker', async () => {
@@ -623,6 +1166,229 @@ describe('sandbox', () => {
         expect.arrayContaining(['--volume', '/extra/path:/extra/path:ro']),
         expect.any(Object),
       );
+    });
+
+    it('should reject sensitive host mounts in SANDBOX_MOUNTS with FatalSandboxError', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      vi.stubEnv('SANDBOX_MOUNTS', '/home/user/.gemini:/mnt:rw');
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      await expect(start_sandbox(config)).rejects.toThrow(FatalSandboxError);
+    });
+
+    it('should reject running container sandbox from a sensitive working directory with FatalSandboxError', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue('/home/user');
+
+      try {
+        interface MockProcessWithStdout extends EventEmitter {
+          stdout: EventEmitter;
+        }
+        const mockImageCheckProcess =
+          new EventEmitter() as MockProcessWithStdout;
+        mockImageCheckProcess.stdout = new EventEmitter();
+        vi.mocked(spawn).mockImplementationOnce(() => {
+          setTimeout(() => {
+            mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+            mockImageCheckProcess.emit('close', 0);
+          }, 1);
+          return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+        });
+
+        const targetWorkdir = path.resolve('/home/user');
+        await expect(start_sandbox(config)).rejects.toThrow(
+          new RegExp(
+            `Running sandbox from a sensitive host directory '${targetWorkdir.replace(/\\/g, '\\\\')}' is strictly prohibited`,
+          ),
+        );
+      } finally {
+        cwdSpy.mockRestore();
+      }
+    });
+
+    it('should reject running container sandbox when cliConfig targetDir is sensitive with FatalSandboxError', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      const targetDir = path.resolve('/home/user/.gemini');
+      const mockCliConfig = {
+        getTargetDir: vi.fn().mockReturnValue(targetDir),
+        getDebugMode: vi.fn().mockReturnValue(false),
+      } as unknown as Config;
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      await expect(start_sandbox(config, [], mockCliConfig)).rejects.toThrow(
+        new RegExp(
+          `Running sandbox from a sensitive host directory '${targetDir.replace(/\\/g, '\\\\')}' is strictly prohibited`,
+        ),
+      );
+    });
+
+    it('should reject running macOS seatbelt sandbox from a sensitive working directory with FatalSandboxError', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+      const targetDir = path.resolve('/home/user');
+      const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(targetDir);
+
+      try {
+        await expect(start_sandbox(config)).rejects.toThrow(
+          new RegExp(
+            `Running sandbox from a sensitive host directory '${targetDir.replace(/\\/g, '\\\\')}' is strictly prohibited`,
+          ),
+        );
+      } finally {
+        cwdSpy.mockRestore();
+      }
+    });
+
+    it('should reject running LXC sandbox from a sensitive working directory with FatalSandboxError', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'lxc',
+        image: 'gemini-sandbox',
+      });
+      const targetDir = path.resolve('/home/user');
+      const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(targetDir);
+
+      try {
+        await expect(start_sandbox(config)).rejects.toThrow(
+          new RegExp(
+            `Running sandbox from a sensitive host directory '${targetDir.replace(/\\/g, '\\\\')}' is strictly prohibited`,
+          ),
+        );
+      } finally {
+        cwdSpy.mockRestore();
+      }
+    });
+
+    it('should skip sensitive workspace directory in macOS seatbelt includedDirs', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+      const safeWorkspace = path.resolve('/safe/workspace');
+      const safeOther = path.resolve('/safe/other');
+      const sensitiveUser = path.resolve('/home/user');
+      const mockCliConfig = {
+        getTargetDir: vi.fn().mockReturnValue(safeWorkspace),
+        getDebugMode: vi.fn().mockReturnValue(false),
+        getWorkspaceContext: vi.fn().mockReturnValue({
+          getDirectories: vi
+            .fn()
+            .mockReturnValue([safeWorkspace, sensitiveUser, safeOther]),
+        }),
+      } as unknown as Config;
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config, [], mockCliConfig);
+      setTimeout(() => mockSpawnProcess.emit('close', 0), 10);
+      await promise;
+
+      const spawnArgs = vi.mocked(spawn).mock.calls[0][1] as string[];
+      expect(spawnArgs).toContain(`INCLUDE_DIR_0=${safeOther}`);
+      const includeDirs = spawnArgs.filter((arg) =>
+        arg.startsWith('INCLUDE_DIR_'),
+      );
+      expect(includeDirs.some((arg) => arg.includes(sensitiveUser))).toBe(
+        false,
+      );
+    });
+
+    it('should ignore sensitive paths in allowedPaths', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+        allowedPaths: ['/home/user/.gemini', '/safe/extra/path'],
+      });
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      const runCalls = vi
+        .mocked(spawn)
+        .mock.calls.filter(
+          (call) =>
+            call[0] === 'docker' &&
+            Array.isArray(call[1]) &&
+            call[1].includes('run'),
+        );
+      expect(runCalls.length).toBe(1);
+      const runArgs = runCalls[0][1] as string[];
+      expect(runArgs).toContain('/safe/extra/path:/safe/extra/path:ro');
+      expect(
+        runArgs.some(
+          (arg) =>
+            typeof arg === 'string' && arg.includes('/home/user/.gemini:'),
+        ),
+      ).toBe(false);
     });
 
     it('should handle networkAccess: false in Docker', async () => {
@@ -791,7 +1557,7 @@ describe('sandbox', () => {
 
       expect(spawn).toHaveBeenCalledWith(
         'docker',
-        expect.arrayContaining(['--user', 'root', '--env', 'HOME=/home/user']),
+        expect.arrayContaining(['--user', 'root', '--env', 'HOME=/home/node']),
         expect.any(Object),
       );
       // Check that the entrypoint command includes the defensive useradd check
@@ -1046,6 +1812,516 @@ describe('sandbox', () => {
         expect.arrayContaining(['run', '--runtime=runsc']),
         expect.objectContaining({ stdio: 'inherit' }),
       );
+    });
+  });
+
+  describe('IDE bridge', () => {
+    const upstream = {
+      port: '45678',
+      authToken: 'host-only-token',
+      workspacePaths: ['/test/project'],
+    };
+
+    interface MockProcessWithStdout extends EventEmitter {
+      stdout: EventEmitter;
+    }
+
+    /** Mocks the image check and the container run, like the other tests. */
+    function mockContainerRun() {
+      const imageCheck = new EventEmitter() as MockProcessWithStdout;
+      imageCheck.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          imageCheck.stdout.emit('data', Buffer.from('image-id'));
+          imageCheck.emit('close', 0);
+        }, 1);
+        return imageCheck as unknown as ReturnType<typeof spawn>;
+      });
+      const container = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      > & { exitCode: number | null; signalCode: string | null };
+      container.exitCode = null;
+      container.signalCode = null;
+      container.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return container;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => container);
+      return container;
+    }
+
+    function containerArgs(): string[] {
+      const call = vi
+        .mocked(spawn)
+        .mock.calls.find((c) => Array.isArray(c[1]) && c[1][0] === 'run');
+      return (call?.[1] as string[]) ?? [];
+    }
+
+    beforeEach(() => {
+      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '45678';
+      process.env['GEMINI_CLI_IDE_AUTH_TOKEN'] = 'host-only-token';
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/project';
+      process.env['TERM_PROGRAM'] = 'vscode';
+      vi.mocked(resolveIdeBridgeUpstream).mockResolvedValue(upstream);
+      vi.mocked(IdeBridge.prototype.connectUpstream).mockResolvedValue(
+        undefined,
+      );
+      vi.mocked(IdeBridge.prototype.attach).mockResolvedValue(undefined);
+      vi.mocked(IdeBridge.prototype.stop).mockResolvedValue(undefined);
+    });
+
+    it('bridges the IDE connection over exec instead of forwarding the port or token', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs();
+      const envs = args.filter((_, i) => args[i - 1] === '--env');
+      // The companion's port and token stay on the host.
+      expect(
+        envs.some((e) => e.startsWith('GEMINI_CLI_IDE_SERVER_PORT=')),
+      ).toBe(false);
+      expect(envs.some((e) => e.startsWith('GEMINI_CLI_IDE_AUTH_TOKEN='))).toBe(
+        false,
+      );
+      // The CLI inside reaches the bridge through its stdio transport.
+      expect(envs).toContain('GEMINI_CLI_IDE_SERVER_STDIO_COMMAND=node');
+      expect(envs).toContain(
+        `GEMINI_CLI_IDE_SERVER_STDIO_ARGS=${JSON.stringify([
+          `/home/node/.gemini/${IDE_BRIDGE_HELPER_FILENAME}`,
+          'connect',
+          IDE_BRIDGE_SOCKET_PATH,
+        ])}`,
+      );
+      expect(envs).toContain('GEMINI_CLI_IDE_WORKSPACE_PATH=/test/project');
+      expect(envs).toContain('TERM_PROGRAM=vscode');
+      // The helper is delivered through the mounted sandbox temp directory.
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`${IDE_BRIDGE_HELPER_FILENAME}$`)),
+        expect.stringContaining('gemini-ide-bridge'),
+        { mode: 0o600 },
+      );
+      expect(IdeBridge).toHaveBeenCalledWith({
+        upstream,
+        helperPathInContainer: `/home/node/.gemini/${IDE_BRIDGE_HELPER_FILENAME}`,
+        socketPathInContainer: IDE_BRIDGE_SOCKET_PATH,
+      });
+      expect(IdeBridge.prototype.connectUpstream).toHaveBeenCalled();
+      const containerName = args[args.indexOf('--name') + 1];
+      const attachOptions = vi.mocked(IdeBridge.prototype.attach).mock
+        .calls[0]?.[0];
+      // `<command> exec -i [--user uid:gid] <container>`; the bridge appends
+      // the helper invocation itself.
+      expect(attachOptions?.execCommand.slice(0, 3)).toEqual([
+        'docker',
+        'exec',
+        '-i',
+      ]);
+      expect(attachOptions?.execCommand.at(-1)).toBe(containerName);
+      expect(attachOptions?.isSandboxAlive()).toBe(true);
+      expect(IdeBridge.prototype.stop).toHaveBeenCalled();
+    });
+
+    it('passes the mapped uid/gid to exec when the sandbox runs as the current user', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      process.env['SANDBOX_SET_UID_GID'] = 'true';
+      mockedExecCommands.length = 0;
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const attachOptions = vi.mocked(IdeBridge.prototype.attach).mock
+        .calls[0]?.[0];
+      expect(attachOptions?.execCommand.slice(0, 5)).toEqual([
+        'docker',
+        'exec',
+        '-i',
+        '--user',
+        '1000:1000',
+      ]);
+    });
+
+    it('does not set the bridge up when the companion is unreachable from the host', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      vi.mocked(IdeBridge.prototype.connectUpstream).mockRejectedValue(
+        new Error('ECONNREFUSED'),
+      );
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const envs = containerArgs().filter(
+        (a, i, all) => all[i - 1] === '--env',
+      );
+      expect(
+        envs.some((e) => e.startsWith('GEMINI_CLI_IDE_SERVER_STDIO')),
+      ).toBe(false);
+      expect(
+        envs.some((e) => e.startsWith('GEMINI_CLI_IDE_SERVER_PORT=')),
+      ).toBe(false);
+      expect(envs).toContain('TERM_PROGRAM=vscode');
+      expect(IdeBridge.prototype.attach).not.toHaveBeenCalled();
+    });
+
+    it('does nothing IDE-specific when no companion is advertised', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      vi.mocked(resolveIdeBridgeUpstream).mockResolvedValue(undefined);
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      expect(IdeBridge).not.toHaveBeenCalled();
+      const envs = containerArgs().filter(
+        (a, i, all) => all[i - 1] === '--env',
+      );
+      expect(envs.some((e) => e.startsWith('GEMINI_CLI_IDE_SERVER_'))).toBe(
+        false,
+      );
+    });
+  });
+
+  describe('Podman rootless user namespace mapping', () => {
+    interface MockProcessWithStdout extends EventEmitter {
+      stdout: EventEmitter;
+    }
+
+    function mockContainerRun() {
+      const imageCheck = new EventEmitter() as MockProcessWithStdout;
+      imageCheck.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          imageCheck.stdout.emit('data', Buffer.from('image-id'));
+          imageCheck.emit('close', 0);
+        }, 1);
+        return imageCheck as unknown as ReturnType<typeof spawn>;
+      });
+      const container = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      > & { exitCode: number | null; signalCode: string | null };
+      container.exitCode = null;
+      container.signalCode = null;
+      container.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return container;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => container);
+      return container;
+    }
+
+    function containerArgs(cmd = 'podman'): string[] {
+      const call = vi
+        .mocked(spawn)
+        .mock.calls.find(
+          (c) => c[0] === cmd && Array.isArray(c[1]) && c[1][0] === 'run',
+        );
+      return (call?.[1] as string[]) ?? [];
+    }
+
+    function podmanInfoResult(stdout: string) {
+      return { stdout, stderr: '' };
+    }
+
+    /** Mirrors the error execFile reports when podman exits non-zero. */
+    function podmanExitError(exitCode: number) {
+      return Object.assign(new Error('Command failed: podman info'), {
+        code: exitCode,
+        killed: false,
+        signal: null,
+      });
+    }
+
+    beforeEach(() => {
+      vi.stubEnv('SANDBOX_FLAGS', '');
+      // Exercise the path where the sandbox runs as the host UID/GID.
+      vi.stubEnv('SANDBOX_SET_UID_GID', 'true');
+      vi.stubEnv('GEMINI_CLI_INTEGRATION_TEST', '');
+      mockedPodmanExecFile.mockReset();
+    });
+
+    describe('isPodmanRootless', () => {
+      it('returns true when Host.Security.Rootless is true', async () => {
+        mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+
+        await expect(isPodmanRootless()).resolves.toBe(true);
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(1);
+        expect(mockedPodmanExecFile).toHaveBeenCalledWith(
+          'podman',
+          ['info', '--format', '{{.Host.Security.Rootless}}'],
+          expect.objectContaining({ encoding: 'utf-8' }),
+        );
+      });
+
+      it('bounds podman info with a timeout', async () => {
+        mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+
+        await isPodmanRootless();
+
+        expect(mockedPodmanExecFile).toHaveBeenCalledWith(
+          'podman',
+          ['info', '--format', '{{.Host.Security.Rootless}}'],
+          expect.objectContaining({
+            timeout: expect.any(Number),
+            killSignal: 'SIGKILL',
+          }),
+        );
+      });
+
+      it('returns false when Host.Security.Rootless is false without calling fallback', async () => {
+        mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('false\n'));
+
+        await expect(isPodmanRootless()).resolves.toBe(false);
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(1);
+      });
+
+      it('falls back to Host.ServiceIsRootless when Host.Security.Rootless is empty', async () => {
+        mockedPodmanExecFile
+          .mockResolvedValueOnce(podmanInfoResult('\n'))
+          .mockResolvedValueOnce(podmanInfoResult('true\n'));
+
+        await expect(isPodmanRootless()).resolves.toBe(true);
+        expect(mockedPodmanExecFile).toHaveBeenNthCalledWith(
+          1,
+          'podman',
+          ['info', '--format', '{{.Host.Security.Rootless}}'],
+          expect.objectContaining({ encoding: 'utf-8' }),
+        );
+        expect(mockedPodmanExecFile).toHaveBeenNthCalledWith(
+          2,
+          'podman',
+          ['info', '--format', '{{.Host.ServiceIsRootless}}'],
+          expect.objectContaining({ encoding: 'utf-8' }),
+        );
+      });
+
+      it('falls back to Host.ServiceIsRootless when Host.Security.Rootless is unsupported and fails', async () => {
+        mockedPodmanExecFile
+          .mockRejectedValueOnce(podmanExitError(125))
+          .mockResolvedValueOnce(podmanInfoResult('true\n'));
+
+        await expect(isPodmanRootless()).resolves.toBe(true);
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(2);
+      });
+
+      it('returns false when podman info fails with an error', async () => {
+        mockedPodmanExecFile.mockRejectedValue(podmanExitError(125));
+
+        await expect(isPodmanRootless()).resolves.toBe(false);
+        // A generic failure may mean the property is unsupported, so the
+        // fallback query is still attempted.
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(2);
+      });
+
+      it('stops without running the fallback query when podman is not installed', async () => {
+        mockedPodmanExecFile.mockRejectedValue(
+          Object.assign(new Error('spawn podman ENOENT'), { code: 'ENOENT' }),
+        );
+
+        await expect(isPodmanRootless()).resolves.toBe(false);
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(1);
+      });
+
+      it('stops without running the fallback query when podman info times out', async () => {
+        // execFile reports a timeout by killing the process, so the error has
+        // `killed: true` and no ETIMEDOUT code.
+        mockedPodmanExecFile.mockRejectedValue(
+          Object.assign(new Error('Command failed: podman info'), {
+            code: null,
+            killed: true,
+            signal: 'SIGKILL',
+          }),
+        );
+
+        await expect(isPodmanRootless()).resolves.toBe(false);
+        expect(mockedPodmanExecFile).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('adds --userns=keep-id for rootless Podman when the sandbox runs as the host user', async () => {
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      expect(args).toEqual(
+        expect.arrayContaining(['--user', 'root', '--userns=keep-id']),
+      );
+      // The flag must precede the image name to be parsed as a podman option.
+      expect(args.indexOf('--userns=keep-id')).toBeLessThan(
+        args.lastIndexOf('gemini-cli-sandbox'),
+      );
+      expect(mockedPodmanExecFile).toHaveBeenCalledWith(
+        'podman',
+        ['info', '--format', '{{.Host.Security.Rootless}}'],
+        expect.objectContaining({ encoding: 'utf-8' }),
+      );
+    });
+
+    it('does not add --userns=keep-id for integration test runs that stay as container root', async () => {
+      vi.stubEnv('GEMINI_CLI_INTEGRATION_TEST', 'true');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      expect(args).toEqual(expect.arrayContaining(['--user', 'root']));
+      expect(args).not.toContain('--userns=keep-id');
+      expect(mockedPodmanExecFile).not.toHaveBeenCalled();
+    });
+
+    it('does not add --userns=keep-id when host UID/GID mapping is disabled', async () => {
+      vi.stubEnv('SANDBOX_SET_UID_GID', 'false');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      expect(args).not.toContain('--userns=keep-id');
+      expect(mockedPodmanExecFile).not.toHaveBeenCalled();
+    });
+
+    it('does not add --userns=keep-id when running rootful Podman', async () => {
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('false\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      expect(args).not.toContain('--userns=keep-id');
+    });
+
+    it('preserves user-supplied --userns=host in SANDBOX_FLAGS without adding --userns=keep-id', async () => {
+      vi.stubEnv('SANDBOX_FLAGS', '--userns=host');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      expect(args).toContain('--userns=host');
+      expect(args).not.toContain('--userns=keep-id');
+      expect(mockedPodmanExecFile).not.toHaveBeenCalled();
+    });
+
+    it('preserves space-separated --userns keep-id in SANDBOX_FLAGS without duplicating --userns=keep-id', async () => {
+      vi.stubEnv('SANDBOX_FLAGS', '--userns keep-id');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      const usernsIdx = args.indexOf('--userns');
+      expect(usernsIdx).toBeGreaterThan(-1);
+      expect(args[usernsIdx + 1]).toBe('keep-id');
+      expect(args).not.toContain('--userns=keep-id');
+    });
+
+    it('still adds --userns=keep-id for rootless Podman when SANDBOX_FLAGS has unrelated flags', async () => {
+      vi.stubEnv('SANDBOX_FLAGS', '--security-opt label=disable');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'podman',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('podman');
+      expect(args).toEqual(
+        expect.arrayContaining([
+          '--security-opt',
+          'label=disable',
+          '--userns=keep-id',
+        ]),
+      );
+    });
+
+    it('does not invoke rootless check or add --userns=keep-id when runtime is docker', async () => {
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      mockContainerRun();
+
+      await start_sandbox(config);
+
+      const args = containerArgs('docker');
+      expect(mockedPodmanExecFile).not.toHaveBeenCalled();
+      expect(args).not.toContain('--userns=keep-id');
+    });
+
+    it('does not invoke rootless check or add --userns=keep-id when runtime is macOS seatbelt', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      mockedPodmanExecFile.mockResolvedValue(podmanInfoResult('true\n'));
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'sandbox-exec',
+        image: 'some-image',
+      });
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config, [], undefined, ['arg1']);
+      setTimeout(() => mockSpawnProcess.emit('close', 0), 10);
+      await expect(promise).resolves.toBe(0);
+
+      const spawnArgs = vi.mocked(spawn).mock.calls[0]?.[1] as string[];
+      expect(mockedPodmanExecFile).not.toHaveBeenCalled();
+      expect(spawnArgs).not.toContain('--userns=keep-id');
     });
   });
 });

@@ -20,6 +20,7 @@ import { coreEvents } from '@google/gemini-cli-core';
 const mockRewindTo = vi.fn();
 const mockRecordMessage = vi.fn();
 const mockSetHistory = vi.fn();
+const mockClearCurrentSequenceModel = vi.fn();
 const mockSendMessageStream = vi.fn();
 const mockGetChatRecordingService = vi.fn();
 const mockGetConversation = vi.fn();
@@ -28,6 +29,11 @@ const mockLoadHistory = vi.fn();
 const mockAddItem = vi.fn();
 const mockSetPendingItem = vi.fn();
 const mockResetContext = vi.fn();
+const mockResetAvailability = vi.fn();
+const mockSetActiveModel = vi.fn();
+const mockGetModel = vi
+  .fn()
+  .mockReturnValue('gemini-3.1-pro-preview-customtools');
 const mockSetInput = vi.fn();
 const mockRevertFileChanges = vi.fn();
 const mockGetProjectRoot = vi.fn().mockReturnValue('/mock/root');
@@ -102,11 +108,17 @@ describe('rewindCommand', () => {
           geminiClient: {
             getChatRecordingService: mockGetChatRecordingService,
             setHistory: mockSetHistory,
+            clearCurrentSequenceModel: mockClearCurrentSequenceModel,
             sendMessageStream: mockSendMessageStream,
           },
           config: {
             getSessionId: () => 'test-session-id',
             getMemoryContextManager: () => ({ refresh: mockResetContext }),
+            getModelAvailabilityService: () => ({
+              reset: mockResetAvailability,
+            }),
+            getModel: mockGetModel,
+            setActiveModel: mockSetActiveModel,
             getProjectRoot: mockGetProjectRoot,
           },
         },
@@ -143,6 +155,11 @@ describe('rewindCommand', () => {
       expect(mockRevertFileChanges).not.toHaveBeenCalled();
       expect(mockRewindTo).toHaveBeenCalledWith('msg-id-123');
       expect(mockSetHistory).toHaveBeenCalled();
+      expect(mockClearCurrentSequenceModel).toHaveBeenCalled();
+      expect(mockResetAvailability).toHaveBeenCalled();
+      expect(mockSetActiveModel).toHaveBeenCalledWith(
+        'gemini-3.1-pro-preview-customtools',
+      );
       expect(mockResetContext).toHaveBeenCalled();
       expect(mockLoadHistory).toHaveBeenCalledWith(
         [
@@ -198,6 +215,9 @@ describe('rewindCommand', () => {
         'msg-id-123',
       );
       expect(mockRewindTo).not.toHaveBeenCalled();
+      expect(mockClearCurrentSequenceModel).not.toHaveBeenCalled();
+      expect(mockResetAvailability).not.toHaveBeenCalled();
+      expect(mockSetActiveModel).not.toHaveBeenCalled();
       expect(mockRemoveComponent).toHaveBeenCalled();
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
         'info',
@@ -359,6 +379,45 @@ describe('rewindCommand', () => {
       type: 'message',
       messageType: 'info',
       content: 'Nothing to rewind to.',
+    });
+  });
+
+  it('prefers getConversationAsync and rewindToAsync when available to avoid blocking UI thread', async () => {
+    const asyncConversation = {
+      messages: [{ id: 'msg-1', type: 'user', content: 'async hello' }],
+      sessionId: 'async-session',
+    };
+    const mockGetConversationAsync = vi
+      .fn()
+      .mockResolvedValue(asyncConversation);
+    const mockRewindToAsync = vi.fn().mockResolvedValue({ messages: [] });
+
+    mockGetChatRecordingService.mockReturnValue({
+      getConversation: mockGetConversation,
+      getConversationAsync: mockGetConversationAsync,
+      rewindTo: mockRewindTo,
+      rewindToAsync: mockRewindToAsync,
+      recordMessage: mockRecordMessage,
+    });
+
+    const result = (await rewindCommand.action!(
+      mockContext,
+      '',
+    )) as OpenCustomDialogActionReturn;
+
+    expect(mockGetConversationAsync).toHaveBeenCalledOnce();
+    expect(mockGetConversation).not.toHaveBeenCalled();
+
+    const component = result.component as ReactElement<RewindViewerProps>;
+    await component.props.onRewind(
+      'msg-1',
+      'Updated prompt',
+      RewindOutcome.RewindOnly,
+    );
+
+    await waitFor(() => {
+      expect(mockRewindToAsync).toHaveBeenCalledWith('msg-1');
+      expect(mockRewindTo).not.toHaveBeenCalled();
     });
   });
 });

@@ -51,7 +51,12 @@ import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js'
 import * as policyCatalog from '../availability/policyCatalog.js';
 import { LlmRole, LoopType } from '../telemetry/types.js';
 import { partToString } from '../utils/partUtils.js';
-import { coreEvents, CoreEvent } from '../utils/events.js';
+import {
+  coreEvents,
+  CoreEvent,
+  type RetryAttemptPayload,
+} from '../utils/events.js';
+import { promptIdContext } from '../utils/promptIdContext.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 // Mock fs module to prevent actual file system operations during tests
@@ -341,13 +346,60 @@ describe('Gemini Client (client.ts)', () => {
   });
 
   describe('setHistory', () => {
-    it('should update telemetry token count when history is set', () => {
+    it('should update telemetry token count and clear currentSequenceModel when history is set', () => {
+      client['currentSequenceModel'] = 'gemini-3-flash-preview';
       const history: Content[] = [
         { role: 'user', parts: [{ text: 'some message' }] },
       ];
       client.setHistory(history);
 
       expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalled();
+      expect(client.getCurrentSequenceModel()).toBeNull();
+    });
+  });
+
+  describe('discardTrailingUnansweredToolCallTurn', () => {
+    it('should return false without throwing when the chat is not initialized', () => {
+      const uninitializedClient = new GeminiClient(
+        mockConfig as unknown as AgentLoopContext,
+      );
+
+      expect(uninitializedClient.isInitialized()).toBe(false);
+      expect(() =>
+        uninitializedClient.discardTrailingUnansweredToolCallTurn(),
+      ).not.toThrow();
+      expect(uninitializedClient.discardTrailingUnansweredToolCallTurn()).toBe(
+        false,
+      );
+    });
+
+    it('should delegate to the chat and update telemetry when a turn is removed', () => {
+      const mockChat = {
+        discardTrailingUnansweredToolCallTurn: vi.fn().mockReturnValue(true),
+        getLastPromptTokenCount: vi.fn().mockReturnValue(0),
+        setTools: vi.fn(),
+      } as unknown as GeminiChat;
+      client['chat'] = mockChat;
+      vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
+
+      expect(client.discardTrailingUnansweredToolCallTurn()).toBe(true);
+      expect(
+        mockChat.discardTrailingUnansweredToolCallTurn,
+      ).toHaveBeenCalledTimes(1);
+      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalled();
+    });
+
+    it('should not update telemetry when no turn is removed', () => {
+      const mockChat = {
+        discardTrailingUnansweredToolCallTurn: vi.fn().mockReturnValue(false),
+        getLastPromptTokenCount: vi.fn().mockReturnValue(0),
+        setTools: vi.fn(),
+      } as unknown as GeminiChat;
+      client['chat'] = mockChat;
+      vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
+
+      expect(client.discardTrailingUnansweredToolCallTurn()).toBe(false);
+      expect(uiTelemetryService.setLastPromptTokenCount).not.toHaveBeenCalled();
     });
   });
 
@@ -712,6 +764,32 @@ describe('Gemini Client (client.ts)', () => {
         },
       );
     });
+
+    it('prefers non-blocking getConversationAsync over synchronous getConversation during compression', async () => {
+      const { client, mockOriginalChat } = setup({
+        compressionStatus: CompressionStatus.COMPRESSED,
+      });
+
+      const mockConversation = { sessionId: 'async-session', messages: [] };
+      const mockFilePath = '/tmp/session.jsonl';
+      const syncSpy = vi.fn();
+      const asyncSpy = vi.fn().mockResolvedValue(mockConversation);
+
+      vi.mocked(mockOriginalChat.getChatRecordingService!).mockReturnValue({
+        getConversation: syncSpy,
+        getConversationAsync: asyncSpy,
+        getConversationFilePath: vi.fn().mockReturnValue(mockFilePath),
+      } as unknown as ChatRecordingService);
+
+      await client.tryCompressChat('prompt-id', false);
+
+      expect(asyncSpy).toHaveBeenCalledOnce();
+      expect(syncSpy).not.toHaveBeenCalled();
+      expect(client['startChat']).toHaveBeenCalledWith(expect.anything(), {
+        conversation: mockConversation,
+        filePath: mockFilePath,
+      });
+    });
   });
 
   describe('sendMessageStream', () => {
@@ -749,6 +827,60 @@ describe('Gemini Client (client.ts)', () => {
       expect(manageHistorySpy).toHaveBeenCalledWith(
         expect.any(Array),
         expect.any(AbortSignal),
+      );
+    });
+
+    it('includes all hardened turns from pendingApiHistory in apiHistoryOverride so requests never end on a model turn', async () => {
+      mockConfig.getContextManagementConfig = vi
+        .fn()
+        .mockReturnValue({ enabled: true });
+
+      const renderHistorySpy = vi.fn().mockResolvedValue({
+        history: [],
+        apiHistory: [
+          { role: 'user', parts: [{ text: 'Earlier prompt' }] },
+          { role: 'model', parts: [{ text: 'Earlier answer' }] },
+        ],
+        pendingApiHistory: [
+          { role: 'user', parts: [{ text: 'Processed prompt' }] },
+          { role: 'model', parts: [{ text: 'Injected model context' }] },
+          { role: 'user', parts: [{ text: 'Please continue.' }] },
+        ],
+        baseUnits: 42,
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (client as any).contextManager = {
+        renderHistory: renderHistorySpy,
+      };
+
+      mockTurnRunFn.mockReturnValue(
+        (async function* () {
+          yield { type: 'content', value: 'Hello' };
+        })(),
+      );
+
+      const stream = client.sendMessageStream(
+        [{ text: 'Raw prompt' }],
+        new AbortController().signal,
+        'prompt-cm-multi-pending',
+      );
+      await fromAsync(stream);
+
+      expect(renderHistorySpy).toHaveBeenCalledOnce();
+      expect(mockTurnRunFn).toHaveBeenCalledWith(
+        expect.anything(),
+        [{ text: 'Processed prompt' }],
+        expect.any(AbortSignal),
+        expect.objectContaining({
+          apiHistoryOverride: [
+            { role: 'user', parts: [{ text: 'Earlier prompt' }] },
+            { role: 'model', parts: [{ text: 'Earlier answer' }] },
+            { role: 'user', parts: [{ text: 'Processed prompt' }] },
+            { role: 'model', parts: [{ text: 'Injected model context' }] },
+            { role: 'user', parts: [{ text: 'Please continue.' }] },
+          ],
+        }),
       );
     });
 
@@ -814,9 +946,10 @@ describe('Gemini Client (client.ts)', () => {
       );
     });
 
-    it('yields UserCancelled when processTurn throws AbortError', async () => {
+    it('yields UserCancelled and clears sequence/turn state when processTurn throws AbortError', async () => {
       const abortError = new Error('Aborted');
       abortError.name = 'AbortError';
+      client['currentSequenceModel'] = 'gemini-3-flash-preview';
       vi.spyOn(client['loopDetector'], 'turnStarted').mockRejectedValueOnce(
         abortError,
       );
@@ -824,11 +957,13 @@ describe('Gemini Client (client.ts)', () => {
       const stream = client.sendMessageStream(
         [{ text: 'Hi' }],
         new AbortController().signal,
-        'prompt-id-abort-error',
+        'test-session-id',
       );
       const events = await fromAsync(stream);
 
       expect(events).toEqual([{ type: GeminiEventType.UserCancelled }]);
+      expect(client.getCurrentSequenceModel()).toBeNull();
+      expect(mockConfig.resetTurn).toHaveBeenCalledTimes(2);
     });
 
     it.each([
@@ -3191,6 +3326,102 @@ ${JSON.stringify(
         'test-session-id',
         LlmRole.MAIN,
       );
+    });
+
+    it('should include role, promptId, and updated model policy maxAttempts in RetryAttempt events', async () => {
+      vi.useFakeTimers();
+      const contents = [{ role: 'user', parts: [{ text: 'test retry' }] }];
+      vi.spyOn(policyCatalog, 'getModelPolicyChain').mockReturnValue([
+        {
+          model: 'test-model',
+          maxAttempts: 3,
+          actions: { terminal: 'prompt', transient: 'prompt' },
+          stateTransitions: { terminal: 'terminal', transient: 'sticky_retry' },
+        },
+        {
+          model: 'fallback-model',
+          maxAttempts: 5,
+          actions: { terminal: 'prompt', transient: 'prompt' },
+          stateTransitions: { terminal: 'terminal', transient: 'terminal' },
+        },
+      ]);
+
+      let activeModel = 'test-model';
+      vi.mocked(mockConfig.getModel).mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
+      vi.mocked(mockConfig.getActiveModel).mockImplementation(
+        () => activeModel,
+      );
+      const mockAvailabilityService = createAvailabilityServiceMock();
+      vi.mocked(
+        mockAvailabilityService.selectFirstAvailable,
+      ).mockImplementation((models: readonly string[]) => ({
+        selectedModel: models[0],
+        attempts: models[0] === 'test-model' ? 3 : 5,
+        skipped: [],
+      }));
+      vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
+        mockAvailabilityService,
+      );
+
+      const error503 = Object.assign(new Error('Service Unavailable'), {
+        status: 503,
+      });
+      mockGenerateContentFn
+        .mockImplementationOnce(async () => {
+          throw error503;
+        })
+        .mockImplementationOnce(async () => {
+          throw error503;
+        })
+        .mockResolvedValueOnce({
+          candidates: [{ content: { parts: [{ text: 'ok' }] } }],
+        });
+
+      const retryPayloads: RetryAttemptPayload[] = [];
+      const onRetryAttempt = (payload: RetryAttemptPayload) => {
+        retryPayloads.push(payload);
+        if (retryPayloads.length === 1) {
+          activeModel = 'fallback-model';
+        }
+      };
+      coreEvents.on(CoreEvent.RetryAttempt, onRetryAttempt);
+
+      try {
+        const promise = promptIdContext.run('prompt-client-1', () =>
+          client.generateContent(
+            { model: 'test-model' },
+            contents,
+            new AbortController().signal,
+            LlmRole.SUBAGENT,
+          ),
+        );
+
+        await vi.runAllTimersAsync();
+        await promise;
+
+        expect(retryPayloads).toHaveLength(2);
+        expect(retryPayloads[0]).toEqual(
+          expect.objectContaining({
+            attempt: 1,
+            maxAttempts: 3,
+            model: 'test-model',
+            role: LlmRole.SUBAGENT,
+            promptId: 'prompt-client-1',
+          }),
+        );
+        expect(retryPayloads[1]).toEqual(
+          expect.objectContaining({
+            attempt: 2,
+            maxAttempts: 5,
+            model: 'fallback-model',
+            role: LlmRole.SUBAGENT,
+            promptId: 'prompt-client-1',
+          }),
+        );
+      } finally {
+        coreEvents.off(CoreEvent.RetryAttempt, onRetryAttempt);
+        vi.useRealTimers();
+      }
     });
 
     describe('Hook System', () => {

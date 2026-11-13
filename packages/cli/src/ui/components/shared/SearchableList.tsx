@@ -117,7 +117,7 @@ export function SearchableList<T extends GenericListItem>({
     isFocused,
     showNumbers: false,
     wrapAround: true,
-    priority: true,
+    priority: !searchBuffer,
   });
 
   const [scrollOffsetState, setScrollOffsetState] = React.useState(0);

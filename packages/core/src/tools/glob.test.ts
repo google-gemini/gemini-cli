@@ -452,6 +452,134 @@ describe('GlobTool', () => {
       expect(result.llmContent).toContain('gemini-ignored_test.txt');
     }, 30000);
   });
+
+  describe.skipIf(process.platform === 'win32')(
+    'symlink canonical path resolution',
+    () => {
+      it('should find files and return canonical paths when targetDir is a symlink to the workspace root', async () => {
+        const rawTempDir = await fs.mkdtemp(
+          path.join(os.tmpdir(), 'glob-tool-symlink-root-'),
+        );
+        const tempDir = await fs.realpath(rawTempDir);
+        try {
+          const realRootDir = path.join(tempDir, 'real-root');
+          const symlinkedRootDir = path.join(tempDir, 'symlinked-root');
+          await fs.mkdir(path.join(realRootDir, 'sub'), { recursive: true });
+          await fs.writeFile(
+            path.join(realRootDir, 'sub', 'fileA.txt'),
+            'contentA',
+          );
+          await fs.symlink(realRootDir, symlinkedRootDir, 'dir');
+
+          const workspaceContext = createMockWorkspaceContext(symlinkedRootDir);
+          const fileDiscovery = new FileDiscoveryService(realRootDir);
+          const symlinkConfig = {
+            getTargetDir: () => symlinkedRootDir,
+            getWorkspaceContext: () => workspaceContext,
+            getFileService: () => fileDiscovery,
+            getFileFilteringOptions: () => DEFAULT_FILE_FILTERING_OPTIONS,
+            getFileExclusions: () => ({ getGlobExcludes: () => [] }),
+            validatePathAccess: () => null,
+          } as unknown as Config;
+
+          const symlinkGlobTool = new GlobTool(
+            symlinkConfig,
+            createMockMessageBus(),
+          );
+          const invocation = symlinkGlobTool.build({ pattern: '**/*.txt' });
+          const result = await invocation.execute({ abortSignal });
+
+          expect(result.llmContent).toContain('Found 1 file(s)');
+          expect(result.llmContent).toContain(
+            path.join(realRootDir, 'sub', 'fileA.txt'),
+          );
+          expect(result.llmContent).not.toContain(symlinkedRootDir);
+        } finally {
+          await fs.rm(tempDir, { recursive: true, force: true });
+        }
+      }, 30000);
+
+      it('should resolve symlinked files inside the workspace to their canonical paths and deduplicate matches', async () => {
+        const realFile = path.join(tempRootDir, 'fileA.txt');
+        const linkedFile = path.join(tempRootDir, 'linkedFileA.txt');
+        await fs.symlink(realFile, linkedFile);
+
+        // Searching specifically for the symlinked filename should find it and return its canonical path
+        const singleInvocation = globTool.build({ pattern: 'linkedFileA.txt' });
+        const singleResult = await singleInvocation.execute({ abortSignal });
+        expect(singleResult.llmContent).toContain('Found 1 file(s)');
+        expect(singleResult.llmContent).toContain(realFile);
+        expect(singleResult.llmContent).not.toContain(linkedFile);
+
+        // Searching with a wildcard matching both the real file and its symlink should deduplicate canonical paths
+        const wildcardInvocation = globTool.build({
+          pattern: '*fileA.txt',
+          case_sensitive: false,
+        });
+        const wildcardResult = await wildcardInvocation.execute({
+          abortSignal,
+        });
+        expect(wildcardResult.llmContent).toContain('Found 1 file(s)');
+        expect(wildcardResult.llmContent).toContain(realFile);
+      }, 30000);
+
+      it('should filter out symlinked files whose canonical targets resolve outside the workspace', async () => {
+        const rawOutsideDir = await fs.mkdtemp(
+          path.join(os.tmpdir(), 'glob-tool-outside-'),
+        );
+        const outsideDir = await fs.realpath(rawOutsideDir);
+        try {
+          const outsideFile = path.join(outsideDir, 'secret.txt');
+          await fs.writeFile(outsideFile, 'secret');
+          await fs.symlink(
+            outsideFile,
+            path.join(tempRootDir, 'escaped_link.txt'),
+          );
+
+          const invocation = globTool.build({ pattern: 'escaped_link.txt' });
+          const result = await invocation.execute({ abortSignal });
+
+          expect(result.llmContent).toContain('No files found');
+          expect(result.llmContent).not.toContain('secret.txt');
+        } finally {
+          await fs.rm(outsideDir, { recursive: true, force: true });
+        }
+      }, 30000);
+
+      it('should resolve files inside symlinked directories to their canonical paths', async () => {
+        const linkedSubDir = path.join(tempRootDir, 'linked-sub');
+        await fs.symlink(path.join(tempRootDir, 'sub'), linkedSubDir, 'dir');
+
+        // Matching via pattern containing the symlinked directory name
+        const patternInvocation = globTool.build({
+          pattern: 'linked-sub/*.md',
+        });
+        const patternResult = await patternInvocation.execute({ abortSignal });
+        expect(patternResult.llmContent).toContain('Found 2 file(s)');
+        expect(patternResult.llmContent).toContain(
+          path.join(tempRootDir, 'sub', 'fileC.md'),
+        );
+        expect(patternResult.llmContent).toContain(
+          path.join(tempRootDir, 'sub', 'FileD.MD'),
+        );
+        expect(patternResult.llmContent).not.toContain(linkedSubDir);
+
+        // Matching via dir_path pointing to the symlinked directory
+        const dirPathInvocation = globTool.build({
+          pattern: '*.md',
+          dir_path: 'linked-sub',
+        });
+        const dirPathResult = await dirPathInvocation.execute({ abortSignal });
+        expect(dirPathResult.llmContent).toContain('Found 2 file(s)');
+        expect(dirPathResult.llmContent).toContain(
+          path.join(tempRootDir, 'sub', 'fileC.md'),
+        );
+        expect(dirPathResult.llmContent).toContain(
+          path.join(tempRootDir, 'sub', 'FileD.MD'),
+        );
+      }, 30000);
+    },
+  );
 });
 
 describe('sortFileEntries', () => {

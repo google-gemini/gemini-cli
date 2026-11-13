@@ -276,18 +276,22 @@ export const McpProgressIndicator: React.FC<McpProgressIndicatorProps> = ({
       ? Math.min(100, Math.round((progress / total) * 100))
       : null;
 
+  const safeBarWidth = Math.max(0, Math.floor(barWidth || 0));
   let rawFilled: number;
   if (total && total > 0) {
-    rawFilled = Math.round((progress / total) * barWidth);
+    rawFilled = Math.round((progress / total) * safeBarWidth);
   } else {
-    rawFilled = Math.floor(progress) % (barWidth + 1);
+    rawFilled = Math.floor(progress) % (safeBarWidth + 1);
   }
 
   const filled = Math.max(
     0,
-    Math.min(Number.isFinite(rawFilled) ? rawFilled : 0, barWidth),
+    Math.min(
+      Number.isFinite(rawFilled) ? Math.floor(rawFilled) : 0,
+      safeBarWidth,
+    ),
   );
-  const empty = Math.max(0, barWidth - filled);
+  const empty = Math.max(0, safeBarWidth - filled);
   const progressBar = '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
 
   return (

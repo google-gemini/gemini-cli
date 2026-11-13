@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { WorkspaceContext } from './workspaceContext.js';
 import { debugLogger } from './debugLogger.js';
+import { resolveToRealPath } from './paths.js';
 
 describe('WorkspaceContext with real filesystem', () => {
   let tempDir: string;
@@ -18,8 +19,8 @@ describe('WorkspaceContext with real filesystem', () => {
 
   beforeEach(() => {
     // os.tmpdir() can return a path using a symlink (this is standard on macOS)
-    // Use fs.realpathSync to fully resolve the absolute path.
-    tempDir = fs.realpathSync(
+    // Use resolveToRealPath to fully resolve the absolute path canonically.
+    tempDir = resolveToRealPath(
       fs.mkdtempSync(path.join(os.tmpdir(), 'workspace-context-test-')),
     );
 
@@ -453,7 +454,7 @@ describe('WorkspaceContext with optional directories', () => {
   let nonExistentDir: string;
 
   beforeEach(() => {
-    tempDir = fs.realpathSync(
+    tempDir = resolveToRealPath(
       fs.mkdtempSync(path.join(os.tmpdir(), 'workspace-context-optional-')),
     );
     cwd = path.join(tempDir, 'project');

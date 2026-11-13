@@ -30,6 +30,10 @@ export interface UseReverseSearchCompletionReturn {
   resetCompletionState: () => void;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function useReverseSearchCompletion(
   buffer: TextBuffer,
   history: readonly string[],
@@ -71,11 +75,12 @@ export function useReverseSearchCompletion(
   const searchHistory = useCallback(
     (query: string, items: readonly string[]) => {
       const out: Suggestion[] = [];
+      const regex = new RegExp(escapeRegExp(query), 'iu');
       for (let i = 0; i < items.length; i++) {
         const cmd = items[i];
-        const idx = cmd.toLowerCase().indexOf(query);
-        if (idx !== -1) {
-          out.push({ label: cmd, value: cmd, matchedIndex: idx });
+        const match = regex.exec(cmd);
+        if (match) {
+          out.push({ label: cmd, value: cmd, matchedIndex: match.index });
         }
       }
       return out;
@@ -92,17 +97,17 @@ export function useReverseSearchCompletion(
         matchedIndex: -1,
       }));
 
-    const query = debouncedQuery.toLowerCase();
+    const lowerQuery = debouncedQuery.toLowerCase();
     const canUseCache =
       prevQueryRef.current &&
-      query.startsWith(prevQueryRef.current) &&
+      lowerQuery.startsWith(prevQueryRef.current) &&
       prevMatchesRef.current.length > 0;
 
     const source = canUseCache
       ? prevMatchesRef.current.map((m) => m.value)
       : history;
 
-    return searchHistory(query, source);
+    return searchHistory(debouncedQuery, source);
   }, [debouncedQuery, history, reverseSearchActive, searchHistory]);
 
   useEffect(() => {

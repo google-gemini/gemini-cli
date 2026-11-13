@@ -75,6 +75,17 @@ describe('IgnoreFileParser', () => {
       expect(paths[0]).toBe(path.join(projectRoot, secondary));
       expect(paths[1]).toBe(path.join(projectRoot, primary));
     });
+
+    it('should expand wildcard patterns across all files considering cross-file negations', async () => {
+      await createTestFile(primary, '!build/keep.txt');
+      await createTestFile(secondary, 'build/**');
+
+      const parser = new IgnoreFileParser(projectRoot, [primary, secondary]);
+
+      expect(parser.isIgnored('build/output.js', false)).toBe(true);
+      expect(parser.isIgnored('build/keep.txt', false)).toBe(false);
+      expect(parser.isIgnored('build', true)).toBe(false);
+    });
   });
 
   describe('Direct Pattern Input (isPatterns = true)', () => {

@@ -6,7 +6,11 @@
 
 // File for 'gemini mcp remove' command
 import type { CommandModule } from 'yargs';
-import { loadSettings, SettingScope } from '../../config/settings.js';
+import {
+  loadSettings,
+  SettingScope,
+  UNTRUSTED_WORKSPACE_SETTINGS_ERROR,
+} from '../../config/settings.js';
 import { debugLogger } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
 
@@ -20,6 +24,25 @@ async function removeMcpServer(
   const settingsScope =
     scope === 'user' ? SettingScope.User : SettingScope.Workspace;
   const settings = loadSettings();
+
+  if (settingsScope === SettingScope.Workspace) {
+    const inHome =
+      settings.workspace.path === '' ||
+      settings.workspace.path === settings.user.path;
+    if (inHome) {
+      debugLogger.error(
+        'Error: Please use --scope user to edit settings in the home directory.',
+      );
+      process.exit(1);
+    }
+    if (
+      (settings.forScope(settingsScope).readOnly ?? false) ||
+      settings.isTrusted === false
+    ) {
+      debugLogger.error(`Error: ${UNTRUSTED_WORKSPACE_SETTINGS_ERROR}`);
+      process.exit(1);
+    }
+  }
 
   const existingSettings = settings.forScope(settingsScope).settings;
   const mcpServers = existingSettings.mcpServers || {};

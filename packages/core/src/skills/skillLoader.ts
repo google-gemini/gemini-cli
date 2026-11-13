@@ -10,6 +10,7 @@ import { glob } from 'glob';
 import { load } from 'js-yaml';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
+import { readFileWithEncoding } from '../utils/fileUtils.js';
 
 /**
  * Represents the definition of an Agent Skill.
@@ -32,7 +33,7 @@ export interface SkillDefinition {
 }
 
 export const FRONTMATTER_REGEX =
-  /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n([\s\S]*))?/;
+  /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n([\s\S]*))?$/;
 
 /**
  * Parses frontmatter content using YAML with a fallback to simple key-value parsing.
@@ -60,6 +61,17 @@ export function parseFrontmatter(
   return parseSimpleFrontmatter(content);
 }
 
+function stripOuterQuotes(value: string): string {
+  if (
+    value.length >= 2 &&
+    ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'")))
+  ) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
 /**
  * Simple frontmatter parser that extracts name and description fields.
  * Handles cases where values contain colons that would break YAML parsing.
@@ -75,22 +87,37 @@ function parseSimpleFrontmatter(
     const line = lines[i];
 
     // Match "name:" at the start of the line (optional whitespace)
-    const nameMatch = line.match(/^\s*name:\s*(.*)$/);
-    if (nameMatch) {
-      name = nameMatch[1].trim();
+    const namePrefixMatch = line.match(/^[ \t]*name[ \t]*:/i);
+    if (namePrefixMatch) {
+      name = stripOuterQuotes(line.slice(namePrefixMatch[0].length).trim());
       continue;
     }
 
     // Match "description:" at the start of the line (optional whitespace)
-    const descMatch = line.match(/^\s*description:\s*(.*)$/);
-    if (descMatch) {
-      const descLines = [descMatch[1].trim()];
+    const descPrefixMatch = line.match(/^([ \t]*)description[ \t]*:/i);
+    if (descPrefixMatch) {
+      const descIndent = descPrefixMatch[1].length;
+      const firstLine = line.slice(descPrefixMatch[0].length).trim();
+      const descLines = /^[>|][-+]?$/.test(firstLine) ? [] : [firstLine];
 
-      // Check for multi-line description (indented continuation lines)
+      // Check for multi-line description (continuation lines)
       while (i + 1 < lines.length) {
         const nextLine = lines[i + 1];
-        // If next line is indented, it's a continuation of the description
-        if (nextLine.match(/^[ \t]+\S/)) {
+        const nextIndentMatch = nextLine.match(/^[ \t]*/);
+        const nextIndent = nextIndentMatch ? nextIndentMatch[0].length : 0;
+        const isNonEmpty = nextIndent < nextLine.length;
+        const isKnownKey = /^[ \t]*(?:name|description)[ \t]*:/i.test(nextLine);
+        const isComment = /^[ \t]*#/.test(nextLine);
+        const isOtherKeyAtOrAboveDescIndent =
+          nextIndent <= descIndent &&
+          /^[ \t]*[a-zA-Z0-9_-]+[ \t]*:/.test(nextLine);
+
+        if (
+          isNonEmpty &&
+          !isKnownKey &&
+          !isComment &&
+          !isOtherKeyAtOrAboveDescIndent
+        ) {
           descLines.push(nextLine.trim());
           i++;
         } else {
@@ -98,7 +125,7 @@ function parseSimpleFrontmatter(
         }
       }
 
-      description = descLines.filter(Boolean).join(' ');
+      description = stripOuterQuotes(descLines.filter(Boolean).join(' '));
       continue;
     }
   }
@@ -165,7 +192,7 @@ export async function loadSkillFromFile(
   filePath: string,
 ): Promise<SkillDefinition | null> {
   try {
-    const content = await fs.readFile(filePath, 'utf-8');
+    const content = await readFileWithEncoding(filePath);
     const match = content.match(FRONTMATTER_REGEX);
     if (!match) {
       return null;

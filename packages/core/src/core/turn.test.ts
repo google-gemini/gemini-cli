@@ -254,7 +254,15 @@ describe('Turn', () => {
         events.push(event);
       }
 
-      expect(events).toEqual([{ type: GeminiEventType.InvalidStream }]);
+      expect(events).toEqual([
+        {
+          type: GeminiEventType.InvalidStream,
+          value: {
+            type: 'NO_FINISH_REASON',
+            message: 'Test invalid stream',
+          },
+        },
+      ]);
       expect(turn.getDebugResponses().length).toBe(0);
       expect(reportError).not.toHaveBeenCalled(); // Should not report as error
     });
@@ -734,6 +742,74 @@ describe('Turn', () => {
         { type: GeminiEventType.Retry },
         { type: GeminiEventType.Content, value: 'Success' },
       ]);
+    });
+
+    it('should reset debugResponses, pendingToolCalls, and getResponseText upon Retry', async () => {
+      const mockResponseStream = (async function* () {
+        yield {
+          type: StreamEventType.CHUNK,
+          value: {
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: 'Partial text from abandoned attempt' }],
+                },
+              },
+            ],
+            functionCalls: [{ name: 'abandoned_tool', args: {} }],
+          } as unknown as GenerateContentResponse,
+        };
+        yield { type: StreamEventType.RETRY };
+        yield {
+          type: StreamEventType.CHUNK,
+          value: {
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: 'Clean response from retried attempt' }],
+                },
+              },
+            ],
+          } as unknown as GenerateContentResponse,
+        };
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      const events = [];
+      for await (const event of turn.run(
+        { model: 'gemini' },
+        [],
+        new AbortController().signal,
+      )) {
+        events.push(event);
+      }
+
+      expect(events).toEqual([
+        {
+          type: GeminiEventType.Content,
+          value: 'Partial text from abandoned attempt',
+          traceId: undefined,
+        },
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: expect.objectContaining({ name: 'abandoned_tool' }),
+        },
+        { type: GeminiEventType.Retry },
+        {
+          type: GeminiEventType.Content,
+          value: 'Clean response from retried attempt',
+          traceId: undefined,
+        },
+      ]);
+
+      // Turn.getResponseText() must NOT contain the abandoned attempt's text
+      expect(turn.getResponseText()).toBe(
+        'Clean response from retried attempt',
+      );
+      // Turn.pendingToolCalls must NOT contain the abandoned attempt's tool call
+      expect(turn.pendingToolCalls).toHaveLength(0);
+      // Turn.getDebugResponses() must only contain the response from the retried attempt
+      expect(turn.getDebugResponses()).toHaveLength(1);
     });
 
     it.each([

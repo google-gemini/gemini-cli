@@ -45,7 +45,7 @@ export const bugMemoryCommand: SlashCommand = {
     context.ui.addItem(
       {
         type: MessageType.INFO,
-        text: `Capturing V8 heap snapshot (current RSS: ${formatBytes(rss)}).\nThis can take 20+ seconds and the CLI may be temporarily unresponsive — please do not exit.\nDestination: ${filePath}`,
+        text: `Capturing V8 heap snapshot (current RSS: ${formatBytes(rss)}).\nThis can take 20+ seconds and the CLI may be temporarily unresponsive — please do not exit.\nDestination: \`${filePath}\``,
       },
       Date.now(),
     );
@@ -78,7 +78,7 @@ export const bugMemoryCommand: SlashCommand = {
     context.ui.addItem(
       {
         type: MessageType.INFO,
-        text: `Heap snapshot saved${sizeText} in ${durationMs}ms:\n${filePath}\n\nLoad it in Chrome DevTools → Memory → "Load" to analyze. Attach it to your bug report only if it does not contain sensitive information.`,
+        text: `Heap snapshot saved${sizeText} in ${durationMs}ms:\n\`${filePath}\`\n\nLoad it in Chrome DevTools → Memory → "Load" to analyze. Attach it to your bug report only if it does not contain sensitive information.`,
       },
       Date.now(),
     );

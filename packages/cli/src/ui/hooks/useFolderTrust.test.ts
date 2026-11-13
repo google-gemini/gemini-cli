@@ -25,7 +25,12 @@ import {
   type LoadedTrustedFolders,
 } from '../../config/trustedFolders.js';
 import * as trustedFolders from '../../config/trustedFolders.js';
-import { coreEvents, ExitCodes, isHeadlessMode } from '@google/gemini-cli-core';
+import {
+  coreEvents,
+  ExitCodes,
+  isHeadlessMode,
+  FolderTrustDiscoveryService,
+} from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
 
 const mockedCwd = vi.hoisted(() => vi.fn().mockReturnValue('/mock/cwd'));
@@ -366,7 +371,7 @@ describe('useFolderTrust', () => {
   });
 
   describe('headless mode', () => {
-    it('should force trust and hide dialog in headless mode', async () => {
+    it('should propagate false to onTrustChange, hide dialog, and show warning when folder is untrusted', async () => {
       vi.mocked(isHeadlessMode).mockReturnValue(true);
       isWorkspaceTrustedSpy.mockReturnValue({
         isTrusted: false,
@@ -378,7 +383,8 @@ describe('useFolderTrust', () => {
       );
 
       expect(result.current.isFolderTrustDialogOpen).toBe(false);
-      expect(onTrustChange).toHaveBeenCalledWith(true);
+      expect(result.current.isTrusted).toBe(false);
+      expect(onTrustChange).toHaveBeenCalledWith(false);
       expect(addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
@@ -386,6 +392,256 @@ describe('useFolderTrust', () => {
         }),
         expect.any(Number),
       );
+    });
+
+    it('should propagate true to onTrustChange, hide dialog, and not show warning when folder is trusted', async () => {
+      vi.mocked(isHeadlessMode).mockReturnValue(true);
+      isWorkspaceTrustedSpy.mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+
+      const { result } = await renderHook(() =>
+        useFolderTrust(mockSettings, onTrustChange, addItem),
+      );
+
+      expect(result.current.isFolderTrustDialogOpen).toBe(false);
+      expect(result.current.isTrusted).toBe(true);
+      expect(onTrustChange).toHaveBeenCalledWith(true);
+      expect(addItem).not.toHaveBeenCalled();
+    });
+
+    it('should propagate undefined to onTrustChange and hide dialog when folder trust is undefined', async () => {
+      vi.mocked(isHeadlessMode).mockReturnValue(true);
+      isWorkspaceTrustedSpy.mockReturnValue({
+        isTrusted: undefined,
+        source: undefined,
+      });
+
+      const { result } = await renderHook(() =>
+        useFolderTrust(mockSettings, onTrustChange, addItem),
+      );
+
+      expect(result.current.isFolderTrustDialogOpen).toBe(false);
+      expect(result.current.isTrusted).toBeUndefined();
+      expect(onTrustChange).toHaveBeenCalledWith(undefined);
+      expect(addItem).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('callback stability', () => {
+    it('should not re-run effect or trigger onTrustChange again when callback references change', async () => {
+      isWorkspaceTrustedSpy.mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+
+      const initialOnTrustChange = vi.fn();
+      const initialAddItem = vi.fn();
+
+      const { rerender } = await renderHook(
+        ({ onTrustChangeCb, addItemCb }) =>
+          useFolderTrust(mockSettings, onTrustChangeCb, addItemCb),
+        {
+          initialProps: {
+            onTrustChangeCb: initialOnTrustChange,
+            addItemCb: initialAddItem,
+          },
+        },
+      );
+
+      expect(initialOnTrustChange).toHaveBeenCalledTimes(1);
+      expect(initialOnTrustChange).toHaveBeenCalledWith(true);
+
+      const newOnTrustChange = vi.fn();
+      const newAddItem = vi.fn();
+
+      rerender({
+        onTrustChangeCb: newOnTrustChange,
+        addItemCb: newAddItem,
+      });
+
+      expect(newOnTrustChange).not.toHaveBeenCalled();
+      expect(initialOnTrustChange).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not re-trigger FolderTrustDiscoveryService.discover when callback references change', async () => {
+      isWorkspaceTrustedSpy.mockReturnValue({
+        isTrusted: false,
+        source: 'file',
+      });
+      const discoverSpy = vi.spyOn(FolderTrustDiscoveryService, 'discover');
+      discoverSpy.mockClear();
+
+      const initialOnTrustChange = vi.fn();
+      const initialAddItem = vi.fn();
+
+      const { rerender } = await renderHook(
+        ({ onTrustChangeCb, addItemCb }) =>
+          useFolderTrust(mockSettings, onTrustChangeCb, addItemCb),
+        {
+          initialProps: {
+            onTrustChangeCb: initialOnTrustChange,
+            addItemCb: initialAddItem,
+          },
+        },
+      );
+
+      expect(discoverSpy).toHaveBeenCalledTimes(1);
+
+      const newOnTrustChange = vi.fn();
+      const newAddItem = vi.fn();
+
+      rerender({
+        onTrustChangeCb: newOnTrustChange,
+        addItemCb: newAddItem,
+      });
+
+      expect(discoverSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should use updated onTrustChange callback in handleFolderTrustSelect when callback reference changes', async () => {
+      isWorkspaceTrustedSpy.mockReturnValue({
+        isTrusted: undefined,
+        source: undefined,
+      });
+
+      const initialOnTrustChange = vi.fn();
+      const initialAddItem = vi.fn();
+
+      const { result, rerender } = await renderHook(
+        ({ onTrustChangeCb, addItemCb }) =>
+          useFolderTrust(mockSettings, onTrustChangeCb, addItemCb),
+        {
+          initialProps: {
+            onTrustChangeCb: initialOnTrustChange,
+            addItemCb: initialAddItem,
+          },
+        },
+      );
+
+      expect(initialOnTrustChange).toHaveBeenCalledWith(undefined);
+
+      const newOnTrustChange = vi.fn();
+      const newAddItem = vi.fn();
+
+      rerender({
+        onTrustChangeCb: newOnTrustChange,
+        addItemCb: newAddItem,
+      });
+
+      await act(async () => {
+        await result.current.handleFolderTrustSelect(
+          FolderTrustChoice.TRUST_FOLDER,
+        );
+      });
+
+      expect(newOnTrustChange).toHaveBeenCalledWith(true);
+      expect(initialOnTrustChange).not.toHaveBeenCalledWith(true);
+    });
+
+    it('should not re-run discovery effect when unrelated settings change', async () => {
+      isWorkspaceTrustedSpy.mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+
+      const onTrustChangeCb = vi.fn();
+      const addItemCb = vi.fn();
+
+      const initialSettings = {
+        merged: {
+          security: {
+            folderTrust: {
+              enabled: true,
+            },
+          },
+          ui: {
+            theme: 'default',
+          },
+        },
+        setValue: vi.fn(),
+      } as unknown as LoadedSettings;
+
+      const { rerender } = await renderHook(
+        ({ settings }) => useFolderTrust(settings, onTrustChangeCb, addItemCb),
+        {
+          initialProps: {
+            settings: initialSettings,
+          },
+        },
+      );
+
+      expect(onTrustChangeCb).toHaveBeenCalledTimes(1);
+
+      const updatedSettings = {
+        merged: {
+          security: {
+            folderTrust: {
+              enabled: true,
+            },
+          },
+          ui: {
+            theme: 'dark',
+          },
+        },
+        setValue: vi.fn(),
+      } as unknown as LoadedSettings;
+
+      rerender({
+        settings: updatedSettings,
+      });
+
+      expect(onTrustChangeCb).toHaveBeenCalledTimes(1);
+    });
+
+    it('should re-run discovery effect when folderTrust setting changes', async () => {
+      isWorkspaceTrustedSpy.mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+
+      const onTrustChangeCb = vi.fn();
+      const addItemCb = vi.fn();
+
+      const initialSettings = {
+        merged: {
+          security: {
+            folderTrust: {
+              enabled: true,
+            },
+          },
+        },
+        setValue: vi.fn(),
+      } as unknown as LoadedSettings;
+
+      const { rerender } = await renderHook(
+        ({ settings }) => useFolderTrust(settings, onTrustChangeCb, addItemCb),
+        {
+          initialProps: {
+            settings: initialSettings,
+          },
+        },
+      );
+
+      expect(onTrustChangeCb).toHaveBeenCalledTimes(1);
+
+      const updatedSettings = {
+        merged: {
+          security: {
+            folderTrust: {
+              enabled: false,
+            },
+          },
+        },
+        setValue: vi.fn(),
+      } as unknown as LoadedSettings;
+
+      rerender({
+        settings: updatedSettings,
+      });
+
+      expect(onTrustChangeCb).toHaveBeenCalledTimes(2);
     });
   });
 });

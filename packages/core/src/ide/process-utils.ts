@@ -8,6 +8,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import os from 'node:os';
 import path from 'node:path';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const execAsync = promisify(exec);
 
@@ -23,8 +24,12 @@ interface ProcessInfo {
 interface RawProcessInfo {
   ProcessId?: number;
   ParentProcessId?: number;
-  Name?: string;
-  CommandLine?: string;
+  Name?: string | null;
+  CommandLine?: string | null;
+}
+
+function isRawProcessInfo(value: unknown): value is RawProcessInfo {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -37,40 +42,101 @@ async function getProcessTableWindows(): Promise<Map<number, ProcessInfo>> {
     const powershellCommand =
       'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine | ConvertTo-Json -Compress';
     // Increase maxBuffer to handle large process lists (default is 1MB)
-    const { stdout } = await execAsync(`powershell "${powershellCommand}"`, {
-      maxBuffer: 10 * 1024 * 1024,
-    });
+    const { stdout } = await execAsync(
+      'powershell -NoProfile -NonInteractive -Command "' +
+        powershellCommand +
+        '"',
+      {
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: 5000,
+      },
+    );
 
     if (!stdout.trim()) {
       return processMap;
     }
 
-    let processes: RawProcessInfo | RawProcessInfo[];
+    let parsed: unknown;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      processes = JSON.parse(stdout);
-    } catch {
+      parsed = JSON.parse(stdout);
+    } catch (error) {
+      debugLogger.warn(
+        'Failed to parse Windows process table snapshot JSON:',
+        error,
+      );
       return processMap;
     }
 
-    if (!Array.isArray(processes)) {
-      processes = [processes];
-    }
+    const processes = Array.isArray(parsed) ? parsed : [parsed];
 
     for (const p of processes) {
-      if (p && typeof p.ProcessId === 'number') {
+      if (isRawProcessInfo(p) && typeof p.ProcessId === 'number') {
+        const name = typeof p.Name === 'string' ? p.Name : '';
+        const command =
+          typeof p.CommandLine === 'string' && p.CommandLine
+            ? p.CommandLine
+            : name;
         processMap.set(p.ProcessId, {
           pid: p.ProcessId,
-          parentPid: p.ParentProcessId || 0,
-          name: p.Name || '',
-          command: p.CommandLine || '',
+          parentPid:
+            typeof p.ParentProcessId === 'number' ? p.ParentProcessId : 0,
+          name,
+          command,
         });
       }
     }
-  } catch {
-    // Fallback or error handling if PowerShell fails
+  } catch (error) {
+    debugLogger.warn('Failed to fetch Windows process table snapshot:', error);
   }
   return processMap;
+}
+
+/**
+ * Fetches the parent process ID, name, and command for a single process ID on
+ * Windows via PowerShell CIM.
+ *
+ * @param pid The process ID to inspect.
+ * @returns A promise that resolves to the parent's PID, name, and command.
+ */
+async function getProcessInfoWindows(pid: number): Promise<{
+  parentPid: number;
+  name: string;
+  command: string;
+}> {
+  if (!Number.isInteger(pid) || pid <= 0) {
+    return { parentPid: 0, name: '', command: '' };
+  }
+
+  try {
+    const powershellCommand = `Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}' -ErrorAction SilentlyContinue | Select-Object ProcessId,ParentProcessId,Name,CommandLine | ConvertTo-Json -Compress`;
+    const { stdout } = await execAsync(
+      `powershell -NoProfile -NonInteractive -Command "${powershellCommand}"`,
+      { timeout: 3000 },
+    );
+    const trimmedStdout = stdout.trim();
+    if (!trimmedStdout) {
+      return { parentPid: 0, name: '', command: '' };
+    }
+
+    const parsed: unknown = JSON.parse(trimmedStdout);
+    const proc: unknown = Array.isArray(parsed) ? parsed[0] : parsed;
+    if (!isRawProcessInfo(proc)) {
+      return { parentPid: 0, name: '', command: '' };
+    }
+
+    return {
+      parentPid:
+        typeof proc.ParentProcessId === 'number' ? proc.ParentProcessId : 0,
+      name: typeof proc.Name === 'string' ? proc.Name : '',
+      command: typeof proc.CommandLine === 'string' ? proc.CommandLine : '',
+    };
+  } catch (error) {
+    debugLogger.warn(
+      `Failed to fetch Windows process info for PID ${pid}:`,
+      error,
+    );
+    return { parentPid: 0, name: '', command: '' };
+  }
 }
 
 /**
@@ -86,7 +152,7 @@ async function getProcessInfo(pid: number): Promise<{
 }> {
   try {
     const command = `ps -o ppid=,command= -p ${pid}`;
-    const { stdout } = await execAsync(command);
+    const { stdout } = await execAsync(command, { timeout: 3000 });
     const trimmedStdout = stdout.trim();
     if (!trimmedStdout) {
       return { parentPid: 0, name: '', command: '' };
@@ -172,8 +238,11 @@ async function getIdeProcessInfoForWindows(): Promise<{
   const myProc = processMap.get(myPid);
 
   if (!myProc) {
+    debugLogger.warn(
+      `Current process (PID ${myPid}) not found in Windows process table snapshot; falling back to single-PID CIM query.`,
+    );
     // Fallback: try to get info for current process directly if snapshot fails
-    const { command } = await getProcessInfo(myPid);
+    const { command } = await getProcessInfoWindows(myPid);
     return { pid: myPid, command };
   }
 
@@ -192,13 +261,22 @@ async function getIdeProcessInfoForWindows(): Promise<{
 
   if (ancestors.length >= 3) {
     const target = ancestors[ancestors.length - 3];
-    return { pid: target.pid, command: target.command };
+    return {
+      pid: target.pid,
+      command: target.command || target.name || 'unknown',
+    };
   } else if (ancestors.length > 0) {
     const target = ancestors[ancestors.length - 1];
-    return { pid: target.pid, command: target.command };
+    return {
+      pid: target.pid,
+      command: target.command || target.name || 'unknown',
+    };
   }
 
-  return { pid: myPid, command: myProc.command };
+  return {
+    pid: myPid,
+    command: myProc.command || myProc.name || 'unknown',
+  };
 }
 
 /**
@@ -230,9 +308,8 @@ export async function getIdeProcessInfo(): Promise<{
     const idePid = parseInt(process.env['GEMINI_CLI_IDE_PID'], 10);
     if (!isNaN(idePid) && idePid > 0) {
       if (platform === 'win32') {
-        const processMap = await getProcessTableWindows();
-        const proc = processMap.get(idePid);
-        return { pid: idePid, command: proc?.command || '' };
+        const { command } = await getProcessInfoWindows(idePid);
+        return { pid: idePid, command };
       }
       const { command } = await getProcessInfo(idePid);
       return { pid: idePid, command };

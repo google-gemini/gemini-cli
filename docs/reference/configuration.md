@@ -66,9 +66,14 @@ variables using `$VAR_NAME`, `${VAR_NAME}`, or `${VAR_NAME:-DEFAULT_VALUE}`
 syntax. These variables will be automatically resolved when the settings are
 loaded. For example, if you have an environment variable `MY_API_TOKEN`, you
 could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`. If you
-want to provide a fallback value, use `${MY_API_TOKEN:-default-token}`.
-Additionally, each extension can have its own `.env` file in its directory,
-which will be loaded automatically.
+want to provide a fallback value, use `${MY_API_TOKEN:-default-token}`. You can
+reference variables from your shell environment as well as variables loaded from
+[`.env` files](#environment-variables-and-env-files). The settings that control
+how `.env` files are loaded, such as `security.folderTrust.enabled`,
+`advanced.ignoreLocalEnv`, `advanced.excludedEnvVars`, and `tools.sandbox`, are
+evaluated before any `.env` file is loaded, so they can only reference variables
+from your shell environment. Additionally, each extension can have its own
+`.env` file in its directory, which will be loaded automatically.
 
 **Note for Enterprise Users:** For guidance on deploying and managing Gemini CLI
 in a corporate environment, see the
@@ -542,6 +547,14 @@ their corresponding top-level category object in your `settings.json` file.
     session. -1 means unlimited.
   - **Default:** `-1`
 
+- **`model.requestTimeoutMs`** (number):
+
+  - **Description:** How long to wait, in milliseconds, for the API to start
+    responding before a request is aborted and retried. Defaults to 60000. Raise
+    this if long-thinking requests are timing out.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
 - **`model.summarizeToolOutput`** (object):
 
   - **Description:** Enables or disables summarization of tool output. Configure
@@ -672,10 +685,22 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3.1-flash-lite"
         }
       },
+      "gemini-3.5-flash-lite": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.5-flash-lite"
+        }
+      },
       "gemini-3.5-flash": {
         "extends": "chat-base-3",
         "modelConfig": {
           "model": "gemini-3.5-flash"
+        }
+      },
+      "gemini-3.8-flash": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.8-flash"
         }
       },
       "gemma-4-31b-it": {
@@ -914,6 +939,16 @@ their corresponding top-level category object in your `settings.json` file.
           "multimodalToolUse": true
         }
       },
+      "gemini-3.5-flash-lite": {
+        "tier": "flash-lite",
+        "family": "gemini-3",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": true
+        }
+      },
       "gemini-3.1-pro-preview": {
         "tier": "pro",
         "family": "gemini-3",
@@ -955,6 +990,16 @@ their corresponding top-level category object in your `settings.json` file.
         }
       },
       "gemini-3.5-flash": {
+        "tier": "flash",
+        "family": "gemini-3",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": true
+        }
+      },
+      "gemini-3.8-flash": {
         "tier": "flash",
         "family": "gemini-3",
         "isPreview": false,
@@ -1019,7 +1064,7 @@ their corresponding top-level category object in your `settings.json` file.
       "auto": {
         "displayName": "Auto",
         "tier": "auto",
-        "isPreview": true,
+        "isPreview": false,
         "isVisible": true,
         "features": {
           "thinking": true,
@@ -1118,16 +1163,16 @@ their corresponding top-level category object in your `settings.json` file.
           {
             "condition": {
               "hasAccessToPreview": false,
-              "useGemini3_5Flash": true
+              "useLatestFlash": true
             },
-            "target": "gemini-3.5-flash"
+            "target": "gemini-3.8-flash"
           },
           {
             "condition": {
               "hasAccessToPreview": false,
-              "useGemini3_5Flash": false
+              "useLatestFlash": false
             },
-            "target": "gemini-2.5-flash"
+            "target": "gemini-3.5-flash"
           }
         ]
       },
@@ -1136,29 +1181,25 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
-              "useGemini3_5Flash": false,
-              "hasAccessToPreview": false
+              "useLatestFlash": true
             },
-            "target": "gemini-2.5-flash"
-          },
-          {
-            "condition": {
-              "useGemini3_5Flash": false
-            },
-            "target": "gemini-3-flash-preview"
+            "target": "gemini-3.8-flash"
           }
         ]
       },
-      "gemini-2.5-flash": {
-        "default": "gemini-2.5-flash",
+      "gemini-3.8-flash": {
+        "default": "gemini-3.8-flash",
         "contexts": [
           {
             "condition": {
-              "useGemini3_5Flash": true
+              "useLatestFlash": false
             },
             "target": "gemini-3.5-flash"
           }
         ]
+      },
+      "gemini-2.5-flash": {
+        "default": "gemini-2.5-flash"
       },
       "gemini-3-pro-preview": {
         "default": "gemini-3-pro-preview",
@@ -1233,27 +1274,54 @@ their corresponding top-level category object in your `settings.json` file.
         ]
       },
       "gemini-3.1-flash-lite": {
-        "default": "gemini-3.1-flash-lite"
+        "default": "gemini-3.1-flash-lite",
+        "contexts": [
+          {
+            "condition": {
+              "useLatestFlashLite": true
+            },
+            "target": "gemini-3.5-flash-lite"
+          }
+        ]
+      },
+      "gemini-3.5-flash-lite": {
+        "default": "gemini-3.5-flash-lite",
+        "contexts": [
+          {
+            "condition": {
+              "useLatestFlashLite": false
+            },
+            "target": "gemini-3.1-flash-lite"
+          }
+        ]
       },
       "flash": {
         "default": "gemini-3-flash-preview",
         "contexts": [
           {
             "condition": {
-              "useGemini3_5Flash": true
+              "useLatestFlash": true
             },
-            "target": "gemini-3.5-flash"
+            "target": "gemini-3.8-flash"
           },
           {
             "condition": {
               "hasAccessToPreview": false
             },
-            "target": "gemini-2.5-flash"
+            "target": "gemini-3.5-flash"
           }
         ]
       },
       "flash-lite": {
-        "default": "gemini-3.1-flash-lite"
+        "default": "gemini-3.1-flash-lite",
+        "contexts": [
+          {
+            "condition": {
+              "useLatestFlashLite": true
+            },
+            "target": "gemini-3.5-flash-lite"
+          }
+        ]
       },
       "auto-gemini-3": {
         "default": "gemini-3-pro-preview",
@@ -1300,21 +1368,21 @@ their corresponding top-level category object in your `settings.json` file.
         "contexts": [
           {
             "condition": {
-              "useGemini3_5Flash": true
+              "useLatestFlash": true
             },
-            "target": "gemini-3.5-flash"
+            "target": "gemini-3.8-flash"
           },
           {
             "condition": {
               "hasAccessToPreview": false
             },
-            "target": "gemini-2.5-flash"
+            "target": "gemini-3.5-flash"
           },
           {
             "condition": {
               "requestedModels": ["gemini-2.5-pro", "auto-gemini-2.5"]
             },
-            "target": "gemini-2.5-flash"
+            "target": "gemini-3.5-flash"
           }
         ]
       },
@@ -1447,7 +1515,7 @@ their corresponding top-level category object in your `settings.json` file.
           }
         },
         {
-          "model": "gemini-2.5-flash",
+          "model": "gemini-3.5-flash",
           "isLastResort": true,
           "maxAttempts": 10,
           "actions": {
@@ -1482,7 +1550,7 @@ their corresponding top-level category object in your `settings.json` file.
           }
         },
         {
-          "model": "gemini-2.5-flash",
+          "model": "gemini-3.5-flash",
           "isLastResort": true,
           "maxAttempts": 10,
           "actions": {
@@ -1501,7 +1569,7 @@ their corresponding top-level category object in your `settings.json` file.
       ],
       "lite": [
         {
-          "model": "flash-lite",
+          "model": "gemini-3.1-flash-lite",
           "actions": {
             "terminal": "silent",
             "transient": "silent",
@@ -1516,7 +1584,7 @@ their corresponding top-level category object in your `settings.json` file.
           }
         },
         {
-          "model": "gemini-2.5-flash",
+          "model": "gemini-3.5-flash",
           "actions": {
             "terminal": "silent",
             "transient": "silent",
@@ -2487,6 +2555,8 @@ see [Telemetry](../cli/telemetry.md).
   - **`otlpEndpoint`** (string): The endpoint for the OTLP Exporter.
   - **`otlpProtocol`** (string): The protocol for the OTLP Exporter (`grpc` or
     `http`).
+  - **`otlpHeaders`** (object): Custom headers to send with OTLP Exporter
+    requests.
   - **`logPrompts`** (boolean): Whether or not to include the content of user
     prompts in the logs.
   - **`outfile`** (string): The file to write telemetry to when `target` is
@@ -2703,6 +2773,11 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GEMINI_TELEMETRY_OTLP_PROTOCOL`**:
   - Sets the OTLP protocol (`grpc` or `http`).
   - Overrides the `telemetry.otlpProtocol` setting.
+- **`GEMINI_TELEMETRY_OTLP_HEADERS`**:
+  - Sets custom headers for OTLP exporter requests (as a JSON object string or
+    comma-separated `key=value` pairs; also falls back to
+    `OTEL_EXPORTER_OTLP_HEADERS`).
+  - Merges with and overrides headers in the `telemetry.otlpHeaders` setting.
 - **`GEMINI_TELEMETRY_LOG_PROMPTS`**:
   - Set to `true` or `1` to enable or disable logging of user prompts. Any other
     value is treated as disabling it.

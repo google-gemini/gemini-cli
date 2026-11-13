@@ -15,6 +15,7 @@ import { debugLogger } from './debugLogger.js';
 import {
   TerminalQuotaError,
   RetryableQuotaError,
+  ValidationRequiredError,
 } from './googleQuotaErrors.js';
 import { PREVIEW_GEMINI_MODEL } from '../config/models.js';
 import type { ModelPolicy } from '../availability/modelPolicy.js';
@@ -586,6 +587,35 @@ describe('retryWithBackoff', () => {
       await expect(promise).resolves.toBe('success');
       expect(mockFn).toHaveBeenCalledTimes(2);
     });
+
+    it.each([
+      'ENETUNREACH',
+      'EHOSTUNREACH',
+      'ENETDOWN',
+      'EACCES',
+      'ERR_INVALID_URL',
+      'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+      'SELF_SIGNED_CERT_IN_CHAIN',
+      'ERR_TLS_CERT_ALTNAME_INVALID',
+    ])(
+      "should fail fast without retrying on 'fetch failed' caused by deterministic network/TLS error code (%s) even when retryFetchErrors is true",
+      async (code) => {
+        const cause = new Error(`Permanent failure: ${code}`);
+        (cause as any).code = code;
+        const fetchError = new TypeError('fetch failed', { cause });
+
+        const mockFn = vi.fn().mockRejectedValue(fetchError);
+
+        const promise = retryWithBackoff(mockFn, {
+          retryFetchErrors: true,
+          maxAttempts: 5,
+          initialDelayMs: 10,
+        });
+
+        await expect(promise).rejects.toThrow('fetch failed');
+        expect(mockFn).toHaveBeenCalledTimes(1);
+      },
+    );
   });
 
   describe('Flash model fallback for OAuth users', () => {
@@ -936,6 +966,169 @@ describe('retryWithBackoff', () => {
         getAvailabilityContext: getContext,
       }).catch(() => {});
       expect(mockService.markTerminal).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Capacity Exhaustion Context-Aware Retries (Option 2)', () => {
+    it('should retry automatically when onPersistent429 is undefined (unattended runs)', async () => {
+      const capacityError = new TerminalQuotaError(
+        'Resource has been exhausted (e.g. MODEL_CAPACITY_EXHAUSTED).',
+        {
+          code: 429,
+          message: 'MODEL_CAPACITY_EXHAUSTED',
+          details: [
+            {
+              '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+              reason: 'MODEL_CAPACITY_EXHAUSTED',
+            },
+          ],
+        },
+        undefined,
+        'MODEL_CAPACITY_EXHAUSTED',
+      );
+
+      const fn = vi
+        .fn()
+        .mockRejectedValueOnce(capacityError)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(fn, {
+        maxAttempts: 3,
+        initialDelayMs: 1,
+        maxDelayMs: 2,
+        onPersistent429: undefined, // unattended mode
+      });
+
+      await vi.runAllTimersAsync();
+      const result = await promise;
+      expect(result).toBe('success');
+      expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should silently retry up to 2 times and succeed on the 3rd attempt in interactive mode without calling onPersistent429', async () => {
+      const capacityError = new TerminalQuotaError(
+        'Resource has been exhausted (e.g. MODEL_CAPACITY_EXHAUSTED).',
+        {
+          code: 429,
+          message: 'MODEL_CAPACITY_EXHAUSTED',
+          details: [
+            {
+              '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+              reason: 'MODEL_CAPACITY_EXHAUSTED',
+            },
+          ],
+        },
+        undefined,
+        'MODEL_CAPACITY_EXHAUSTED',
+      );
+
+      const fn = vi
+        .fn()
+        .mockRejectedValueOnce(capacityError)
+        .mockRejectedValueOnce(capacityError)
+        .mockResolvedValue('success');
+
+      const onPersistent429 = vi.fn().mockResolvedValue(null);
+
+      const promise = retryWithBackoff(fn, {
+        maxAttempts: 5,
+        initialDelayMs: 1,
+        maxDelayMs: 2,
+        onPersistent429, // interactive mode
+      });
+
+      await vi.runAllTimersAsync();
+      const result = await promise;
+      expect(result).toBe('success');
+      expect(fn).toHaveBeenCalledTimes(3);
+      expect(onPersistent429).not.toHaveBeenCalled();
+    });
+
+    it('should silently retry up to 2 times and invoke onPersistent429 on the 3rd failure in interactive mode', async () => {
+      const capacityError = new TerminalQuotaError(
+        'Resource has been exhausted (e.g. MODEL_CAPACITY_EXHAUSTED).',
+        {
+          code: 429,
+          message: 'MODEL_CAPACITY_EXHAUSTED',
+          details: [
+            {
+              '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+              reason: 'MODEL_CAPACITY_EXHAUSTED',
+            },
+          ],
+        },
+        undefined,
+        'MODEL_CAPACITY_EXHAUSTED',
+      );
+
+      const fn = vi
+        .fn()
+        .mockRejectedValueOnce(capacityError)
+        .mockRejectedValueOnce(capacityError)
+        .mockRejectedValueOnce(capacityError)
+        .mockResolvedValue('success');
+
+      const onPersistent429 = vi.fn().mockResolvedValue(null);
+
+      const promise = retryWithBackoff(fn, {
+        maxAttempts: 5,
+        initialDelayMs: 1,
+        maxDelayMs: 2,
+        onPersistent429, // interactive mode
+      });
+
+      await Promise.all([
+        expect(promise).rejects.toThrow(TerminalQuotaError),
+        vi.runAllTimersAsync(),
+      ]);
+      expect(fn).toHaveBeenCalledTimes(3);
+      expect(onPersistent429).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('ValidationRequiredError handling', () => {
+    it('should retry and resolve when onValidationRequired returns verify', async () => {
+      const validationError = new ValidationRequiredError(
+        'Validation required',
+        undefined,
+        'https://accounts.google.com/verify',
+        'Please verify',
+      );
+      const fn = vi
+        .fn()
+        .mockRejectedValueOnce(validationError)
+        .mockResolvedValueOnce('verified-success');
+      const onValidationRequired = vi.fn().mockResolvedValue('verify');
+
+      const result = await retryWithBackoff(fn, {
+        maxAttempts: 2,
+        onValidationRequired,
+      });
+
+      expect(result).toBe('verified-success');
+      expect(onValidationRequired).toHaveBeenCalledTimes(1);
+      expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should bound verification retries to prevent an infinite verification loop', async () => {
+      const validationError = new ValidationRequiredError(
+        'Validation required',
+        undefined,
+        'https://accounts.google.com/verify',
+        'Please verify',
+      );
+      const fn = vi.fn().mockRejectedValue(validationError);
+      const onValidationRequired = vi.fn().mockResolvedValue('verify');
+
+      await expect(
+        retryWithBackoff(fn, {
+          maxAttempts: 2,
+          onValidationRequired,
+        }),
+      ).rejects.toThrow(ValidationRequiredError);
+
+      expect(onValidationRequired).toHaveBeenCalledTimes(3);
+      expect(fn).toHaveBeenCalledTimes(4);
     });
   });
 });
