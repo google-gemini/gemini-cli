@@ -27,7 +27,7 @@ import {
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
-import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
+import { PolicyDecision, ApprovalMode } from '../policy/types.js';
 import {
   Kind,
   ToolConfirmationOutcome,
@@ -711,10 +711,15 @@ export class Scheduler {
         decision = PolicyDecision.ASK_USER;
       }
 
+      const isYoloMode =
+        this.config.getApprovalMode() === ApprovalMode.YOLO &&
+        !(this.config.isYoloModeDisabled?.() ?? false);
+
       if (isCommandParseCacheAware(toolCall.invocation)) {
         await toolCall.invocation.prepareCommandParseCache(signal);
       }
       const hasTaintRisk =
+        !isYoloMode &&
         isTaintRiskDetectable(toolCall.invocation) &&
         toolCall.invocation.hasTaintedOrBuildFileRisk();
 
