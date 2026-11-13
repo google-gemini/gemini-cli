@@ -119,7 +119,7 @@ export async function handleList(
 
   const authType =
     settings.merged.security?.auth?.selectedType ?? getAuthTypeFromEnv();
-  if (authType && !settings.merged.security?.auth?.useExternal) {
+  if (authType && !(settings.merged.security?.auth?.useExternal ?? false)) {
     await config.refreshAuth(authType);
   }
 
