@@ -4520,13 +4520,13 @@ describe('PolicyEngine', () => {
       expect(makefileCheck.decision).toBe(PolicyDecision.ASK_USER);
     });
 
-    it('should require ASK_USER for build files even in YOLO mode', async () => {
-      const engine = new PolicyEngine({
+    it('should allow build files in trusted YOLO mode while still requiring ASK_USER in untrusted folders', async () => {
+      const trustedEngine = new PolicyEngine({
         approvalMode: ApprovalMode.YOLO,
       });
 
       // Regular file should be ALLOWed in YOLO mode
-      const regularCheck = await engine.check(
+      const regularCheck = await trustedEngine.check(
         {
           name: 'replace',
           args: { file_path: 'src/main.py', instruction: 'edit' },
@@ -4535,15 +4535,44 @@ describe('PolicyEngine', () => {
       );
       expect(regularCheck.decision).toBe(PolicyDecision.ALLOW);
 
-      // BUILD.bazel must still require ASK_USER
-      const buildCheck = await engine.check(
+      // BUILD.bazel and package.json should also be ALLOWed in trusted YOLO mode
+      const buildCheck = await trustedEngine.check(
         {
           name: 'replace',
           args: { file_path: 'BUILD.bazel', instruction: 'edit' },
         },
         undefined,
       );
-      expect(buildCheck.decision).toBe(PolicyDecision.ASK_USER);
+      expect(buildCheck.decision).toBe(PolicyDecision.ALLOW);
+
+      // Non-interactive trusted YOLO mode should also ALLOW build file edits
+      const nonInteractiveYoloEngine = new PolicyEngine({
+        approvalMode: ApprovalMode.YOLO,
+        nonInteractive: true,
+      });
+      const headlessBuildCheck = await nonInteractiveYoloEngine.check(
+        {
+          name: 'write_file',
+          args: { file_path: 'package.json', content: '{}' },
+        },
+        undefined,
+      );
+      expect(headlessBuildCheck.decision).toBe(PolicyDecision.ALLOW);
+
+      // Untrusted folder must still enforce Build File Protection even if approvalMode is YOLO
+      const untrustedEngine = new PolicyEngine({
+        approvalMode: ApprovalMode.YOLO,
+        isTrustedFolder: () => false,
+      });
+      const untrustedBuildCheck = await untrustedEngine.check(
+        {
+          name: 'replace',
+          args: { file_path: 'BUILD.bazel', instruction: 'edit' },
+        },
+        undefined,
+      );
+      expect(untrustedBuildCheck.decision).toBe(PolicyDecision.ASK_USER);
+      expect(untrustedBuildCheck.rule?.source).toBe('Build File Protection');
     });
 
     it('should return DENY for build files in nonInteractive mode when otherwise ALLOWed', async () => {
