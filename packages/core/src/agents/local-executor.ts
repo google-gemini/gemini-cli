@@ -355,11 +355,31 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // (e.g., superseding stale tool outputs to reclaim context tokens).
     await this.definition.onBeforeTurn?.(chat, combinedSignal);
 
-    const { functionCalls, modelToUse } = await promptIdContext.run(
-      promptId,
-      async () =>
-        this.callModel(chat, currentMessage, combinedSignal, promptId),
-    );
+    // Optionally bound this turn's model response, so one stalled call cannot
+    // silently use up the whole run deadline.
+    const turnTimeoutMs =
+      (this.definition.runConfig.maxTurnTimeMinutes ?? 0) * 60 * 1000;
+    const turnController = new AbortController();
+    const turnTimeout =
+      turnTimeoutMs > 0
+        ? setTimeout(() => turnController.abort(), turnTimeoutMs)
+        : undefined;
+    const modelSignal = turnTimeout
+      ? AbortSignal.any([combinedSignal, turnController.signal])
+      : combinedSignal;
+
+    const modelResult = await promptIdContext
+      .run(promptId, async () =>
+        this.callModel(chat, currentMessage, modelSignal, promptId),
+      )
+      .catch((error: unknown) => {
+        // An abort caused by the turn timer is reported below.
+        if (turnController.signal.aborted && !combinedSignal.aborted) {
+          return undefined;
+        }
+        throw error;
+      })
+      .finally(() => clearTimeout(turnTimeout));
 
     if (combinedSignal.aborted) {
       const terminateReason = timeoutSignal.aborted
@@ -371,6 +391,23 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         finalResult: null, // 'run' method will set the final timeout string
       };
     }
+
+    if (!modelResult || turnController.signal.aborted) {
+      const error = `Agent stopped: the model did not respond within ${turnTimeoutMs / 1000} seconds.`;
+      this.emitActivity('ERROR', {
+        error,
+        context: 'timeout',
+        errorType: SubagentActivityErrorType.GENERIC,
+      });
+      // ERROR skips the recovery turn, which would wait on the same model.
+      return {
+        status: 'stop',
+        terminateReason: AgentTerminateMode.ERROR,
+        finalResult: error,
+      };
+    }
+
+    const { functionCalls, modelToUse } = modelResult;
 
     // If the model stops calling tools without calling complete_task, it's an error.
     if (functionCalls.length === 0) {

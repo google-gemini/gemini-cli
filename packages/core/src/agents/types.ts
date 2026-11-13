@@ -381,6 +381,13 @@ export interface RunConfig {
    * If not specified, defaults to DEFAULT_MAX_TURNS (30).
    */
   maxTurns?: number;
+  /**
+   * The maximum time in minutes to wait for the model's response in a single
+   * turn (tool execution is not counted). If exceeded, the agent stops with
+   * an error instead of waiting out `maxTimeMinutes`.
+   * If not specified, a turn is bounded only by `maxTimeMinutes`.
+   */
+  maxTurnTimeMinutes?: number;
 }
 
 /**

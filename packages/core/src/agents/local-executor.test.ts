@@ -125,6 +125,7 @@ import type {
   ResolvedModelConfig,
 } from '../services/modelConfigService.js';
 import { getModelConfigAlias, type AgentRegistry } from './registry.js';
+import { CliHelpAgent } from './cli-help-agent.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 
 let mockChatHistory: Content[] = [];
@@ -2667,6 +2668,166 @@ describe('LocalAgentExecutor', () => {
       const output = await executor.run({ goal: 'Abort test' }, signal);
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.ABORTED);
+    });
+  });
+
+  describe('run (Turn Timeout)', () => {
+    /** Mocks a model call that sends nothing until its signal is aborted. */
+    const mockStalledModelCall = (throwOnAbort: boolean) => {
+      mockSendMessageStream.mockImplementationOnce(
+        async (_key, _message, _promptId, signal: AbortSignal) =>
+          // eslint-disable-next-line require-yield
+          (async function* () {
+            await new Promise<void>((resolve, reject) =>
+              signal.addEventListener(
+                'abort',
+                () => {
+                  if (!throwOnAbort) return resolve();
+                  const error = new Error('The operation was aborted.');
+                  error.name = 'AbortError';
+                  reject(error);
+                },
+                { once: true },
+              ),
+            );
+          })(),
+      );
+    };
+
+    it.each([
+      { stream: 'ends', throwOnAbort: false },
+      { stream: 'throws an AbortError', throwOnAbort: true },
+    ])(
+      'should stop with ERROR, without a recovery turn, when a stalled stream $stream after maxTurnTimeMinutes',
+      async ({ throwOnAbort }) => {
+        const definition = createTestDefinition([LS_TOOL_NAME], {
+          maxTimeMinutes: 3,
+          maxTurnTimeMinutes: 0.5,
+        });
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+        mockStalledModelCall(throwOnAbort);
+
+        const runPromise = executor.run({ goal: 'Stall test' }, signal);
+        await vi.advanceTimersByTimeAsync(31 * 1000);
+        const output = await runPromise;
+
+        expect(output.terminate_reason).toBe(AgentTerminateMode.ERROR);
+        expect(output.result).toBe(
+          'Agent stopped: the model did not respond within 30 seconds.',
+        );
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
+        expect(activities).toContainEqual(
+          expect.objectContaining({
+            type: 'ERROR',
+            data: expect.objectContaining({
+              context: 'timeout',
+              error: output.result,
+            }),
+          }),
+        );
+      },
+    );
+
+    it('should not count tool execution time and should clear the turn timer', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME], {
+        maxTimeMinutes: 3,
+        maxTurnTimeMinutes: 0.5,
+      });
+      const executor = await LocalAgentExecutor.create(definition, mockConfig);
+
+      mockModelResponse([
+        { name: LS_TOOL_NAME, args: { path: '.' }, id: 't1' },
+      ]);
+      // A tool that runs longer than the turn limit.
+      mockScheduleAgentTools.mockImplementationOnce(
+        async (_ctx, requests: ToolCallRequestInfo[]) => {
+          await vi.advanceTimersByTimeAsync(45 * 1000);
+          return [
+            {
+              status: 'success',
+              request: requests[0],
+              tool: {} as AnyDeclarativeTool,
+              invocation: {} as unknown as AnyToolInvocation,
+              response: {
+                callId: 't1',
+                resultDisplay: 'ok',
+                responseParts: [
+                  {
+                    functionResponse: {
+                      name: LS_TOOL_NAME,
+                      response: {},
+                      id: 't1',
+                    },
+                  },
+                ],
+                error: undefined,
+                errorType: undefined,
+                contentLength: undefined,
+              },
+            },
+          ];
+        },
+      );
+      mockModelResponse([
+        {
+          name: COMPLETE_TASK_TOOL_NAME,
+          args: { finalResult: 'Done' },
+          id: 't2',
+        },
+      ]);
+
+      const output = await executor.run({ goal: 'Slow tool' }, signal);
+
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output.result).toBe('Done');
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('should bound the recovery turn after an empty model turn', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME], {
+        maxTimeMinutes: 3,
+        maxTurnTimeMinutes: 0.25, // Shorter than the 60s grace period.
+      });
+      const executor = await LocalAgentExecutor.create(definition, mockConfig);
+
+      // Turn 1: an empty response (no text, no tool calls).
+      mockModelResponse([]);
+      // Recovery turn: the model stalls.
+      mockStalledModelCall(true);
+
+      const runPromise = executor.run({ goal: 'Empty turn' }, signal);
+      await vi.advanceTimersByTimeAsync(16 * 1000);
+      const output = await runPromise;
+
+      expect(output.terminate_reason).toBe(
+        AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
+      );
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+    });
+
+    it('should make cli_help fail fast instead of waiting out its 3-minute limit', async () => {
+      const executor = await LocalAgentExecutor.create(
+        CliHelpAgent(mockConfig) as LocalAgentDefinition,
+        mockConfig,
+      );
+      mockStalledModelCall(true);
+
+      const runPromise = executor.run(
+        { question: 'How do I upgrade Gemini CLI?' },
+        signal,
+      );
+      await vi.advanceTimersByTimeAsync(61 * 1000);
+      const output = await runPromise;
+
+      expect(output.terminate_reason).toBe(AgentTerminateMode.ERROR);
+      expect(output.result).toBe(
+        'Agent stopped: the model did not respond within 60 seconds.',
+      );
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
     });
   });
 
