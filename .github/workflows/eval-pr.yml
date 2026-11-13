@@ -47,7 +47,7 @@ jobs:
           PR_HEAD_SHA: '${{ github.event.pull_request.head.sha }}'
         run: |
           # Fetch the fork's PR branch for analysis
-          git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-head
+          git fetch --no-tags origin "${{ github.event.pull_request.head.sha }}:pr-head"
 
           # Run the trusted script from main
           SHOULD_RUN=$(node scripts/changed_prompt.js)
