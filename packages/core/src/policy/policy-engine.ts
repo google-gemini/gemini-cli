@@ -282,6 +282,7 @@ export class PolicyEngine {
   private approvalMode: ApprovalMode;
   private readonly sandboxManager: SandboxManager;
   private readonly isTrustedFolderFn?: () => boolean;
+  private readonly isYoloModeDisabledFn?: () => boolean;
 
   constructor(config: PolicyEngineConfig = {}, checkerRunner?: CheckerRunner) {
     this.rules = (config.rules ?? []).sort(
@@ -338,6 +339,7 @@ export class PolicyEngine {
     this.approvalMode = config.approvalMode ?? ApprovalMode.DEFAULT;
     this.sandboxManager = config.sandboxManager ?? new NoopSandboxManager();
     this.isTrustedFolderFn = config.isTrustedFolder;
+    this.isYoloModeDisabledFn = config.isYoloModeDisabled;
   }
 
   isTrustedFolder(): boolean {
@@ -345,6 +347,13 @@ export class PolicyEngine {
       return this.isTrustedFolderFn();
     }
     return true;
+  }
+
+  isYoloModeDisabled(): boolean {
+    if (this.isYoloModeDisabledFn) {
+      return this.isYoloModeDisabledFn();
+    }
+    return false;
   }
 
   /**
@@ -1104,28 +1113,35 @@ export class PolicyEngine {
         }
       }
 
-      // Build File Protection: Always require user confirmation when modifying build configuration files
-      const isFileEditTool = toolNamesToTry.some((name) => {
-        if (
-          EDIT_TOOL_NAMES.has(name) ||
-          name === 'replace' ||
-          name === 'write_file'
-        ) {
-          return true;
-        }
-        const editKeywords = new Set([
-          'write',
-          'edit',
-          'replace',
-          'patch',
-          'update',
-          'create',
-          'append',
-          'save',
-        ]);
-        const tokens = name.toLowerCase().split(/[^a-z0-9]+/);
-        return tokens.some((token) => editKeywords.has(token));
-      });
+      // Build File Protection: Require user confirmation when modifying build
+      // configuration files outside active, trusted YOLO mode.
+      const isActiveYoloMode =
+        this.approvalMode === ApprovalMode.YOLO &&
+        this.isTrustedFolder() &&
+        !this.isYoloModeDisabled();
+      const isFileEditTool =
+        !isActiveYoloMode &&
+        toolNamesToTry.some((name) => {
+          if (
+            EDIT_TOOL_NAMES.has(name) ||
+            name === 'replace' ||
+            name === 'write_file'
+          ) {
+            return true;
+          }
+          const editKeywords = new Set([
+            'write',
+            'edit',
+            'replace',
+            'patch',
+            'update',
+            'create',
+            'append',
+            'save',
+          ]);
+          const tokens = name.toLowerCase().split(/[^a-z0-9]+/);
+          return tokens.some((token) => editKeywords.has(token));
+        });
       if (isFileEditTool) {
         let targetPath = extractFilePathFromArgs(toolCall.args);
         if (targetPath) {

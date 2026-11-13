@@ -2623,6 +2623,30 @@ describe('isYoloModeDisabled', () => {
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
     expect(config.isYoloModeDisabled()).toBe(true);
   });
+
+  it('should propagate isYoloModeDisabled to PolicyEngine', () => {
+    const enabledConfig = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.YOLO,
+    });
+    vi.spyOn(enabledConfig, 'isTrustedFolder').mockReturnValue(true);
+    expect(enabledConfig.getPolicyEngine().isYoloModeDisabled()).toBe(false);
+
+    const disabledConfig = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.YOLO,
+      disableYoloMode: true,
+    });
+    vi.spyOn(disabledConfig, 'isTrustedFolder').mockReturnValue(true);
+    expect(disabledConfig.getPolicyEngine().isYoloModeDisabled()).toBe(true);
+
+    const untrustedConfig = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.YOLO,
+    });
+    vi.spyOn(untrustedConfig, 'isTrustedFolder').mockReturnValue(false);
+    expect(untrustedConfig.getPolicyEngine().isYoloModeDisabled()).toBe(true);
+  });
 });
 
 describe('BaseLlmClient Lifecycle', () => {

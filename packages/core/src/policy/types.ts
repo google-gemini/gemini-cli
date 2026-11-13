@@ -348,6 +348,12 @@ export interface PolicyEngineConfig {
    * Callback or boolean indicating whether the current workspace is trusted.
    */
   isTrustedFolder?: () => boolean;
+
+  /**
+   * Callback indicating whether YOLO mode is disabled (e.g., by admin settings
+   * or an untrusted folder).
+   */
+  isYoloModeDisabled?: () => boolean;
 }
 
 export interface PolicySettings {

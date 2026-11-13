@@ -1346,6 +1346,7 @@ export class Config implements McpContext, AgentLoopContext {
       params.policyUpdateConfirmationRequest;
 
     this.disableAlwaysAllow = params.disableAlwaysAllow ?? false;
+    this.disableYoloMode = params.disableYoloMode ?? false;
     const engineApprovalMode =
       params.approvalMode ??
       params.policyEngineConfig?.approvalMode ??
@@ -1357,6 +1358,7 @@ export class Config implements McpContext, AgentLoopContext {
         disableAlwaysAllow: this.disableAlwaysAllow,
         sandboxManager: this.sandboxManager,
         isTrustedFolder: () => this.isTrustedFolder(),
+        isYoloModeDisabled: () => this.isYoloModeDisabled(),
       },
       checkerRunner,
     );
@@ -1396,7 +1398,6 @@ export class Config implements McpContext, AgentLoopContext {
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
       DEFAULT_MAX_ATTEMPTS,
     );
-    this.disableYoloMode = params.disableYoloMode ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
 
