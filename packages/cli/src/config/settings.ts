@@ -23,7 +23,9 @@ import {
   createCache,
   isFileAndDirectorySecureSync,
   createPathSecurityCache,
+  type PathSecurityCache,
 } from '@google/gemini-cli-core';
+import { parse } from 'shell-quote';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
 import { DefaultDark } from '../ui/themes/builtin/dark/default-dark.js';
@@ -932,6 +934,192 @@ function resolveSettings(
   return (validationResult.data as Settings) ?? expandedSettings;
 }
 
+const SCRIPT_INTERPRETERS = new Set([
+  'sh',
+  'bash',
+  'zsh',
+  'dash',
+  'ksh',
+  'node',
+  'nodejs',
+  'python',
+  'python3',
+  'ruby',
+  'perl',
+  'php',
+  'pwsh',
+  'powershell',
+  'deno',
+  'bun',
+  'tsx',
+]);
+
+const INLINE_EVAL_FLAGS = new Set([
+  '-c',
+  '-e',
+  '--eval',
+  '-p',
+  '--print',
+  '-command',
+  '-encodedcommand',
+]);
+
+interface SystemMcpCommandCheckContext {
+  workspaceDir: string;
+  settingsFilePath: string;
+  fileLabel: string;
+  securityCache: PathSecurityCache;
+  settingsErrors: SettingsError[];
+}
+
+function isExplicitCommandPath(command: string): boolean {
+  return (
+    path.isAbsolute(command) || command.includes('/') || command.includes('\\')
+  );
+}
+
+function resolveMcpCommandPath(
+  command: string,
+  cwd: string | undefined,
+  workspaceDir: string,
+): string {
+  if (path.isAbsolute(command) || /^[a-zA-Z]:[\\/]/.test(command)) {
+    return command;
+  }
+  const baseDir = cwd ? path.resolve(workspaceDir, cwd) : workspaceDir;
+  return path.resolve(baseDir, command);
+}
+
+function extractInterpreterScriptArg(
+  command: string,
+  args: string[] | undefined,
+): string | undefined {
+  if (!args || args.length === 0) {
+    return undefined;
+  }
+  const baseName = command
+    .split(/[\\/]/)
+    .pop()
+    ?.toLowerCase()
+    .replace(/\.(exe|cmd|bat)$/, '');
+  if (!baseName || !SCRIPT_INTERPRETERS.has(baseName)) {
+    return undefined;
+  }
+  for (const arg of args) {
+    const trimmed = arg.trim();
+    if (!trimmed) continue;
+    if (INLINE_EVAL_FLAGS.has(trimmed.toLowerCase())) return undefined;
+    if (!trimmed.startsWith('-')) return trimmed;
+  }
+  return undefined;
+}
+
+function findInsecureMcpTarget(
+  command: string | undefined,
+  args: string[] | undefined,
+  cwd: string | undefined,
+  ctx: SystemMcpCommandCheckContext,
+): { target: string; reason: string } | undefined {
+  const trimmed = command?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  const candidates: string[] = [];
+  if (isExplicitCommandPath(trimmed)) {
+    candidates.push(trimmed);
+  }
+  const scriptArg = extractInterpreterScriptArg(trimmed, args);
+  if (scriptArg) {
+    candidates.push(scriptArg);
+  }
+  for (const target of candidates) {
+    const resolved = resolveMcpCommandPath(target, cwd, ctx.workspaceDir);
+    const check = isFileAndDirectorySecureSync(resolved, ctx.securityCache);
+    if (!check.secure) {
+      return { target, reason: check.reason ?? 'Insecure file or directory.' };
+    }
+  }
+  return undefined;
+}
+
+function sanitizeSystemMcpServerMap(
+  settings: Settings,
+  ctx: SystemMcpCommandCheckContext,
+): string[] {
+  const skipped: string[] = [];
+  for (const [serverName, serverConfig] of Object.entries(
+    settings.mcpServers ?? {},
+  )) {
+    const insecure = findInsecureMcpTarget(
+      serverConfig.command,
+      serverConfig.args,
+      serverConfig.cwd,
+      ctx,
+    );
+    if (!insecure) continue;
+    ctx.settingsErrors.push({
+      message: `Security Warning: Skipping MCP server '${serverName}' in ${ctx.fileLabel} file '${ctx.settingsFilePath}' due to insecure command path '${insecure.target}': ${insecure.reason}`,
+      path: ctx.settingsFilePath,
+      severity: 'warning',
+    });
+    delete settings.mcpServers?.[serverName];
+    skipped.push(serverName);
+  }
+  return skipped;
+}
+
+function sanitizeSystemMcpServerCommand(
+  settings: Settings,
+  ctx: SystemMcpCommandCheckContext,
+): void {
+  if (!settings.mcp?.serverCommand) {
+    return;
+  }
+  const tokens = parse(settings.mcp.serverCommand).filter(
+    (token): token is string => typeof token === 'string',
+  );
+  const insecure = findInsecureMcpTarget(
+    tokens[0],
+    tokens.slice(1),
+    undefined,
+    ctx,
+  );
+  if (!insecure) {
+    return;
+  }
+  ctx.settingsErrors.push({
+    message: `Security Warning: Skipping mcp.serverCommand in ${ctx.fileLabel} file '${ctx.settingsFilePath}' due to insecure command path '${insecure.target}': ${insecure.reason}`,
+    path: ctx.settingsFilePath,
+    severity: 'warning',
+  });
+  delete settings.mcp.serverCommand;
+}
+
+function blockSkippedSystemMcpServers(
+  skippedServers: string[],
+  allScopes: Settings[],
+  systemSettings: Settings,
+): void {
+  if (skippedServers.length === 0) {
+    return;
+  }
+  const blockedIds = new Set(
+    skippedServers.map((name) => name.toLowerCase().trim()),
+  );
+  for (const scopeSettings of allScopes) {
+    for (const key of Object.keys(scopeSettings.mcpServers ?? {})) {
+      if (blockedIds.has(key.toLowerCase().trim())) {
+        delete scopeSettings.mcpServers?.[key];
+      }
+    }
+  }
+  const existingExcluded = systemSettings.mcp?.excluded ?? [];
+  systemSettings.mcp = {
+    ...systemSettings.mcp,
+    excluded: [...new Set([...existingExcluded, ...skippedServers])],
+  };
+}
+
 /**
  * Internal implementation of the settings loading logic.
  */
@@ -1125,6 +1313,38 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
         settingsErrors,
       )
     : {};
+
+  const systemCheckCtx: SystemMcpCommandCheckContext = {
+    workspaceDir,
+    settingsFilePath: systemSettingsPath,
+    fileLabel: 'system settings',
+    securityCache,
+    settingsErrors,
+  };
+  const defaultsCheckCtx: SystemMcpCommandCheckContext = {
+    workspaceDir,
+    settingsFilePath: systemDefaultsPath,
+    fileLabel: 'system defaults',
+    securityCache,
+    settingsErrors,
+  };
+  const skippedSystemServers = [
+    ...sanitizeSystemMcpServerMap(systemSettings, systemCheckCtx),
+    ...sanitizeSystemMcpServerMap(systemDefaultSettings, defaultsCheckCtx),
+  ];
+  sanitizeSystemMcpServerCommand(systemSettings, systemCheckCtx);
+  sanitizeSystemMcpServerCommand(systemDefaultSettings, defaultsCheckCtx);
+  blockSkippedSystemMcpServers(
+    skippedSystemServers,
+    [
+      systemSettings,
+      systemDefaultSettings,
+      userSettings,
+      workspaceSettings,
+      workspaceOriginalSettings,
+    ],
+    systemSettings,
+  );
 
   // Support legacy theme names
   normalizeLegacyTheme(userSettings);
