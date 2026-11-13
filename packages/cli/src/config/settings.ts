@@ -973,6 +973,32 @@ const INLINE_EVAL_FLAGS = new Set([
   '-encodedcommand',
 ]);
 
+const PRELOAD_FLAGS = new Set([
+  '-r',
+  '--require',
+  '--import',
+  '--loader',
+  '--experimental-loader',
+  '--preload',
+  '--env-file',
+  '--env-file-if-exists',
+  '-f',
+  '-file',
+]);
+
+const NON_SCRIPT_VALUE_FLAGS = new Set([
+  '-w',
+  '-x',
+  '-o',
+  '-d',
+  '--config',
+  '-executionpolicy',
+  '--conditions',
+]);
+
+const SUBCOMMAND_INTERPRETERS = new Set(['deno', 'bun']);
+const INTERPRETER_SUBCOMMANDS = new Set(['run', 'x', 'serve', 'test', 'bench']);
+
 const SCRIPT_EXTENSIONS = new Set([
   '.js',
   '.mjs',
@@ -1049,9 +1075,29 @@ function extractInterpreterScriptArgs(
     return [];
   }
   const candidates: string[] = [];
+  let expectPreloadValue = false;
+  let skipNextValue = false;
+  let sawSubcommand = false;
+
   for (const arg of args) {
     const trimmed = arg.trim();
-    if (!trimmed || trimmed === '--') continue;
+    if (!trimmed) continue;
+
+    if (expectPreloadValue) {
+      if (isScriptPathCandidate(trimmed)) {
+        candidates.push(trimmed);
+      }
+      expectPreloadValue = false;
+      continue;
+    }
+
+    if (skipNextValue) {
+      skipNextValue = false;
+      continue;
+    }
+
+    if (trimmed === '--') continue;
+
     if (trimmed.startsWith('-') && trimmed !== '-') {
       const eqIndex = trimmed.indexOf('=');
       const flagName = (
@@ -1060,18 +1106,37 @@ function extractInterpreterScriptArgs(
       if (INLINE_EVAL_FLAGS.has(flagName)) {
         break;
       }
-      if (eqIndex >= 0) {
-        const inlineValue = trimmed.slice(eqIndex + 1).trim();
-        if (inlineValue && isScriptPathCandidate(inlineValue)) {
-          candidates.push(inlineValue);
+      if (PRELOAD_FLAGS.has(flagName)) {
+        if (eqIndex >= 0) {
+          const inlineValue = trimmed.slice(eqIndex + 1).trim();
+          if (inlineValue && isScriptPathCandidate(inlineValue)) {
+            candidates.push(inlineValue);
+          }
+        } else {
+          expectPreloadValue = true;
         }
+      } else if (eqIndex < 0 && NON_SCRIPT_VALUE_FLAGS.has(flagName)) {
+        skipNextValue = true;
       }
       continue;
     }
+
+    if (
+      !sawSubcommand &&
+      candidates.length === 0 &&
+      SUBCOMMAND_INTERPRETERS.has(baseName) &&
+      INTERPRETER_SUBCOMMANDS.has(trimmed.toLowerCase())
+    ) {
+      sawSubcommand = true;
+      continue;
+    }
+
     if (isScriptPathCandidate(trimmed)) {
       candidates.push(trimmed);
     }
+    break;
   }
+
   return candidates;
 }
 
