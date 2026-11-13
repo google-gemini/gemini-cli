@@ -770,6 +770,67 @@ function isValidSedNArg(arg: string | undefined): boolean {
 }
 
 /**
+ * Checks whether `rm` arguments request a recursive (`-r`, `-R`,
+ * `--recursive`) or forced (`-f`, `--force`) removal. Short flags may be
+ * combined in any order (`-vrf`) and options may follow operands
+ * (`rm x -rf`), as GNU rm allows. A `--` argument ends option parsing.
+ *
+ * @param args - Arguments passed to `rm`.
+ * @returns true if any option makes the removal recursive or forced.
+ */
+function isRecursiveOrForcedRm(args: string[]): boolean {
+  for (const arg of args) {
+    if (arg === '--') {
+      return false;
+    }
+    if (arg.startsWith('--')) {
+      // GNU getopt_long also accepts unambiguous prefixes such as `--rec`.
+      if ('--recursive'.startsWith(arg) || '--force'.startsWith(arg)) {
+        return true;
+      }
+    } else if (arg.startsWith('-') && /[rRf]/.test(arg)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// sudo options that take a value, either attached (-uroot, --user=root) or as
+// the next argument (-u root, --user root).
+const SUDO_SHORT_OPTIONS_WITH_VALUE = /[ugChprtUDR]/;
+const SUDO_LONG_OPTIONS_WITH_VALUE = new Set([
+  '--user',
+  '--group',
+  '--close-from',
+  '--host',
+  '--prompt',
+  '--role',
+  '--type',
+  '--other-user',
+  '--chdir',
+  '--chroot',
+]);
+
+/** Returns how many leading args are sudo's own options. */
+function sudoOptionsLength(args: string[]): number {
+  let i = 0;
+  while (i < args.length) {
+    const arg = args[i];
+    if (arg === '--') return i + 1;
+    if (!arg.startsWith('-') || arg === '-') return i;
+    if (arg.startsWith('--')) {
+      i += !arg.includes('=') && SUDO_LONG_OPTIONS_WITH_VALUE.has(arg) ? 2 : 1;
+      continue;
+    }
+    // In a cluster like -Eu, a value option takes the rest of the token, or
+    // the next argument when it is the last letter.
+    const valueAt = arg.slice(1).search(SUDO_SHORT_OPTIONS_WITH_VALUE);
+    i += valueAt === arg.length - 2 ? 2 : 1;
+  }
+  return i;
+}
+
+/**
  * Checks if a command with its arguments is explicitly known to be dangerous
  * and should be blocked or require strict user confirmation. This catches
  * destructive commands like `rm -rf`, `sudo`, and commands with execution
@@ -788,8 +849,10 @@ export function isDangerousCommand(
   }
 
   const cmd = args[0];
+  // Match path-qualified invocations such as /bin/rm or /usr/bin/sudo too.
+  const cmdBase = cmd.split(/[\\/]/).pop();
 
-  if (cmd === 'ln') {
+  if (cmdBase === 'ln') {
     const isSymbolic = args.some(
       (arg) =>
         arg === '-s' ||
@@ -801,15 +864,15 @@ export function isDangerousCommand(
     }
   }
 
-  if (cmd === 'rm') {
-    return args[1] === '-f' || args[1] === '-rf' || args[1] === '-fr';
+  if (cmdBase === 'rm' || cmdBase === 'rm.exe') {
+    return isRecursiveOrForcedRm(args.slice(1));
   }
 
-  if (cmd === 'sudo') {
-    return isDangerousCommand(args.slice(1));
+  if (cmdBase === 'sudo') {
+    return isDangerousCommand(args.slice(1 + sudoOptionsLength(args.slice(1))));
   }
 
-  if (cmd === 'find') {
+  if (cmdBase === 'find') {
     const unsafeOptions = new Set([
       '-exec',
       '-execdir',
@@ -837,7 +900,7 @@ export function isDangerousCommand(
     });
   }
 
-  if (cmd === 'git') {
+  if (cmdBase === 'git') {
     if (gitHasConfigOverrideGlobalOption(args)) {
       return true;
     }
@@ -870,7 +933,7 @@ export function isDangerousCommand(
     return false;
   }
 
-  if (cmd === 'base64') {
+  if (cmdBase === 'base64') {
     const unsafeOptions = new Set(['-o', '--output']);
     return args
       .slice(1)
