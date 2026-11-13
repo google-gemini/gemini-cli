@@ -550,6 +550,67 @@ describe('models list command', () => {
       expect(mockRefreshAuth).not.toHaveBeenCalled();
       expect(stdoutWriteSpy).not.toHaveBeenCalled();
     });
+
+    it('should propagate error when enforcedType matches selectedType but validateAuthMethod fails', async () => {
+      mockValidateAuthMethod.mockResolvedValueOnce(
+        'When using Gemini API, you must specify the GEMINI_API_KEY environment variable.',
+      );
+      const mockRefreshAuth = vi.fn().mockResolvedValue(undefined);
+      mockLoadCliConfig.mockResolvedValueOnce({
+        storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+        refreshAuth: mockRefreshAuth,
+      } as unknown as Config);
+
+      await expect(
+        handleList({
+          outputFormat: 'json',
+          loadedSettings: {
+            merged: {
+              security: {
+                auth: {
+                  selectedType: AuthType.USE_GEMINI,
+                  enforcedType: AuthType.USE_GEMINI,
+                },
+              },
+            },
+          } as unknown as LoadedSettings,
+        }),
+      ).rejects.toThrow(
+        'When using Gemini API, you must specify the GEMINI_API_KEY environment variable.',
+      );
+
+      expect(mockRefreshAuth).not.toHaveBeenCalled();
+      expect(stdoutWriteSpy).not.toHaveBeenCalled();
+    });
+
+    it('should propagate error when enforcedType matches selectedType but refreshAuth fails', async () => {
+      const mockRefreshAuth = vi
+        .fn()
+        .mockRejectedValue(new Error('OAuth credentials missing'));
+      mockLoadCliConfig.mockResolvedValueOnce({
+        storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+        refreshAuth: mockRefreshAuth,
+      } as unknown as Config);
+
+      await expect(
+        handleList({
+          outputFormat: 'json',
+          loadedSettings: {
+            merged: {
+              security: {
+                auth: {
+                  selectedType: AuthType.LOGIN_WITH_GOOGLE,
+                  enforcedType: AuthType.LOGIN_WITH_GOOGLE,
+                },
+              },
+            },
+          } as unknown as LoadedSettings,
+        }),
+      ).rejects.toThrow('OAuth credentials missing');
+
+      expect(mockRefreshAuth).toHaveBeenCalledWith(AuthType.LOGIN_WITH_GOOGLE);
+      expect(stdoutWriteSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('listCommand module', () => {

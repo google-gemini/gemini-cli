@@ -143,6 +143,9 @@ export async function handleList(
       config.isBrowserLaunchSuppressed = () => true;
       await config.refreshAuth(authType);
     } catch (e) {
+      if (enforcedType) {
+        throw e;
+      }
       debugLogger.debug(
         'Failed to refresh auth for models list, falling back to default catalog:',
         e,
