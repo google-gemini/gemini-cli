@@ -307,6 +307,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return getUnacknowledgedUntrustedFlags(untrustedFlags, roots, config);
   }
 
+  private isActiveYoloMode(): boolean {
+    const config = this.context.config;
+    return (
+      config?.getApprovalMode?.() === ApprovalMode.YOLO &&
+      !(config.isYoloModeDisabled?.() ?? false)
+    );
+  }
+
   hasTaintedOrBuildFileRisk(): boolean {
     const command = stripShellWrapper(this.params.command);
     const untrustedFlags = this.getUntrustedFlags(command);
@@ -367,14 +375,16 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return super.shouldConfirmExecute(abortSignal, forcedDecision);
     }
 
-    if (this.hasTaintedOrBuildFileRisk()) {
+    const isYoloMode = this.isActiveYoloMode();
+
+    if (
+      (!isYoloMode || forcedDecision === 'ask_user') &&
+      this.hasTaintedOrBuildFileRisk()
+    ) {
       return this.getConfirmationDetails(abortSignal);
     }
 
-    if (
-      this.context.config.getApprovalMode() === ApprovalMode.YOLO &&
-      forcedDecision !== 'ask_user'
-    ) {
+    if (isYoloMode && forcedDecision !== 'ask_user') {
       return super.shouldConfirmExecute(abortSignal, forcedDecision);
     }
 
@@ -610,7 +620,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return true;
     }
 
-    if (this.hasTaintedOrBuildFileRisk()) {
+    if (!this.isActiveYoloMode() && this.hasTaintedOrBuildFileRisk()) {
       return false;
     }
 
@@ -629,7 +639,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return checkResult.decision === PolicyDecision.ALLOW;
     }
 
-    return this.context.config?.getApprovalMode?.() === ApprovalMode.YOLO;
+    return this.isActiveYoloMode();
   }
 
   async execute(options: ExecuteOptions): Promise<ToolResult> {
