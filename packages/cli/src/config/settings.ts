@@ -973,6 +973,32 @@ const INLINE_EVAL_FLAGS = new Set([
   '-encodedcommand',
 ]);
 
+const SCRIPT_EXTENSIONS = new Set([
+  '.js',
+  '.mjs',
+  '.cjs',
+  '.jsx',
+  '.ts',
+  '.mts',
+  '.cts',
+  '.tsx',
+  '.py',
+  '.pyw',
+  '.py3',
+  '.sh',
+  '.bash',
+  '.zsh',
+  '.ksh',
+  '.pl',
+  '.pm',
+  '.rb',
+  '.php',
+  '.ps1',
+  '.psm1',
+  '.cmd',
+  '.bat',
+]);
+
 interface SystemMcpCommandCheckContext {
   workspaceDir: string;
   settingsFilePath: string;
@@ -985,6 +1011,14 @@ function isExplicitCommandPath(command: string): boolean {
   return (
     path.isAbsolute(command) || command.includes('/') || command.includes('\\')
   );
+}
+
+function isScriptPathCandidate(token: string): boolean {
+  if (isExplicitCommandPath(token)) {
+    return true;
+  }
+  const ext = path.extname(token).toLowerCase();
+  return ext !== '' && SCRIPT_EXTENSIONS.has(ext);
 }
 
 function resolveMcpCommandPath(
@@ -1017,8 +1051,7 @@ function extractInterpreterScriptArgs(
   const candidates: string[] = [];
   for (const arg of args) {
     const trimmed = arg.trim();
-    if (!trimmed) continue;
-    if (trimmed === '--') continue;
+    if (!trimmed || trimmed === '--') continue;
     if (trimmed.startsWith('-') && trimmed !== '-') {
       const eqIndex = trimmed.indexOf('=');
       const flagName = (
@@ -1029,13 +1062,15 @@ function extractInterpreterScriptArgs(
       }
       if (eqIndex >= 0) {
         const inlineValue = trimmed.slice(eqIndex + 1).trim();
-        if (inlineValue && isExplicitCommandPath(inlineValue)) {
+        if (inlineValue && isScriptPathCandidate(inlineValue)) {
           candidates.push(inlineValue);
         }
       }
       continue;
     }
-    candidates.push(trimmed);
+    if (isScriptPathCandidate(trimmed)) {
+      candidates.push(trimmed);
+    }
   }
   return candidates;
 }
@@ -1100,9 +1135,19 @@ function sanitizeSystemMcpServerCommand(
   }
   let tokens: string[];
   try {
-    tokens = parse(settings.mcp.serverCommand).filter(
-      (token): token is string => typeof token === 'string',
-    );
+    const parsedTokens = parse(settings.mcp.serverCommand, process.env);
+    if (
+      !parsedTokens.every((token): token is string => typeof token === 'string')
+    ) {
+      ctx.settingsErrors.push({
+        message: `Security Warning: Skipping mcp.serverCommand in ${ctx.fileLabel} file '${ctx.settingsFilePath}' due to presence of shell operators.`,
+        path: ctx.settingsFilePath,
+        severity: 'warning',
+      });
+      delete settings.mcp.serverCommand;
+      return;
+    }
+    tokens = parsedTokens;
   } catch (err) {
     ctx.settingsErrors.push({
       message: `Security Warning: Skipping mcp.serverCommand in ${ctx.fileLabel} file '${ctx.settingsFilePath}' due to parse failure: ${getErrorMessage(err)}`,

@@ -4947,6 +4947,101 @@ MALICIOUS_VAR=allowed-because-trusted
           'parse failure: Bad substitution',
         );
       });
+
+      it('should skip mcp.serverCommand when shell operators are present', () => {
+        resetSettingsCacheForTesting();
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) => String(p) === getSystemSettingsPath(),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (String(p) === getSystemSettingsPath()) {
+            return JSON.stringify({
+              mcp: {
+                serverCommand: '/opt/secure-mcp.sh && /opt/insecure-mcp.sh',
+              },
+            });
+          }
+          return '';
+        });
+        vi.spyOn(core, 'isFileAndDirectorySecureSync').mockReturnValue({
+          secure: true,
+        });
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(settings.merged.mcp?.serverCommand).toBeUndefined();
+        expect(settings.errors).toEqual([
+          {
+            message: expect.stringContaining(
+              'Security Warning: Skipping mcp.serverCommand in system settings file',
+            ),
+            path: getSystemSettingsPath(),
+            severity: 'warning',
+          },
+        ]);
+        expect(settings.errors[0]?.message).toContain(
+          'due to presence of shell operators',
+        );
+      });
+
+      it('should ignore non-path positional arguments on interpreter MCP commands while still validating bare script filenames', () => {
+        resetSettingsCacheForTesting();
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) => String(p) === getSystemSettingsPath(),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (String(p) === getSystemSettingsPath()) {
+            return JSON.stringify({
+              mcpServers: {
+                'secure-with-args': {
+                  command: 'node',
+                  args: ['/opt/corp/server.mjs', 'production', '8080'],
+                },
+                'bare-script-in-workspace': {
+                  command: 'node',
+                  args: ['--require', '/usr/local/bin/preload.js', 'local.js'],
+                },
+              },
+            });
+          }
+          return '';
+        });
+        const secureSpy = vi
+          .spyOn(core, 'isFileAndDirectorySecureSync')
+          .mockImplementation((targetPath) => {
+            if (
+              normalizePath(targetPath).startsWith(
+                normalizePath(MOCK_WORKSPACE_DIR),
+              )
+            ) {
+              return {
+                secure: false,
+                reason: 'Workspace directory is not owned by root (uid 0).',
+              };
+            }
+            return { secure: true };
+          });
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(settings.merged.mcpServers?.['secure-with-args']).toEqual({
+          command: 'node',
+          args: ['/opt/corp/server.mjs', 'production', '8080'],
+        });
+        expect(
+          settings.merged.mcpServers?.['bare-script-in-workspace'],
+        ).toBeUndefined();
+        expect(secureSpy).not.toHaveBeenCalledWith(
+          path.resolve(MOCK_WORKSPACE_DIR, 'production'),
+          expect.anything(),
+        );
+        expect(secureSpy).not.toHaveBeenCalledWith(
+          path.resolve(MOCK_WORKSPACE_DIR, '8080'),
+          expect.anything(),
+        );
+        expect(settings.errors).toHaveLength(1);
+        expect(settings.errors[0]?.message).toContain('local.js');
+      });
     });
   });
 });
