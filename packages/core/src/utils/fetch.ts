@@ -30,12 +30,15 @@ export class PrivateIpError extends Error {
   }
 }
 
-let defaultHeadersTimeout = 60000; // 60 seconds
-const defaultBodyTimeout = 300000; // 5 minutes
+const DEFAULT_HEADERS_TIMEOUT = 60000; // 60 seconds
+const DEFAULT_BODY_TIMEOUT = 300000; // 5 minutes
 // The global dispatcher carries the streamed model responses, which can stay
 // silent for minutes, e.g. while one large tool-call argument is generated.
 // Google recommends client timeouts of at least 15 minutes for hard prompts.
-const globalBodyTimeout = 900000; // 15 minutes
+const GLOBAL_BODY_TIMEOUT = 900000; // 15 minutes
+let defaultHeadersTimeout = DEFAULT_HEADERS_TIMEOUT;
+let defaultBodyTimeout = DEFAULT_BODY_TIMEOUT;
+let globalBodyTimeout = GLOBAL_BODY_TIMEOUT;
 let currentProxy: string | undefined = undefined;
 
 function getBuildConnector():
@@ -224,18 +227,33 @@ undici.setGlobalDispatcher(
   }),
 );
 
-export function updateGlobalFetchTimeouts(timeoutMs: number) {
+export function updateGlobalFetchTimeouts(
+  timeoutMs: number,
+  bodyTimeoutMs?: number,
+) {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     throw new RangeError(
       `Invalid timeout value: ${timeoutMs}. Must be a positive finite number.`,
     );
   }
+  if (
+    bodyTimeoutMs !== undefined &&
+    (!Number.isFinite(bodyTimeoutMs) || bodyTimeoutMs <= 0)
+  ) {
+    throw new RangeError(
+      `Invalid body timeout value: ${bodyTimeoutMs}. Must be a positive finite number.`,
+    );
+  }
   defaultHeadersTimeout = timeoutMs;
+  // We keep body timeout at least at the 5-minute default for LLM streaming responses,
+  // while scaling it up when a larger request timeout is configured.
+  defaultBodyTimeout =
+    bodyTimeoutMs ?? Math.max(DEFAULT_BODY_TIMEOUT, timeoutMs);
+  globalBodyTimeout = bodyTimeoutMs ?? Math.max(GLOBAL_BODY_TIMEOUT, timeoutMs);
   defaultSafeAgent = createSafeAgent({
     headersTimeout: defaultHeadersTimeout,
     bodyTimeout: defaultBodyTimeout,
   });
-  // We keep body timeout high for LLM streaming responses
   if (currentProxy) {
     setGlobalProxy(currentProxy);
   } else {
@@ -552,7 +570,16 @@ export async function fetchWithTimeout(
 
 export function setGlobalProxy(proxy: string) {
   const trimmedProxy = proxy.trim();
-  currentProxy = trimmedProxy;
+  currentProxy = trimmedProxy || undefined;
+  if (!currentProxy) {
+    undici.setGlobalDispatcher(
+      new undici.Agent({
+        headersTimeout: defaultHeadersTimeout,
+        bodyTimeout: globalBodyTimeout,
+      }),
+    );
+    return;
+  }
   const noProxy = (
     process.env['NO_PROXY'] ??
     process.env['no_proxy'] ??

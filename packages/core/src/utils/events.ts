@@ -141,6 +141,7 @@ export interface RetryAttemptPayload {
   error?: string;
   model: string;
   status?: number;
+  sessionId?: string;
 }
 
 /**

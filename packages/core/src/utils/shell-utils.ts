@@ -57,6 +57,16 @@ import { NoopSandboxManager } from '../services/sandboxManager.js';
 
 export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
+export const GEMINI_CLI_IN_SHELL_ENV_VAR = 'GEMINI_CLI_IN_SHELL';
+export const GEMINI_CLI_IN_SHELL_ENV_VAR_VALUE = '1';
+export const GEMINI_CLI_NESTED_SESSION_ENV_VAR = 'GEMINI_CLI_NESTED_SESSION';
+
+export const NESTED_INTERACTIVE_SESSION_ERROR =
+  'Error: Starting a nested interactive Gemini CLI session inside Gemini CLI Shell Mode is not supported. To switch models or update settings, exit Shell Mode (!) and use /model or /settings.';
+
+export const INTERACTIVE_GEMINI_SHELL_ERROR =
+  "Tool Error: Do not invoke interactive 'gemini' or 'gemini config' via the Shell tool. Use built-in slash commands (/model, /settings) or inform the user how to change their setting.";
+
 /**
  * An identifier for the shell type.
  */
@@ -2212,4 +2222,378 @@ function detectPowerShellSubstitution(command: string): boolean {
     i++;
   }
   return false;
+}
+
+const VALID_NON_INTERACTIVE_GEMINI_SUBCOMMANDS = new Set([
+  'mcp',
+  'extensions',
+  'extension',
+  'skills',
+  'skill',
+  'hooks',
+  'hook',
+  'gemma',
+  'models',
+]);
+
+const INVALID_GEMINI_MANAGEMENT_SUBCOMMANDS = new Set([
+  'config',
+  'set',
+  'model',
+  'settings',
+]);
+
+const GEMINI_FLAGS_WITH_VALUE = new Set([
+  '-m',
+  '--model',
+  '-p',
+  '--prompt',
+  '-i',
+  '--prompt-interactive',
+  '-w',
+  '--worktree',
+  '--approval-mode',
+  '--policy',
+  '--admin-policy',
+  '--allowed-mcp-server-names',
+  '--allowed-tools',
+  '-e',
+  '--extensions',
+  '-r',
+  '--resume',
+  '--session-file',
+  '--session-id',
+  '--delete-session',
+  '--include-directories',
+  '-o',
+  '--output-format',
+  '--fake-responses',
+  '--fake-responses-non-strict',
+  '--record-responses',
+]);
+
+const SHELL_COMMAND_PREFIXES = new Set([
+  'env',
+  'command',
+  'exec',
+  'nohup',
+  'sudo',
+]);
+
+const PREFIX_FLAGS_WITH_VALUE: Record<string, ReadonlySet<string>> = {
+  sudo: new Set([
+    '-u',
+    '-g',
+    '-h',
+    '-p',
+    '-r',
+    '-t',
+    '-U',
+    '-C',
+    '-D',
+    '-R',
+    '-T',
+  ]),
+  env: new Set(['-u', '-C', '-S']),
+  exec: new Set(['-a']),
+};
+
+function splitShellCommandSegments(command: string): string[] {
+  const segments: string[] = [];
+  let current = '';
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i];
+    if (ch === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      current += ch;
+      continue;
+    }
+    if (ch === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      current += ch;
+      continue;
+    }
+    if (!inSingleQuote && ch === '\\' && i + 1 < command.length) {
+      current += ch + command[i + 1];
+      i++;
+      continue;
+    }
+    if (
+      !inSingleQuote &&
+      !inDoubleQuote &&
+      (ch === ';' || ch === '|' || ch === '&' || ch === '\n' || ch === '\r')
+    ) {
+      const trimmed = current.trim();
+      if (trimmed) {
+        segments.push(trimmed);
+      }
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+
+  const trimmed = current.trim();
+  if (trimmed) {
+    segments.push(trimmed);
+  }
+  return segments;
+}
+
+function tokenizeShellCommandWords(segment: string): string[] {
+  const tokens: string[] = [];
+  let current = '';
+  let hasTokenChar = false;
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+
+  for (let i = 0; i < segment.length; i++) {
+    const ch = segment[i];
+    if (ch === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      hasTokenChar = true;
+      continue;
+    }
+    if (ch === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      hasTokenChar = true;
+      continue;
+    }
+    if (!inSingleQuote && ch === '\\' && i + 1 < segment.length) {
+      const next = segment[i + 1];
+      if (inDoubleQuote) {
+        if (next === '"' || next === '\\' || next === '$') {
+          current += next;
+          hasTokenChar = true;
+          i++;
+          continue;
+        }
+      } else {
+        const isWindowsPathToken =
+          process.platform === 'win32' ||
+          /^[A-Za-z]:$/.test(current) ||
+          current === '.' ||
+          current === '..' ||
+          current.includes('\\') ||
+          (current.length > 0 && next === '.');
+        const isWhitespaceOrQuote =
+          next === ' ' ||
+          next === '\t' ||
+          next === '\n' ||
+          next === '\r' ||
+          next === '"' ||
+          next === "'";
+        current +=
+          isWindowsPathToken && !isWhitespaceOrQuote ? ch + next : next;
+        hasTokenChar = true;
+        i++;
+        continue;
+      }
+    }
+    if (
+      !inSingleQuote &&
+      !inDoubleQuote &&
+      (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r')
+    ) {
+      if (hasTokenChar) {
+        tokens.push(current);
+        current = '';
+        hasTokenChar = false;
+      }
+      continue;
+    }
+    current += ch;
+    hasTokenChar = true;
+  }
+
+  if (hasTokenChar) {
+    tokens.push(current);
+  }
+  return tokens;
+}
+
+function isEnvAssignmentToken(token: string): boolean {
+  const eqIdx = token.indexOf('=');
+  if (eqIdx <= 0) {
+    return false;
+  }
+  const name = token.slice(0, eqIdx);
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
+}
+
+function isInteractiveGeminiSegment(segment: string): boolean {
+  let unwrapped = segment.trim();
+  for (let depth = 0; depth < 3; depth++) {
+    const next = stripShellWrapper(unwrapped);
+    if (next === unwrapped) {
+      break;
+    }
+    unwrapped = next;
+  }
+
+  const tokens = tokenizeShellCommandWords(unwrapped);
+  let idx = 0;
+  while (idx < tokens.length) {
+    const token = tokens[idx];
+    if (isEnvAssignmentToken(token)) {
+      idx++;
+      continue;
+    }
+    const lowerToken = token.toLowerCase();
+    if (SHELL_COMMAND_PREFIXES.has(lowerToken)) {
+      idx++;
+      const flagsWithValue = PREFIX_FLAGS_WITH_VALUE[lowerToken];
+      while (idx < tokens.length && tokens[idx].startsWith('-')) {
+        const flag = tokens[idx];
+        idx++;
+        if (flag === '--') {
+          break;
+        }
+        if (lowerToken === 'command' && (flag === '-v' || flag === '-V')) {
+          return false;
+        }
+        if (
+          flagsWithValue?.has(flag) &&
+          idx < tokens.length &&
+          !tokens[idx].startsWith('-')
+        ) {
+          idx++;
+        }
+      }
+      continue;
+    }
+    break;
+  }
+
+  if (idx >= tokens.length) {
+    return false;
+  }
+
+  const normalizedExe = normalizeCommand(tokens[idx]).replace(
+    /\.(cmd|bat|ps1)$/,
+    '',
+  );
+  if (normalizedExe !== 'gemini') {
+    return false;
+  }
+
+  const args = tokens.slice(idx + 1);
+  if (args.length === 0) {
+    return true;
+  }
+
+  for (const arg of args) {
+    if (
+      arg === '--help' ||
+      arg === '-h' ||
+      arg === '--version' ||
+      arg === '-v'
+    ) {
+      return false;
+    }
+    if (
+      arg === '-i' ||
+      arg === '--prompt-interactive' ||
+      arg.startsWith('--prompt-interactive=')
+    ) {
+      return true;
+    }
+  }
+
+  let hasHeadlessPromptFlag = false;
+  let hasUtilityFlag = false;
+  const positionals: string[] = [];
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--') {
+      positionals.push(...args.slice(i + 1));
+      break;
+    }
+    if (arg === '-p' || arg === '--prompt' || arg.startsWith('--prompt=')) {
+      hasHeadlessPromptFlag = true;
+      if ((arg === '-p' || arg === '--prompt') && i + 1 < args.length) {
+        i++;
+      }
+      continue;
+    }
+    if (
+      arg === '--list-models' ||
+      arg === '--list-extensions' ||
+      arg === '-l' ||
+      arg === '--list-sessions' ||
+      arg === '--delete-session' ||
+      arg.startsWith('--delete-session=')
+    ) {
+      hasUtilityFlag = true;
+      if (arg === '--delete-session' && i + 1 < args.length) {
+        i++;
+      }
+      continue;
+    }
+    if (arg.startsWith('-')) {
+      if (
+        GEMINI_FLAGS_WITH_VALUE.has(arg) &&
+        i + 1 < args.length &&
+        !args[i + 1].startsWith('-')
+      ) {
+        i++;
+      }
+      continue;
+    }
+    positionals.push(arg);
+  }
+
+  const firstPositional = positionals[0]?.toLowerCase();
+  if (
+    firstPositional &&
+    INVALID_GEMINI_MANAGEMENT_SUBCOMMANDS.has(firstPositional)
+  ) {
+    return true;
+  }
+
+  if (
+    firstPositional &&
+    VALID_NON_INTERACTIVE_GEMINI_SUBCOMMANDS.has(firstPositional)
+  ) {
+    return false;
+  }
+
+  if (hasHeadlessPromptFlag || hasUtilityFlag) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Checks whether a shell command string attempts to invoke an interactive
+ * `gemini` CLI session or an invalid management subcommand such as
+ * `gemini config ...`.
+ */
+export function isInteractiveGeminiCommand(command: string): boolean {
+  if (!command || !command.trim()) {
+    return false;
+  }
+
+  let unwrapped = command.trim();
+  for (let depth = 0; depth < 3; depth++) {
+    const next = stripShellWrapper(unwrapped);
+    if (next === unwrapped) {
+      break;
+    }
+    unwrapped = next;
+  }
+
+  const parsedSegments = splitCommands(unwrapped);
+  const fallbackSegments = splitShellCommandSegments(unwrapped);
+  const allSegments =
+    parsedSegments.length > 0
+      ? [...parsedSegments, ...fallbackSegments]
+      : fallbackSegments;
+
+  return allSegments.some((segment) => isInteractiveGeminiSegment(segment));
 }

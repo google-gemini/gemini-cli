@@ -33,6 +33,8 @@ import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import {
   ChatCompressionService,
+  calculateHistoryByteSize,
+  COLLAPSE_HISTORY_BYTE_THRESHOLD,
   collapseOlderFunctionResponses,
   DEFAULT_COMPRESSION_TOKEN_THRESHOLD,
 } from '../context/chatCompressionService.js';
@@ -932,7 +934,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         : estimateTokenCountSync(currentHistory.flatMap((c) => c.parts || []));
 
     // Only collapse older function responses when under context or memory pressure
-    if (originalTokenCount >= threshold * modelLimit) {
+    if (
+      originalTokenCount >= threshold * modelLimit ||
+      calculateHistoryByteSize(currentHistory) >=
+        COLLAPSE_HISTORY_BYTE_THRESHOLD
+    ) {
       const collapsedHistory = collapseOlderFunctionResponses(currentHistory);
       if (collapsedHistory !== currentHistory) {
         const existingTurns = chat.getHistoryTurns?.(false) ?? [];

@@ -19,7 +19,11 @@ import { render } from './graph/render.js';
 import { ContextWorkingBufferImpl } from './pipeline/contextWorkingBuffer.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { deriveStableId } from '../utils/cryptoUtils.js';
-import { hardenHistory } from '../utils/historyHardening.js';
+import {
+  hardenHistory,
+  hasNonThoughtParts,
+  INTERRUPTED_RESPONSE_PLACEHOLDER,
+} from '../utils/historyHardening.js';
 import { checkContextInvariants } from './utils/invariantChecker.js';
 import type { AdvancedTokenCalculator } from './utils/contextTokenCalculator.js';
 
@@ -220,7 +224,44 @@ export class ContextManager {
     // Structural validation
     checkContextInvariants(this.buffer.nodes, 'RenderHistory');
 
-    const fullHistoryToHarden = [...renderedHistory, ...pendingHistory];
+    let effectiveLastRendered: HistoryTurn | undefined;
+    for (let i = renderedHistory.length - 1; i >= 0; i--) {
+      if (hasNonThoughtParts(renderedHistory[i].content)) {
+        effectiveLastRendered = renderedHistory[i];
+        break;
+      }
+    }
+
+    const firstPending = pendingHistory[0];
+    const lastRenderedHasToolResponse = (
+      effectiveLastRendered?.content.parts ?? []
+    ).some((p) => !!p?.functionResponse);
+    const firstPendingHasToolResponse = (
+      firstPending?.content.parts ?? []
+    ).some((p) => !!p?.functionResponse);
+
+    const needsBoundaryBridge =
+      effectiveLastRendered?.content.role === 'user' &&
+      firstPending?.content.role === 'user' &&
+      !(lastRenderedHasToolResponse && firstPendingHasToolResponse);
+
+    const fullHistoryToHarden =
+      effectiveLastRendered && needsBoundaryBridge
+        ? [
+            ...renderedHistory,
+            {
+              id: deriveStableId([
+                effectiveLastRendered.id,
+                'interrupted_model_turn',
+              ]),
+              content: {
+                role: 'model',
+                parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+              },
+            },
+            ...pendingHistory,
+          ]
+        : [...renderedHistory, ...pendingHistory];
 
     const hardenedFullHistory = hardenHistory(fullHistoryToHarden, {
       sentinels: this.sidecar.sentinels,

@@ -64,30 +64,13 @@ describe('fetch utils', () => {
       return [{ address: '93.184.216.34', family: 4 }];
     });
     vi.unstubAllEnvs();
+    setGlobalProxy('');
     updateGlobalFetchTimeouts(60000);
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-  });
-
-  // Runs before any test calls setGlobalProxy, so the global dispatcher is an Agent.
-  describe('updateGlobalFetchTimeouts', () => {
-    it('should give the global dispatcher a 15-minute body timeout and keep 5 minutes for the safe agent', () => {
-      updateGlobalFetchTimeouts(45773134);
-
-      // Streamed model responses go through the global dispatcher.
-      expect(Agent).toHaveBeenCalledWith({
-        headersTimeout: 45773134,
-        bodyTimeout: 900000,
-      });
-      // web_fetch keeps its 5-minute body timeout.
-      expect(Agent).toHaveBeenCalledWith({
-        headersTimeout: 45773134,
-        bodyTimeout: 300000,
-        connect: expect.any(Function),
-      });
-    });
   });
 
   describe('isAddressPrivate', () => {
@@ -280,6 +263,107 @@ describe('fetch utils', () => {
     });
   });
 
+  describe('updateGlobalFetchTimeouts', () => {
+    it('should give the global dispatcher a 15-minute body timeout and keep 5 minutes for the safe agent', () => {
+      updateGlobalFetchTimeouts(120000);
+
+      // Streamed model responses go through the global dispatcher.
+      expect(Agent).toHaveBeenCalledWith({
+        headersTimeout: 120000,
+        bodyTimeout: 900000,
+      });
+      // web_fetch keeps its 5-minute body timeout.
+      expect(Agent).toHaveBeenCalledWith({
+        headersTimeout: 120000,
+        bodyTimeout: 300000,
+        connect: expect.any(Function),
+      });
+    });
+
+    it('should scale bodyTimeout up alongside headersTimeout on global Agent and safe Agent when no proxy is set', () => {
+      updateGlobalFetchTimeouts(900000);
+
+      expect(Agent).toHaveBeenCalledWith({
+        headersTimeout: 900000,
+        bodyTimeout: 900000,
+        connect: expect.any(Function),
+      });
+      expect(Agent).toHaveBeenLastCalledWith({
+        headersTimeout: 900000,
+        bodyTimeout: 900000,
+      });
+      expect(setGlobalDispatcher).toHaveBeenCalledTimes(1);
+    });
+
+    it('should scale bodyTimeout up on EnvHttpProxyAgent when a proxy is active or created', () => {
+      setGlobalProxy('http://proxy.example.com');
+      vi.clearAllMocks();
+
+      updateGlobalFetchTimeouts(900000);
+
+      expect(EnvHttpProxyAgent).toHaveBeenCalledWith({
+        httpProxy: 'http://proxy.example.com',
+        httpsProxy: 'http://proxy.example.com',
+        noProxy: '',
+        headersTimeout: 900000,
+        bodyTimeout: 900000,
+      });
+
+      vi.clearAllMocks();
+      createSafeProxyAgent('http://proxy.example.com');
+      expect(EnvHttpProxyAgent).toHaveBeenCalledWith({
+        httpProxy: 'http://proxy.example.com',
+        httpsProxy: 'http://proxy.example.com',
+        noProxy: '',
+        headersTimeout: 900000,
+        bodyTimeout: 900000,
+      });
+    });
+
+    it('should preserve the bodyTimeout floors when timeout is below 300000ms and reset after a higher timeout', () => {
+      updateGlobalFetchTimeouts(1200000);
+      expect(Agent).toHaveBeenLastCalledWith({
+        headersTimeout: 1200000,
+        bodyTimeout: 1200000,
+      });
+
+      updateGlobalFetchTimeouts(120000);
+      // 5 minutes for the safe agent, 15 minutes for the global dispatcher.
+      expect(Agent).toHaveBeenCalledWith({
+        headersTimeout: 120000,
+        bodyTimeout: 300000,
+        connect: expect.any(Function),
+      });
+      expect(Agent).toHaveBeenLastCalledWith({
+        headersTimeout: 120000,
+        bodyTimeout: 900000,
+      });
+    });
+
+    it('should allow an explicit bodyTimeoutMs override both above and below the 300s default', () => {
+      updateGlobalFetchTimeouts(60000, 1200000);
+      expect(Agent).toHaveBeenLastCalledWith({
+        headersTimeout: 60000,
+        bodyTimeout: 1200000,
+      });
+
+      updateGlobalFetchTimeouts(60000, 150000);
+      expect(Agent).toHaveBeenLastCalledWith({
+        headersTimeout: 60000,
+        bodyTimeout: 150000,
+      });
+    });
+
+    it('should throw RangeError for invalid headers or body timeout values', () => {
+      for (const invalid of [0, -100, NaN, Infinity]) {
+        expect(() => updateGlobalFetchTimeouts(invalid)).toThrow(RangeError);
+        expect(() => updateGlobalFetchTimeouts(60000, invalid)).toThrow(
+          RangeError,
+        );
+      }
+    });
+  });
+
   describe('setGlobalProxy', () => {
     it('should configure EnvHttpProxyAgent with experiment flag timeout and noProxy', () => {
       const proxyUrl = ' http://proxy.example.com ';
@@ -294,7 +378,7 @@ describe('fetch utils', () => {
         httpsProxy: 'http://proxy.example.com',
         noProxy: 'localhost,127.0.0.1',
         headersTimeout: 45773134,
-        bodyTimeout: 900000,
+        bodyTimeout: 45773134,
       });
       expect(setGlobalDispatcher).toHaveBeenCalled();
     });
@@ -339,6 +423,20 @@ describe('fetch utils', () => {
           noProxy: 'google.com, 127.0.0.1 , localhost',
         }),
       );
+    });
+
+    it('should clear currentProxy and restore standard Agent when given an empty string', () => {
+      setGlobalProxy('http://proxy.example.com');
+      vi.clearAllMocks();
+
+      updateGlobalFetchTimeouts(900000);
+      setGlobalProxy('   ');
+
+      expect(Agent).toHaveBeenLastCalledWith({
+        headersTimeout: 900000,
+        bodyTimeout: 900000,
+      });
+      expect(setGlobalDispatcher).toHaveBeenCalled();
     });
   });
 

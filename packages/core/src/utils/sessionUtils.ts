@@ -119,8 +119,11 @@ export function isIgnoredUserContent(trimmedContent: string): boolean {
  *   `functionResponse` parts by ID so previously inflated recordings recover cleanly.
  */
 export function convertSessionToClientHistory(
-  messages: ConversationRecord['messages'],
+  messages: ConversationRecord['messages'] | undefined,
 ): HistoryTurn[] {
+  if (!messages) {
+    return [];
+  }
   const clientHistory: HistoryTurn[] = [];
   const seenFunctionResponseIds = new Set<string>();
   const pendingPartsToAppend = new Map<string, Part[]>();
@@ -273,6 +276,18 @@ export function convertSessionToClientHistory(
               }
 
               functionResponseParts.push(responseData);
+            } else if (!isAlreadyRecorded) {
+              functionResponseParts.push({
+                functionResponse: {
+                  id: toolCall.id ?? '',
+                  name: toolCall.name?.trim() || 'generic_tool',
+                  response: {
+                    output:
+                      'Command execution was interrupted or cancelled before completion. It may have executed partially or completed — check system state before running again.',
+                    error: 'Operation interrupted or cancelled.',
+                  },
+                },
+              });
             }
           }
 

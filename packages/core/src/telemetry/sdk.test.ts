@@ -454,6 +454,43 @@ describe('Telemetry SDK', () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
       expect(callback).toHaveBeenCalled();
     });
+
+    it('should drop events and not buffer if telemetry is disabled in config', async () => {
+      vi.spyOn(mockConfig, 'getTelemetryEnabled').mockReturnValue(false);
+      const callback = vi.fn();
+      bufferTelemetryEvent(callback, mockConfig);
+      expect(callback).not.toHaveBeenCalled();
+
+      // Re-enable and initialize to verify nothing was queued in telemetryBuffer
+      vi.spyOn(mockConfig, 'getTelemetryEnabled').mockReturnValue(true);
+      await initializeTelemetry(mockConfig);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(callback).not.toHaveBeenCalled();
+
+      // If telemetry is subsequently disabled at runtime, events must not execute even when initialized
+      vi.spyOn(mockConfig, 'getTelemetryEnabled').mockReturnValue(false);
+      bufferTelemetryEvent(callback, mockConfig);
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('should cap buffered events at MAX_TELEMETRY_BUFFER_SIZE before SDK initialization', async () => {
+      const callbacks = Array.from({ length: 120 }, () => vi.fn());
+      for (const cb of callbacks) {
+        bufferTelemetryEvent(cb, mockConfig);
+      }
+
+      await initializeTelemetry(mockConfig);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const calledCount = callbacks.filter(
+        (cb) => cb.mock.calls.length > 0,
+      ).length;
+      expect(calledCount).toBe(100);
+      expect(callbacks[0]).not.toHaveBeenCalled();
+      expect(callbacks[19]).not.toHaveBeenCalled();
+      expect(callbacks[20]).toHaveBeenCalled();
+      expect(callbacks[119]).toHaveBeenCalled();
+    });
   });
 
   it('should disable telemetry and log error if useCollector and useCliAuth are both true', async () => {

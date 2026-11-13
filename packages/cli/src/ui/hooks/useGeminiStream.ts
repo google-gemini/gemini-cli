@@ -1163,7 +1163,8 @@ export const useGeminiStream = (
           }
         }
 
-        if (shellModeActive && handleShellCommand(trimmedQuery, abortSignal)) {
+        if (shellModeActive) {
+          handleShellCommand(trimmedQuery, abortSignal);
           return { queryToSend: null, shouldProceed: false };
         }
 
