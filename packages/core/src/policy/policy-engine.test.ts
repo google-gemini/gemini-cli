@@ -23,6 +23,8 @@ import type { CheckerRunner } from '../safety/checker-runner.js';
 import {
   initializeShellParsers,
   parseCommandDetails,
+  ShellCommandParser,
+  hasRedirection,
 } from '../utils/shell-utils.js';
 import { buildArgsPatterns } from './utils.js';
 import {
@@ -46,6 +48,11 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
       }
       return [command];
     }),
+    ShellCommandParser: vi.fn().mockImplementation(() => ({
+      prepare: vi.fn().mockResolvedValue(undefined),
+      getCommandDetails: (command: string) => parseCommandDetails(command),
+      hasRedirection: (command: string) => hasRedirection(command),
+    })),
     parseCommandDetails: vi.fn().mockImplementation((command: string) => {
       // Basic mock implementation for PolicyEngine test needs
       const commands = command.includes('&&')
@@ -139,6 +146,20 @@ describe('PolicyEngine', () => {
       },
       mockCheckerRunner,
     );
+  });
+
+  it('shares parsing state across recursive shell checks but isolates later checks', async () => {
+    const before = vi.mocked(ShellCommandParser).mock.calls.length;
+    await engine.check(
+      { name: 'run_shell_command', args: { command: 'echo a && echo b' } },
+      undefined,
+    );
+    expect(vi.mocked(ShellCommandParser).mock.calls.length).toBe(before + 1);
+    await engine.check(
+      { name: 'run_shell_command', args: { command: 'echo a' } },
+      undefined,
+    );
+    expect(vi.mocked(ShellCommandParser).mock.calls.length).toBe(before + 2);
   });
 
   describe('constructor', () => {

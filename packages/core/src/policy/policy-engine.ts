@@ -10,7 +10,7 @@ import {
   SHELL_TOOL_NAMES,
   REDIRECTION_NAMES,
   initializeShellParsers,
-  parseCommandDetails,
+  ShellCommandParser,
   stripShellWrapper,
   hasRedirection,
   detectCommandSubstitution,
@@ -339,9 +339,15 @@ export class PolicyEngine {
     command: string,
     allowRedirection?: boolean,
     rule?: PolicyRule,
+    shellParser?: ShellCommandParser,
   ): boolean {
     if (allowRedirection) return false;
-    if (!hasRedirection(command)) return false;
+    if (
+      !(shellParser
+        ? shellParser.hasRedirection(command)
+        : hasRedirection(command))
+    )
+      return false;
 
     // Require explicit allowRedirection when matching a command-prefix rule.
     if (rule?.argsPattern && !allowRedirection) {
@@ -481,6 +487,7 @@ export class PolicyEngine {
     toolAnnotations?: Record<string, unknown>,
     subagent?: string,
     hasTopLevelHeuristicDowngrade = false,
+    shellParser = new ShellCommandParser(),
   ): Promise<CheckResult> {
     if (!command) {
       return {
@@ -490,7 +497,8 @@ export class PolicyEngine {
     }
 
     await initializeShellParsers();
-    const parsed = parseCommandDetails(command);
+    await shellParser.prepare(command);
+    const parsed = shellParser.getCommandDetails(command);
     const subCommands = parsed?.details ?? [];
 
     // Handle parser failures or syntax errors
@@ -548,6 +556,7 @@ export class PolicyEngine {
       command,
       allowRedirection,
       rule,
+      shellParser,
     );
     if (hasTopLevelRedirectionDowngrade) {
       if (aggregateDecision === PolicyDecision.ALLOW) {
@@ -599,6 +608,7 @@ export class PolicyEngine {
           toolAnnotations,
           subagent,
           true,
+          shellParser,
         );
 
         if (wrapperResult.decision === PolicyDecision.DENY)
@@ -623,6 +633,9 @@ export class PolicyEngine {
       }
 
       if (!isAtomic) {
+        // A recursive YOLO check can allow an unmatched child without parsing
+        // it. Prepare its exact text for the following redirection check too.
+        await shellParser.prepare(subCmd);
         evaluatedSubCommands++;
         const subResult = await this.check(
           { name: toolName, args: { command: subCmd, dir_path } },
@@ -630,6 +643,7 @@ export class PolicyEngine {
           toolAnnotations,
           subagent,
           true,
+          shellParser,
         );
 
         if (subResult.decision === PolicyDecision.DENY) return subResult;
@@ -651,6 +665,7 @@ export class PolicyEngine {
             subCmd,
             subResult.rule?.allowRedirection ?? allowRedirection,
             subResult.rule,
+            shellParser,
           ) ||
             this.shouldDowngradeForCommandSubstitution(
               subCmd,
@@ -733,6 +748,7 @@ export class PolicyEngine {
     toolAnnotations?: Record<string, unknown>,
     subagent?: string,
     skipHeuristics = false,
+    shellParser?: ShellCommandParser,
   ): Promise<CheckResult> {
     // Case 1: Metadata injection is the primary and safest way to identify an MCP server.
     // If we have explicit `_serverName` metadata (usually injected by tool-registry for active tools), use it.
@@ -859,6 +875,7 @@ export class PolicyEngine {
             toolAnnotations,
             subagent,
             hasTopLevelHeuristicDowngrade,
+            shellParser,
           );
           decision = shellResult.decision;
           matchedRule = shellResult.rule;
@@ -911,6 +928,7 @@ export class PolicyEngine {
             toolAnnotations,
             subagent,
             hasTopLevelHeuristicDowngrade,
+            shellParser,
           );
           decision = shellResult.decision;
           matchedRule = shellResult.rule;

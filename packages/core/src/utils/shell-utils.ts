@@ -11,6 +11,7 @@ import { quote, parse, type ParseEntry } from 'shell-quote';
 import {
   spawn,
   spawnSync,
+  execFile,
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
 
@@ -566,6 +567,114 @@ export function parseBashCommandDetails(
   };
 }
 
+function processPowerShellParserOutput(
+  stdout: string,
+  command: string,
+): CommandParseResult {
+  const output = stdout.trim();
+  if (!output) {
+    return { details: [], hasError: true };
+  }
+
+  interface RawPowerShellCommand {
+    name?: string;
+    text?: string;
+    startIndex?: number;
+    args?: string[];
+  }
+
+  let parsed: {
+    success?: boolean;
+    commands?: RawPowerShellCommand[] | RawPowerShellCommand;
+    hasRedirection?: boolean;
+    hasCommandSubstitution?: boolean;
+  } | null = null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    parsed = JSON.parse(output);
+  } catch {
+    return { details: [], hasError: true };
+  }
+
+  if (!parsed?.success) {
+    return { details: [], hasError: true };
+  }
+
+  const rawCommands = Array.isArray(parsed.commands)
+    ? parsed.commands
+    : parsed.commands
+      ? [parsed.commands]
+      : [];
+
+  const details = rawCommands
+    .map((commandDetail): ParsedCommandDetail | null => {
+      if (!commandDetail || typeof commandDetail.name !== 'string') {
+        return null;
+      }
+
+      const name = normalizeCommandName(commandDetail.name);
+      const text =
+        typeof commandDetail.text === 'string'
+          ? commandDetail.text.trim()
+          : command;
+
+      return {
+        name,
+        text,
+        startIndex:
+          typeof commandDetail.startIndex === 'number'
+            ? commandDetail.startIndex
+            : 0,
+        args: Array.isArray(commandDetail.args)
+          ? commandDetail.args
+          : undefined,
+      };
+    })
+    .filter((detail): detail is ParsedCommandDetail => detail !== null)
+    .sort((a, b) => a.startIndex - b.startIndex);
+
+  return {
+    details,
+    hasError: details.length === 0,
+    hasRedirection: parsed.hasRedirection,
+    hasCommandSubstitution: parsed.hasCommandSubstitution ?? false,
+  };
+}
+
+async function parsePowerShellCommandDetailsAsync(
+  command: string,
+  executable: string,
+): Promise<CommandParseResult | null> {
+  if (!command.trim()) return { details: [], hasError: true };
+  const result = await new Promise<CommandParseResult | null>((resolve) => {
+    try {
+      execFile(
+        executable,
+        [
+          '-NoLogo',
+          '-NoProfile',
+          '-NonInteractive',
+          '-EncodedCommand',
+          POWERSHELL_PARSER_SCRIPT,
+        ],
+        {
+          env: { ...process.env, [POWERSHELL_COMMAND_ENV]: command },
+          encoding: 'utf-8',
+          windowsHide: true,
+          maxBuffer: 1024 * 1024,
+        },
+        (error, stdout) =>
+          resolve(
+            error ? null : processPowerShellParserOutput(stdout, command),
+          ),
+      );
+    } catch {
+      resolve(null);
+    }
+  });
+  return result;
+}
+
 function parsePowerShellCommandDetails(
   command: string,
   executable: string,
@@ -601,74 +710,11 @@ function parsePowerShellCommandDetails(
       return null;
     }
 
-    const output = (result.stdout ?? '').toString().trim();
-    if (!output) {
-      return { details: [], hasError: true };
-    }
-
-    interface RawPowerShellCommand {
-      name?: string;
-      text?: string;
-      startIndex?: number;
-      args?: string[];
-    }
-
-    let parsed: {
-      success?: boolean;
-      commands?: RawPowerShellCommand[] | RawPowerShellCommand;
-      hasRedirection?: boolean;
-      hasCommandSubstitution?: boolean;
-    } | null = null;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      parsed = JSON.parse(output);
-    } catch {
-      return { details: [], hasError: true };
-    }
-
-    if (!parsed?.success) {
-      return { details: [], hasError: true };
-    }
-
-    const rawCommands = Array.isArray(parsed.commands)
-      ? parsed.commands
-      : parsed.commands
-        ? [parsed.commands]
-        : [];
-
-    const details = rawCommands
-      .map((commandDetail): ParsedCommandDetail | null => {
-        if (!commandDetail || typeof commandDetail.name !== 'string') {
-          return null;
-        }
-
-        const name = normalizeCommandName(commandDetail.name);
-        const text =
-          typeof commandDetail.text === 'string'
-            ? commandDetail.text.trim()
-            : command;
-
-        return {
-          name,
-          text,
-          startIndex:
-            typeof commandDetail.startIndex === 'number'
-              ? commandDetail.startIndex
-              : 0,
-          args: Array.isArray(commandDetail.args)
-            ? commandDetail.args
-            : undefined,
-        };
-      })
-      .filter((detail): detail is ParsedCommandDetail => detail !== null)
-      .sort((a, b) => a.startIndex - b.startIndex);
-
-    return {
-      details,
-      hasError: details.length === 0,
-      hasRedirection: parsed.hasRedirection,
-      hasCommandSubstitution: parsed.hasCommandSubstitution ?? false,
-    };
+    const parsed = processPowerShellParserOutput(
+      (result.stdout ?? '').toString(),
+      command,
+    );
+    return parsed;
   } catch {
     return null;
   }
@@ -684,22 +730,7 @@ export function parseCommandDetails(
       command,
       configuration.executable,
     );
-    if (!result || result.hasError) {
-      // Never fall back to the Bash parser when PowerShell command substitution
-      // is detected, because Bash and PowerShell have incompatible quoting,
-      // escaping, and subexpression grammars (e.g. @(...), bare (...)
-      // subexpressions, backtick escapes, and Unicode quotes).
-      if (detectPowerShellSubstitution(command)) {
-        return result ?? { details: [], hasError: true };
-      }
-      // Fallback to bash parser which is usually good enough for simple commands
-      // and doesn't rely on the host PowerShell environment restrictions (e.g., ConstrainedLanguage)
-      const bashResult = parseBashCommandDetails(command);
-      if (bashResult && !bashResult.hasError) {
-        return bashResult;
-      }
-    }
-    return result;
+    return powerShellParseFallback(command, result);
   }
 
   if (configuration.shell === 'bash') {
@@ -707,6 +738,117 @@ export function parseCommandDetails(
   }
 
   return null;
+}
+
+/**
+ * Parsing state owned by one policy check or shell invocation. Only complete,
+ * exact command parses are reused; failures cannot leak into later operations.
+ * Async lifecycle methods prepare commands before synchronous tool hooks read
+ * them. Standalone synchronous APIs retain their original behavior.
+ */
+export class ShellCommandParser {
+  private readonly pending = new Map<
+    string,
+    Promise<CommandParseResult | null>
+  >();
+  private readonly results = new Map<string, CommandParseResult | null>();
+
+  private key(command: string): string {
+    return JSON.stringify([getShellConfiguration().executable, command]);
+  }
+
+  async prepare(command: string): Promise<void> {
+    await initializeShellParsers();
+    let current = command;
+    for (let depth = 0; depth <= 3; depth++) {
+      const key = this.key(current);
+      let pending = this.pending.get(key);
+      if (!pending) {
+        const configuration = getShellConfiguration();
+        pending =
+          configuration.shell === 'powershell'
+            ? parsePowerShellCommandDetailsAsync(
+                current,
+                configuration.executable,
+              )
+            : Promise.resolve(parseCommandDetails(current));
+        this.pending.set(key, pending);
+      }
+      this.results.set(key, await pending);
+      const next = stripShellWrapper(current.trim());
+      if (next === current || depth === 3) break;
+      current = next;
+    }
+  }
+
+  getCommandDetails(command: string): CommandParseResult | null {
+    const key = this.key(command);
+    if (!this.results.has(key)) return parseCommandDetails(command);
+    const result = this.results.get(key)!;
+    return getShellConfiguration().shell === 'powershell'
+      ? powerShellParseFallback(command, result)
+      : result;
+  }
+
+  getCommandRoots(command: string): string[] {
+    if (!command) return [];
+    const parsed = this.getCommandDetails(command);
+    return !parsed || parsed.hasError
+      ? []
+      : parsed.details
+          .map((detail) => detail.name)
+          .filter((name) => Boolean(name) && !REDIRECTION_NAMES.has(name));
+  }
+
+  hasRedirection(command: string): boolean {
+    if (!/[><]/.test(command)) return false;
+    const key = this.key(command);
+    if (
+      getShellConfiguration().shell !== 'powershell' ||
+      !this.results.has(key)
+    ) {
+      return hasRedirection(command);
+    }
+    // Redirection detection uses the raw PowerShell result, never Bash fallback.
+    const result = this.results.get(key);
+    return result && !result.hasError
+      ? !!result.hasRedirection
+      : /[><]/.test(command);
+  }
+
+  isInteractiveGeminiCommand(command: string): boolean {
+    return isInteractiveGeminiCommand(command, (unwrapped) => {
+      const parsed = this.getCommandDetails(unwrapped);
+      return !parsed || parsed.hasError
+        ? []
+        : parsed.details
+            .filter((detail) => !REDIRECTION_NAMES.has(detail.name))
+            .map((detail) => detail.text)
+            .filter(Boolean);
+    });
+  }
+}
+
+function powerShellParseFallback(
+  command: string,
+  result: CommandParseResult | null,
+): CommandParseResult | null {
+  if (!result || result.hasError) {
+    // Never fall back to the Bash parser when PowerShell command substitution
+    // is detected, because Bash and PowerShell have incompatible quoting,
+    // escaping, and subexpression grammars (e.g. @(...), bare (...)
+    // subexpressions, backtick escapes, and Unicode quotes).
+    if (detectPowerShellSubstitution(command)) {
+      return result ?? { details: [], hasError: true };
+    }
+    // Fallback to bash parser which is usually good enough for simple commands
+    // and doesn't rely on the host PowerShell environment restrictions (e.g., ConstrainedLanguage)
+    const bashResult = parseBashCommandDetails(command);
+    if (bashResult && !bashResult.hasError) {
+      return bashResult;
+    }
+  }
+  return result;
 }
 
 /**
@@ -2574,7 +2716,10 @@ function isInteractiveGeminiSegment(segment: string): boolean {
  * `gemini` CLI session or an invalid management subcommand such as
  * `gemini config ...`.
  */
-export function isInteractiveGeminiCommand(command: string): boolean {
+export function isInteractiveGeminiCommand(
+  command: string,
+  parseSegments: (command: string) => string[] = splitCommands,
+): boolean {
   if (!command || !command.trim()) {
     return false;
   }
@@ -2588,7 +2733,7 @@ export function isInteractiveGeminiCommand(command: string): boolean {
     unwrapped = next;
   }
 
-  const parsedSegments = splitCommands(unwrapped);
+  const parsedSegments = parseSegments(unwrapped);
   const fallbackSegments = splitShellCommandSegments(unwrapped);
   const allSegments =
     parsedSegments.length > 0

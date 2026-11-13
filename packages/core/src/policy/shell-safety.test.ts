@@ -56,31 +56,40 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
     ],
   };
 
+  const parseCommandDetails = (command: string) => {
+    if (Object.prototype.hasOwnProperty.call(commandMap, command)) {
+      const subcommands = commandMap[command];
+      return {
+        details: subcommands.map((text) => ({
+          name: text.split(' ')[0],
+          text,
+          startIndex: command.indexOf(text),
+        })),
+        hasError: subcommands.length === 0 && command.includes('&&&'),
+      };
+    }
+    return {
+      details: [
+        {
+          name: command.split(' ')[0],
+          text: command,
+          startIndex: 0,
+        },
+      ],
+      hasError: false,
+    };
+  };
+
   return {
     ...actual,
     initializeShellParsers: vi.fn(),
-    parseCommandDetails: (command: string) => {
-      if (Object.prototype.hasOwnProperty.call(commandMap, command)) {
-        const subcommands = commandMap[command];
-        return {
-          details: subcommands.map((text) => ({
-            name: text.split(' ')[0],
-            text,
-            startIndex: command.indexOf(text),
-          })),
-          hasError: subcommands.length === 0 && command.includes('&&&'),
-        };
+    parseCommandDetails,
+    ShellCommandParser: class {
+      prepare = vi.fn().mockResolvedValue(undefined);
+      getCommandDetails = parseCommandDetails;
+      hasRedirection(command: string) {
+        return /[><]/.test(command);
       }
-      return {
-        details: [
-          {
-            name: command.split(' ')[0],
-            text: command,
-            startIndex: 0,
-          },
-        ],
-        hasError: false,
-      };
     },
     stripShellWrapper: (command: string) => command,
     splitCommands: (command: string) => {

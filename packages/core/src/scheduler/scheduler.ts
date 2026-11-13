@@ -71,7 +71,7 @@ export interface SchedulerOptions {
 }
 
 interface TaintRiskDetectable {
-  hasTaintedOrBuildFileRisk: () => boolean;
+  hasTaintedOrBuildFileRisk: () => boolean | Promise<boolean>;
 }
 
 function isTaintRiskDetectable(
@@ -686,7 +686,7 @@ export class Scheduler {
 
     const hasTaintRisk =
       isTaintRiskDetectable(toolCall.invocation) &&
-      toolCall.invocation.hasTaintedOrBuildFileRisk();
+      (await toolCall.invocation.hasTaintedOrBuildFileRisk());
 
     if (decision === PolicyDecision.ALLOW && hasTaintRisk) {
       decision =

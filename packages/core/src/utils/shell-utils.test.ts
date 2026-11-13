@@ -19,6 +19,7 @@ import {
   getShellConfiguration,
   initializeShellParsers,
   parseCommandDetails,
+  ShellCommandParser,
   splitCommands,
   stripShellWrapper,
   normalizeCommand,
@@ -50,9 +51,11 @@ vi.mock('node:fs', () => ({
   constants: { X_OK: 1 },
 }));
 
+const mockExecFile = vi.hoisted(() => vi.fn());
 const mockSpawnSync = vi.hoisted(() => vi.fn());
 vi.mock('node:child_process', () => ({
   spawnSync: mockSpawnSync,
+  execFile: mockExecFile,
   spawn: vi.fn(),
 }));
 
@@ -958,5 +961,106 @@ describe('isInteractiveGeminiCommand', () => {
     expect(isInteractiveGeminiCommand('command -V gemini')).toBe(false);
     expect(isInteractiveGeminiCommand('gemini\\ config')).toBe(false);
     expect(isInteractiveGeminiCommand('git status')).toBe(false);
+  });
+});
+
+describe('scoped asynchronous PowerShell parsing', () => {
+  beforeEach(() => {
+    mockPlatform.mockReturnValue('win32');
+    vi.stubEnv('ComSpec', 'powershell.exe');
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('shares an in-flight parse only within one operation without blocking timers', async () => {
+    let complete!: (error: Error | null, stdout: string) => void;
+    mockExecFile.mockImplementation((_exe, _args, _options, callback) => {
+      complete = callback;
+    });
+    const parser = new ShellCommandParser();
+    const first = parser.prepare('Get-Content a > b');
+    const second = parser.prepare('Get-Content a > b');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(mockExecFile).toHaveBeenCalledTimes(1);
+    expect(mockSpawnSync).not.toHaveBeenCalled();
+    complete(
+      null,
+      JSON.stringify({
+        success: true,
+        commands: [
+          {
+            name: 'Get-Content',
+            text: 'Get-Content a > b',
+            startIndex: 0,
+            args: ['a'],
+          },
+        ],
+        hasRedirection: true,
+        hasCommandSubstitution: true,
+      }),
+    );
+    await Promise.all([first, second]);
+    expect(parser.getCommandDetails('Get-Content a > b')).toMatchObject({
+      hasRedirection: true,
+      hasCommandSubstitution: true,
+    });
+    expect(parser.hasRedirection('Get-Content a > b')).toBe(true);
+    expect(mockSpawnSync).not.toHaveBeenCalled();
+    const third = new ShellCommandParser().prepare('Get-Content a > b');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(mockExecFile).toHaveBeenCalledTimes(2);
+    complete(null, '{"success":false}');
+    await third;
+  });
+
+  it('keeps raw PowerShell failure separate from Bash fallback and retries in the next operation', async () => {
+    mockExecFile.mockImplementation((_exe, _args, _options, callback) =>
+      callback(new Error('failed'), ''),
+    );
+    const parser = new ShellCommandParser();
+    const command = 'Write-Output hi > out.txt';
+    await parser.prepare(command);
+    expect(parser.getCommandDetails(command)?.hasError).toBe(false);
+    expect(parser.hasRedirection(command)).toBe(true);
+    expect(parser.getCommandRoots(command)).toContain('Write-Output');
+    expect(mockSpawnSync).not.toHaveBeenCalled();
+    await new ShellCommandParser().prepare(command);
+    expect(mockExecFile).toHaveBeenCalledTimes(2);
+    expect(mockExecFile.mock.calls[0][2]).not.toHaveProperty('timeout');
+  });
+
+  it('prepares stripped wrappers for the interactive-command guard', async () => {
+    mockExecFile.mockImplementation((_exe, _args, _options, callback) =>
+      callback(null, '{"success":false}'),
+    );
+    const parser = new ShellCommandParser();
+    await parser.prepare('powershell -Command "gemini"');
+    expect(
+      parser.isInteractiveGeminiCommand('powershell -Command "gemini"'),
+    ).toBe(true);
+    expect(mockSpawnSync).not.toHaveBeenCalled();
+  });
+
+  it('does not treat child extents as independent parse results', async () => {
+    mockExecFile.mockImplementation((_exe, _args, _options, callback) =>
+      callback(
+        null,
+        JSON.stringify({
+          success: true,
+          commands: [
+            {
+              name: 'Write-Output',
+              text: 'Write-Output $(Get-Content a)',
+              startIndex: 0,
+            },
+            { name: 'Get-Content', text: 'Get-Content a', startIndex: 15 },
+          ],
+          hasCommandSubstitution: true,
+        }),
+      ),
+    );
+    const parser = new ShellCommandParser();
+    await parser.prepare('Write-Output $(Get-Content a)');
+    await parser.prepare('Get-Content a');
+    expect(mockExecFile).toHaveBeenCalledTimes(2);
   });
 });
