@@ -91,10 +91,9 @@ describe('getInstallationInfo', () => {
   });
 
   it('should detect running from a local git clone', () => {
-    process.argv[1] = `${projectRoot}/packages/cli/dist/index.js`;
-    mockedRealPathSync.mockReturnValue(
-      `${projectRoot}/packages/cli/dist/index.js`,
-    );
+    const cliPath = `${projectRoot}/packages/cli/dist/index.js`;
+    process.argv[1] = cliPath;
+    mockedRealPathSync.mockReturnValue(cliPath);
     mockedIsGitRepository.mockReturnValue(true);
 
     const info = getInstallationInfo(projectRoot, true);
@@ -102,6 +101,44 @@ describe('getInstallationInfo', () => {
     expect(info.packageManager).toBe(PackageManager.UNKNOWN);
     expect(info.isGlobal).toBe(false);
     expect(info.updateMessage).toBe(
+      'Running from a local git clone. Please update with "git pull".',
+    );
+    expect(mockedIsGitRepository).toHaveBeenCalledWith(
+      `${projectRoot}/packages/cli/dist`,
+    );
+  });
+
+  it('should detect running from a local git clone when working directory is outside the clone', () => {
+    const clonePath = '/home/user/gemini-cli/bundle/gemini.js';
+    const unrelatedCwd = '/home/user/unrelated-project';
+    vi.spyOn(process, 'cwd').mockReturnValue(unrelatedCwd);
+    process.argv[1] = clonePath;
+    mockedRealPathSync.mockReturnValue(clonePath);
+    mockedIsGitRepository.mockReturnValue(true);
+
+    const info = getInstallationInfo(unrelatedCwd, true);
+
+    expect(info.packageManager).toBe(PackageManager.UNKNOWN);
+    expect(info.isGlobal).toBe(false);
+    expect(info.updateMessage).toBe(
+      'Running from a local git clone. Please update with "git pull".',
+    );
+    expect(info.updateCommand).toBeUndefined();
+    expect(mockedIsGitRepository).toHaveBeenCalledWith(
+      '/home/user/gemini-cli/bundle',
+    );
+  });
+
+  it('should not detect as local git clone if inside node_modules even if in a git repo', () => {
+    const nodeModulesPath =
+      '/home/user/project/node_modules/@google/gemini-cli/bundle/gemini.js';
+    process.argv[1] = nodeModulesPath;
+    mockedRealPathSync.mockReturnValue(nodeModulesPath);
+    mockedIsGitRepository.mockReturnValue(true);
+
+    const info = getInstallationInfo('/home/user/project', true);
+
+    expect(info.updateMessage).not.toBe(
       'Running from a local git clone. Please update with "git pull".',
     );
   });
