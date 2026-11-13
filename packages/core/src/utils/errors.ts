@@ -122,7 +122,7 @@ export class FatalUntrustedWorkspaceError extends FatalError {
   }
 }
 export class FatalCancellationError extends FatalError {
-  constructor(message: string, exitCode = ExitCodes.FATAL_CANCELLATION_ERROR) {
+  constructor(message: string, exitCode: number = ExitCodes.FATAL_CANCELLATION_ERROR) {
     super(message, exitCode); // Standard exit code for SIGINT by default
     this.name = 'FatalCancellationError';
   }
