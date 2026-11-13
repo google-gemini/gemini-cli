@@ -144,6 +144,7 @@ describe('GeminiAgent - RPC Dispatcher', () => {
       },
     });
     expect(response.agentCapabilities?.loadSession).toBe(true);
+    expect(response.agentCapabilities?.sessionCapabilities?.close).toEqual({});
   });
 
   it('should authenticate correctly', async () => {
@@ -248,6 +249,18 @@ describe('GeminiAgent - RPC Dispatcher', () => {
     await expect(agent.cancel({ sessionId: 'unknown' })).rejects.toThrow(
       'Session not found',
     );
+  });
+
+  it('should close a session through the session manager', async () => {
+    const closeSession = vi.fn().mockResolvedValue(undefined);
+    (
+      agent as unknown as { sessionManager: { closeSession: Mock } }
+    ).sessionManager = { closeSession };
+
+    await expect(
+      agent.unstable_closeSession({ sessionId: 'test-session-id' }),
+    ).resolves.toEqual({});
+    expect(closeSession).toHaveBeenCalledWith('test-session-id');
   });
 
   it('should delegate prompt to session', async () => {

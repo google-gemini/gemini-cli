@@ -705,6 +705,27 @@ describe('AcpSessionManager', () => {
     expect(manager.getSession(response.sessionId)).toBeUndefined();
   });
 
+  it('should forget a closed session even when its disposal fails', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
+    const { sessionId } = await manager.newSession(
+      { cwd: '/tmp', mcpServers: [] },
+      {},
+    );
+    const disposeSpy = vi
+      .spyOn(manager.getSession(sessionId)!, 'dispose')
+      .mockRejectedValue(new Error('dispose failed'));
+
+    await manager.closeSession(sessionId);
+
+    expect(disposeSpy).toHaveBeenCalledTimes(1);
+    expect(manager.getSession(sessionId)).toBeUndefined();
+    await expect(manager.closeSession(sessionId)).rejects.toThrow(
+      'Session not found',
+    );
+  });
+
   it('should dispose session and remove from manager when newSession fails after session instantiation', async () => {
     mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
       apiKey: 'test-key',

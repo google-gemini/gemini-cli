@@ -90,6 +90,9 @@ export class GeminiAgent {
       },
       agentCapabilities: {
         loadSession: true,
+        sessionCapabilities: {
+          close: {},
+        },
         promptCapabilities: {
           image: true,
           audio: true,
@@ -184,6 +187,13 @@ export class GeminiAgent {
     params: acp.LoadSessionRequest,
   ): Promise<acp.LoadSessionResponse> {
     return this.sessionManager.loadSession(params, this.getAuthDetails());
+  }
+
+  async unstable_closeSession(
+    params: acp.CloseSessionRequest,
+  ): Promise<acp.CloseSessionResponse> {
+    await this.sessionManager.closeSession(params.sessionId);
+    return {};
   }
 
   async cancel(params: acp.CancelNotification): Promise<void> {
