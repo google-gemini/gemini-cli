@@ -32,6 +32,7 @@ import { LlmRole } from '../telemetry/llmRole.js';
 import { WEB_FETCH_TOOL_NAME, WEB_FETCH_DISPLAY_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
+import { promptIdContext } from '../utils/promptIdContext.js';
 import { retryWithBackoff, getRetryErrorType } from '../utils/retry.js';
 import { WEB_FETCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
@@ -254,6 +255,8 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       error: errorType,
       model: modelName,
       sessionId: this.context.config.getSessionId?.(),
+      role: LlmRole.UTILITY_TOOL,
+      promptId: promptIdContext.getStore(),
     });
 
     logNetworkRetryAttempt(
