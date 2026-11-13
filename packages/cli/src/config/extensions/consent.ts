@@ -401,6 +401,7 @@ export async function maybeRequestConsentOrFail(
   previousSkills: SkillDefinition[] = [],
   isMigrating: boolean = false,
   linkedSourcePath?: string,
+  previousLinkedSourcePath?: string,
 ) {
   const extensionConsent = await extensionConsentString(
     extensionConfig,
@@ -417,7 +418,7 @@ export async function maybeRequestConsentOrFail(
       previousSkills,
       undefined,
       false,
-      linkedSourcePath,
+      previousLinkedSourcePath,
     );
     if (previousExtensionConsent === extensionConsent) {
       return;

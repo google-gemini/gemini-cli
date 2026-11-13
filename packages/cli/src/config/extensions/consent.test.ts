@@ -237,6 +237,57 @@ describe('consent', () => {
       ).rejects.toThrow('Installation cancelled for "test-ext".');
     });
 
+    it('should request consent when transitioning from a non-linked extension to a linked extension', async () => {
+      const requestConsent = vi.fn().mockResolvedValue(true);
+      await maybeRequestConsentOrFail(
+        baseConfig,
+        requestConsent,
+        false,
+        baseConfig,
+        false,
+        [],
+        [],
+        false,
+        '/canonical/linked/path',
+        undefined,
+      );
+      expect(requestConsent).toHaveBeenCalledTimes(1);
+    });
+
+    it('should request consent when linkedSourcePath changes between updates', async () => {
+      const requestConsent = vi.fn().mockResolvedValue(true);
+      await maybeRequestConsentOrFail(
+        baseConfig,
+        requestConsent,
+        false,
+        baseConfig,
+        false,
+        [],
+        [],
+        false,
+        '/new/canonical/linked/path',
+        '/old/canonical/linked/path',
+      );
+      expect(requestConsent).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not request consent when linkedSourcePath and previousLinkedSourcePath are identical', async () => {
+      const requestConsent = vi.fn().mockResolvedValue(true);
+      await maybeRequestConsentOrFail(
+        baseConfig,
+        requestConsent,
+        false,
+        baseConfig,
+        false,
+        [],
+        [],
+        false,
+        '/same/canonical/linked/path',
+        '/same/canonical/linked/path',
+      );
+      expect(requestConsent).not.toHaveBeenCalled();
+    });
+
     describe('consent string generation', () => {
       it('should generate a consent string with all fields', async () => {
         const config: ExtensionConfig = {

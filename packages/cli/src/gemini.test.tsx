@@ -31,6 +31,7 @@ import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { terminalCapabilityManager } from './ui/utils/terminalCapabilityManager.js';
 import { start_sandbox } from './utils/sandbox.js';
+import { resolveFolderTrustForSandbox } from './utils/sandboxFolderTrust.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import os from 'node:os';
 import v8 from 'node:v8';
@@ -92,6 +93,11 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     writeToStdout: vi.fn((...args) =>
       process.stdout.write(
         ...(args as Parameters<typeof process.stdout.write>),
+      ),
+    ),
+    writeToStderr: vi.fn((...args) =>
+      process.stderr.write(
+        ...(args as Parameters<typeof process.stderr.write>),
       ),
     ),
     patchStdio: vi.fn(() => () => {}),
@@ -242,6 +248,10 @@ import * as readStdinModule from './utils/readStdin.js';
 vi.mock('./utils/sandbox.js', () => ({
   sandbox_command: vi.fn(() => ''), // Default to no sandbox command
   start_sandbox: vi.fn(() => Promise.resolve()), // Mock as an async function that resolves
+}));
+
+vi.mock('./utils/sandboxFolderTrust.js', () => ({
+  resolveFolderTrustForSandbox: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('./utils/relaunch.js', () => ({
@@ -779,6 +789,61 @@ describe('gemini.tsx main function kitty protocol', () => {
     processExitSpy.mockRestore();
   });
 
+  it('should resolve folder trust before starting the Seatbelt sandbox', async () => {
+    vi.stubEnv('SANDBOX', '');
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
+    vi.mocked(start_sandbox).mockClear();
+    vi.mocked(resolveFolderTrustForSandbox).mockClear();
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      promptInteractive: false,
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    const mockSettings = createMockSettings({
+      merged: {
+        advanced: {},
+        security: { auth: { selectedType: 'google' } },
+        ui: {},
+      },
+      workspace: { settings: {} },
+      setValue: vi.fn(),
+      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+    });
+    vi.mocked(loadSettings).mockReturnValue(mockSettings);
+
+    const sandboxConfig = createMockSandboxConfig({ command: 'sandbox-exec' });
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => false,
+        getQuestion: () => '',
+        getSandbox: () => sandboxConfig,
+      }),
+    );
+    vi.mocked(loadSandboxConfig).mockResolvedValue(sandboxConfig);
+
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    expect(resolveFolderTrustForSandbox).toHaveBeenCalledWith({
+      sandboxCommand: 'sandbox-exec',
+      settings: mockSettings,
+      interactive: false,
+    });
+    expect(start_sandbox).toHaveBeenCalled();
+    expect(
+      vi.mocked(resolveFolderTrustForSandbox).mock.invocationCallOrder[0],
+    ).toBeLessThan(vi.mocked(start_sandbox).mock.invocationCallOrder[0]);
+    processExitSpy.mockRestore();
+  });
+
   it('should log warning when theme is not found', async () => {
     const { themeManager } = await import('./ui/themes/theme-manager.js');
     const debugLoggerWarnSpy = vi
@@ -1262,6 +1327,7 @@ describe('gemini.tsx main function exit codes', () => {
       configurable: true,
       writable: true,
     });
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -1359,6 +1425,95 @@ describe('gemini.tsx main function exit codes', () => {
       expect(e).toBeInstanceOf(MockProcessExitError);
       expect((e as MockProcessExitError).code).toBe(41);
     }
+  });
+
+  it('does not dump raw GaxiosError via debugLogger.error during pre-sandbox auth failure', async () => {
+    const gaxiosError = Object.assign(
+      new Error('Request failed with status code 403'),
+      {
+        config: {
+          headers: { Authorization: 'Bearer secret-token' },
+          errorRedactor: () => ({}),
+          retryConfig: { retry: 3 },
+        },
+        response: {
+          status: 403,
+          data: {
+            error: {
+              code: 403,
+              message: 'Permission denied on project test-invalid-project.',
+              status: 'PERMISSION_DENIED',
+            },
+          },
+        },
+      },
+    );
+
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+
+    // 1. Sandbox setup failure: emits clean single-line stderr message and exits 41
+    vi.stubEnv('SANDBOX', '');
+    vi.mocked(loadSandboxConfig).mockResolvedValue(
+      createMockSandboxConfig({
+        command: 'docker',
+        image: 'test-image',
+      }),
+    );
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        refreshAuth: vi.fn().mockRejectedValue(gaxiosError),
+        getRemoteAdminSettings: vi.fn().mockReturnValue(undefined),
+        isInteractive: vi.fn().mockReturnValue(false),
+      }),
+    );
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          security: { auth: { selectedType: 'google', useExternal: false } },
+        },
+      }),
+    );
+    vi.mocked(parseArguments).mockResolvedValue({} as CliArgs);
+
+    await expect(main()).rejects.toMatchObject({
+      name: 'MockProcessExitError',
+      code: 41,
+    });
+    expect(debugErrorSpy).not.toHaveBeenCalledWith(
+      'Error authenticating:',
+      expect.anything(),
+    );
+    expect(process.stderr.write).toHaveBeenCalledWith(
+      'Error: Permission denied on project test-invalid-project. (Status: 403)\n',
+    );
+
+    // 2. Non-sandbox headless failure: rejects cleanly for top-level formatter without intermediate dump
+    debugErrorSpy.mockClear();
+    vi.mocked(process.stderr.write).mockClear();
+    vi.mocked(loadSandboxConfig).mockResolvedValue(undefined);
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        refreshAuth: vi.fn().mockRejectedValue(gaxiosError),
+        getRemoteAdminSettings: vi.fn().mockReturnValue(undefined),
+        isInteractive: vi.fn().mockReturnValue(false),
+        getQuestion: vi.fn().mockReturnValue('ping'),
+        getSandbox: vi.fn().mockReturnValue(undefined),
+      }),
+    );
+
+    await expect(main()).rejects.toBe(gaxiosError);
+    expect(debugErrorSpy).not.toHaveBeenCalledWith(
+      'Error authenticating:',
+      expect.anything(),
+    );
+    const stderrOutput = vi
+      .mocked(process.stderr.write)
+      .mock.calls.map(([chunk]) => String(chunk))
+      .join('');
+    expect(stderrOutput).not.toContain('errorRedactor');
+    expect(stderrOutput).not.toContain('retryConfig');
   });
 
   it('should exit with 42 for session resume failure', async () => {

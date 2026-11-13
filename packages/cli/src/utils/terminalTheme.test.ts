@@ -27,6 +27,7 @@ vi.mock('../ui/utils/textUtils.js', () => ({
 
 vi.mock('../ui/themes/theme-manager.js', () => ({
   themeManager: {
+    loadUserThemes: vi.fn(),
     loadCustomThemes: vi.fn(),
     setActiveTheme: vi.fn(),
     getActiveTheme: vi.fn(),

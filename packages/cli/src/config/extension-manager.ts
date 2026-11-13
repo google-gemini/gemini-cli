@@ -373,6 +373,9 @@ Would you like to attempt to install via "git clone" instead?`,
           previousSkills,
           isMigrating,
           installMetadata.type === 'link' ? localSourcePath : undefined,
+          previous?.installMetadata?.type === 'link'
+            ? previous.installMetadata.source
+            : undefined,
         );
         const extensionId = getExtensionId(newExtensionConfig, installMetadata);
         const destinationPath = new ExtensionStorage(

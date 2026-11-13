@@ -23,6 +23,7 @@ import {
   runInDevTraceSpan,
   spanRegistry,
   truncateForTelemetry,
+  type SpanMetadata,
 } from './trace.js';
 
 vi.mock('@opentelemetry/api', async (importOriginal) => {
@@ -332,5 +333,36 @@ describe('runInDevTraceSpan', () => {
       }),
     );
     expect(mockSpan.end).toHaveBeenCalled();
+  });
+
+  it('should clear metadata input, output, and error references when span ends', async () => {
+    mockSpan.setAttribute.mockReset();
+    let capturedMetadata: SpanMetadata | undefined;
+
+    await runInDevTraceSpan(
+      {
+        operation: GeminiCliOperation.LLMCall,
+        sessionId: 'test-session-id',
+        tracesEnabled: true,
+      },
+      async ({ metadata }) => {
+        capturedMetadata = metadata;
+        metadata.input = { largePayload: 'input-data' };
+        metadata.output = { largePayload: 'output-data' };
+      },
+    );
+
+    expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+      GEN_AI_INPUT_MESSAGES,
+      JSON.stringify({ largePayload: 'input-data' }),
+    );
+    expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+      GEN_AI_OUTPUT_MESSAGES,
+      JSON.stringify({ largePayload: 'output-data' }),
+    );
+    expect(capturedMetadata?.input).toBeUndefined();
+    expect(capturedMetadata?.output).toBeUndefined();
+    expect(capturedMetadata?.error).toBeUndefined();
+    expect(capturedMetadata?.attributes).toEqual({});
   });
 });

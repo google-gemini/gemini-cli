@@ -270,21 +270,6 @@ describe('DiffManager Comprehensive Unit Tests', () => {
       expect(onDidChangeActiveTextEditor).toHaveBeenCalled();
       const activeEditorListener = onDidChangeActiveTextEditor.mock.calls[0][0];
 
-      // Simulate editor change to our tracked rightDocUri
-      const mockEditor = {
-        document: {
-          uri: rightDocUri,
-        },
-      };
-      await activeEditorListener(mockEditor as unknown as vscode.TextEditor);
-
-      // Verify isVisible updated to true
-      expect(vscode.commands.executeCommand).toHaveBeenLastCalledWith(
-        'setContext',
-        'gemini.diff.isVisible',
-        true,
-      );
-
       // Simulate editor change to unrelated editor
       const mockUnrelatedEditor = {
         document: {
@@ -300,6 +285,44 @@ describe('DiffManager Comprehensive Unit Tests', () => {
         'setContext',
         'gemini.diff.isVisible',
         false,
+      );
+
+      // Simulate editor change back to our tracked rightDocUri
+      const mockEditor = {
+        document: {
+          uri: rightDocUri,
+        },
+      };
+      await activeEditorListener(mockEditor as unknown as vscode.TextEditor);
+
+      // Verify isVisible updated to true
+      expect(vscode.commands.executeCommand).toHaveBeenLastCalledWith(
+        'setContext',
+        'gemini.diff.isVisible',
+        true,
+      );
+    });
+
+    it('should not invoke redundant setContext commands when visibility does not change', async () => {
+      const onDidChangeActiveTextEditor = vi.mocked(
+        vscode.window.onDidChangeActiveTextEditor,
+      );
+      const activeEditorListener = onDidChangeActiveTextEditor.mock.calls[0][0];
+      vi.mocked(vscode.commands.executeCommand).mockClear();
+
+      const mockUnrelatedEditor = {
+        document: {
+          uri: vscode.Uri.file('/test/unrelated.ts'),
+        },
+      };
+      await activeEditorListener(
+        mockUnrelatedEditor as unknown as vscode.TextEditor,
+      );
+
+      expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+        'setContext',
+        'gemini.diff.isVisible',
+        expect.anything(),
       );
     });
   });
