@@ -13,6 +13,7 @@ import type {
   TokenStorageInitializationEvent,
   KeychainAvailabilityEvent,
 } from '../telemetry/types.js';
+import type { LlmRole } from '../telemetry/llmRole.js';
 import { debugLogger } from './debugLogger.js';
 import type { ApprovalMode } from '../policy/types.js';
 
@@ -142,6 +143,8 @@ export interface RetryAttemptPayload {
   model: string;
   status?: number;
   sessionId?: string;
+  role?: LlmRole;
+  promptId?: string;
 }
 
 /**

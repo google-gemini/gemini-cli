@@ -57,6 +57,7 @@ import {
   TRUE_EMPTY_RESPONSE_MESSAGE,
   DEFAULT_GEMINI_FLASH_MODEL,
   Kind,
+  LlmRole,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -2646,6 +2647,8 @@ describe('useGeminiStream', () => {
         attempt: 2,
         maxAttempts: 3,
         delayMs: 1000,
+        role: LlmRole.MAIN,
+        promptId: 'test-session-id########5',
       };
 
       // Start a query to make isResponding true
@@ -2656,8 +2659,7 @@ describe('useGeminiStream', () => {
       mockSendMessageStream.mockReturnValue(mockStream);
 
       await act(async () => {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        result.current.submitQuery('test query');
+        void result.current.submitQuery('test query');
       });
 
       await waitFor(() => {
@@ -2686,12 +2688,16 @@ describe('useGeminiStream', () => {
         attempt: 2,
         maxAttempts: 3,
         delayMs: 1000,
+        role: LlmRole.MAIN,
+        promptId: 'test-session-id########5',
       };
       const lateRetryPayload = {
         model: 'gemini-2.5-pro',
         attempt: 3,
         maxAttempts: 3,
         delayMs: 2000,
+        role: LlmRole.MAIN,
+        promptId: 'test-session-id########5',
       };
 
       const mockStream = (async function* () {
@@ -2701,8 +2707,7 @@ describe('useGeminiStream', () => {
       mockSendMessageStream.mockReturnValue(mockStream);
 
       await act(async () => {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        result.current.submitQuery('test query');
+        void result.current.submitQuery('test query');
       });
 
       await waitFor(() => {
@@ -2727,6 +2732,175 @@ describe('useGeminiStream', () => {
         coreEvents.emit(CoreEvent.RetryAttempt, lateRetryPayload);
       });
 
+      expect(result.current.retryStatus).toBeNull();
+    });
+
+    it('should ignore background subagent/utility retries and stale-prompt retries while accepting active main prompt retries', async () => {
+      const { result } = await renderTestHook();
+
+      let resolvePromptA!: () => void;
+      const streamA = (async function* () {
+        yield { type: ServerGeminiEventType.Content, value: 'Prompt A start' };
+        await new Promise<void>((resolve) => {
+          resolvePromptA = resolve;
+        });
+      })();
+      mockSendMessageStream.mockReturnValueOnce(streamA);
+
+      await act(async () => {
+        void result.current.submitQuery('prompt A', undefined, 'prompt-A');
+      });
+
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      // 1. Background subagent retry during Prompt A should be ignored
+      await act(async () => {
+        coreEvents.emit(CoreEvent.RetryAttempt, {
+          model: 'gemini-2.5-flash',
+          attempt: 1,
+          maxAttempts: 5,
+          delayMs: 1000,
+          role: LlmRole.SUBAGENT,
+          promptId: 'prompt-A',
+        });
+      });
+      expect(result.current.retryStatus).toBeNull();
+
+      // 2. Utility router retry sharing Prompt A's promptId should be ignored
+      await act(async () => {
+        coreEvents.emit(CoreEvent.RetryAttempt, {
+          model: 'gemini-2.5-flash-lite',
+          attempt: 1,
+          maxAttempts: 2,
+          delayMs: 1000,
+          role: LlmRole.UTILITY_ROUTER,
+          promptId: 'prompt-A',
+        });
+      });
+      expect(result.current.retryStatus).toBeNull();
+
+      // 3. Active MAIN retry for Prompt A is accepted
+      const activeMainRetryA = {
+        model: 'gemini-2.5-pro',
+        attempt: 1,
+        maxAttempts: 3,
+        delayMs: 1000,
+        role: LlmRole.MAIN,
+        promptId: 'prompt-A',
+      };
+      await act(async () => {
+        coreEvents.emit(CoreEvent.RetryAttempt, activeMainRetryA);
+      });
+      expect(result.current.retryStatus).toEqual(activeMainRetryA);
+
+      // Finish Prompt A and start Prompt B
+      await act(async () => {
+        resolvePromptA();
+      });
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Idle);
+      });
+
+      const streamB = (async function* () {
+        yield { type: ServerGeminiEventType.Content, value: 'Prompt B start' };
+        await new Promise(() => {});
+      })();
+      mockSendMessageStream.mockReturnValueOnce(streamB);
+
+      await act(async () => {
+        void result.current.submitQuery('prompt B', undefined, 'prompt-B');
+      });
+
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      // 4. Late MAIN retry callback from Prompt A delivered while Prompt B is active should be ignored
+      await act(async () => {
+        coreEvents.emit(CoreEvent.RetryAttempt, {
+          model: 'gemini-2.5-pro',
+          attempt: 2,
+          maxAttempts: 3,
+          delayMs: 2000,
+          role: LlmRole.MAIN,
+          promptId: 'prompt-A',
+        });
+      });
+      expect(result.current.retryStatus).toBeNull();
+    });
+
+    it('should clear stale retryStatus on successful Thought and ToolCallRequest activity before any Content event', async () => {
+      const { result } = await renderTestHook();
+
+      let yieldThought!: () => void;
+      let yieldToolCall!: () => void;
+      const mockStream = (async function* () {
+        await new Promise<void>((resolve) => {
+          yieldThought = resolve;
+        });
+        yield {
+          type: ServerGeminiEventType.Thought,
+          value: { subject: 'Planning', description: 'Thinking...' },
+        };
+        await new Promise<void>((resolve) => {
+          yieldToolCall = resolve;
+        });
+        yield {
+          type: ServerGeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'call-1',
+            name: 'read_file',
+            args: { file_path: 'test.txt' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-A',
+          },
+        };
+        await new Promise(() => {});
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      await act(async () => {
+        void result.current.submitQuery('test query', undefined, 'prompt-A');
+      });
+
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      const activeRetry = {
+        model: 'gemini-2.5-pro',
+        attempt: 1,
+        maxAttempts: 3,
+        delayMs: 1000,
+        role: LlmRole.MAIN,
+        promptId: 'prompt-A',
+      };
+
+      await act(async () => {
+        coreEvents.emit(CoreEvent.RetryAttempt, activeRetry);
+      });
+      expect(result.current.retryStatus).toEqual(activeRetry);
+
+      // Model succeeds and emits a Thought chunk -> should clear retryStatus
+      await act(async () => {
+        yieldThought();
+      });
+      await waitFor(() => {
+        expect(result.current.thought?.subject).toBe('Planning');
+      });
+      expect(result.current.retryStatus).toBeNull();
+
+      // Re-emit retry and then emit ToolCallRequest -> should also clear retryStatus
+      await act(async () => {
+        coreEvents.emit(CoreEvent.RetryAttempt, activeRetry);
+      });
+      expect(result.current.retryStatus).toEqual(activeRetry);
+
+      await act(async () => {
+        yieldToolCall();
+      });
       expect(result.current.retryStatus).toBeNull();
     });
   });
