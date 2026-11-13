@@ -15,7 +15,7 @@ const RATE_LIMIT_ERROR_MESSAGE_VERTEX =
   '\nPlease wait and try again later. To increase your limits, request a quota increase through Vertex, or switch to another /auth method';
 const FETCH_FAILURE_HINT =
   '\nNo response was received from the Gemini API. Check your internet connection, VPN or firewall, and HTTP_PROXY/HTTPS_PROXY settings, then try again.';
-const FETCH_FAILED_PATTERN = /\bfetch failed\b/i;
+const FETCH_FAILED_PATTERN = /\b(fetch failed|failed to fetch)\b/i;
 const getRateLimitErrorMessageDefault = (
   fallbackModel: string = DEFAULT_GEMINI_FLASH_MODEL,
 ) =>

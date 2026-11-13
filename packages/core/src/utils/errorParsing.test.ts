@@ -74,6 +74,23 @@ describe('parseAndFormatApiError', () => {
     expect(result).toContain('No response was received from the Gemini API.');
   });
 
+  it('adds network troubleshooting guidance for the browser fetch failure', () => {
+    const result = parseAndFormatApiError('TypeError: Failed to fetch');
+
+    expect(result).toContain('[API Error: TypeError: Failed to fetch]');
+    expect(result).toContain('No response was received from the Gemini API.');
+    expect(result).toContain('HTTP_PROXY/HTTPS_PROXY');
+  });
+
+  it('adds network guidance to a structured browser fetch error without an HTTP status', () => {
+    const result = parseAndFormatApiError({
+      message: 'TypeError: Failed to fetch',
+      status: undefined,
+    });
+
+    expect(result).toContain('No response was received from the Gemini API.');
+  });
+
   it('does not describe an HTTP 503 as a network fetch failure', () => {
     const result = parseAndFormatApiError({
       message: 'The model is currently experiencing high demand.',
