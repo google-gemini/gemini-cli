@@ -56,14 +56,16 @@ export function getInstallationInfo(
     // Normalize path separators to forward slashes for consistent matching.
     const realPath = fs.realpathSync(cliPath).replace(/\\/g, '/');
     const normalizedProjectRoot = projectRoot?.replace(/\\/g, '/');
-    const isGit = isGitRepository(process.cwd());
 
-    // Check for local git clone first
+    // Detect a source checkout from the CLI script's own directory.
+    // `projectRoot` is the directory the process was launched in, so a
+    // checkout started from anywhere else used to be treated as a global
+    // npm install. Homebrew prefixes are git repositories themselves, so
+    // those paths are left for the Homebrew check below.
     if (
-      isGit &&
-      normalizedProjectRoot &&
-      realPath.startsWith(normalizedProjectRoot) &&
-      !realPath.includes('/node_modules/')
+      !realPath.includes('/node_modules/') &&
+      !isHomebrewInstallPath(realPath) &&
+      isGitRepository(path.dirname(realPath))
     ) {
       return {
         packageManager: PackageManager.UNKNOWN, // Not managed by a package manager in this sense
@@ -216,4 +218,17 @@ export function getInstallationInfo(
     debugLogger.log(error);
     return { packageManager: PackageManager.UNKNOWN, isGlobal: false };
   }
+}
+
+/**
+ * Homebrew installs live under a prefix that is its own git clone, including
+ * custom prefixes (`HOMEBREW_PREFIX/<...>/Cellar`). Those paths must not be
+ * treated as a Gemini CLI source checkout.
+ */
+function isHomebrewInstallPath(realPath: string): boolean {
+  return (
+    realPath.includes('/Cellar/') ||
+    realPath.includes('/homebrew/') ||
+    realPath.includes('/linuxbrew/')
+  );
 }

@@ -49,7 +49,8 @@ describe('getInstallationInfo', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     originalArgv = [...process.argv];
-    // Mock process.cwd() for isGitRepository
+    // Default the working directory to the project root. Tests that launch
+    // the CLI from somewhere else override this.
     vi.spyOn(process, 'cwd').mockReturnValue(projectRoot);
     vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
   });
@@ -99,10 +100,83 @@ describe('getInstallationInfo', () => {
 
     const info = getInstallationInfo(projectRoot, true);
 
+    expect(mockedIsGitRepository).toHaveBeenCalledWith(
+      path.dirname(`${projectRoot}/packages/cli/dist/index.js`),
+    );
     expect(info.packageManager).toBe(PackageManager.UNKNOWN);
     expect(info.isGlobal).toBe(false);
+    expect(info.updateCommand).toBeUndefined();
     expect(info.updateMessage).toBe(
       'Running from a local git clone. Please update with "git pull".',
+    );
+  });
+
+  it('should detect a source checkout when run from an unrelated directory', () => {
+    const cloneRoot = '/home/user/gemini-cli';
+    const cliPath = `${cloneRoot}/bundle/gemini.js`;
+    const unrelatedDir = '/tmp/not-a-git-repo';
+    process.argv[1] = cliPath;
+    mockedRealPathSync.mockReturnValue(cliPath);
+    vi.spyOn(process, 'cwd').mockReturnValue(unrelatedDir);
+    mockedIsGitRepository.mockImplementation(
+      (directory) => directory === path.dirname(cliPath),
+    );
+
+    const info = getInstallationInfo(unrelatedDir, true);
+
+    expect(mockedIsGitRepository).toHaveBeenCalledWith(path.dirname(cliPath));
+    expect(info.packageManager).toBe(PackageManager.UNKNOWN);
+    expect(info.isGlobal).toBe(false);
+    expect(info.updateCommand).toBeUndefined();
+    expect(info.updateMessage).toBe(
+      'Running from a local git clone. Please update with "git pull".',
+    );
+  });
+
+  it('should detect a source checkout when the current directory is another git repository', () => {
+    const cloneRoot = '/home/user/gemini-cli';
+    const cliPath = `${cloneRoot}/packages/cli/dist/index.js`;
+    const otherRepo = '/home/user/some-other-project';
+    process.argv[1] = cliPath;
+    mockedRealPathSync.mockReturnValue(cliPath);
+    vi.spyOn(process, 'cwd').mockReturnValue(otherRepo);
+    mockedIsGitRepository.mockImplementation(
+      (directory) =>
+        directory === path.dirname(cliPath) || directory === otherRepo,
+    );
+
+    const info = getInstallationInfo(otherRepo, true);
+
+    expect(mockedIsGitRepository).toHaveBeenCalledWith(path.dirname(cliPath));
+    expect(info.packageManager).toBe(PackageManager.UNKNOWN);
+    expect(info.isGlobal).toBe(false);
+    expect(info.updateCommand).toBeUndefined();
+    expect(info.updateMessage).toBe(
+      'Running from a local git clone. Please update with "git pull".',
+    );
+  });
+
+  it('should detect a global npm install when the current directory is a git repository', () => {
+    const cwd = '/home/user/some-other-repo';
+    const cliPath =
+      '/usr/local/lib/node_modules/@google/gemini-cli/dist/index.js';
+    process.argv[1] = cliPath;
+    mockedRealPathSync.mockReturnValue(cliPath);
+    vi.spyOn(process, 'cwd').mockReturnValue(cwd);
+    // Both the working directory and the install location report a git
+    // repository. The node_modules segment is what keeps this global.
+    mockedIsGitRepository.mockReturnValue(true);
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('Command failed');
+    });
+
+    const info = getInstallationInfo(cwd, true);
+
+    expect(info.packageManager).toBe(PackageManager.NPM);
+    expect(info.isGlobal).toBe(true);
+    expect(info.updateCommand).toBe('npm install -g @google/gemini-cli@latest');
+    expect(info.updateMessage).toContain(
+      'Installed with npm. Attempting to automatically update now...',
     );
   });
 
@@ -174,6 +248,38 @@ describe('getInstallationInfo', () => {
       expect.stringContaining('brew --prefix gemini-cli'),
       expect.anything(),
     );
+    expect(info.packageManager).toBe(PackageManager.HOMEBREW);
+    expect(info.isGlobal).toBe(true);
+    expect(info.updateMessage).toBe(
+      'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
+    );
+  });
+
+  it('should detect Homebrew when the Homebrew prefix is a git repository', () => {
+    Object.defineProperty(process, 'platform', {
+      value: 'darwin',
+    });
+    const cliPath = '/opt/homebrew/Cellar/gemini-cli/1.0.0/bin/gemini';
+    process.argv[1] = cliPath;
+    // Homebrew's prefix is a git clone, so walking up from the Cellar
+    // path finds a repository. That must not win over the brew check.
+    mockedIsGitRepository.mockReturnValue(true);
+    mockedExecSync.mockImplementation((cmd) => {
+      if (typeof cmd === 'string' && cmd.includes('brew --prefix gemini-cli')) {
+        return '/opt/homebrew/opt/gemini-cli';
+      }
+      throw new Error(`Command failed: ${cmd}`);
+    });
+    mockedRealPathSync.mockImplementation((p) => {
+      if (p === cliPath) return cliPath;
+      if (p === '/opt/homebrew/opt/gemini-cli') {
+        return '/opt/homebrew/Cellar/gemini-cli/1.0.0';
+      }
+      return String(p);
+    });
+
+    const info = getInstallationInfo('/home/user/unrelated-repo', true);
+
     expect(info.packageManager).toBe(PackageManager.HOMEBREW);
     expect(info.isGlobal).toBe(true);
     expect(info.updateMessage).toBe(
