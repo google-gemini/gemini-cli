@@ -28,6 +28,7 @@ import {
   resolveToRealPath,
 } from '../utils/paths.js';
 import { resolveGitWorktreePaths } from '../sandbox/utils/fsUtils.js';
+import { FatalSandboxError } from '../utils/errors.js';
 
 /**
  * A structured result of fully resolved sandbox paths.
@@ -341,7 +342,9 @@ export class LocalSandboxManager implements SandboxManager {
   constructor(private options?: GlobalSandboxOptions) {}
 
   async prepareCommand(_req: SandboxRequest): Promise<SandboxedCommand> {
-    throw new Error('Tool sandboxing is not yet implemented.');
+    throw new FatalSandboxError(
+      'Tool sandboxing is not supported in this environment. Disable sandboxing with --sandbox=false or configure a supported container runtime.',
+    );
   }
 
   isKnownSafeCommand(_args: string[], _cwd?: string): boolean {

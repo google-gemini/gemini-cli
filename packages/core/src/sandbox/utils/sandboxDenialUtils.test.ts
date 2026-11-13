@@ -10,6 +10,9 @@ import {
   createSandboxDenialCache,
 } from './sandboxDenialUtils.js';
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
+import { LocalSandboxManager } from '../../services/sandboxManager.js';
+import { FatalSandboxError } from '../../utils/errors.js';
+import { ExitCodes } from '../../utils/exitCodes.js';
 
 describe('parsePosixSandboxDenials', () => {
   it('should detect file system denial and extract paths', () => {
@@ -223,5 +226,107 @@ PermissionError: [Errno 13] Permission denied: '/etc/test_sandbox_denial'`;
 
     const parsed2 = parsePosixSandboxDenials(result);
     expect(parsed2).toBeDefined();
+  });
+
+  describe('regression tests for linux & container permission errors (issue #29338)', () => {
+    it('should detect mkdir permission denied errors and extract paths', () => {
+      const output =
+        "mkdir: cannot create directory '/tmp/protected_dir': Permission denied";
+      const parsed = parsePosixSandboxDenials({
+        output,
+      } as unknown as ShellExecutionResult);
+      expect(parsed).toBeDefined();
+      expect(parsed?.filePaths).toContain('/tmp/protected_dir');
+    });
+
+    it('should detect touch permission denied errors and extract paths', () => {
+      const output = "touch: cannot touch '/var/log/app.log': Permission denied";
+      const parsed = parsePosixSandboxDenials({
+        output,
+      } as unknown as ShellExecutionResult);
+      expect(parsed).toBeDefined();
+      expect(parsed?.filePaths).toContain('/var/log/app.log');
+    });
+
+    it('should detect chmod operation not permitted and extract paths', () => {
+      const output =
+        "chmod: changing permissions of '/etc/hosts': Operation not permitted";
+      const parsed = parsePosixSandboxDenials({
+        output,
+      } as unknown as ShellExecutionResult);
+      expect(parsed).toBeDefined();
+      expect(parsed?.filePaths).toContain('/etc/hosts');
+    });
+
+    it('should detect EACCES scandir errors and extract paths', () => {
+      const output =
+        "Error: EACCES: permission denied, scandir '/root/protected_store'";
+      const parsed = parsePosixSandboxDenials({
+        output,
+      } as unknown as ShellExecutionResult);
+      expect(parsed).toBeDefined();
+      expect(parsed?.filePaths).toContain('/root/protected_store');
+    });
+
+    it('should detect EACCES access errors and extract paths', () => {
+      const output =
+        "Error: EACCES: permission denied, access '/var/run/secrets'";
+      const parsed = parsePosixSandboxDenials({
+        output,
+      } as unknown as ShellExecutionResult);
+      expect(parsed).toBeDefined();
+      expect(parsed?.filePaths).toContain('/var/run/secrets');
+    });
+
+    it('should detect Python OSError [Errno 13] permission denied and extract paths', () => {
+      const output =
+        "OSError: [Errno 13] Permission denied: '/home/user/app/script.py'";
+      const parsed = parsePosixSandboxDenials({
+        output,
+      } as unknown as ShellExecutionResult);
+      expect(parsed).toBeDefined();
+      expect(parsed?.filePaths).toContain('/home/user/app/script.py');
+    });
+
+    it('should detect shell invocation permission denied and extract paths', () => {
+      const output = 'bash: /opt/bin/daemon: Permission denied';
+      const parsed = parsePosixSandboxDenials({
+        output,
+      } as unknown as ShellExecutionResult);
+      expect(parsed).toBeDefined();
+      expect(parsed?.filePaths).toContain('/opt/bin/daemon');
+    });
+  });
+});
+
+describe('LocalSandboxManager (unsupported environment)', () => {
+  it('throws FatalSandboxError with exit code 44 for unsupported environments', async () => {
+    const manager = new LocalSandboxManager();
+    await expect(
+      manager.prepareCommand({
+        command: 'ls',
+        args: [],
+        cwd: '/tmp',
+        env: {},
+      }),
+    ).rejects.toThrow(FatalSandboxError);
+
+    try {
+      await manager.prepareCommand({
+        command: 'ls',
+        args: [],
+        cwd: '/tmp',
+        env: {},
+      });
+    } catch (err: unknown) {
+      expect(err).toBeInstanceOf(FatalSandboxError);
+      expect((err as FatalSandboxError).exitCode).toBe(
+        ExitCodes.FATAL_SANDBOX_ERROR,
+      );
+      expect((err as FatalSandboxError).exitCode).toBe(44);
+      expect((err as FatalSandboxError).message).toContain(
+        'Tool sandboxing is not supported',
+      );
+    }
   });
 });
