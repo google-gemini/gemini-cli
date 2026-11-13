@@ -133,6 +133,14 @@
       "topK": 64
     }
   },
+  "gemini-2.5-flash-image": {
+    "model": "gemini-2.5-flash-image",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1,
+      "responseModalities": ["TEXT", "IMAGE"]
+    }
+  },
   "gemini-3.1-flash-lite": {
     "model": "gemini-3.1-flash-lite",
     "generateContentConfig": {
