@@ -333,12 +333,14 @@ export class LoadedSettings {
     workspace: SettingsFile,
     isTrusted: boolean,
     errors: SettingsError[] = [],
+    blockedMcpServers: ReadonlySet<string> = new Set(),
   ) {
     this.system = system;
     this.systemDefaults = systemDefaults;
     this.user = user;
     this._workspaceFile = workspace;
     this.isTrusted = isTrusted;
+    this._blockedMcpServers = blockedMcpServers;
     this.workspace = isTrusted
       ? workspace
       : this.createEmptyWorkspace(workspace);
@@ -355,6 +357,7 @@ export class LoadedSettings {
   readonly errors: SettingsError[];
 
   private _workspaceFile: SettingsFile;
+  private readonly _blockedMcpServers: ReadonlySet<string>;
   private _merged: MergedSettings;
   private _snapshot: LoadedSettingsSnapshot;
   private _remoteAdminSettings: Partial<Settings> | undefined;
@@ -388,6 +391,10 @@ export class LoadedSettings {
         this.errors,
       );
       normalizeLegacyTheme(resolvedWorkspaceSettings);
+      stripBlockedMcpServers(
+        resolvedWorkspaceSettings,
+        this._blockedMcpServers,
+      );
       this._workspaceFile = {
         ...this._workspaceFile,
         settings: resolvedWorkspaceSettings,
@@ -424,6 +431,7 @@ export class LoadedSettings {
       workspaceSettings,
       isTrusted,
     );
+    stripBlockedMcpServers(merged, this._blockedMcpServers);
 
     // Remote admin settings always take precedence and file-based admin settings
     // are ignored.
@@ -935,6 +943,7 @@ function resolveSettings(
 }
 
 const SCRIPT_INTERPRETERS = new Set([
+  'env',
   'sh',
   'bash',
   'zsh',
@@ -990,12 +999,12 @@ function resolveMcpCommandPath(
   return path.resolve(baseDir, command);
 }
 
-function extractInterpreterScriptArg(
+function extractInterpreterScriptArgs(
   command: string,
   args: string[] | undefined,
-): string | undefined {
+): string[] {
   if (!args || args.length === 0) {
-    return undefined;
+    return [];
   }
   const baseName = command
     .split(/[\\/]/)
@@ -1003,15 +1012,32 @@ function extractInterpreterScriptArg(
     ?.toLowerCase()
     .replace(/\.(exe|cmd|bat)$/, '');
   if (!baseName || !SCRIPT_INTERPRETERS.has(baseName)) {
-    return undefined;
+    return [];
   }
+  const candidates: string[] = [];
   for (const arg of args) {
     const trimmed = arg.trim();
     if (!trimmed) continue;
-    if (INLINE_EVAL_FLAGS.has(trimmed.toLowerCase())) return undefined;
-    if (!trimmed.startsWith('-')) return trimmed;
+    if (trimmed === '--') continue;
+    if (trimmed.startsWith('-') && trimmed !== '-') {
+      const eqIndex = trimmed.indexOf('=');
+      const flagName = (
+        eqIndex >= 0 ? trimmed.slice(0, eqIndex) : trimmed
+      ).toLowerCase();
+      if (INLINE_EVAL_FLAGS.has(flagName)) {
+        break;
+      }
+      if (eqIndex >= 0) {
+        const inlineValue = trimmed.slice(eqIndex + 1).trim();
+        if (inlineValue && isExplicitCommandPath(inlineValue)) {
+          candidates.push(inlineValue);
+        }
+      }
+      continue;
+    }
+    candidates.push(trimmed);
   }
-  return undefined;
+  return candidates;
 }
 
 function findInsecureMcpTarget(
@@ -1028,10 +1054,7 @@ function findInsecureMcpTarget(
   if (isExplicitCommandPath(trimmed)) {
     candidates.push(trimmed);
   }
-  const scriptArg = extractInterpreterScriptArg(trimmed, args);
-  if (scriptArg) {
-    candidates.push(scriptArg);
-  }
+  candidates.push(...extractInterpreterScriptArgs(trimmed, args));
   for (const target of candidates) {
     const resolved = resolveMcpCommandPath(target, cwd, ctx.workspaceDir);
     const check = isFileAndDirectorySecureSync(resolved, ctx.securityCache);
@@ -1075,9 +1098,20 @@ function sanitizeSystemMcpServerCommand(
   if (!settings.mcp?.serverCommand) {
     return;
   }
-  const tokens = parse(settings.mcp.serverCommand).filter(
-    (token): token is string => typeof token === 'string',
-  );
+  let tokens: string[];
+  try {
+    tokens = parse(settings.mcp.serverCommand).filter(
+      (token): token is string => typeof token === 'string',
+    );
+  } catch (err) {
+    ctx.settingsErrors.push({
+      message: `Security Warning: Skipping mcp.serverCommand in ${ctx.fileLabel} file '${ctx.settingsFilePath}' due to parse failure: ${getErrorMessage(err)}`,
+      path: ctx.settingsFilePath,
+      severity: 'warning',
+    });
+    delete settings.mcp.serverCommand;
+    return;
+  }
   const insecure = findInsecureMcpTarget(
     tokens[0],
     tokens.slice(1),
@@ -1095,29 +1129,40 @@ function sanitizeSystemMcpServerCommand(
   delete settings.mcp.serverCommand;
 }
 
+function stripBlockedMcpServers(
+  settings: Settings,
+  blockedIds: ReadonlySet<string>,
+): void {
+  if (blockedIds.size === 0 || !settings.mcpServers) {
+    return;
+  }
+  for (const key of Object.keys(settings.mcpServers)) {
+    if (blockedIds.has(key.toLowerCase().trim())) {
+      delete settings.mcpServers[key];
+    }
+  }
+}
+
 function blockSkippedSystemMcpServers(
   skippedServers: string[],
   allScopes: Settings[],
   systemSettings: Settings,
-): void {
-  if (skippedServers.length === 0) {
-    return;
-  }
+): Set<string> {
   const blockedIds = new Set(
     skippedServers.map((name) => name.toLowerCase().trim()),
   );
+  if (blockedIds.size === 0) {
+    return blockedIds;
+  }
   for (const scopeSettings of allScopes) {
-    for (const key of Object.keys(scopeSettings.mcpServers ?? {})) {
-      if (blockedIds.has(key.toLowerCase().trim())) {
-        delete scopeSettings.mcpServers?.[key];
-      }
-    }
+    stripBlockedMcpServers(scopeSettings, blockedIds);
   }
   const existingExcluded = systemSettings.mcp?.excluded ?? [];
   systemSettings.mcp = {
     ...systemSettings.mcp,
     excluded: [...new Set([...existingExcluded, ...skippedServers])],
   };
+  return blockedIds;
 }
 
 /**
@@ -1334,15 +1379,9 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   ];
   sanitizeSystemMcpServerCommand(systemSettings, systemCheckCtx);
   sanitizeSystemMcpServerCommand(systemDefaultSettings, defaultsCheckCtx);
-  blockSkippedSystemMcpServers(
+  const blockedSystemMcpServerIds = blockSkippedSystemMcpServers(
     skippedSystemServers,
-    [
-      systemSettings,
-      systemDefaultSettings,
-      userSettings,
-      workspaceSettings,
-      workspaceOriginalSettings,
-    ],
+    [systemSettings, systemDefaultSettings, userSettings, workspaceSettings],
     systemSettings,
   );
 
@@ -1392,6 +1431,7 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
     },
     isTrusted,
     settingsErrors,
+    blockedSystemMcpServerIds,
   );
 
   // Automatically migrate deprecated settings when loading.
