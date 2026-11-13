@@ -341,6 +341,54 @@ describe('useLoadingIndicator - 429 Rate Limit and Cool-Down Countdown UX', () =
     expect(result.current.currentLoadingPhrase).toMatch(/4s/);
   });
 
+  it('Case 7: New prompt with identical retry fields restarts countdown', async () => {
+    const promptARetry: RetryAttemptPayload = {
+      model: 'gemini-2.5-flash',
+      attempt: 1,
+      maxAttempts: 3,
+      delayMs: 5000,
+      error: '429 Rate limit',
+      status: 429,
+      promptId: 'prompt-A',
+    };
+
+    const { result, rerender } = await renderLoadingIndicatorHook(
+      promptARetry,
+      'low',
+      StreamingState.Responding,
+    );
+
+    expect(result.current.statusPhrase).toBe(
+      'Rate limit reached. Cooling down... Retrying in 5s (Attempt 2/3)',
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+    expect(result.current.statusPhrase).toBe(
+      'Rate limit reached. Cooling down... Retrying in 2s (Attempt 2/3)',
+    );
+
+    // New prompt B emits a retry with identical attempt/delayMs/model/status/error
+    const promptBRetry: RetryAttemptPayload = {
+      model: 'gemini-2.5-flash',
+      attempt: 1,
+      maxAttempts: 3,
+      delayMs: 5000,
+      error: '429 Rate limit',
+      status: 429,
+      promptId: 'prompt-B',
+    };
+
+    await act(async () => {
+      await rerender({ retryStatus: promptBRetry });
+    });
+
+    expect(result.current.statusPhrase).toBe(
+      'Rate limit reached. Cooling down... Retrying in 5s (Attempt 2/3)',
+    );
+  });
+
   describe('isRateLimitRetry detection helper', () => {
     it('should detect rate limits by status code 429', () => {
       expect(
