@@ -56,14 +56,11 @@ export function getInstallationInfo(
     // Normalize path separators to forward slashes for consistent matching.
     const realPath = fs.realpathSync(cliPath).replace(/\\/g, '/');
     const normalizedProjectRoot = projectRoot?.replace(/\\/g, '/');
-    const isGit = isGitRepository(process.cwd());
 
-    // Check for local git clone first
+    // Check for local git clone first based on the CLI executable's location
     if (
-      isGit &&
-      normalizedProjectRoot &&
-      realPath.startsWith(normalizedProjectRoot) &&
-      !realPath.includes('/node_modules/')
+      !realPath.includes('/node_modules/') &&
+      isGitRepository(path.dirname(realPath))
     ) {
       return {
         packageManager: PackageManager.UNKNOWN, // Not managed by a package manager in this sense
