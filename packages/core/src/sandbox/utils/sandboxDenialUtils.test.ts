@@ -12,7 +12,6 @@ import {
 import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import { LocalSandboxManager } from '../../services/sandboxManager.js';
 import { FatalSandboxError } from '../../utils/errors.js';
-import { ExitCodes } from '../../utils/exitCodes.js';
 
 describe('parsePosixSandboxDenials', () => {
   it('should detect file system denial and extract paths', () => {
