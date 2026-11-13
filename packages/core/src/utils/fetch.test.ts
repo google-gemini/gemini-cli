@@ -264,6 +264,22 @@ describe('fetch utils', () => {
   });
 
   describe('updateGlobalFetchTimeouts', () => {
+    it('should give the global dispatcher a 15-minute body timeout and keep 5 minutes for the safe agent', () => {
+      updateGlobalFetchTimeouts(120000);
+
+      // Streamed model responses go through the global dispatcher.
+      expect(Agent).toHaveBeenCalledWith({
+        headersTimeout: 120000,
+        bodyTimeout: 900000,
+      });
+      // web_fetch keeps its 5-minute body timeout.
+      expect(Agent).toHaveBeenCalledWith({
+        headersTimeout: 120000,
+        bodyTimeout: 300000,
+        connect: expect.any(Function),
+      });
+    });
+
     it('should scale bodyTimeout up alongside headersTimeout on global Agent and safe Agent when no proxy is set', () => {
       updateGlobalFetchTimeouts(900000);
 
@@ -304,17 +320,23 @@ describe('fetch utils', () => {
       });
     });
 
-    it('should preserve the 300s bodyTimeout floor when timeout is below 300000ms and reset after a higher timeout', () => {
-      updateGlobalFetchTimeouts(900000);
+    it('should preserve the bodyTimeout floors when timeout is below 300000ms and reset after a higher timeout', () => {
+      updateGlobalFetchTimeouts(1200000);
       expect(Agent).toHaveBeenLastCalledWith({
-        headersTimeout: 900000,
-        bodyTimeout: 900000,
+        headersTimeout: 1200000,
+        bodyTimeout: 1200000,
       });
 
       updateGlobalFetchTimeouts(120000);
-      expect(Agent).toHaveBeenLastCalledWith({
+      // 5 minutes for the safe agent, 15 minutes for the global dispatcher.
+      expect(Agent).toHaveBeenCalledWith({
         headersTimeout: 120000,
         bodyTimeout: 300000,
+        connect: expect.any(Function),
+      });
+      expect(Agent).toHaveBeenLastCalledWith({
+        headersTimeout: 120000,
+        bodyTimeout: 900000,
       });
     });
 

@@ -801,8 +801,14 @@ export class GeminiChat {
             const errorType = isContentError
               ? error.type
               : getRetryErrorType(error);
+            // A body timeout means the model sent nothing for the whole idle
+            // window. A replay restarts the generation and is billed again.
+            const isBodyTimeout = errorType === 'UND_ERR_BODY_TIMEOUT';
 
-            if (isRetryableContentError || (isRetryable && !signal.aborted)) {
+            if (
+              isRetryableContentError ||
+              (isRetryable && !isBodyTimeout && !signal.aborted)
+            ) {
               // The issue requests exactly 3 retries (4 attempts) for API errors during stream iteration.
               // Regardless of the global maxAttempts (e.g. 10), we only want to retry these mid-stream API errors
               // up to 3 times before finally throwing the error to the user.

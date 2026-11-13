@@ -32,8 +32,13 @@ export class PrivateIpError extends Error {
 
 const DEFAULT_HEADERS_TIMEOUT = 60000; // 60 seconds
 const DEFAULT_BODY_TIMEOUT = 300000; // 5 minutes
+// The global dispatcher carries the streamed model responses, which can stay
+// silent for minutes, e.g. while one large tool-call argument is generated.
+// Google recommends client timeouts of at least 15 minutes for hard prompts.
+const GLOBAL_BODY_TIMEOUT = 900000; // 15 minutes
 let defaultHeadersTimeout = DEFAULT_HEADERS_TIMEOUT;
 let defaultBodyTimeout = DEFAULT_BODY_TIMEOUT;
+let globalBodyTimeout = GLOBAL_BODY_TIMEOUT;
 let currentProxy: string | undefined = undefined;
 
 function getBuildConnector():
@@ -218,7 +223,7 @@ let defaultSafeAgent = createSafeAgent();
 undici.setGlobalDispatcher(
   new undici.Agent({
     headersTimeout: defaultHeadersTimeout,
-    bodyTimeout: defaultBodyTimeout,
+    bodyTimeout: globalBodyTimeout,
   }),
 );
 
@@ -244,6 +249,7 @@ export function updateGlobalFetchTimeouts(
   // while scaling it up when a larger request timeout is configured.
   defaultBodyTimeout =
     bodyTimeoutMs ?? Math.max(DEFAULT_BODY_TIMEOUT, timeoutMs);
+  globalBodyTimeout = bodyTimeoutMs ?? Math.max(GLOBAL_BODY_TIMEOUT, timeoutMs);
   defaultSafeAgent = createSafeAgent({
     headersTimeout: defaultHeadersTimeout,
     bodyTimeout: defaultBodyTimeout,
@@ -254,7 +260,7 @@ export function updateGlobalFetchTimeouts(
     undici.setGlobalDispatcher(
       new undici.Agent({
         headersTimeout: defaultHeadersTimeout,
-        bodyTimeout: defaultBodyTimeout,
+        bodyTimeout: globalBodyTimeout,
       }),
     );
   }
@@ -569,7 +575,7 @@ export function setGlobalProxy(proxy: string) {
     undici.setGlobalDispatcher(
       new undici.Agent({
         headersTimeout: defaultHeadersTimeout,
-        bodyTimeout: defaultBodyTimeout,
+        bodyTimeout: globalBodyTimeout,
       }),
     );
     return;
@@ -585,7 +591,7 @@ export function setGlobalProxy(proxy: string) {
       httpsProxy: trimmedProxy,
       noProxy,
       headersTimeout: defaultHeadersTimeout,
-      bodyTimeout: defaultBodyTimeout,
+      bodyTimeout: globalBodyTimeout,
     }),
   );
 }
