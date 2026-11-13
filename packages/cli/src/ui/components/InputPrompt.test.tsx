@@ -63,6 +63,7 @@ import {
 } from '../commands/types.js';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { Text } from 'ink';
+import { useTextBuffer } from './shared/text-buffer.js';
 import {
   useShellHistory,
   type UseShellHistoryReturn,
@@ -555,6 +556,32 @@ describe('InputPrompt', () => {
       );
       expect(props.onSubmit).toHaveBeenCalledWith('ls -l');
     });
+    unmount();
+  });
+
+  it('should submit the latest text when the last IME character and Enter arrive in the same tick', async () => {
+    const initialText = '안녕하세';
+    const RealBufferPrompt = () => {
+      const realBuffer = useTextBuffer({
+        initialText,
+        initialCursorOffset: cpLen(initialText),
+        viewport: { width: 80, height: 10 },
+      });
+      return <TestInputPrompt {...props} buffer={realBuffer} />;
+    };
+    const { stdin, unmount } = await renderWithProviders(<RealBufferPrompt />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('요');
+      stdin.write('\r');
+    });
+
+    await waitFor(() => {
+      expect(props.onSubmit).toHaveBeenCalledWith('안녕하세요');
+    });
+    expect(props.onSubmit).toHaveBeenCalledTimes(1);
     unmount();
   });
 
