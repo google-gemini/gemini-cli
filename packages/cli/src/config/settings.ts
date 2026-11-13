@@ -986,24 +986,12 @@ const PRELOAD_FLAGS = new Set([
   '-file',
 ]);
 
-const NON_SCRIPT_VALUE_FLAGS = new Set([
-  '-w',
-  '-x',
-  '-o',
-  '-d',
-  '--config',
-  '-executionpolicy',
-  '--conditions',
-]);
-
-const SUBCOMMAND_INTERPRETERS = new Set(['deno', 'bun']);
-const INTERPRETER_SUBCOMMANDS = new Set(['run', 'x', 'serve', 'test', 'bench']);
-
 const SCRIPT_EXTENSIONS = new Set([
   '.js',
   '.mjs',
   '.cjs',
   '.jsx',
+  '.node',
   '.ts',
   '.mts',
   '.cts',
@@ -1011,6 +999,7 @@ const SCRIPT_EXTENSIONS = new Set([
   '.py',
   '.pyw',
   '.py3',
+  '.pyz',
   '.sh',
   '.bash',
   '.zsh',
@@ -1019,6 +1008,7 @@ const SCRIPT_EXTENSIONS = new Set([
   '.pm',
   '.rb',
   '.php',
+  '.phar',
   '.ps1',
   '.psm1',
   '.cmd',
@@ -1040,11 +1030,15 @@ function isExplicitCommandPath(command: string): boolean {
 }
 
 function isScriptPathCandidate(token: string): boolean {
-  if (isExplicitCommandPath(token)) {
-    return true;
-  }
   const ext = path.extname(token).toLowerCase();
-  return ext !== '' && SCRIPT_EXTENSIONS.has(ext);
+  if (ext !== '') {
+    return SCRIPT_EXTENSIONS.has(ext);
+  }
+  return isExplicitCommandPath(token);
+}
+
+function isPreloadTargetCandidate(token: string): boolean {
+  return isExplicitCommandPath(token) || isScriptPathCandidate(token);
 }
 
 function resolveMcpCommandPath(
@@ -1076,27 +1070,31 @@ function extractInterpreterScriptArgs(
   }
   const candidates: string[] = [];
   let expectPreloadValue = false;
-  let skipNextValue = false;
-  let sawSubcommand = false;
+  let afterDoubleDash = false;
 
   for (const arg of args) {
     const trimmed = arg.trim();
     if (!trimmed) continue;
 
+    if (afterDoubleDash) {
+      if (isPreloadTargetCandidate(trimmed)) {
+        candidates.push(trimmed);
+      }
+      break;
+    }
+
     if (expectPreloadValue) {
-      if (isScriptPathCandidate(trimmed)) {
+      if (isPreloadTargetCandidate(trimmed)) {
         candidates.push(trimmed);
       }
       expectPreloadValue = false;
       continue;
     }
 
-    if (skipNextValue) {
-      skipNextValue = false;
+    if (trimmed === '--') {
+      afterDoubleDash = true;
       continue;
     }
-
-    if (trimmed === '--') continue;
 
     if (trimmed.startsWith('-') && trimmed !== '-') {
       const eqIndex = trimmed.indexOf('=');
@@ -1109,32 +1107,20 @@ function extractInterpreterScriptArgs(
       if (PRELOAD_FLAGS.has(flagName)) {
         if (eqIndex >= 0) {
           const inlineValue = trimmed.slice(eqIndex + 1).trim();
-          if (inlineValue && isScriptPathCandidate(inlineValue)) {
+          if (inlineValue && isPreloadTargetCandidate(inlineValue)) {
             candidates.push(inlineValue);
           }
         } else {
           expectPreloadValue = true;
         }
-      } else if (eqIndex < 0 && NON_SCRIPT_VALUE_FLAGS.has(flagName)) {
-        skipNextValue = true;
       }
-      continue;
-    }
-
-    if (
-      !sawSubcommand &&
-      candidates.length === 0 &&
-      SUBCOMMAND_INTERPRETERS.has(baseName) &&
-      INTERPRETER_SUBCOMMANDS.has(trimmed.toLowerCase())
-    ) {
-      sawSubcommand = true;
       continue;
     }
 
     if (isScriptPathCandidate(trimmed)) {
       candidates.push(trimmed);
+      break;
     }
-    break;
   }
 
   return candidates;

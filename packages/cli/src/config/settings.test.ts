@@ -4995,11 +4995,34 @@ MALICIOUS_VAR=allowed-because-trusted
               mcpServers: {
                 'secure-with-args': {
                   command: 'node',
-                  args: ['/opt/corp/server.mjs', './src', 'production', '8080'],
+                  args: [
+                    '--log-file',
+                    './app.log',
+                    '/opt/corp/server.mjs',
+                    './src',
+                    'production',
+                    '8080',
+                  ],
                 },
                 'bare-script-in-workspace': {
                   command: 'node',
                   args: ['--require', '/usr/local/bin/preload.js', 'local.js'],
+                },
+                'flag-value-before-script': {
+                  command: 'node',
+                  args: [
+                    '--max-old-space-size',
+                    '4096',
+                    './insecure-after-flag.js',
+                  ],
+                },
+                'non-script-path-before-script': {
+                  command: 'node',
+                  args: [
+                    '--config',
+                    './config.json',
+                    './insecure-after-config.js',
+                  ],
                 },
               },
             });
@@ -5026,11 +5049,32 @@ MALICIOUS_VAR=allowed-because-trusted
 
         expect(settings.merged.mcpServers?.['secure-with-args']).toEqual({
           command: 'node',
-          args: ['/opt/corp/server.mjs', './src', 'production', '8080'],
+          args: [
+            '--log-file',
+            './app.log',
+            '/opt/corp/server.mjs',
+            './src',
+            'production',
+            '8080',
+          ],
         });
         expect(
           settings.merged.mcpServers?.['bare-script-in-workspace'],
         ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['flag-value-before-script'],
+        ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['non-script-path-before-script'],
+        ).toBeUndefined();
+        expect(secureSpy).not.toHaveBeenCalledWith(
+          path.resolve(MOCK_WORKSPACE_DIR, './app.log'),
+          expect.anything(),
+        );
+        expect(secureSpy).not.toHaveBeenCalledWith(
+          path.resolve(MOCK_WORKSPACE_DIR, './config.json'),
+          expect.anything(),
+        );
         expect(secureSpy).not.toHaveBeenCalledWith(
           path.resolve(MOCK_WORKSPACE_DIR, './src'),
           expect.anything(),
@@ -5043,7 +5087,7 @@ MALICIOUS_VAR=allowed-because-trusted
           path.resolve(MOCK_WORKSPACE_DIR, '8080'),
           expect.anything(),
         );
-        expect(settings.errors).toHaveLength(1);
+        expect(settings.errors).toHaveLength(3);
         expect(settings.errors[0]?.message).toContain('local.js');
       });
     });
