@@ -13,6 +13,7 @@ import {
   type Config,
   PolicyDecision,
   ApprovalMode,
+  SafeRegExp,
 } from '@google/gemini-cli-core';
 
 describe('policiesCommand', () => {
@@ -78,7 +79,7 @@ describe('policiesCommand', () => {
         },
         {
           decision: PolicyDecision.ALLOW,
-          argsPattern: /safe/,
+          argsPattern: SafeRegExp.compile('safe'),
           source: 'test.toml',
         },
         {

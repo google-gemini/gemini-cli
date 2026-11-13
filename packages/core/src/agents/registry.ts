@@ -30,6 +30,7 @@ import {
   ModelConfigService,
 } from '../services/modelConfigService.js';
 import { PolicyDecision, PRIORITY_SUBAGENT_TOOL } from '../policy/types.js';
+import { SafeRegExp } from '../policy/safe-regex.js';
 import { A2AAgentError, AgentAuthConfigMissingError } from './a2a-errors.js';
 
 /**
@@ -425,7 +426,9 @@ export class AgentRegistry {
     if (definition.kind === 'remote') {
       policyEngine.addRule({
         toolName: AgentTool.Name,
-        argsPattern: new RegExp(`"agent_name":\\s*"${definition.name}"`),
+        argsPattern: SafeRegExp.compile(
+          `"agent_name":\\s*"${definition.name}"`,
+        ),
         decision: PolicyDecision.ASK_USER,
         priority: PRIORITY_SUBAGENT_TOOL + 0.1, // Higher priority to override blanket allow
         source: DYNAMIC_RULE_SOURCE,

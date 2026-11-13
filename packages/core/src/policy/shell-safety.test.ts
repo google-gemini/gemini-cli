@@ -102,6 +102,7 @@ import { PolicyEngine } from './policy-engine.js';
 import { PolicyDecision, ApprovalMode } from './types.js';
 import type { FunctionCall } from '@google/genai';
 import { buildArgsPatterns } from './utils.js';
+import { SafeRegExp } from './safe-regex.js';
 
 describe('Shell Safety Policy', () => {
   let policyEngine: PolicyEngine;
@@ -111,7 +112,7 @@ describe('Shell Safety Policy', () => {
     const argsPatterns = buildArgsPatterns(undefined, prefix, undefined);
     // Since buildArgsPatterns returns array of patterns (strings), we pick the first one
     // and compile it.
-    const argsPattern = new RegExp(argsPatterns[0]!);
+    const argsPattern = SafeRegExp.compile(argsPatterns[0]!);
 
     return new PolicyEngine({
       rules: [
@@ -224,13 +225,13 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsEcho[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsEcho[0]!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsGit[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsGit[0]!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
         },
@@ -255,14 +256,14 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsEcho[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsEcho[0]!),
           decision: PolicyDecision.ALLOW,
           allowCommandSubstitution: true,
           priority: 2,
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsGit[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsGit[0]!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
         },
@@ -287,14 +288,14 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsEcho[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsEcho[0]!),
           decision: PolicyDecision.ALLOW,
           allowCommandSubstitution: false,
           priority: 2,
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsGit[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsGit[0]!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
         },
@@ -376,13 +377,13 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsEcho[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsEcho[0]!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsGit[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsGit[0]!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
         },
@@ -407,14 +408,14 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsEcho[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsEcho[0]!),
           decision: PolicyDecision.ALLOW,
           allowCommandSubstitution: true,
           priority: 2,
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsGit[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsGit[0]!),
           decision: PolicyDecision.ALLOW,
           allowCommandSubstitution: true,
           priority: 2,
@@ -440,14 +441,14 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsEcho[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsEcho[0]!),
           decision: PolicyDecision.ALLOW,
           allowCommandSubstitution: false,
           priority: 2,
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsGit[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsGit[0]!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
         },
@@ -488,7 +489,7 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsGitLog[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsGitLog[0]!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
           allowRedirection: true,
@@ -531,7 +532,7 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsPush[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsPush[0]!),
           decision: PolicyDecision.DENY,
           priority: 2,
         },
@@ -562,7 +563,7 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsGitStatus[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsGitStatus[0]!),
           decision: PolicyDecision.ALLOW,
           priority: 2,
           name: 'allow_git_status_rule', // Give a name to easily identify
@@ -599,7 +600,7 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsAnotherUnknown[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsAnotherUnknown[0]!),
           decision: PolicyDecision.ASK_USER,
           priority: 2,
           name: 'ask_another_unknown_command_rule',
@@ -642,14 +643,14 @@ describe('Shell Safety Policy', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsAsk1[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsAsk1[0]!),
           decision: PolicyDecision.ASK_USER,
           priority: 2,
           name: 'ask_rule_1',
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(argsPatternsAsk2[0]!),
+          argsPattern: SafeRegExp.compile(argsPatternsAsk2[0]!),
           decision: PolicyDecision.ASK_USER,
           priority: 2,
           name: 'ask_rule_2',
