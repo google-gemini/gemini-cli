@@ -1776,6 +1776,21 @@ const SETTINGS_SCHEMA = {
           'Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.',
         showInDialog: true,
       },
+      callTimeout: {
+        type: 'number',
+        label: 'Tool Call Timeout',
+        category: 'Tools',
+        requiresRestart: true,
+        default: 0,
+        description: oneLine`
+          Maximum time in seconds that a single tool call may run before it is
+          aborted. Set to 0 (the default) or a negative value to disable.
+          For shell commands it works alongside tools.shell.inactivityTimeout.
+          Subagents are bounded by their own maxTimeMinutes (see
+          agents.overrides) instead, but the tool calls they make are limited.
+        `,
+        showInDialog: true,
+      },
       disableLLMCorrection: {
         type: 'boolean',
         label: 'Disable LLM Correction',

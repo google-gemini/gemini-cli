@@ -1900,6 +1900,16 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `40000`
   - **Requires restart:** Yes
 
+- **`tools.callTimeout`** (number):
+
+  - **Description:** Maximum time in seconds that a single tool call may run
+    before it is aborted. Set to 0 (the default) or a negative value to disable.
+    For shell commands it works alongside tools.shell.inactivityTimeout.
+    Subagents are bounded by their own maxTimeMinutes (see agents.overrides)
+    instead, but the tool calls they make are limited.
+  - **Default:** `0`
+  - **Requires restart:** Yes
+
 - **`tools.disableLLMCorrection`** (boolean):
   - **Description:** Disable LLM-based error correction for edit tools. When
     enabled, tools will fail immediately if exact string matches are not found,
