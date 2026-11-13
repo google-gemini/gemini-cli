@@ -690,6 +690,49 @@ describe('GeminiChat', () => {
       expect(modelTurn.parts![0].functionCall?.name).toBe('tool_A');
       expect(modelTurn.parts![1].functionCall?.name).toBe('tool_B');
     });
+
+    it('should trim whitespace from functionCall name and preserve trimmed name in history', async () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(true);
+
+      const paddedCallStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: ' update_topic ' } }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+          functionCalls: [{ name: ' update_topic ' }],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        paddedCallStream,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'test padded tool',
+        'prompt-padded-tool',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // Consume
+      }
+
+      const history = chat.getHistoryTurns();
+      expect(history.length).toBe(2);
+
+      const modelTurn = history[1].content;
+      expect(modelTurn.role).toBe('model');
+      expect(modelTurn.parts?.length).toBe(1);
+      expect(modelTurn.parts![0].functionCall?.name).toBe('update_topic');
+      expect(modelTurn.parts![0].functionCall?.id).toMatch(/^update_topic__/);
+    });
     it('repro: should not collide when multiple tool calls with the same name arrive in the same chunk', async () => {
       vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(true);
 

@@ -487,8 +487,9 @@ export class Turn {
       ? rawCallId
       : `${name}__${rawCallId}`;
 
-    // Mutate the function call object ID so that history consolidation inherits it
+    // Mutate the function call object ID and name so that history consolidation inherits it
     fnCall.id = callId;
+    fnCall.name = name;
 
     const tool = this.chat.loopContext.toolRegistry.getTool(name);
     let display;
