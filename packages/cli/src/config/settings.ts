@@ -1015,6 +1015,36 @@ const SCRIPT_EXTENSIONS = new Set([
   '.bat',
 ]);
 
+const NON_SCRIPT_VALUE_FLAGS = new Set([
+  '-w',
+  '-x',
+  '-o',
+  '-d',
+  '--config',
+  '--log-file',
+  '--max-old-space-size',
+  '--inspect-port',
+  '--debug-port',
+  '--conditions',
+  '--input-type',
+  '--title',
+  '-executionpolicy',
+]);
+
+const SUBCOMMAND_INTERPRETERS = new Set(['deno', 'bun']);
+const INTERPRETER_SUBCOMMANDS = new Set(['run', 'x', 'serve', 'test', 'bench']);
+
+const IMPLICIT_SCRIPT_EXTENSIONS = [
+  '.js',
+  '.mjs',
+  '.cjs',
+  '.ts',
+  '.mts',
+  '.cts',
+  '.py',
+  '.ps1',
+];
+
 interface SystemMcpCommandCheckContext {
   workspaceDir: string;
   settingsFilePath: string;
@@ -1030,11 +1060,14 @@ function isExplicitCommandPath(command: string): boolean {
 }
 
 function isScriptPathCandidate(token: string): boolean {
+  if (/^\d+$/.test(token)) {
+    return false;
+  }
   const ext = path.extname(token).toLowerCase();
   if (ext !== '') {
     return SCRIPT_EXTENSIONS.has(ext);
   }
-  return isExplicitCommandPath(token);
+  return true;
 }
 
 function isPreloadTargetCandidate(token: string): boolean {
@@ -1051,6 +1084,24 @@ function resolveMcpCommandPath(
   }
   const baseDir = cwd ? path.resolve(workspaceDir, cwd) : workspaceDir;
   return path.resolve(baseDir, command);
+}
+
+function expandCandidatePaths(resolvedPath: string): string[] {
+  const paths = [resolvedPath];
+  if (path.extname(resolvedPath) !== '') {
+    return paths;
+  }
+  for (const ext of IMPLICIT_SCRIPT_EXTENSIONS) {
+    const withExt = `${resolvedPath}${ext}`;
+    try {
+      if (fs.existsSync(withExt)) {
+        paths.push(withExt);
+      }
+    } catch {
+      paths.push(withExt);
+    }
+  }
+  return paths;
 }
 
 function extractInterpreterScriptArgs(
@@ -1070,6 +1121,8 @@ function extractInterpreterScriptArgs(
   }
   const candidates: string[] = [];
   let expectPreloadValue = false;
+  let skipNextValue = false;
+  let sawSubcommand = false;
   let afterDoubleDash = false;
 
   for (const arg of args) {
@@ -1088,6 +1141,11 @@ function extractInterpreterScriptArgs(
         candidates.push(trimmed);
       }
       expectPreloadValue = false;
+      continue;
+    }
+
+    if (skipNextValue) {
+      skipNextValue = false;
       continue;
     }
 
@@ -1113,7 +1171,19 @@ function extractInterpreterScriptArgs(
         } else {
           expectPreloadValue = true;
         }
+      } else if (eqIndex < 0 && NON_SCRIPT_VALUE_FLAGS.has(flagName)) {
+        skipNextValue = true;
       }
+      continue;
+    }
+
+    if (
+      !sawSubcommand &&
+      candidates.length === 0 &&
+      SUBCOMMAND_INTERPRETERS.has(baseName) &&
+      INTERPRETER_SUBCOMMANDS.has(trimmed.toLowerCase())
+    ) {
+      sawSubcommand = true;
       continue;
     }
 
@@ -1143,9 +1213,17 @@ function findInsecureMcpTarget(
   candidates.push(...extractInterpreterScriptArgs(trimmed, args));
   for (const target of candidates) {
     const resolved = resolveMcpCommandPath(target, cwd, ctx.workspaceDir);
-    const check = isFileAndDirectorySecureSync(resolved, ctx.securityCache);
-    if (!check.secure) {
-      return { target, reason: check.reason ?? 'Insecure file or directory.' };
+    for (const candidatePath of expandCandidatePaths(resolved)) {
+      const check = isFileAndDirectorySecureSync(
+        candidatePath,
+        ctx.securityCache,
+      );
+      if (!check.secure) {
+        return {
+          target,
+          reason: check.reason ?? 'Insecure file or directory.',
+        };
+      }
     }
   }
   return undefined;
@@ -1186,10 +1264,11 @@ function sanitizeSystemMcpServerCommand(
   }
   let tokens: string[];
   try {
-    const parsedTokens = parse(settings.mcp.serverCommand, process.env);
-    if (
-      !parsedTokens.every((token): token is string => typeof token === 'string')
-    ) {
+    const parsedTokens = parse(settings.mcp.serverCommand);
+    const stringTokens = parsedTokens.filter(
+      (token): token is string => typeof token === 'string',
+    );
+    if (stringTokens.length !== parsedTokens.length) {
       ctx.settingsErrors.push({
         message: `Security Warning: Skipping mcp.serverCommand in ${ctx.fileLabel} file '${ctx.settingsFilePath}' due to presence of shell operators.`,
         path: ctx.settingsFilePath,
@@ -1198,7 +1277,7 @@ function sanitizeSystemMcpServerCommand(
       delete settings.mcp.serverCommand;
       return;
     }
-    tokens = parsedTokens;
+    tokens = stringTokens;
   } catch (err) {
     ctx.settingsErrors.push({
       message: `Security Warning: Skipping mcp.serverCommand in ${ctx.fileLabel} file '${ctx.settingsFilePath}' due to parse failure: ${getErrorMessage(err)}`,

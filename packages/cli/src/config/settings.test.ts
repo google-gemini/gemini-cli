@@ -5024,6 +5024,10 @@ MALICIOUS_VAR=allowed-because-trusted
                     './insecure-after-config.js',
                   ],
                 },
+                'extensionless-bare-script': {
+                  command: 'node',
+                  args: ['server'],
+                },
               },
             });
           }
@@ -5067,6 +5071,9 @@ MALICIOUS_VAR=allowed-because-trusted
         expect(
           settings.merged.mcpServers?.['non-script-path-before-script'],
         ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['extensionless-bare-script'],
+        ).toBeUndefined();
         expect(secureSpy).not.toHaveBeenCalledWith(
           path.resolve(MOCK_WORKSPACE_DIR, './app.log'),
           expect.anything(),
@@ -5087,7 +5094,7 @@ MALICIOUS_VAR=allowed-because-trusted
           path.resolve(MOCK_WORKSPACE_DIR, '8080'),
           expect.anything(),
         );
-        expect(settings.errors).toHaveLength(3);
+        expect(settings.errors).toHaveLength(4);
         expect(settings.errors[0]?.message).toContain('local.js');
       });
     });
