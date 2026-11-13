@@ -775,6 +775,48 @@ describe('GeminiChat', () => {
       expect(modelTurn.parts?.length).toBe(1);
       expect(modelTurn.parts![0].functionCall?.name).toBe('update_topic');
     });
+
+    it('should fallback to generic_tool when functionCall name is empty or whitespace when context management is disabled', async () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(false);
+
+      const emptyCallStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: '   ' } }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+          functionCalls: [{ name: '   ' }],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        emptyCallStream,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'test empty tool legacy',
+        'prompt-empty-tool-legacy',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // Consume
+      }
+
+      const history = chat.getHistoryTurns();
+      expect(history.length).toBe(2);
+
+      const modelTurn = history[1].content;
+      expect(modelTurn.role).toBe('model');
+      expect(modelTurn.parts?.length).toBe(1);
+      expect(modelTurn.parts![0].functionCall?.name).toBe('generic_tool');
+    });
     it('repro: should not collide when multiple tool calls with the same name arrive in the same chunk', async () => {
       vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(true);
 

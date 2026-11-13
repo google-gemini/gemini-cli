@@ -1784,9 +1784,9 @@ export class GeminiChat {
     }
 
     for (const part of consolidatedParts) {
-      if (part.functionCall?.name) {
+      if (part.functionCall) {
         part.functionCall.name =
-          part.functionCall.name.trim() || 'generic_tool';
+          part.functionCall.name?.trim() || 'generic_tool';
       }
     }
 
