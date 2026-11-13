@@ -24,7 +24,6 @@ import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
-import { isAutoModel } from '../config/models.js';
 import {
   type ModelConfig,
   ModelConfigService,
@@ -694,15 +693,19 @@ export class AgentRegistry {
       },
     );
 
-    if (agentModelConfig.model && isAutoModel(agentModelConfig.model)) {
-      this.config.modelConfigService.registerRuntimeModelOverride({
-        match: {
-          overrideScope: definition.name,
-        },
-        modelConfig: {
-          generateContentConfig: agentModelConfig.generateContentConfig,
-        },
-      });
+    // GeminiChat resolves each request by model name, not by this alias, so
+    // apply the agent's settings to its scope, whatever model it runs on.
+    // Re-registration (e.g. on reload) replaces the scope, so drop a stale one
+    // when the agent no longer sets generateContentConfig.
+    if (agentModelConfig.generateContentConfig) {
+      this.config.modelConfigService.registerRuntimeScopeOverride(
+        definition.name,
+        { generateContentConfig: agentModelConfig.generateContentConfig },
+      );
+    } else {
+      this.config.modelConfigService.unregisterRuntimeScopeOverride(
+        definition.name,
+      );
     }
   }
 

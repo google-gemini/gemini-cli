@@ -147,6 +147,10 @@ export interface _ResolvedModelConfig {
 export class ModelConfigService {
   private readonly runtimeAliases: Record<string, ModelConfigAlias> = {};
   private readonly runtimeOverrides: ModelConfigOverride[] = [];
+  private readonly runtimeScopeOverrides = new Map<
+    string,
+    ModelConfigOverride
+  >();
 
   // TODO(12597): Process config to build a typed alias hierarchy.
   constructor(private readonly config: ModelConfigServiceConfig) {}
@@ -366,6 +370,27 @@ export class ModelConfigService {
     this.runtimeOverrides.push(override);
   }
 
+  /**
+   * Applies `modelConfig` to every request made with `overrideScope` (e.g. a
+   * subagent's name), whatever model the request resolves to. Registering a
+   * scope again replaces its config, and `clearRuntimeOverrides()` leaves it
+   * in place. Configured overrides that match the same request still win.
+   */
+  registerRuntimeScopeOverride(
+    overrideScope: string,
+    modelConfig: ModelConfig,
+  ): void {
+    this.runtimeScopeOverrides.set(overrideScope, {
+      match: { overrideScope },
+      modelConfig,
+    });
+  }
+
+  /** Removes the scope override registered for `overrideScope`, if any. */
+  unregisterRuntimeScopeOverride(overrideScope: string): void {
+    this.runtimeScopeOverrides.delete(overrideScope);
+  }
+
   clearRuntimeOverrides(): void {
     this.runtimeOverrides.length = 0;
   }
@@ -417,6 +442,8 @@ export class ModelConfigService {
 
     const modelToLevel = this.buildModelLevelMap(aliasChain, baseModel);
     const allOverrides = [
+      // First, so configured overrides with the same specificity win ties.
+      ...this.runtimeScopeOverrides.values(),
       ...overrides,
       ...customOverrides,
       ...this.runtimeOverrides,
@@ -617,12 +644,32 @@ export class ModelConfigService {
    * The `generateContentConfig` properties are deeply merged.
    */
   static merge(base: ModelConfig, override: ModelConfig): ModelConfig {
+    const generateContentConfig = ModelConfigService.deepMerge(
+      base.generateContentConfig,
+      override.generateContentConfig,
+    );
+    // The API rejects a request that sets both thinkingLevel and
+    // thinkingBudget, so the one the override sets replaces the inherited one.
+    const overrideThinking = override.generateContentConfig?.thinkingConfig;
+    if (overrideThinking && generateContentConfig.thinkingConfig) {
+      // Clone: deepMerge can return the override's own nested object.
+      const thinkingConfig = { ...generateContentConfig.thinkingConfig };
+      if (
+        overrideThinking.thinkingBudget !== undefined &&
+        overrideThinking.thinkingLevel === undefined
+      ) {
+        delete thinkingConfig.thinkingLevel;
+      } else if (
+        overrideThinking.thinkingLevel !== undefined &&
+        overrideThinking.thinkingBudget === undefined
+      ) {
+        delete thinkingConfig.thinkingBudget;
+      }
+      generateContentConfig.thinkingConfig = thinkingConfig;
+    }
     return {
       model: override.model ?? base.model,
-      generateContentConfig: ModelConfigService.deepMerge(
-        base.generateContentConfig,
-        override.generateContentConfig,
-      ),
+      generateContentConfig,
     };
   }
 
