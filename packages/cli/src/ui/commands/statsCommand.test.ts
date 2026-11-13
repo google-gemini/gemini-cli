@@ -81,6 +81,7 @@ describe('statsCommand', () => {
       tier: undefined,
       userEmail: 'mock@example.com',
       currentModel: undefined,
+      stats: mockContext.session.stats.metrics,
       creditBalance: undefined,
     });
   });
@@ -144,6 +145,7 @@ describe('statsCommand', () => {
       currentModel: undefined,
       pooledRemaining: undefined,
       pooledLimit: undefined,
+      stats: mockContext.session.stats.metrics,
     });
   });
 
@@ -158,6 +160,7 @@ describe('statsCommand', () => {
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith({
       type: MessageType.TOOL_STATS,
+      stats: mockContext.session.stats.metrics,
     });
   });
 
