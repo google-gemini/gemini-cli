@@ -319,9 +319,6 @@ describe('LocalSandboxManager (unsupported environment)', () => {
       });
     } catch (err: unknown) {
       expect(err).toBeInstanceOf(FatalSandboxError);
-      expect((err as FatalSandboxError).exitCode).toBe(
-        ExitCodes.FATAL_SANDBOX_ERROR,
-      );
       expect((err as FatalSandboxError).exitCode).toBe(44);
       expect((err as FatalSandboxError).message).toContain(
         'Tool sandboxing is not supported',
