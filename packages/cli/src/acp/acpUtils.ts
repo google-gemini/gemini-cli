@@ -161,6 +161,12 @@ export function toPermissionOptions(
         }
         break;
       case 'exec':
+        if (
+          (confirmation.untrustedFlags?.length ?? 0) > 0 ||
+          (confirmation.modifiedBuildFiles?.length ?? 0) > 0
+        ) {
+          break;
+        }
         options.push({
           optionId: ToolConfirmationOutcome.ProceedAlways,
           name: 'Allow for this session',
