@@ -10,6 +10,23 @@ import { MAX_LINE_LENGTH_TEXT_FILE } from '../utils/constants.js';
 import type { GrepResult } from './tools.js';
 
 /**
+ * Upper bound on the characters a single grep result sends to the model.
+ *
+ * The match cap alone doesn't bound the size: 100 matches of 2000-character
+ * lines is 200K characters. This keeps a broad search in line with the default
+ * tool output truncation threshold (40K characters) and under the tool
+ * executor's MAX_STORED_TOOL_OUTPUT_BYTES, so grep output is cut on a whole
+ * line with a hint to narrow the search instead of mid-line by the generic
+ * truncation.
+ */
+export const MAX_GREP_OUTPUT_CHARS = 40_000;
+
+// Room kept free under MAX_GREP_OUTPUT_CHARS for the truncation notice.
+const TRUNCATION_NOTICE_RESERVE_CHARS = 500;
+
+const FILE_SEPARATOR = '---\n';
+
+/**
  * Result object for a single grep match
  */
 export interface GrepMatch {
@@ -18,6 +35,81 @@ export interface GrepMatch {
   lineNumber: number;
   line: string;
   isContext?: boolean;
+}
+
+function formatMatchLine(match: GrepMatch): string {
+  // If isContext is undefined, assume it's a match (false)
+  const separator = match.isContext ? '-' : ':';
+  // trimEnd to avoid double newlines if line has them, but we want to preserve indentation
+  let lineContent = match.line.trimEnd();
+  const graphemes = Array.from(lineContent);
+  if (graphemes.length > MAX_LINE_LENGTH_TEXT_FILE) {
+    lineContent =
+      graphemes.slice(0, MAX_LINE_LENGTH_TEXT_FILE).join('') +
+      '... [truncated]';
+  }
+  return `L${match.lineNumber}${separator} ${lineContent}\n`;
+}
+
+/**
+ * Renders grouped matches, stopping on a whole line before the text would
+ * grow past `budget` characters.
+ */
+function renderMatchGroups(
+  matchesByFile: Record<string, GrepMatch[]>,
+  budget: number,
+  includeContext: boolean,
+): { text: string; shownMatches: number; truncated: boolean } {
+  let text = '';
+  let shownMatches = 0;
+  for (const filePath in matchesByFile) {
+    let fileBlock = `File: ${filePath}\n`;
+    let fileHasLines = false;
+    let truncated = false;
+    for (const match of matchesByFile[filePath]) {
+      if (match.isContext && !includeContext) {
+        continue;
+      }
+      const line = formatMatchLine(match);
+      if (
+        text.length + fileBlock.length + line.length + FILE_SEPARATOR.length >
+        budget
+      ) {
+        truncated = true;
+        break;
+      }
+      fileBlock += line;
+      fileHasLines = true;
+      if (!match.isContext) {
+        shownMatches++;
+      }
+    }
+    if (fileHasLines) {
+      text += fileBlock + FILE_SEPARATOR;
+    }
+    if (truncated) {
+      return { text, shownMatches, truncated };
+    }
+  }
+  return { text, shownMatches, truncated: false };
+}
+
+function formatTruncationNotice(
+  shown: number,
+  total: number,
+  unit: string,
+  contextOmitted = false,
+): string {
+  if (shown >= total) {
+    return `\n[Context lines were left out to stay under ${MAX_GREP_OUTPUT_CHARS} characters. Read the file around a match to see its surroundings.]`;
+  }
+  return (
+    `\n[Output truncated: showing ${shown} of ${total} ${unit}${contextOmitted ? ' without context lines' : ''} to stay under ${MAX_GREP_OUTPUT_CHARS} characters. ` +
+    `This search is too broad to read in full. Narrow the search with a more specific pattern` +
+    (unit === 'files'
+      ? ` or an 'include_pattern' or a 'dir_path'.]`
+      : `, an 'include_pattern' or a 'dir_path', or set 'names_only' to see which files match first.]`)
+  );
 }
 
 /**
@@ -175,6 +267,7 @@ export async function formatGrepResults(
   await enrichWithAutoContext(matchesByFile, matchCount, params);
 
   const wasTruncated = matchCount >= totalMaxMatches;
+  const outputBudget = MAX_GREP_OUTPUT_CHARS - TRUNCATION_NOTICE_RESERVE_CHARS;
 
   if (names_only) {
     const filePaths = Object.keys(matchesByFile).sort();
@@ -185,11 +278,26 @@ export async function formatGrepResults(
         ? ` (results limited to ${totalMaxMatches} matches for performance)`
         : ''
     }:\n`;
-    llmContent += filePaths.join('\n');
+    let shownFiles = 0;
+    for (const filePath of filePaths) {
+      if (llmContent.length + filePath.length + 1 > outputBudget) {
+        break;
+      }
+      llmContent += `${filePath}\n`;
+      shownFiles++;
+    }
+    const sizeLimited = shownFiles < filePaths.length;
+    if (sizeLimited) {
+      llmContent += formatTruncationNotice(
+        shownFiles,
+        filePaths.length,
+        'files',
+      );
+    }
     return {
       llmContent: llmContent.trim(),
       returnDisplay: {
-        summary: `Found ${filePaths.length} files${wasTruncated ? ' (limited)' : ''}`,
+        summary: `Found ${filePaths.length} files${wasTruncated || sizeLimited ? ' (limited)' : ''}`,
         matches: [],
       },
     };
@@ -203,28 +311,35 @@ export async function formatGrepResults(
 
   llmContent += `:\n---\n`;
 
-  for (const filePath in matchesByFile) {
-    llmContent += `File: ${filePath}\n`;
-    matchesByFile[filePath].forEach((match) => {
-      // If isContext is undefined, assume it's a match (false)
-      const separator = match.isContext ? '-' : ':';
-      // trimEnd to avoid double newlines if line has them, but we want to preserve indentation
-      let lineContent = match.line.trimEnd();
-      const graphemes = Array.from(lineContent);
-      if (graphemes.length > MAX_LINE_LENGTH_TEXT_FILE) {
-        lineContent =
-          graphemes.slice(0, MAX_LINE_LENGTH_TEXT_FILE).join('') +
-          '... [truncated]';
-      }
-      llmContent += `L${match.lineNumber}${separator} ${lineContent}\n`;
-    });
-    llmContent += '---\n';
+  const bodyBudget = outputBudget - llmContent.length;
+  let rendered = renderMatchGroups(matchesByFile, bodyBudget, true);
+  let contextOmitted = false;
+  // If the full output doesn't fit, drop context lines before dropping
+  // matches, so the matches themselves are what the model gets to see.
+  if (
+    rendered.truncated &&
+    Object.values(matchesByFile).some((fileMatches) =>
+      fileMatches.some((m) => m.isContext),
+    )
+  ) {
+    rendered = renderMatchGroups(matchesByFile, bodyBudget, false);
+    contextOmitted = true;
+  }
+  llmContent += rendered.text;
+
+  if (contextOmitted || rendered.truncated) {
+    llmContent += formatTruncationNotice(
+      rendered.shownMatches,
+      matchCount,
+      matchTerm,
+      contextOmitted,
+    );
   }
 
   return {
     llmContent: llmContent.trim(),
     returnDisplay: {
-      summary: `Found ${matchCount} ${matchTerm}${wasTruncated ? ' (limited)' : ''}`,
+      summary: `Found ${matchCount} ${matchTerm}${wasTruncated || rendered.truncated ? ' (limited)' : ''}`,
       matches: allMatches
         .filter((m) => !m.isContext)
         .map((m) => ({

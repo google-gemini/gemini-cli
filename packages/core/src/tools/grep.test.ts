@@ -641,6 +641,25 @@ describe('GrepTool', () => {
       expect(result.llmContent).toContain('... [truncated]');
       expect(result.llmContent).not.toContain(longString);
     });
+
+    it('should bound the output of a broad search over long lines', async () => {
+      // A broad pattern hitting a log full of long lines, as in issue #17448.
+      const logLine = `Gmail ${'x'.repeat(1500)}`;
+      await fs.writeFile(
+        path.join(tempRootDir, 'debug.txt'),
+        Array.from({ length: 500 }, () => logLine).join('\n'),
+      );
+
+      const params: GrepToolParams = { pattern: 'Gmail' };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute({ abortSignal });
+
+      // MAX_GREP_OUTPUT_CHARS is 40000.
+      expect(String(result.llmContent).length).toBeLessThanOrEqual(40000);
+      expect(result.llmContent).toContain('Found 100 matches');
+      expect(result.llmContent).toMatch(/showing \d+ of 100 matches/);
+      expect(result.llmContent).toContain('Narrow the search');
+    });
   });
 
   describe('getDescription', () => {
