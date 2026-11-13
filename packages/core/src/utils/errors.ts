@@ -5,6 +5,7 @@
  */
 
 import { parseGoogleApiError, type ErrorInfo } from './googleErrors.js';
+import { ExitCodes } from './exitCodes.js';
 
 interface GaxiosError {
   response?: {
@@ -80,48 +81,48 @@ export class FatalError extends Error {
 
 export class FatalAuthenticationError extends FatalError {
   constructor(message: string) {
-    super(message, 41);
+    super(message, ExitCodes.FATAL_AUTHENTICATION_ERROR);
     this.name = 'FatalAuthenticationError';
   }
 }
 export class FatalInputError extends FatalError {
   constructor(message: string) {
-    super(message, 42);
+    super(message, ExitCodes.FATAL_INPUT_ERROR);
     this.name = 'FatalInputError';
   }
 }
 export class FatalSandboxError extends FatalError {
   constructor(message: string) {
-    super(message, 44);
+    super(message, ExitCodes.FATAL_SANDBOX_ERROR);
     this.name = 'FatalSandboxError';
   }
 }
 export class FatalConfigError extends FatalError {
   constructor(message: string) {
-    super(message, 52);
+    super(message, ExitCodes.FATAL_CONFIG_ERROR);
     this.name = 'FatalConfigError';
   }
 }
 export class FatalTurnLimitedError extends FatalError {
   constructor(message: string) {
-    super(message, 53);
+    super(message, ExitCodes.FATAL_TURN_LIMITED_ERROR);
     this.name = 'FatalTurnLimitedError';
   }
 }
 export class FatalToolExecutionError extends FatalError {
   constructor(message: string) {
-    super(message, 54);
+    super(message, ExitCodes.FATAL_TOOL_EXECUTION_ERROR);
     this.name = 'FatalToolExecutionError';
   }
 }
 export class FatalUntrustedWorkspaceError extends FatalError {
   constructor(message: string) {
-    super(message, 55);
+    super(message, ExitCodes.FATAL_UNTRUSTED_WORKSPACE_ERROR);
     this.name = 'FatalUntrustedWorkspaceError';
   }
 }
 export class FatalCancellationError extends FatalError {
-  constructor(message: string, exitCode = 130) {
+  constructor(message: string, exitCode: number = ExitCodes.FATAL_CANCELLATION_ERROR) {
     super(message, exitCode); // Standard exit code for SIGINT by default
     this.name = 'FatalCancellationError';
   }
