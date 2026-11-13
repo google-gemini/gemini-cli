@@ -4,15 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
-import type {
-  AnsiOutput,
-  AnsiToken,
-  FileDiff,
-  ToolResult,
-  ToolResultDisplay,
+import { describe, it, expect, afterEach } from 'vitest';
+import {
+  type AnsiOutput,
+  type AnsiToken,
+  type Config,
+  type FileDiff,
+  type ToolResult,
+  type ToolResultDisplay,
+  AuthType,
+  LATEST_GEMINI_FLASH_MODEL,
+  setFlashModels,
+  resetModelsForTesting,
 } from '@google/gemini-cli-core';
-import { toToolCallContent } from './acpUtils.js';
+import type { LoadedSettings } from '../config/settings.js';
+import { toToolCallContent, buildAvailableModels } from './acpUtils.js';
 
 function createToken(
   text: string,
@@ -141,5 +147,81 @@ describe('toToolCallContent', () => {
         }),
       ),
     ).toBeNull();
+  });
+});
+
+describe('buildAvailableModels', () => {
+  afterEach(() => {
+    resetModelsForTesting();
+  });
+
+  it('deduplicates manual options when preview and default Flash both resolve to gemini-3.8-flash', () => {
+    const mockConfig = {
+      getModel: () => 'auto',
+      getHasAccessToPreviewModel: () => true,
+      getGemini31LaunchedSync: () => true,
+      hasLatestFlashGAAccess: () => {
+        setFlashModels(LATEST_GEMINI_FLASH_MODEL, LATEST_GEMINI_FLASH_MODEL);
+        return true;
+      },
+      hasLatestFlashLiteGAAccess: () => false,
+      getExperimentalDynamicModelConfiguration: () => false,
+    } as unknown as Config;
+
+    const settings = {
+      merged: {
+        security: {
+          auth: {
+            selectedType: AuthType.LOGIN_WITH_GOOGLE,
+          },
+        },
+      },
+    } as unknown as LoadedSettings;
+
+    const { availableModels, currentModelId } = buildAvailableModels(
+      mockConfig,
+      settings,
+    );
+
+    expect(currentModelId).toBe('auto');
+    expect(availableModels.map((m) => m.modelId)).toEqual([
+      'auto',
+      'gemini-3.1-pro-preview',
+      'gemini-3.8-flash',
+      'gemini-2.5-pro',
+      'gemini-3.1-flash-lite',
+    ]);
+  });
+
+  it('falls back to contentGeneratorConfig.authType when settings.merged.security is undefined', () => {
+    const mockConfig = {
+      getModel: () => 'auto',
+      getHasAccessToPreviewModel: () => true,
+      getGemini31LaunchedSync: () => true,
+      hasLatestFlashGAAccess: () => {
+        setFlashModels('gemini-3-flash-preview', LATEST_GEMINI_FLASH_MODEL);
+        return true;
+      },
+      hasLatestFlashLiteGAAccess: () => false,
+      getExperimentalDynamicModelConfiguration: () => false,
+      getContentGeneratorConfig: () => ({
+        authType: AuthType.USE_GEMINI,
+      }),
+    } as unknown as Config;
+
+    const settings = {
+      merged: {},
+    } as unknown as LoadedSettings;
+
+    const { availableModels } = buildAvailableModels(mockConfig, settings);
+
+    expect(availableModels.map((m) => m.modelId)).toEqual([
+      'auto',
+      'gemini-3.1-pro-preview-customtools',
+      'gemini-3-flash-preview',
+      'gemini-2.5-pro',
+      'gemini-3.8-flash',
+      'gemini-3.1-flash-lite',
+    ]);
   });
 });
