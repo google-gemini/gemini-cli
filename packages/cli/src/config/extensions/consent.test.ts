@@ -76,9 +76,14 @@ function normalizePathsForSnapshot(str: string, tempDir: string): string {
 
 describe('consent', () => {
   let tempDir: string;
+  const originalStdinIsTTY = process.stdin.isTTY;
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
     if (originalReaddir.current) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mockReaddir.mockImplementation(originalReaddir.current as any);
@@ -87,6 +92,10 @@ describe('consent', () => {
   });
 
   afterEach(async () => {
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalStdinIsTTY,
+      configurable: true,
+    });
     vi.restoreAllMocks();
     if (tempDir) {
       await fs.rm(tempDir, { recursive: true, force: true });
@@ -98,7 +107,7 @@ describe('consent', () => {
     it.each([
       { input: 'y', expected: true },
       { input: 'Y', expected: true },
-      { input: '', expected: true },
+      { input: '', expected: false },
       { input: 'n', expected: false },
       { input: 'N', expected: false },
       { input: 'yes', expected: true },
@@ -116,12 +125,24 @@ describe('consent', () => {
         const consent = await requestConsentNonInteractive('Test consent');
         expect(debugLogger.log).toHaveBeenCalledWith('Test consent');
         expect(questionMock).toHaveBeenCalledWith(
-          'Do you want to continue? [Y/n]: ',
+          'Do you want to continue? [y/N]: ',
           expect.any(Function),
         );
         expect(consent).toBe(expected);
       },
     );
+
+    it('should fail closed and return false without prompting when stdin is not a TTY', async () => {
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: false,
+        configurable: true,
+      });
+
+      const consent = await requestConsentNonInteractive('Test consent');
+      expect(debugLogger.log).toHaveBeenCalledWith('Test consent');
+      expect(mockReadline.createInterface).not.toHaveBeenCalled();
+      expect(consent).toBe(false);
+    });
   });
 
   describe('requestConsentInteractive', () => {

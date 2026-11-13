@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {
   vi,
   describe,
@@ -13,11 +15,33 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
-import { coreEvents, getErrorMessage } from '@google/gemini-cli-core';
+import {
+  coreEvents,
+  getErrorMessage,
+  type ExtensionInstallMetadata,
+} from '@google/gemini-cli-core';
 import { type Argv } from 'yargs';
 import { handleLink, linkCommand } from './link.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
+import { maybeRequestConsentOrFail } from '../../config/extensions/consent.js';
+
+const mockReadline = vi.hoisted(() => ({
+  createInterface: vi.fn(),
+}));
+
+vi.mock('node:readline', () => ({
+  default: mockReadline,
+  createInterface: mockReadline.createInterface,
+}));
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    realpathSync: vi.fn((p: fs.PathLike) => path.resolve(String(p))),
+  };
+});
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const { mockCoreDebugLogger } = await import(
@@ -31,9 +55,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 
 vi.mock('../../config/extension-manager.js');
 vi.mock('../../config/settings.js');
-vi.mock('../../config/extensions/consent.js', () => ({
-  requestConsentNonInteractive: vi.fn(),
-}));
 vi.mock('../../config/extensions/extensionSettings.js', () => ({
   promptForSetting: vi.fn(),
 }));
@@ -45,9 +66,35 @@ describe('extensions link command', () => {
   const mockLoadSettings = vi.mocked(loadSettings);
   const mockGetErrorMessage = vi.mocked(getErrorMessage);
   const mockExtensionManager = vi.mocked(ExtensionManager);
+  const mockRealpathSync = vi.mocked(fs.realpathSync);
+
+  const originalStdinIsTTY = process.stdin.isTTY;
+  const originalStdoutIsTTY = process.stdout.isTTY;
+  let questionMock: Mock;
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
+    questionMock = vi.fn().mockImplementation((_prompt, callback) => {
+      callback('y');
+    });
+    mockReadline.createInterface.mockReturnValue({
+      question: questionMock,
+      close: vi.fn(),
+    });
+    mockRealpathSync.mockImplementation((p: fs.PathLike) =>
+      path.resolve(String(p)),
+    );
+    mockGetErrorMessage.mockImplementation((err: unknown) =>
+      err instanceof Error ? err.message : String(err),
+    );
     mockLoadSettings.mockReturnValue({
       merged: {},
     } as unknown as LoadedSettings);
@@ -56,18 +103,64 @@ describe('extensions link command', () => {
       .mockResolvedValue(undefined);
     mockExtensionManager.prototype.installOrUpdateExtension = vi
       .fn()
-      .mockResolvedValue({ name: 'my-linked-extension' });
+      .mockImplementation(async (installMetadata: ExtensionInstallMetadata) => {
+        const lastCall =
+          mockExtensionManager.mock.calls[
+            mockExtensionManager.mock.calls.length - 1
+          ]?.[0];
+        if (lastCall?.requestConsent) {
+          await maybeRequestConsentOrFail(
+            { name: 'my-linked-extension', version: '1.0.0' },
+            lastCall.requestConsent,
+            false,
+            undefined,
+            false,
+            [],
+            [],
+            false,
+            installMetadata.type === 'link'
+              ? installMetadata.source
+              : undefined,
+          );
+        }
+        return { name: 'my-linked-extension' };
+      });
   });
 
   afterEach(() => {
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalStdinIsTTY,
+      configurable: true,
+    });
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: originalStdoutIsTTY,
+      configurable: true,
+    });
     vi.restoreAllMocks();
   });
 
   describe('handleLink', () => {
-    it('should link an extension from a local path', async () => {
+    it('should link an extension from a local path, display canonical path and live-symlink warning, and succeed when user confirms with y', async () => {
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
       await handleLink({ path: '/local/path/to/extension' });
 
+      expect(mockRealpathSync).toHaveBeenCalledWith('/local/path/to/extension');
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        expect.stringContaining(
+          'Linking extension "my-linked-extension" from canonical path "/local/path/to/extension".',
+        ),
+      );
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        expect.stringContaining(
+          'Linking creates a live symbolic link to "/local/path/to/extension".',
+        ),
+      );
+      expect(questionMock).toHaveBeenCalledWith(
+        'Do you want to continue? [y/N]: ',
+        expect.any(Function),
+      );
       expect(mockExtensionManager).toHaveBeenCalledWith(
         expect.objectContaining({
           workspaceDir: '/test/dir',
@@ -85,6 +178,86 @@ describe('extensions link command', () => {
         'Extension "my-linked-extension" linked successfully and enabled.',
       );
       mockCwd.mockRestore();
+    });
+
+    it('should resolve symlinks and relative segments via realpathSync and disclose the canonical path in the warning', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/workspace');
+      mockRealpathSync.mockReturnValue('/tmp/malicious_ext');
+
+      await handleLink({ path: './symlink_to_malicious' });
+
+      expect(mockRealpathSync).toHaveBeenCalledWith(
+        path.resolve('/workspace', './symlink_to_malicious'),
+      );
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        expect.stringContaining(
+          'Linking extension "my-linked-extension" from canonical path "/tmp/malicious_ext".',
+        ),
+      );
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        expect.stringContaining(
+          'Linking creates a live symbolic link to "/tmp/malicious_ext".',
+        ),
+      );
+      expect(
+        mockExtensionManager.prototype.installOrUpdateExtension,
+      ).toHaveBeenCalledWith({
+        source: '/tmp/malicious_ext',
+        type: 'link',
+      });
+      mockCwd.mockRestore();
+    });
+
+    it('should default to No ([y/N]) and abort when pressing Enter (empty input) at the confirmation prompt', async () => {
+      const mockProcessExit = vi
+        .spyOn(process, 'exit')
+        .mockImplementation((() => {}) as (
+          code?: string | number | null | undefined,
+        ) => never);
+      questionMock.mockImplementation((_prompt, callback) => {
+        callback('');
+      });
+
+      await handleLink({ path: '/local/path/to/extension' });
+
+      expect(questionMock).toHaveBeenCalledWith(
+        'Do you want to continue? [y/N]: ',
+        expect.any(Function),
+      );
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
+        'error',
+        'Installation cancelled for "my-linked-extension".',
+      );
+      expect(coreEvents.emitConsoleLog).not.toHaveBeenCalledWith(
+        'log',
+        'Extension "my-linked-extension" linked successfully and enabled.',
+      );
+      expect(mockProcessExit).toHaveBeenCalledWith(1);
+      mockProcessExit.mockRestore();
+    });
+
+    it('should fail closed and exit with code 1 when running in a non-TTY environment without --consent', async () => {
+      const mockProcessExit = vi
+        .spyOn(process, 'exit')
+        .mockImplementation((() => {}) as (
+          code?: string | number | null | undefined,
+        ) => never);
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: false,
+        configurable: true,
+      });
+
+      await handleLink({ path: '/local/path/to/extension' });
+
+      expect(questionMock).not.toHaveBeenCalled();
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
+        'error',
+        'Installation cancelled for "my-linked-extension".',
+      );
+      expect(mockProcessExit).toHaveBeenCalledWith(1);
+      mockProcessExit.mockRestore();
     });
 
     it('should log an error message and exit with code 1 when linking fails', async () => {

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type { CommandModule } from 'yargs';
 import chalk from 'chalk';
 import {
@@ -14,6 +16,7 @@ import {
 
 import {
   INSTALL_WARNING_MESSAGE,
+  LINK_WARNING_MESSAGE,
   requestConsentNonInteractive,
 } from '../../config/extensions/consent.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
@@ -28,8 +31,12 @@ interface InstallArgs {
 
 export async function handleLink(args: InstallArgs) {
   try {
+    const workspaceDir = process.cwd();
+    const canonicalPath = fs.realpathSync(
+      path.resolve(workspaceDir, args.path),
+    );
     const installMetadata: ExtensionInstallMetadata = {
-      source: args.path,
+      source: canonicalPath,
       type: 'link',
     };
     const requestConsent = args.consent
@@ -37,9 +44,9 @@ export async function handleLink(args: InstallArgs) {
       : requestConsentNonInteractive;
     if (args.consent) {
       debugLogger.log('You have consented to the following:');
+      debugLogger.log(LINK_WARNING_MESSAGE);
       debugLogger.log(INSTALL_WARNING_MESSAGE);
     }
-    const workspaceDir = process.cwd();
     const extensionManager = new ExtensionManager({
       workspaceDir,
       requestConsent,
