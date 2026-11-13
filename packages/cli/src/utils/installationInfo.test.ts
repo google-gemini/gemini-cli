@@ -180,6 +180,29 @@ describe('getInstallationInfo', () => {
     );
   });
 
+  it('should detect a source checkout when an ancestor directory is named homebrew', () => {
+    const cliPath = '/home/homebrew/gemini-cli/bundle/gemini.js';
+    const unrelatedDir = '/tmp/not-the-clone';
+    process.argv[1] = cliPath;
+    mockedRealPathSync.mockReturnValue(cliPath);
+    vi.spyOn(process, 'cwd').mockReturnValue(unrelatedDir);
+    mockedIsGitRepository.mockImplementation(
+      (directory) => directory === path.dirname(cliPath),
+    );
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('gemini-cli is not installed via Homebrew');
+    });
+
+    const info = getInstallationInfo(unrelatedDir, true);
+
+    expect(info.packageManager).toBe(PackageManager.UNKNOWN);
+    expect(info.isGlobal).toBe(false);
+    expect(info.updateCommand).toBeUndefined();
+    expect(info.updateMessage).toBe(
+      'Running from a local git clone. Please update with "git pull".',
+    );
+  });
+
   it('should detect running via npx', () => {
     const npxPath = `/Users/test/.npm/_npx/12345/bin/gemini`;
     process.argv[1] = npxPath;

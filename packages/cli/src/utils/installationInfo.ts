@@ -60,12 +60,13 @@ export function getInstallationInfo(
     // Detect a source checkout from the CLI script's own directory.
     // `projectRoot` is the directory the process was launched in, so a
     // checkout started from anywhere else used to be treated as a global
-    // npm install. Homebrew prefixes are git repositories themselves, so
-    // those paths are left for the Homebrew check below.
+    // npm install. A Homebrew prefix is itself a git repository, but a
+    // directory merely named homebrew, linuxbrew, or Cellar is not one.
+    // Only a prefix Homebrew reports is left for the Homebrew check below.
     if (
       !realPath.includes('/node_modules/') &&
-      !isHomebrewInstallPath(realPath) &&
-      isGitRepository(path.dirname(realPath))
+      isGitRepository(path.dirname(realPath)) &&
+      !isConfirmedHomebrewInstall(realPath)
     ) {
       return {
         packageManager: PackageManager.UNKNOWN, // Not managed by a package manager in this sense
@@ -221,14 +222,32 @@ export function getInstallationInfo(
 }
 
 /**
- * Homebrew installs live under a prefix that is its own git clone, including
- * custom prefixes (`HOMEBREW_PREFIX/<...>/Cellar`). Those paths must not be
- * treated as a Gemini CLI source checkout.
+ * True only when Homebrew itself reports that this CLI path is the
+ * gemini-cli formula. A checkout stored under a directory named homebrew,
+ * linuxbrew, or Cellar is not excluded unless that command confirms it.
  */
-function isHomebrewInstallPath(realPath: string): boolean {
-  return (
-    realPath.includes('/Cellar/') ||
-    realPath.includes('/homebrew/') ||
-    realPath.includes('/linuxbrew/')
-  );
+function isConfirmedHomebrewInstall(realPath: string): boolean {
+  if (
+    !realPath.includes('/Cellar/') &&
+    !realPath.includes('/homebrew/') &&
+    !realPath.includes('/linuxbrew/')
+  ) {
+    return false;
+  }
+
+  try {
+    const brewPrefix = childProcess
+      .execSync('brew --prefix gemini-cli', {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+      .trim();
+    if (!brewPrefix) {
+      return false;
+    }
+    const brewRealPath = fs.realpathSync(brewPrefix).replace(/\\/g, '/');
+    return brewRealPath.length > 0 && realPath.startsWith(brewRealPath);
+  } catch {
+    return false;
+  }
 }
