@@ -93,6 +93,36 @@ the arguments don't match the pattern, the rule does not apply. For a list of
 argument keys available for each tool, see the **Parameters** in the
 [Tools reference](/docs/reference/tools#available-tools).
 
+Patterns use [RE2 syntax](https://github.com/google/re2/wiki/Syntax). Gemini CLI
+matches them in time proportional to the length of the arguments, so evaluation
+time stays predictable for large arguments. RE2 differs from JavaScript regular
+expressions in the following ways:
+
+- Lookahead (`(?=...)`, `(?!...)`), lookbehind (`(?<=...)`, `(?<!...)`), and
+  backreferences (`\1`) aren't supported.
+- `\uXXXX` escapes aren't supported. Use `\x{XXXX}` instead.
+- A backslash in front of a non-ASCII character isn't supported. Write the
+  character itself.
+- A repetition count can't exceed 1,000. For example, `a{1001}` is rejected.
+- `\s` matches ASCII whitespace only. It doesn't match a no-break space or other
+  Unicode spaces.
+- `.` matches every character except a newline, including a carriage return.
+
+Gemini CLI also limits the compiled size of a pattern to 2,000 instructions.
+Repetition counts multiply the compiled size, so large counts are the usual
+reason a pattern exceeds this limit. For example, `.{1000}` is accepted, but
+`.{1000}.{1000}` and `.{0,1000}` aren't. We recommend keeping repetition counts
+small.
+
+If a pattern doesn't compile or exceeds the size limit, Gemini CLI skips that
+rule and reports the error when it starts.
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> Earlier versions of Gemini CLI evaluated patterns as JavaScript regular
+> expressions. If a rule that used to load now reports an invalid pattern,
+> rewrite the pattern without the unsupported constructs.
+
 #### Execution environment
 
 If `interactive` is specified, the rule will only apply if the CLI's execution
@@ -306,7 +336,8 @@ mcpName = "my-custom-server"
 # key-value pairs provided here are present in the tool's annotations.
 toolAnnotations = { readOnlyHint = true }
 
-# (Optional) A regex to match against the tool's arguments.
+# (Optional) A regular expression in RE2 syntax to match against the tool's
+# arguments.
 argsPattern = '"command":"(git|npm)'
 
 # (Optional) A string or array of strings that a shell command must start with.
@@ -314,7 +345,8 @@ argsPattern = '"command":"(git|npm)'
 # `argsPattern`.
 commandPrefix = "git"
 
-# (Optional) A regex to match against the entire shell command.
+# (Optional) A regular expression in RE2 syntax to match against the entire
+# shell command.
 # This is also syntactic sugar for `toolName = "run_shell_command"`.
 # Note: This pattern is tested against the JSON representation of the arguments
 # (e.g., `{"command":"<your_command>"}`). Because it prepends `"command":"`,
@@ -386,7 +418,8 @@ and [Tools reference](/docs/reference/tools#available-tools).
 - `commandPrefix`: Matches if the `command` argument starts with the given
   string.
 - `commandRegex`: Matches if the `command` argument matches the given regular
-  expression.
+  expression. The pattern uses the same RE2 syntax as
+  [`argsPattern`](#arguments-pattern).
 
 **Example:**
 

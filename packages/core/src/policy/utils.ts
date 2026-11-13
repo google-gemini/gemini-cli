@@ -4,43 +4,114 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { SafeRegExp } from './safe-regex.js';
+
 /**
  * Escapes a string for use in a regular expression.
+ *
+ * Only ASCII whitespace is escaped. Non-ASCII whitespace is an ordinary literal
+ * in every regex dialect, and the linear-time engine used for policy patterns
+ * rejects a backslash in front of a non-ASCII character.
  */
 export function escapeRegex(text: string): string {
-  return text.replace(/[-[\]{}()*+?.,\\^$|#\s"]/g, '\\$&');
+  return text.replace(/[-[\]{}()*+?.,\\^$|#"\t\n\v\f\r ]/g, '\\$&');
+}
+
+/** Patterns longer than this are rejected without being compiled. */
+const MAX_PATTERN_LENGTH = 2048;
+
+/**
+ * Patterns that compile to more instructions than this are rejected. Matching
+ * cost grows with the compiled size, and repetition counts multiply it. For
+ * example, `.{1000}` compiles to about 1,000 instructions and `.{1000}.{1000}`
+ * to about 2,000.
+ */
+export const MAX_PROGRAM_SIZE = 2000;
+
+/**
+ * Check for nested quantifiers such as (a+)+, (.*)*, or ([a-z]+)+: a group that
+ * contains a quantifier and is itself followed by one.
+ *
+ * It predates the linear-time engine and is kept so that the set of accepted
+ * patterns does not grow. It is evaluated by the linear-time engine as well.
+ * `[^\n\r\x{2028}\x{2029}]` spells out what JavaScript's `.` matches.
+ */
+const NESTED_QUANTIFIER = SafeRegExp.compile(
+  String.raw`\([^)]*[*+?{][^\n\r\x{2028}\x{2029}]*\)[*+?{]`,
+);
+
+/**
+ * Outcome of validating and compiling a pattern that comes from a policy file
+ * or a policy update.
+ *
+ * - `invalid`: the pattern is malformed or uses syntax that RE2 does not
+ *   support, such as lookaround or backreferences.
+ * - `restricted`: the pattern is longer than the length limit or contains a
+ *   nested quantifier.
+ * - `too_large`: the pattern compiles to more than `MAX_PROGRAM_SIZE`
+ *   instructions.
+ */
+export type ArgsPatternResult =
+  | { ok: true; regex: SafeRegExp }
+  | { ok: false; reason: 'invalid'; error: string }
+  | { ok: false; reason: 'restricted' }
+  | { ok: false; reason: 'too_large'; programSize: number };
+
+/**
+ * Validates a pattern and compiles it with the linear-time engine.
+ *
+ * This is the single entry point for pattern text that the CLI did not build
+ * itself. It never constructs a native `RegExp` from the pattern.
+ */
+export function compileArgsPattern(pattern: string): ArgsPatternResult {
+  if (pattern.length > MAX_PATTERN_LENGTH) {
+    return { ok: false, reason: 'restricted' };
+  }
+
+  let regex: SafeRegExp;
+  try {
+    regex = SafeRegExp.compile(pattern);
+  } catch (e) {
+    return {
+      ok: false,
+      reason: 'invalid',
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
+
+  if (NESTED_QUANTIFIER.test(pattern)) {
+    return { ok: false, reason: 'restricted' };
+  }
+
+  if (regex.programSize > MAX_PROGRAM_SIZE) {
+    return { ok: false, reason: 'too_large', programSize: regex.programSize };
+  }
+
+  return { ok: true, regex };
 }
 
 /**
- * Basic validation for regular expressions to prevent common ReDoS patterns.
- * This is a heuristic check and not a substitute for a full ReDoS scanner.
+ * Returns true if a pattern compiles with the linear-time engine and passes
+ * the length limit, the nested-quantifier check, and the compiled size limit.
  */
 export function isSafeRegExp(pattern: string): boolean {
-  try {
-    // 1. Ensure it's a valid regex
-    new RegExp(pattern);
-  } catch {
-    return false;
-  }
-
-  // 2. Limit length to prevent extremely long regexes
-  if (pattern.length > 2048) {
-    return false;
-  }
-
-  // 3. Heuristic: Check for nested quantifiers which are a primary source of ReDoS.
-  // Examples: (a+)+, (a|b)*, (.*)*, ([a-z]+)+
-  // We look for a group (...) followed by a quantifier (+, *, or {n,m})
-  // where the group itself contains a quantifier.
-  // This matches a '(' followed by some content including a quantifier, then ')',
-  // followed by another quantifier.
-  const nestedQuantifierPattern = /\([^)]*[*+?{].*\)[*+?{]/;
-  if (nestedQuantifierPattern.test(pattern)) {
-    return false;
-  }
-
-  return true;
+  return compileArgsPattern(pattern).ok;
 }
+
+/**
+ * The whitespace set of JavaScript's `\s`, written for RE2, whose own `\s` is
+ * ASCII-only ([\t\n\f\r ]). Command-prefix patterns were designed for the
+ * JavaScript engine and treat any of these characters as the end of the
+ * prefix, so the set is spelled out to keep them matching the same commands.
+ */
+const JS_WHITESPACE = String.raw`\s\x0b\x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}`;
+
+/**
+ * What may follow a command prefix: whitespace, the closing quote of the JSON
+ * string, or an escaped quote (\"). A bare backslash is not accepted, because
+ * that would let "git\status" match the prefix "git".
+ */
+export const COMMAND_PREFIX_BOUNDARY = `(?:[${JS_WHITESPACE}"]|\\\\")`;
 
 /**
  * Builds a list of args patterns for policy matching.
@@ -75,10 +146,10 @@ export function buildArgsPatterns(
       // Escape the exact JSON literal segment we expect to see
       const matchSegment = escapeRegex(`"command":${openQuotePrefix}`);
 
-      // We allow [\s], ["], or the specific sequence [\"] (for escaped quotes
-      // in JSON). We do NOT allow generic [\\], which would match "git\status"
-      // -> "gitstatus".
-      return `${matchSegment}(?:[\\s"]|\\\\")`;
+      // The prefix must be followed by whitespace, ["], or the specific
+      // sequence [\"] (for escaped quotes in JSON). We do NOT allow generic
+      // [\\], which would match "git\status" -> "gitstatus".
+      return `${matchSegment}${COMMAND_PREFIX_BOUNDARY}`;
     });
   }
 

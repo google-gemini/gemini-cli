@@ -12,7 +12,11 @@ import {
   type SafetyCheckerRule,
   InProcessCheckerType,
 } from './types.js';
-import { buildArgsPatterns, isSafeRegExp } from './utils.js';
+import {
+  buildArgsPatterns,
+  compileArgsPattern,
+  MAX_PROGRAM_SIZE,
+} from './utils.js';
 import {
   isValidToolName,
   ALL_BUILTIN_TOOL_NAMES,
@@ -32,6 +36,22 @@ import { MCP_TOOL_PREFIX, formatMcpToolName } from '../tools/mcp-tool.js';
  * (e.g., dynamically registered agent tools) and are not warned about.
  */
 const MAX_TYPO_DISTANCE = 3;
+
+/**
+ * Shown when a pattern does not compile. Patterns are compiled by a
+ * linear-time engine that uses RE2 syntax, so some constructs that a
+ * JavaScript `RegExp` accepts are rejected.
+ */
+const REGEX_SYNTAX_SUGGESTION =
+  'Check regex syntax for errors like unmatched brackets or invalid escape sequences. ' +
+  'Patterns use RE2 syntax: lookahead, lookbehind, and backreferences are not supported.';
+
+/**
+ * Shown when a pattern compiles to more instructions than the size limit
+ * allows. Repetition counts are the usual cause.
+ */
+const REGEX_SIZE_SUGGESTION =
+  'Use smaller repetition counts, such as {100} instead of {1000}, or split the rule into simpler patterns.';
 
 /**
  * Schema for a single policy rule in the TOML file (before transformation).
@@ -503,27 +523,37 @@ export async function loadPoliciesFromToml(
                   denyMessage: rule.denyMessage ?? rule.deny_message,
                 };
 
-                // Compile regex pattern
+                // Compile with the linear-time engine. A policy pattern is
+                // never turned into a native RegExp.
                 if (argsPattern) {
-                  try {
-                    new RegExp(argsPattern);
-                  } catch (e) {
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                    const error = e as Error;
+                  const compiled = compileArgsPattern(argsPattern);
+                  if (!compiled.ok && compiled.reason === 'invalid') {
                     errors.push({
                       filePath,
                       fileName: file,
                       tier: tierName,
                       errorType: 'regex_compilation',
                       message: 'Invalid regex pattern',
-                      details: `Pattern: ${argsPattern}\nError: ${error.message}`,
-                      suggestion:
-                        'Check regex syntax for errors like unmatched brackets or invalid escape sequences',
+                      details: `Pattern: ${argsPattern}\nError: ${compiled.error}`,
+                      suggestion: REGEX_SYNTAX_SUGGESTION,
                     });
                     return null;
                   }
 
-                  if (!isSafeRegExp(argsPattern)) {
+                  if (!compiled.ok && compiled.reason === 'too_large') {
+                    errors.push({
+                      filePath,
+                      fileName: file,
+                      tier: tierName,
+                      errorType: 'regex_compilation',
+                      message: 'Regex pattern exceeds the size limit',
+                      details: `Pattern: ${argsPattern}\nCompiled size: ${compiled.programSize} (limit: ${MAX_PROGRAM_SIZE})`,
+                      suggestion: REGEX_SIZE_SUGGESTION,
+                    });
+                    return null;
+                  }
+
+                  if (!compiled.ok) {
                     errors.push({
                       filePath,
                       fileName: file,
@@ -537,7 +567,7 @@ export async function loadPoliciesFromToml(
                     return null;
                   }
 
-                  policyRule.argsPattern = new RegExp(argsPattern);
+                  policyRule.argsPattern = compiled.regex;
                 }
 
                 return policyRule;
@@ -630,23 +660,35 @@ export async function loadPoliciesFromToml(
                 };
 
                 if (argsPattern) {
-                  try {
-                    new RegExp(argsPattern);
-                  } catch (e) {
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                    const error = e as Error;
+                  const compiled = compileArgsPattern(argsPattern);
+                  if (!compiled.ok && compiled.reason === 'invalid') {
                     errors.push({
                       filePath,
                       fileName: file,
                       tier: tierName,
                       errorType: 'regex_compilation',
                       message: 'Invalid regex pattern in safety checker',
-                      details: `Pattern: ${argsPattern}\nError: ${error.message}`,
+                      details: `Pattern: ${argsPattern}\nError: ${compiled.error}`,
+                      suggestion: REGEX_SYNTAX_SUGGESTION,
                     });
                     return null;
                   }
 
-                  if (!isSafeRegExp(argsPattern)) {
+                  if (!compiled.ok && compiled.reason === 'too_large') {
+                    errors.push({
+                      filePath,
+                      fileName: file,
+                      tier: tierName,
+                      errorType: 'regex_compilation',
+                      message:
+                        'Regex pattern in safety checker exceeds the size limit',
+                      details: `Pattern: ${argsPattern}\nCompiled size: ${compiled.programSize} (limit: ${MAX_PROGRAM_SIZE})`,
+                      suggestion: REGEX_SIZE_SUGGESTION,
+                    });
+                    return null;
+                  }
+
+                  if (!compiled.ok) {
                     errors.push({
                       filePath,
                       fileName: file,
@@ -659,7 +701,7 @@ export async function loadPoliciesFromToml(
                     return null;
                   }
 
-                  safetyCheckerRule.argsPattern = new RegExp(argsPattern);
+                  safetyCheckerRule.argsPattern = compiled.regex;
                 }
 
                 return safetyCheckerRule;

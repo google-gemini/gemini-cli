@@ -26,7 +26,8 @@ fields for writing rules that target shell commands:
 
 - `commandPrefix`: Matches if the `command` argument starts with a given string.
 - `commandRegex`: Matches if the `command` argument matches a given regular
-  expression.
+  expression. Patterns use RE2 syntax, which is described in
+  [Arguments pattern](../reference/policy-engine.md#arguments-pattern).
 
 These are syntactic sugar for combining `toolName = "run_shell_command"` with an
 `argsPattern` in a policy TOML file. They are **not** arguments of

@@ -15,6 +15,7 @@ export * from './output/types.js';
 export * from './output/json-formatter.js';
 export * from './output/stream-json-formatter.js';
 export * from './policy/types.js';
+export * from './policy/safe-regex.js';
 export * from './policy/policy-engine.js';
 export * from './policy/toml-loader.js';
 export * from './policy/config.js';
