@@ -302,6 +302,8 @@ export class BaseLlmClient {
       maxAttempts,
       additionalProperties,
     } = options;
+    const requestRole = role;
+    const requestPromptId = promptId;
 
     const {
       model,
@@ -311,6 +313,7 @@ export class BaseLlmClient {
 
     let currentModel = model;
     let currentGenerateContentConfig = generateContentConfig;
+    let currentAvailabilityMaxAttempts = availabilityMaxAttempts;
 
     // Define callback to fetch context dynamically since active model may get updated during retry loop
     const getAvailabilityContext = createAvailabilityContextProvider(
@@ -338,17 +341,22 @@ export class BaseLlmClient {
             });
           currentModel = resolvedModel;
           currentGenerateContentConfig = generateContentConfig;
+          currentAvailabilityMaxAttempts = undefined;
         } else if (
           !firstAttempt &&
           (this.config.getModelAvailabilityService?.()?.snapshot(currentModel)
             ?.available ?? true) === false
         ) {
-          const { model: reselectedModel, config: reselectedConfig } =
-            applyModelSelection(this.config, modelConfigKey);
+          const {
+            model: reselectedModel,
+            config: reselectedConfig,
+            maxAttempts: reselectedMaxAttempts,
+          } = applyModelSelection(this.config, modelConfigKey);
           currentModel = reselectedModel;
           if (reselectedConfig) {
             currentGenerateContentConfig = reselectedConfig;
           }
+          currentAvailabilityMaxAttempts = reselectedMaxAttempts;
           initialActiveModel = this.config.getActiveModel();
         }
         const finalConfig: GenerateContentConfig = {
@@ -364,8 +372,8 @@ export class BaseLlmClient {
         };
         return this.contentGenerator.generateContent(
           requestParams,
-          promptId,
-          role,
+          requestPromptId,
+          requestRole,
         );
       };
 
@@ -381,9 +389,11 @@ export class BaseLlmClient {
         authType:
           this.authType ?? this.config.getContentGeneratorConfig()?.authType,
         retryFetchErrors: this.config.getRetryFetchErrors(),
+        signal: abortSignal,
         onRetry: (attempt, error, delayMs) => {
           const actualMaxAttempts =
             getAvailabilityContext()?.policy.maxAttempts ??
+            currentAvailabilityMaxAttempts ??
             maxAttempts ??
             DEFAULT_MAX_ATTEMPTS;
           const modelName = getDisplayString(currentModel);
@@ -396,6 +406,9 @@ export class BaseLlmClient {
             error: errorType,
             model: modelName,
             status: getErrorStatus(error),
+            sessionId: this.config.getSessionId?.(),
+            role: requestRole,
+            promptId: requestPromptId,
           });
 
           logNetworkRetryAttempt(

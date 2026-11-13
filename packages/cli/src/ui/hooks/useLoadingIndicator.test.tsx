@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
-import { useLoadingIndicator } from './useLoadingIndicator.js';
+import { useLoadingIndicator, isNetworkRetry } from './useLoadingIndicator.js';
 import { StreamingState } from '../types.js';
 import {
   PHRASE_CHANGE_INTERVAL_MS,
@@ -308,6 +308,86 @@ describe('useLoadingIndicator', () => {
     expect(result.current.currentLoadingPhrase).toBe(
       "This is taking a bit longer, we're still on it.",
     );
+  });
+
+  it('should immediately surface retry progress in low error verbosity mode for network failures', async () => {
+    const retryStatus: RetryAttemptPayload = {
+      model: 'gemini-pro',
+      attempt: 1,
+      maxAttempts: 3,
+      delayMs: 5000,
+      error: 'FETCH_FAILED',
+    };
+    const { result } = await renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      retryStatus,
+      true,
+      true,
+      'low',
+    );
+
+    expect(result.current.statusPhrase).toBe(
+      'Trying to reach gemini-pro (Attempt 2/3)',
+    );
+    expect(result.current.currentLoadingPhrase).toBe(
+      'Trying to reach gemini-pro (Attempt 2/3)',
+    );
+  });
+
+  describe('isNetworkRetry', () => {
+    it('returns true for network and timeout errors without HTTP status', () => {
+      expect(
+        isNetworkRetry({
+          model: 'gemini-pro',
+          attempt: 1,
+          maxAttempts: 3,
+          delayMs: 5000,
+          error: 'FETCH_FAILED',
+        }),
+      ).toBe(true);
+      expect(
+        isNetworkRetry({
+          model: 'gemini-pro',
+          attempt: 1,
+          maxAttempts: 3,
+          delayMs: 5000,
+          error: 'UND_ERR_CONNECT_TIMEOUT',
+        }),
+      ).toBe(true);
+      expect(
+        isNetworkRetry({
+          model: 'gemini-pro',
+          attempt: 1,
+          maxAttempts: 3,
+          delayMs: 5000,
+          error: 'TypeError: fetch failed',
+        }),
+      ).toBe(true);
+    });
+
+    it('returns false when HTTP status is present or error is non-network', () => {
+      expect(
+        isNetworkRetry({
+          model: 'gemini-pro',
+          attempt: 1,
+          maxAttempts: 3,
+          delayMs: 5000,
+          error: 'SERVER_ERROR',
+          status: 503,
+        }),
+      ).toBe(false);
+      expect(
+        isNetworkRetry({
+          model: 'gemini-pro',
+          attempt: 1,
+          maxAttempts: 3,
+          delayMs: 5000,
+          error: 'INVALID_CONTENT',
+        }),
+      ).toBe(false);
+      expect(isNetworkRetry(null)).toBe(false);
+    });
   });
 
   it('should show no phrases when showTips and showWit are false', async () => {

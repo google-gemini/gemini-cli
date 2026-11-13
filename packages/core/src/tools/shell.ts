@@ -43,6 +43,8 @@ import {
   detectCommandSubstitution,
   normalizeCommand,
   escapeShellArg,
+  isInteractiveGeminiCommand,
+  INTERACTIVE_GEMINI_SHELL_ERROR,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
@@ -357,6 +359,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
     abortSignal: AbortSignal,
     forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
+    if (isInteractiveGeminiCommand(stripShellWrapper(this.params.command))) {
+      return false;
+    }
+
     if (forcedDecision === 'deny') {
       return super.shouldConfirmExecute(abortSignal, forcedDecision);
     }
@@ -634,6 +640,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
       setExecutionIdCallback,
     } = options;
     const strippedCommand = stripShellWrapper(this.params.command);
+
+    if (isInteractiveGeminiCommand(strippedCommand)) {
+      return {
+        llmContent: INTERACTIVE_GEMINI_SHELL_ERROR,
+        returnDisplay: INTERACTIVE_GEMINI_SHELL_ERROR,
+        error: {
+          message: INTERACTIVE_GEMINI_SHELL_ERROR,
+          type: ToolErrorType.SHELL_EXECUTE_ERROR,
+        },
+      };
+    }
 
     if (
       detectCommandSubstitution(strippedCommand) &&

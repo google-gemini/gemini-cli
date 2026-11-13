@@ -50,6 +50,7 @@ import dns from 'node:dns';
 import * as path from 'node:path';
 import * as fsPromises from 'node:fs/promises';
 import { start_sandbox } from './utils/sandbox.js';
+import { resolveFolderTrustForSandbox } from './utils/sandboxFolderTrust.js';
 import {
   loadSettings,
   SettingScope,
@@ -101,6 +102,7 @@ import { runDeferredCommand } from './deferred.js';
 import { handleList as handleListModels } from './commands/models/list.js';
 import { cleanupBackgroundLogs } from './utils/logCleanup.js';
 import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
+import { formatCliError } from './utils/formatError.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -625,6 +627,7 @@ export async function main() {
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
   let initialAuthFailed = false;
+  let initialAuthError: unknown = undefined;
   if (!settings.merged.security.auth.useExternal && !argv.isCommand) {
     try {
       if (
@@ -661,8 +664,9 @@ export async function main() {
       // We allow the app to start, and the React-based ValidationDialog
       // will handle it.
       if (!(err instanceof ValidationRequiredError)) {
-        debugLogger.error('Error authenticating:', err);
+        debugLogger.debug('Error authenticating:', err);
         initialAuthFailed = true;
+        initialAuthError = err;
       }
     }
   }
@@ -712,6 +716,9 @@ export async function main() {
 
     if (sandboxConfig) {
       if (initialAuthFailed) {
+        writeToStderr(
+          formatCliError(initialAuthError, { debug: isDebugMode }) + '\n',
+        );
         await runExitCleanup();
         process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
       }
@@ -744,6 +751,20 @@ export async function main() {
       };
 
       const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
+
+      // Resolve folder trust before entering the sandbox, because the macOS
+      // Seatbelt profiles deny the sandboxed process access to the trusted
+      // folders file. A cancelled prompt or failed save throws a FatalError,
+      // which the main().catch handler in index.ts prints before exiting with
+      // its exit code.
+      await resolveFolderTrustForSandbox({
+        sandboxCommand: sandboxConfig.command,
+        settings,
+        interactive:
+          partialConfig.isInteractive() &&
+          !!process.stdin?.isTTY &&
+          !!process.stdout?.isTTY,
+      });
 
       await relaunchOnExitCode(() =>
         start_sandbox(sandboxConfig, memoryArgs, partialConfig, sandboxArgs),

@@ -24,6 +24,17 @@ export function isRateLimitRetry(
   return /429|quota|rate\s*limit|resource_exhausted/i.test(retryStatus.error);
 }
 
+export function isNetworkRetry(
+  retryStatus: RetryAttemptPayload | null,
+): boolean {
+  if (!retryStatus || retryStatus.status !== undefined || !retryStatus.error) {
+    return false;
+  }
+  return /fetch[\s_]*failed|UND_ERR_|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|EPIPE|EPROTO|ERR_SSL_|ERR_STREAM_PREMATURE_CLOSE|network|timed?\s*out/i.test(
+    retryStatus.error,
+  );
+}
+
 export interface UseLoadingIndicatorProps {
   streamingState: StreamingState;
   shouldShowFocusHint: boolean;
@@ -79,10 +90,13 @@ export const useLoadingIndicator = ({
     (retryStatus !== null &&
       prevRetryStatus !== null &&
       retryStatus.attempt === prevRetryStatus.attempt &&
+      retryStatus.maxAttempts === prevRetryStatus.maxAttempts &&
       retryStatus.delayMs === prevRetryStatus.delayMs &&
       retryStatus.model === prevRetryStatus.model &&
       retryStatus.status === prevRetryStatus.status &&
-      retryStatus.error === prevRetryStatus.error);
+      retryStatus.error === prevRetryStatus.error &&
+      retryStatus.role === prevRetryStatus.role &&
+      retryStatus.promptId === prevRetryStatus.promptId);
 
   if (!isSameRetry) {
     setPrevRetryStatus(retryStatus);
@@ -92,9 +106,12 @@ export const useLoadingIndicator = ({
   }
 
   const isRateLimit = isRateLimitRetry(retryStatus);
+  const isNetwork = isNetworkRetry(retryStatus);
   const attempt = retryStatus?.attempt ?? 0;
   const delayMs = retryStatus?.delayMs ?? 0;
   const model = retryStatus?.model ?? '';
+  const role = retryStatus?.role;
+  const promptId = retryStatus?.promptId;
 
   useEffect(() => {
     if (
@@ -118,7 +135,16 @@ export const useLoadingIndicator = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [attempt, delayMs, model, isTimerActive, isRateLimit, countdownSeconds]);
+  }, [
+    attempt,
+    delayMs,
+    model,
+    role,
+    promptId,
+    isTimerActive,
+    isRateLimit,
+    countdownSeconds,
+  ]);
 
   useEffect(() => {
     if (
@@ -148,7 +174,7 @@ export const useLoadingIndicator = ({
     streamingState === StreamingState.Responding && retryStatus
       ? isRateLimit
         ? `Rate limit reached. Cooling down... Retrying in ${remainingSeconds}s (Attempt ${(retryStatus?.attempt ?? 0) + 1}/${retryStatus?.maxAttempts ?? 0})`
-        : errorVerbosity === 'low'
+        : errorVerbosity === 'low' && !isNetwork
           ? retryStatus.attempt >= LOW_VERBOSITY_RETRY_HINT_ATTEMPT_THRESHOLD
             ? "This is taking a bit longer, we're still on it."
             : null

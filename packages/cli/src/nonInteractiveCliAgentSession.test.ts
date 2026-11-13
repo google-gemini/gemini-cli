@@ -618,6 +618,93 @@ describe('runNonInteractive', () => {
     ).rejects.toThrow('API connection failed');
   });
 
+  it('normalizes plain StructuredError from GeminiEventType.Error into an Error instance in TEXT mode', async () => {
+    const events: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.Error,
+        value: {
+          error: {
+            message: 'Model not found',
+            status: 404,
+          },
+        },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    let caughtError: unknown;
+    try {
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Trigger API 404',
+        prompt_id: 'prompt-id-error-repro',
+      });
+    } catch (err) {
+      caughtError = err;
+    }
+
+    expect(caughtError).toBeInstanceOf(Error);
+    expect((caughtError as Error).message).toBe('Model not found');
+    expect((caughtError as Error).cause).toEqual({
+      message: 'Model not found',
+      status: 404,
+    });
+    expect((caughtError as { status?: number }).status).toBe(404);
+    expect(
+      Object.getOwnPropertyDescriptor(caughtError, 'status'),
+    ).toMatchObject({
+      value: 404,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  });
+
+  it('preserves string-based status on code without violating numeric status contract in GeminiEventType.Error', async () => {
+    const events: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.Error,
+        value: {
+          error: {
+            message: 'Permission denied on resource',
+            status: 'PERMISSION_DENIED' as unknown as number,
+          },
+        },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    let caughtError: unknown;
+    try {
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Trigger string status error',
+        prompt_id: 'prompt-id-string-status',
+      });
+    } catch (err) {
+      caughtError = err;
+    }
+
+    expect(caughtError).toBeInstanceOf(Error);
+    expect((caughtError as Error).message).toBe(
+      'Permission denied on resource',
+    );
+    expect((caughtError as { status?: unknown }).status).toBeUndefined();
+    expect((caughtError as { code?: string }).code).toBe('PERMISSION_DENIED');
+    expect(Object.getOwnPropertyDescriptor(caughtError, 'code')).toMatchObject({
+      value: 'PERMISSION_DENIED',
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  });
+
   it('should not exit if a tool is not found, and should send error back to model', async () => {
     const toolCallEvent: ServerGeminiStreamEvent = {
       type: GeminiEventType.ToolCallRequest,
@@ -1038,6 +1125,53 @@ describe('runNonInteractive', () => {
             type: 'Error',
             message: 'Invalid input provided',
             code: 1,
+          },
+        },
+        null,
+        2,
+      ),
+    );
+  });
+
+  it('preserves StructuredError JSON formatting when GeminiEventType.Error is normalized', async () => {
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents([
+        {
+          type: GeminiEventType.Error,
+          value: {
+            error: {
+              message: 'Model not found',
+              status: 404,
+            },
+          },
+        },
+      ]),
+    );
+
+    let thrownError: Error | null = null;
+    try {
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Test JSON API error',
+        prompt_id: 'prompt-id-json-error',
+      });
+      expect.fail('Expected process.exit to be called');
+    } catch (error) {
+      thrownError = error as Error;
+    }
+
+    expect(thrownError?.message).toBe('process.exit(404) called');
+    expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+      'error',
+      JSON.stringify(
+        {
+          session_id: 'test-session-id',
+          error: {
+            type: 'Error',
+            message: 'Model not found',
+            code: 404,
           },
         },
         null,

@@ -351,6 +351,123 @@ describe('OpenFilesManager', () => {
     expect(textEditor.document.getText).toHaveBeenCalledWith(selection);
   });
 
+  it('skips document.getText when selection is empty', async () => {
+    const manager = new OpenFilesManager(context);
+    const uri = getUri('/test/file1.txt');
+    const selection = {
+      active: { line: 10, character: 20 },
+      isEmpty: true,
+    } as vscode.Selection;
+
+    const getTextMock = vi.fn().mockReturnValue('should not be read');
+    const textEditor = {
+      document: {
+        uri,
+        getText: getTextMock,
+      },
+      selection,
+    } as unknown as vscode.TextEditor;
+
+    onDidChangeActiveTextEditorListener(textEditor);
+    await vi.advanceTimersByTimeAsync(100);
+
+    onDidChangeTextEditorSelectionListener({
+      textEditor,
+      selections: [selection],
+      kind: vscode.TextEditorSelectionChangeKind.Mouse,
+    });
+    await vi.advanceTimersByTimeAsync(100);
+
+    const file = manager.state.workspaceState!.openFiles![0];
+    expect(file.selectedText).toBeUndefined();
+    expect(getTextMock).not.toHaveBeenCalled();
+  });
+
+  it('skips document.getText when document is closed or throws', async () => {
+    const manager = new OpenFilesManager(context);
+    const uri = getUri('/test/file1.txt');
+    const selection = {
+      active: { line: 10, character: 20 },
+      isEmpty: false,
+    } as vscode.Selection;
+
+    const getTextMock = vi.fn().mockImplementation(() => {
+      throw new Error('Document is disposed');
+    });
+    const textEditor = {
+      document: {
+        uri,
+        isClosed: false,
+        getText: getTextMock,
+      },
+      selection,
+    } as unknown as vscode.TextEditor;
+
+    onDidChangeActiveTextEditorListener(textEditor);
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(
+      manager.state.workspaceState!.openFiles![0].selectedText,
+    ).toBeUndefined();
+
+    getTextMock.mockClear();
+    (textEditor.document as { isClosed: boolean }).isClosed = true;
+    onDidChangeTextEditorSelectionListener({
+      textEditor,
+      selections: [selection],
+      kind: vscode.TextEditorSelectionChangeKind.Mouse,
+    });
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(getTextMock).not.toHaveBeenCalled();
+    expect(
+      manager.state.workspaceState!.openFiles![0].selectedText,
+    ).toBeUndefined();
+  });
+
+  it('debounces document.getText across rapid selection changes', async () => {
+    const manager = new OpenFilesManager(context);
+    const uri = getUri('/test/file1.txt');
+    const initialSelection = {
+      active: { line: 0, character: 0 },
+      isEmpty: true,
+    } as vscode.Selection;
+
+    const getTextMock = vi.fn().mockReturnValue('final selected text');
+    const textEditor = {
+      document: {
+        uri,
+        getText: getTextMock,
+      },
+      selection: initialSelection,
+    } as unknown as vscode.TextEditor;
+
+    onDidChangeActiveTextEditorListener(textEditor);
+    await vi.advanceTimersByTimeAsync(100);
+    getTextMock.mockClear();
+
+    for (let i = 1; i <= 5; i++) {
+      const nextSelection = {
+        active: { line: i, character: i },
+      } as vscode.Selection;
+      (textEditor as { selection: vscode.Selection }).selection = nextSelection;
+      onDidChangeTextEditorSelectionListener({
+        textEditor,
+        selections: [nextSelection],
+        kind: vscode.TextEditorSelectionChangeKind.Mouse,
+      });
+    }
+
+    expect(getTextMock).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(getTextMock).toHaveBeenCalledTimes(1);
+    const file = manager.state.workspaceState!.openFiles![0];
+    expect(file.selectedText).toBe('final selected text');
+    expect(file.cursor).toEqual({ line: 6, character: 6 });
+  });
+
   it('truncates long selected text', async () => {
     const manager = new OpenFilesManager(context);
     const uri = getUri('/test/file1.txt');
@@ -470,5 +587,62 @@ describe('OpenFilesManager', () => {
     await vi.advanceTimersByTimeAsync(100);
 
     expect(manager.state.workspaceState!.openFiles).toHaveLength(0);
+  });
+
+  it('disposes all watchers, clears pending debounce timer, and disposes emitter on dispose()', async () => {
+    const editorDispose = vi.fn();
+    const selectionDispose = vi.fn();
+    const deleteDispose = vi.fn();
+    const closeDispose = vi.fn();
+    const renameDispose = vi.fn();
+
+    vi.mocked(vscode.window.onDidChangeActiveTextEditor).mockImplementation(
+      (listener) => {
+        onDidChangeActiveTextEditorListener = listener;
+        return { dispose: editorDispose };
+      },
+    );
+    vi.mocked(vscode.window.onDidChangeTextEditorSelection).mockImplementation(
+      (listener) => {
+        onDidChangeTextEditorSelectionListener = listener;
+        return { dispose: selectionDispose };
+      },
+    );
+    vi.mocked(vscode.workspace.onDidDeleteFiles).mockImplementation(
+      (listener) => {
+        onDidDeleteFilesListener = listener;
+        return { dispose: deleteDispose };
+      },
+    );
+    vi.mocked(vscode.workspace.onDidCloseTextDocument).mockImplementation(
+      (listener) => {
+        onDidCloseTextDocumentListener = listener;
+        return { dispose: closeDispose };
+      },
+    );
+    vi.mocked(vscode.workspace.onDidRenameFiles).mockImplementation(
+      (listener) => {
+        onDidRenameFilesListener = listener;
+        return { dispose: renameDispose };
+      },
+    );
+
+    const manager = new OpenFilesManager(context);
+    const onDidChangeSpy = vi.fn();
+    manager.onDidChange(onDidChangeSpy);
+
+    const uri = getUri('/test/file1.txt');
+    addFile(uri);
+
+    // Dispose before the debounce timer fires
+    manager.dispose();
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(onDidChangeSpy).not.toHaveBeenCalled();
+    expect(editorDispose).toHaveBeenCalledTimes(1);
+    expect(selectionDispose).toHaveBeenCalledTimes(1);
+    expect(deleteDispose).toHaveBeenCalledTimes(1);
+    expect(closeDispose).toHaveBeenCalledTimes(1);
+    expect(renameDispose).toHaveBeenCalledTimes(1);
   });
 });

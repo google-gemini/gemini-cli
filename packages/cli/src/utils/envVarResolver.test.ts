@@ -89,6 +89,22 @@ describe('resolveEnvVarsInString', () => {
     expect(result).toBe('URL: https://default.example.com/api');
   });
 
+  it('should use default value when environment variable is set but empty', () => {
+    vi.stubEnv('EMPTY_VAR', '');
+    const result = resolveEnvVarsInString(
+      'URL: ${EMPTY_VAR:-https://default.example.com}/api',
+    );
+    expect(result).toBe('URL: https://default.example.com/api');
+  });
+
+  it('should use default value when customEnv variable is set but empty', () => {
+    const result = resolveEnvVarsInString(
+      'URL: ${EMPTY_VAR:-https://default.example.com}/api',
+      { EMPTY_VAR: '' },
+    );
+    expect(result).toBe('URL: https://default.example.com/api');
+  });
+
   it('should ignore default value when environment variable is present', () => {
     vi.stubEnv('PRESENT_VAR', 'https://actual.example.com');
     const result = resolveEnvVarsInString(
@@ -107,6 +123,46 @@ describe('resolveEnvVarsInString', () => {
       'Value: ${MISSING_VAR:-val:-123-abc}',
     );
     expect(result).toBe('Value: val:-123-abc');
+  });
+
+  it('should preserve empty string when variable is set to empty and has no default', () => {
+    vi.stubEnv('EMPTY_VAR', '');
+    expect(resolveEnvVarsInString('Value is "$EMPTY_VAR"')).toBe('Value is ""');
+    expect(resolveEnvVarsInString('Value is "${EMPTY_VAR}"')).toBe(
+      'Value is ""',
+    );
+  });
+
+  it('should support empty default value when variable is set but empty', () => {
+    vi.stubEnv('EMPTY_VAR', '');
+    const result = resolveEnvVarsInString('Value: ${EMPTY_VAR:-}');
+    expect(result).toBe('Value: ');
+  });
+
+  it('should respect customEnv overriding process.env with an empty string and using default', () => {
+    vi.stubEnv('VAR_NAME', 'process-value');
+    const result = resolveEnvVarsInString('Value: ${VAR_NAME:-fallback}', {
+      VAR_NAME: '',
+    });
+    expect(result).toBe('Value: fallback');
+  });
+
+  it('should respect customEnv overriding process.env with a non-empty value over default', () => {
+    vi.stubEnv('VAR_NAME', '');
+    const result = resolveEnvVarsInString('Value: ${VAR_NAME:-fallback}', {
+      VAR_NAME: 'custom-value',
+    });
+    expect(result).toBe('Value: custom-value');
+  });
+
+  it('should resolve multiple variables with mixed set, empty, and unset defaults', () => {
+    vi.stubEnv('HOST', '');
+    vi.stubEnv('PORT', '9000');
+
+    const result = resolveEnvVarsInString(
+      'URL: http://${HOST:-localhost}:${PORT:-8080}/api?key=${KEY:-default_key}',
+    );
+    expect(result).toBe('URL: http://localhost:9000/api?key=default_key');
   });
 });
 
@@ -228,6 +284,25 @@ describe('resolveEnvVarsInObject', () => {
     const result = resolveEnvVarsInObject(config);
 
     expect(result).toEqual(config);
+  });
+
+  it('should use default value when variable in object is set but empty', () => {
+    vi.stubEnv('EMPTY_API_BASE', '');
+    const config = {
+      apiBase: '${EMPTY_API_BASE:-https://api.example.com}',
+    };
+    const result = resolveEnvVarsInObject(config);
+    expect(result.apiBase).toBe('https://api.example.com');
+  });
+
+  it('should resolve variables with defaults in arrays when set but empty', () => {
+    vi.stubEnv('EMPTY_TAG', '');
+
+    const config = {
+      tags: ['${EMPTY_TAG:-default-tag}', '${UNSET_TAG:-fallback-tag}'],
+    };
+    const result = resolveEnvVarsInObject(config);
+    expect(result.tags).toEqual(['default-tag', 'fallback-tag']);
   });
 
   it('should handle circular references in objects without infinite recursion', () => {
