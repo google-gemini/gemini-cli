@@ -604,6 +604,10 @@ export async function loadEnvironment(
           key !== 'constructor' &&
           key !== 'prototype'
         ) {
+          // Keep file-supplied Git settings out of task environments.
+          if (/^git_/i.test(key)) {
+            continue;
+          }
           envVars[key] = parsed[key];
         }
       }
