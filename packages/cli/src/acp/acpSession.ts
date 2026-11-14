@@ -41,6 +41,9 @@ import {
   resolveAtCommandPath,
   type ResolvedAtCommandPath,
   tokenLimit,
+  truncateToolOutputIfNeeded,
+  truncateFunctionResponsePart,
+  MAX_STORED_TOOL_OUTPUT_BYTES,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import type { Part, FunctionCall } from '@google/genai';
@@ -893,7 +896,33 @@ export class Session {
       const toolResult: ToolResult = await invocation.execute({
         abortSignal,
       });
-      const content = toToolCallContent(toolResult);
+
+      const { truncatedContent, outputFile } = await truncateToolOutputIfNeeded(
+        toolResult.llmContent,
+        {
+          toolName: fc.name ?? '',
+          callId,
+          promptId,
+          isMcp:
+            typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool,
+          config: this.context.config,
+        },
+      );
+
+      const content = toToolCallContent({
+        ...toolResult,
+        returnDisplay: outputFile
+          ? typeof truncatedContent === 'string'
+            ? truncatedContent
+            : Array.isArray(truncatedContent) &&
+                typeof truncatedContent[0] === 'object' &&
+                truncatedContent[0] !== null &&
+                'text' in truncatedContent[0] &&
+                typeof truncatedContent[0].text === 'string'
+              ? truncatedContent[0].text
+              : toolResult.returnDisplay
+          : toolResult.returnDisplay,
+      });
 
       const updateContent: acp.ToolCallContent[] = content ? [content] : [];
 
@@ -923,6 +952,23 @@ export class Session {
         ),
       );
 
+      const rawResponse = convertToFunctionResponse(
+        fc.name,
+        callId,
+        truncatedContent,
+        this.context.config.getActiveModel(),
+        this.context.config,
+      );
+      const responseParts = this.context.config.isContextManagementEnabled()
+        ? rawResponse
+        : rawResponse.map((part) =>
+            truncateFunctionResponsePart(
+              part,
+              MAX_STORED_TOOL_OUTPUT_BYTES,
+              outputFile,
+            ),
+          );
+
       this.chat.recordCompletedToolCalls(this.context.config.getActiveModel(), [
         {
           status: CoreToolCallStatus.Success,
@@ -937,27 +983,16 @@ export class Session {
           invocation,
           response: {
             callId,
-            responseParts: convertToFunctionResponse(
-              fc.name,
-              callId,
-              toolResult.llmContent,
-              this.context.config.getActiveModel(),
-              this.context.config,
-            ),
+            responseParts,
             resultDisplay: toolResult.returnDisplay,
             error: undefined,
             errorType: undefined,
+            outputFile,
           },
         },
       ]);
 
-      return convertToFunctionResponse(
-        fc.name,
-        callId,
-        toolResult.llmContent,
-        this.context.config.getActiveModel(),
-        this.context.config,
-      );
+      return responseParts;
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
 

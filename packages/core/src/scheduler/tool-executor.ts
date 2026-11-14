@@ -6,8 +6,6 @@
 
 import {
   ToolErrorType,
-  ToolOutputTruncatedEvent,
-  logToolOutputTruncated,
   runInDevTraceSpan,
   type ToolCallRequestInfo,
   type ToolCallResponseInfo,
@@ -22,14 +20,11 @@ import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { ToolOutputDistillationService } from '../context/toolDistillationService.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
-import {
-  saveTruncatedToolOutput,
-  formatTruncatedToolOutput,
-} from '../utils/fileUtils.js';
 import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
 import {
   truncateFunctionResponsePart,
   truncateToolOutput,
+  truncateToolOutputIfNeeded,
 } from '../utils/tool-utils.js';
 import { MAX_STORED_TOOL_OUTPUT_BYTES } from '../utils/constants.js';
 import {
@@ -220,236 +215,13 @@ export class ToolExecutor {
       return distiller.distill(call.request.name, call.request.callId, content);
     }
 
-    const toolName = call.request.name;
-    const callId = call.request.callId;
-    let outputFile: string | undefined;
-
-    if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
-      const threshold = this.config.getTruncateToolOutputThreshold();
-
-      if (threshold > 0 && content.length > threshold) {
-        const originalContentLength = content.length;
-        const { outputFile: savedPath } = await saveTruncatedToolOutput(
-          content,
-          toolName,
-          callId,
-          this.config.storage.getProjectTempDir(),
-          this.context.promptId,
-        );
-        outputFile = savedPath;
-        let truncatedContent = formatTruncatedToolOutput(
-          content,
-          outputFile,
-          threshold,
-        );
-
-        logToolOutputTruncated(
-          this.config,
-          new ToolOutputTruncatedEvent(call.request.prompt_id, {
-            toolName,
-            originalContentLength,
-            truncatedContentLength: truncatedContent.length,
-            threshold,
-          }),
-        );
-
-        if (
-          typeof truncatedContent === 'string' &&
-          Buffer.byteLength(truncatedContent, 'utf8') >
-            MAX_STORED_TOOL_OUTPUT_BYTES
-        ) {
-          truncatedContent = truncateToolOutput(
-            truncatedContent,
-            MAX_STORED_TOOL_OUTPUT_BYTES,
-          );
-        }
-
-        return { truncatedContent, outputFile };
-      }
-    } else if (
-      Array.isArray(content) &&
-      content.length === 1 &&
-      'tool' in call &&
-      call.tool instanceof DiscoveredMCPTool
-    ) {
-      const firstPart = content[0];
-      if (typeof firstPart === 'object' && typeof firstPart.text === 'string') {
-        const textContent = firstPart.text;
-        const threshold = this.config.getTruncateToolOutputThreshold();
-
-        if (threshold > 0 && textContent.length > threshold) {
-          const originalContentLength = textContent.length;
-          const { outputFile: savedPath } = await saveTruncatedToolOutput(
-            textContent,
-            toolName,
-            callId,
-            this.config.storage.getProjectTempDir(),
-            this.context.promptId,
-          );
-          outputFile = savedPath;
-          let truncatedText = formatTruncatedToolOutput(
-            textContent,
-            outputFile,
-            threshold,
-          );
-
-          if (
-            typeof truncatedText === 'string' &&
-            Buffer.byteLength(truncatedText, 'utf8') >
-              MAX_STORED_TOOL_OUTPUT_BYTES
-          ) {
-            truncatedText = truncateToolOutput(
-              truncatedText,
-              MAX_STORED_TOOL_OUTPUT_BYTES,
-            );
-          }
-
-          // We need to return a NEW array to avoid mutating the original toolResult if it matters,
-          // though here we are creating the response so it's probably fine to mutate or return new.
-          const truncatedContent: Part[] = [
-            { ...firstPart, text: truncatedText },
-          ];
-
-          logToolOutputTruncated(
-            this.config,
-            new ToolOutputTruncatedEvent(call.request.prompt_id, {
-              toolName,
-              originalContentLength,
-              truncatedContentLength: truncatedText.length,
-              threshold,
-            }),
-          );
-
-          return { truncatedContent, outputFile };
-        }
-      }
-    }
-
-    const ensureOutputFile = async (
-      rawText: string,
-    ): Promise<string | undefined> => {
-      if (!outputFile) {
-        try {
-          const { outputFile: savedPath } = await saveTruncatedToolOutput(
-            rawText,
-            toolName,
-            callId,
-            this.config.storage.getProjectTempDir(),
-            this.context.promptId,
-          );
-          outputFile = savedPath;
-        } catch {
-          // Ignore error during disk save
-        }
-      }
-      return outputFile;
-    };
-
-    let finalContent: PartListUnion = content;
-    if (typeof finalContent === 'string') {
-      if (
-        Buffer.byteLength(finalContent, 'utf8') > MAX_STORED_TOOL_OUTPUT_BYTES
-      ) {
-        const savedPath = await ensureOutputFile(finalContent);
-        finalContent = truncateToolOutput(
-          finalContent,
-          MAX_STORED_TOOL_OUTPUT_BYTES,
-          savedPath,
-        );
-      }
-    } else if (Array.isArray(finalContent)) {
-      const textParts: string[] = [];
-      let totalBytes = 0;
-      for (const part of finalContent) {
-        const text =
-          typeof part === 'string'
-            ? part
-            : typeof part === 'object' &&
-                part !== null &&
-                'text' in part &&
-                typeof part.text === 'string'
-              ? part.text
-              : undefined;
-        if (text !== undefined) {
-          if (textParts.length > 0) {
-            totalBytes += 1;
-          }
-          textParts.push(text);
-          totalBytes += Buffer.byteLength(text, 'utf8');
-        }
-      }
-      if (totalBytes > MAX_STORED_TOOL_OUTPUT_BYTES) {
-        await ensureOutputFile(textParts.join('\n'));
-      }
-
-      let remainingBytes = MAX_STORED_TOOL_OUTPUT_BYTES;
-      let budgetExhausted = false;
-      const processedParts: PartUnion[] = [];
-
-      for (const part of finalContent) {
-        if (typeof part === 'string') {
-          if (budgetExhausted) {
-            continue;
-          }
-          const partBytes = Buffer.byteLength(part, 'utf8');
-          if (partBytes > remainingBytes) {
-            const savedPath = await ensureOutputFile(part);
-            processedParts.push(
-              truncateToolOutput(part, remainingBytes, savedPath),
-            );
-            budgetExhausted = true;
-            remainingBytes = 0;
-          } else {
-            processedParts.push(part);
-            remainingBytes = Math.max(0, remainingBytes - partBytes - 1);
-          }
-        } else if (
-          typeof part === 'object' &&
-          part !== null &&
-          'text' in part &&
-          typeof part.text === 'string'
-        ) {
-          if (budgetExhausted) {
-            continue;
-          }
-          const partBytes = Buffer.byteLength(part.text, 'utf8');
-          if (partBytes > remainingBytes) {
-            const savedPath = await ensureOutputFile(part.text);
-            processedParts.push({
-              ...part,
-              text: truncateToolOutput(part.text, remainingBytes, savedPath),
-            });
-            budgetExhausted = true;
-            remainingBytes = 0;
-          } else {
-            processedParts.push(part);
-            remainingBytes = Math.max(0, remainingBytes - partBytes - 1);
-          }
-        } else {
-          processedParts.push(part);
-        }
-      }
-      finalContent = processedParts;
-    } else if (
-      typeof finalContent === 'object' &&
-      finalContent !== null &&
-      'text' in finalContent &&
-      typeof finalContent.text === 'string' &&
-      Buffer.byteLength(finalContent.text, 'utf8') >
-        MAX_STORED_TOOL_OUTPUT_BYTES
-    ) {
-      const savedPath = await ensureOutputFile(finalContent.text);
-      finalContent = {
-        ...finalContent,
-        text: truncateToolOutput(
-          finalContent.text,
-          MAX_STORED_TOOL_OUTPUT_BYTES,
-          savedPath,
-        ),
-      };
-    }
-
-    return { truncatedContent: finalContent, outputFile };
+    return truncateToolOutputIfNeeded(content, {
+      toolName: call.request.name,
+      callId: call.request.callId,
+      promptId: this.context.promptId,
+      isMcp: 'tool' in call && call.tool instanceof DiscoveredMCPTool,
+      config: this.config,
+    });
   }
 
   private async createCancelledResult(
