@@ -549,6 +549,19 @@ export class Session {
               stopReason = 'max_tokens';
               break;
 
+            case GeminiEventType.AgentExecutionBlocked: {
+              const reason =
+                event.value.systemMessage?.trim() || event.value.reason;
+              await this.sendUpdate({
+                sessionUpdate: 'agent_message_chunk',
+                content: {
+                  type: 'text',
+                  text: `Agent execution blocked: ${reason}`,
+                },
+              });
+              break;
+            }
+
             case GeminiEventType.Error: {
               const parseResult = StructuredErrorSchema.safeParse(
                 event.value.error,
