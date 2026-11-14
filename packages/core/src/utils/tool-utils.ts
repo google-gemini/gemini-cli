@@ -13,14 +13,24 @@ import { SHELL_TOOL_NAMES } from './shell-utils.js';
 import {
   UPDATE_TOPIC_TOOL_NAME,
   EDIT_TOOL_NAMES,
+  SHELL_TOOL_NAME,
 } from '../tools/tool-names.js';
 import levenshtein from 'fast-levenshtein';
 import type {
   ToolCallRequestInfo,
   ToolCallResponseInfo,
 } from '../scheduler/types.js';
-import type { Part } from '@google/genai';
+import type { Part, PartListUnion, PartUnion } from '@google/genai';
 import { MAX_STORED_TOOL_OUTPUT_BYTES } from './constants.js';
+import {
+  saveTruncatedToolOutput,
+  formatTruncatedToolOutput,
+} from './fileUtils.js';
+import {
+  ToolOutputTruncatedEvent,
+  logToolOutputTruncated,
+} from '../telemetry/index.js';
+import type { Config } from '../config/config.js';
 
 /**
  * Determines whether a tool call request can be executed in parallel with
@@ -301,4 +311,271 @@ export function truncateFunctionResponsePart(
   }
 
   return part;
+}
+
+export interface TruncateToolOutputOptions {
+  toolName: string;
+  callId: string;
+  promptId?: string;
+  isMcp?: boolean;
+  config: Config;
+}
+
+/**
+ * Truncates tool output if it exceeds configured threshold (for shell or MCP tools)
+ * or if it exceeds the maximum byte limit (MAX_STORED_TOOL_OUTPUT_BYTES = 64KB).
+ * Full raw output is saved to disk and a formatted truncated preview is returned.
+ *
+ * @param content The raw tool output (string, Part[], Part, etc.).
+ * @param options Tool and configuration options for truncation.
+ * @returns An object containing the truncated content and the path to the saved file (if any).
+ */
+export async function truncateToolOutputIfNeeded(
+  content: PartListUnion,
+  options: TruncateToolOutputOptions,
+): Promise<{ truncatedContent: PartListUnion; outputFile?: string }> {
+  const { toolName, callId, promptId, isMcp, config } = options;
+  let outputFile: string | undefined;
+
+  const isShellTool =
+    typeof content === 'string' &&
+    (toolName === SHELL_TOOL_NAME || SHELL_TOOL_NAMES.includes(toolName));
+
+  if (isShellTool) {
+    const threshold = config.getTruncateToolOutputThreshold();
+
+    if (threshold > 0 && content.length > threshold) {
+      const originalContentLength = content.length;
+      const projectTempDir = config.storage?.getProjectTempDir?.();
+      if (projectTempDir) {
+        const { outputFile: savedPath } = await saveTruncatedToolOutput(
+          content,
+          toolName,
+          callId,
+          projectTempDir,
+          promptId,
+        );
+        outputFile = savedPath;
+      }
+      let truncatedContent = formatTruncatedToolOutput(
+        content,
+        outputFile ?? '',
+        threshold,
+      );
+
+      logToolOutputTruncated(
+        config,
+        new ToolOutputTruncatedEvent(promptId, {
+          toolName,
+          originalContentLength,
+          truncatedContentLength: truncatedContent.length,
+          threshold,
+        }),
+      );
+
+      if (
+        typeof truncatedContent === 'string' &&
+        Buffer.byteLength(truncatedContent, 'utf8') >
+          MAX_STORED_TOOL_OUTPUT_BYTES
+      ) {
+        truncatedContent = truncateToolOutput(
+          truncatedContent,
+          MAX_STORED_TOOL_OUTPUT_BYTES,
+        );
+      }
+
+      return { truncatedContent, outputFile };
+    }
+  } else if (
+    Array.isArray(content) &&
+    content.length === 1 &&
+    isMcp
+  ) {
+    const firstPart = content[0];
+    if (
+      typeof firstPart === 'object' &&
+      firstPart !== null &&
+      'text' in firstPart &&
+      typeof firstPart.text === 'string'
+    ) {
+      const textContent = firstPart.text;
+      const threshold = config.getTruncateToolOutputThreshold();
+
+      if (threshold > 0 && textContent.length > threshold) {
+        const originalContentLength = textContent.length;
+        const projectTempDir = config.storage?.getProjectTempDir?.();
+        if (projectTempDir) {
+          const { outputFile: savedPath } = await saveTruncatedToolOutput(
+            textContent,
+            toolName,
+            callId,
+            projectTempDir,
+            promptId,
+          );
+          outputFile = savedPath;
+        }
+        let truncatedText = formatTruncatedToolOutput(
+          textContent,
+          outputFile ?? '',
+          threshold,
+        );
+
+        if (
+          typeof truncatedText === 'string' &&
+          Buffer.byteLength(truncatedText, 'utf8') >
+            MAX_STORED_TOOL_OUTPUT_BYTES
+        ) {
+          truncatedText = truncateToolOutput(
+            truncatedText,
+            MAX_STORED_TOOL_OUTPUT_BYTES,
+          );
+        }
+
+        const truncatedContent: Part[] = [
+          { ...firstPart, text: truncatedText },
+        ];
+
+        logToolOutputTruncated(
+          config,
+          new ToolOutputTruncatedEvent(promptId, {
+            toolName,
+            originalContentLength,
+            truncatedContentLength: truncatedText.length,
+            threshold,
+          }),
+        );
+
+        return { truncatedContent, outputFile };
+      }
+    }
+  }
+
+  const ensureOutputFile = async (
+    rawText: string,
+  ): Promise<string | undefined> => {
+    if (!outputFile) {
+      try {
+        const projectTempDir = config.storage?.getProjectTempDir?.();
+        if (projectTempDir) {
+          const { outputFile: savedPath } = await saveTruncatedToolOutput(
+            rawText,
+            toolName,
+            callId,
+            projectTempDir,
+            promptId,
+          );
+          outputFile = savedPath;
+        }
+      } catch {
+        // Ignore error during disk save
+      }
+    }
+    return outputFile;
+  };
+
+  let finalContent: PartListUnion = content;
+  if (typeof finalContent === 'string') {
+    if (
+      Buffer.byteLength(finalContent, 'utf8') > MAX_STORED_TOOL_OUTPUT_BYTES
+    ) {
+      const savedPath = await ensureOutputFile(finalContent);
+      finalContent = truncateToolOutput(
+        finalContent,
+        MAX_STORED_TOOL_OUTPUT_BYTES,
+        savedPath,
+      );
+    }
+  } else if (Array.isArray(finalContent)) {
+    const textParts: string[] = [];
+    let totalBytes = 0;
+    for (const part of finalContent) {
+      const text =
+        typeof part === 'string'
+          ? part
+          : typeof part === 'object' &&
+              part !== null &&
+              'text' in part &&
+              typeof part.text === 'string'
+            ? part.text
+            : undefined;
+      if (text !== undefined) {
+        if (textParts.length > 0) {
+          totalBytes += 1;
+        }
+        textParts.push(text);
+        totalBytes += Buffer.byteLength(text, 'utf8');
+      }
+    }
+    if (totalBytes > MAX_STORED_TOOL_OUTPUT_BYTES) {
+      await ensureOutputFile(textParts.join('\n'));
+    }
+
+    let remainingBytes = MAX_STORED_TOOL_OUTPUT_BYTES;
+    let budgetExhausted = false;
+    const processedParts: PartUnion[] = [];
+
+    for (const part of finalContent) {
+      if (typeof part === 'string') {
+        if (budgetExhausted) {
+          continue;
+        }
+        const partBytes = Buffer.byteLength(part, 'utf8');
+        if (partBytes > remainingBytes) {
+          const savedPath = await ensureOutputFile(part);
+          processedParts.push(
+            truncateToolOutput(part, remainingBytes, savedPath),
+          );
+          budgetExhausted = true;
+          remainingBytes = 0;
+        } else {
+          processedParts.push(part);
+          remainingBytes = Math.max(0, remainingBytes - partBytes - 1);
+        }
+      } else if (
+        typeof part === 'object' &&
+        part !== null &&
+        'text' in part &&
+        typeof part.text === 'string'
+      ) {
+        if (budgetExhausted) {
+          continue;
+        }
+        const partBytes = Buffer.byteLength(part.text, 'utf8');
+        if (partBytes > remainingBytes) {
+          const savedPath = await ensureOutputFile(part.text);
+          processedParts.push({
+            ...part,
+            text: truncateToolOutput(part.text, remainingBytes, savedPath),
+          });
+          budgetExhausted = true;
+          remainingBytes = 0;
+        } else {
+          processedParts.push(part);
+          remainingBytes = Math.max(0, remainingBytes - partBytes - 1);
+        }
+      } else {
+        processedParts.push(part);
+      }
+    }
+    finalContent = processedParts;
+  } else if (
+    typeof finalContent === 'object' &&
+    finalContent !== null &&
+    'text' in finalContent &&
+    typeof finalContent.text === 'string' &&
+    Buffer.byteLength(finalContent.text, 'utf8') >
+      MAX_STORED_TOOL_OUTPUT_BYTES
+  ) {
+    const savedPath = await ensureOutputFile(finalContent.text);
+    finalContent = {
+      ...finalContent,
+      text: truncateToolOutput(
+        finalContent.text,
+        MAX_STORED_TOOL_OUTPUT_BYTES,
+        savedPath,
+      ),
+    };
+  }
+
+  return { truncatedContent: finalContent, outputFile };
 }
