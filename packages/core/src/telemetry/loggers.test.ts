@@ -199,6 +199,23 @@ describe('loggers', () => {
         { tokens_before: 9001, tokens_after: 9000 },
       );
     });
+
+    it('defers OTEL emission until the SDK is initialized', () => {
+      vi.spyOn(sdk, 'bufferTelemetryEvent').mockImplementation(() => {});
+      const mockConfig = makeFakeConfig();
+      const event = makeChatCompressionEvent({
+        tokens_before: 9001,
+        tokens_after: 9000,
+      });
+
+      logChatCompression(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logChatCompressionEvent,
+      ).toHaveBeenCalledWith(event);
+      expect(mockLogger.emit).not.toHaveBeenCalled();
+      expect(metrics.recordChatCompressionMetrics).not.toHaveBeenCalled();
+    });
   });
 
   describe('logCliConfiguration', () => {
