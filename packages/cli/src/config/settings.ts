@@ -1038,6 +1038,34 @@ const NON_SCRIPT_VALUE_FLAGS = new Set([
   '-executionpolicy',
 ]);
 
+const KNOWN_BOOLEAN_FLAGS = new Set([
+  '-x',
+  '-v',
+  '-n',
+  '-u',
+  '-w',
+  '-d',
+  '-O',
+  '-B',
+  '-s',
+  '-S',
+  '-i',
+  '-t',
+  '--watch',
+  '--no-warnings',
+  '--trace-warnings',
+  '--inspect',
+  '--inspect-brk',
+  '--enable-source-maps',
+  '--preserve-symlinks',
+  '--no-deprecation',
+  '--throw-deprecation',
+  '-noprofile',
+  '-noninteractive',
+  '-sta',
+  '-mta',
+]);
+
 const SUBCOMMAND_INTERPRETERS = new Set(['deno', 'bun']);
 const INTERPRETER_SUBCOMMANDS = new Set(['run', 'x', 'serve', 'test', 'bench']);
 
@@ -1169,10 +1197,7 @@ function unwrapEnvInvocation(
   const wrapperPaths: string[] = [];
 
   while (currentCmd && getCommandBaseName(currentCmd) === 'env') {
-    if (
-      isExplicitCommandPath(currentCmd) ||
-      isScriptPathCandidate(currentCmd, effectiveCwd, workspaceDir)
-    ) {
+    if (isExplicitCommandPath(currentCmd)) {
       wrapperPaths.push(currentCmd);
     }
     let idx = 0;
@@ -1295,6 +1320,7 @@ function extractInterpreterScriptArgs(
   const candidates: string[] = [];
   let expectPreloadValue = false;
   let skipNextValue = false;
+  let prevWasUnknownFlag = false;
   let sawSubcommand = false;
   let afterDoubleDash = false;
 
@@ -1314,16 +1340,19 @@ function extractInterpreterScriptArgs(
         candidates.push(trimmed);
       }
       expectPreloadValue = false;
+      prevWasUnknownFlag = false;
       continue;
     }
 
     if (skipNextValue) {
       skipNextValue = false;
+      prevWasUnknownFlag = false;
       continue;
     }
 
     if (trimmed === '--') {
       afterDoubleDash = true;
+      prevWasUnknownFlag = false;
       continue;
     }
 
@@ -1343,11 +1372,16 @@ function extractInterpreterScriptArgs(
           ) {
             candidates.push(inlineValue);
           }
+          prevWasUnknownFlag = false;
         } else {
           expectPreloadValue = true;
+          prevWasUnknownFlag = false;
         }
       } else if (eqIndex < 0 && NON_SCRIPT_VALUE_FLAGS.has(flagName)) {
         skipNextValue = true;
+        prevWasUnknownFlag = false;
+      } else {
+        prevWasUnknownFlag = eqIndex < 0 && !KNOWN_BOOLEAN_FLAGS.has(flagName);
       }
       continue;
     }
@@ -1359,13 +1393,17 @@ function extractInterpreterScriptArgs(
       INTERPRETER_SUBCOMMANDS.has(trimmed.toLowerCase())
     ) {
       sawSubcommand = true;
+      prevWasUnknownFlag = false;
       continue;
     }
 
     if (isScriptPathCandidate(trimmed, cwd, workspaceDir)) {
       candidates.push(trimmed);
-      break;
+      if (!prevWasUnknownFlag) {
+        break;
+      }
     }
+    prevWasUnknownFlag = false;
   }
 
   return candidates;
@@ -1417,7 +1455,8 @@ function findInsecureMcpTarget(
   const candidates: string[] = [];
   if (
     isExplicitCommandPath(unwrapped.command) ||
-    isScriptPathCandidate(unwrapped.command, effectiveCwd, ctx.workspaceDir)
+    (path.extname(unwrapped.command) !== '' &&
+      isScriptPathCandidate(unwrapped.command, effectiveCwd, ctx.workspaceDir))
   ) {
     candidates.push(unwrapped.command);
   }

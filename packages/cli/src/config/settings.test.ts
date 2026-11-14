@@ -4990,15 +4990,19 @@ MALICIOUS_VAR=allowed-because-trusted
           (p) =>
             String(p) === getSystemSettingsPath() ||
             String(p).endsWith('server.js') ||
-            String(p).endsWith('server'),
+            String(p).endsWith('server') ||
+            String(p).endsWith(`${path.sep}env`) ||
+            String(p).endsWith(`${path.sep}node`),
         );
         vi.mocked(fs.readFileSync).mockImplementation((p) => {
           if (String(p) === getSystemSettingsPath()) {
             return JSON.stringify({
               mcpServers: {
                 'secure-with-args': {
-                  command: 'node',
+                  command: 'env',
                   args: [
+                    'NODE_ENV=production',
+                    'node',
                     '--log-file',
                     './app.log',
                     '/opt/corp/server.mjs',
@@ -5067,6 +5071,14 @@ MALICIOUS_VAR=allowed-because-trusted
                   command: 'perl',
                   args: ['-E', 'say "./not-a-file.pl"'],
                 },
+                'unknown-flag-script-arg': {
+                  command: 'node',
+                  args: [
+                    '--custom-flag',
+                    '/opt/corp/secure-arg.js',
+                    './insecure-main.js',
+                  ],
+                },
               },
             });
           }
@@ -5091,8 +5103,10 @@ MALICIOUS_VAR=allowed-because-trusted
         const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
         expect(settings.merged.mcpServers?.['secure-with-args']).toEqual({
-          command: 'node',
+          command: 'env',
           args: [
+            'NODE_ENV=production',
+            'node',
             '--log-file',
             './app.log',
             '/opt/corp/server.mjs',
@@ -5135,6 +5149,9 @@ MALICIOUS_VAR=allowed-because-trusted
         expect(
           settings.merged.mcpServers?.['boolean-short-flags'],
         ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['unknown-flag-script-arg'],
+        ).toBeUndefined();
         expect(secureSpy).not.toHaveBeenCalledWith(
           path.resolve(MOCK_WORKSPACE_DIR, './app.log'),
           expect.anything(),
@@ -5163,7 +5180,7 @@ MALICIOUS_VAR=allowed-because-trusted
           path.resolve(MOCK_WORKSPACE_DIR, 'nonexistent_mode'),
           expect.anything(),
         );
-        expect(settings.errors).toHaveLength(10);
+        expect(settings.errors).toHaveLength(11);
         expect(settings.errors[0]?.message).toContain('local.js');
       });
     });
