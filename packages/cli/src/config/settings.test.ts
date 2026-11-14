@@ -4415,6 +4415,792 @@ MALICIOUS_VAR=allowed-because-trusted
           ui: { theme: 'corporate-theme' },
         });
       });
+
+      it('should skip an insecure system settings MCP server, block user/workspace overrides, and record a warning', () => {
+        resetSettingsCacheForTesting();
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) =>
+            normalizePath(p) === normalizePath(getSystemSettingsPath()) ||
+            normalizePath(p) === normalizePath(USER_SETTINGS_PATH) ||
+            normalizePath(p) === normalizePath(MOCK_WORKSPACE_SETTINGS_PATH),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (normalizePath(p) === normalizePath(getSystemSettingsPath())) {
+            return JSON.stringify({
+              mcp: { allowed: ['corp-mcp'] },
+              mcpServers: {
+                'corp-mcp': { command: '/opt/mcp.sh' },
+              },
+            });
+          }
+          if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH)) {
+            return JSON.stringify({
+              mcpServers: {
+                'corp-mcp': { command: '/mock/home/user/override-mcp.sh' },
+              },
+            });
+          }
+          if (
+            normalizePath(p) === normalizePath(MOCK_WORKSPACE_SETTINGS_PATH)
+          ) {
+            return JSON.stringify({
+              mcpServers: {
+                'CORP-MCP': { command: './workspace-override-mcp.sh' },
+              },
+            });
+          }
+          return '';
+        });
+        vi.spyOn(core, 'isFileAndDirectorySecureSync').mockImplementation(
+          (targetPath) => {
+            if (targetPath === getSystemSettingsPath()) {
+              return { secure: true };
+            }
+            if (targetPath === '/opt/mcp.sh') {
+              return {
+                secure: false,
+                reason:
+                  "File '/opt/mcp.sh' is writable by group or others (mode: 100775).",
+              };
+            }
+            return { secure: true };
+          },
+        );
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(
+          settings.system.settings.mcpServers?.['corp-mcp'],
+        ).toBeUndefined();
+        expect(settings.merged.mcpServers).toEqual({});
+        expect(settings.getConsolidatedExcludedMcpServers()).toContain(
+          'corp-mcp',
+        );
+        expect(settings.errors).toEqual([
+          {
+            message: expect.stringContaining(
+              "Security Warning: Skipping MCP server 'corp-mcp' in system settings file",
+            ),
+            path: getSystemSettingsPath(),
+            severity: 'warning',
+          },
+        ]);
+        expect(settings.errors[0]?.message).toContain('/opt/mcp.sh');
+        expect(settings.errors[0]?.message).toContain(
+          'writable by group or others',
+        );
+      });
+
+      it('should skip an insecure system-defaults.json MCP server and record a warning', () => {
+        resetSettingsCacheForTesting();
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) => String(p) === getSystemDefaultsPath(),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (String(p) === getSystemDefaultsPath()) {
+            return JSON.stringify({
+              mcpServers: {
+                'default-mcp': { command: '/opt/default-mcp.sh' },
+              },
+            });
+          }
+          return '';
+        });
+        vi.spyOn(core, 'isFileAndDirectorySecureSync').mockImplementation(
+          (targetPath) => {
+            if (targetPath === '/opt/default-mcp.sh') {
+              return {
+                secure: false,
+                reason:
+                  "File '/opt/default-mcp.sh' is not owned by root (uid 0).",
+              };
+            }
+            return { secure: true };
+          },
+        );
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(settings.merged.mcpServers?.['default-mcp']).toBeUndefined();
+        expect(settings.getConsolidatedExcludedMcpServers()).toContain(
+          'default-mcp',
+        );
+        expect(settings.errors).toEqual([
+          {
+            message: expect.stringContaining(
+              "Security Warning: Skipping MCP server 'default-mcp' in system defaults file",
+            ),
+            path: getSystemDefaultsPath(),
+            severity: 'warning',
+          },
+        ]);
+      });
+
+      it('should load a system MCP server without warning when its command path is secure', () => {
+        resetSettingsCacheForTesting();
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) => String(p) === getSystemSettingsPath(),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (String(p) === getSystemSettingsPath()) {
+            return JSON.stringify({
+              mcp: { allowed: ['corp-mcp'] },
+              mcpServers: {
+                'corp-mcp': { command: '/opt/mcp.sh' },
+              },
+            });
+          }
+          return '';
+        });
+        const secureSpy = vi
+          .spyOn(core, 'isFileAndDirectorySecureSync')
+          .mockReturnValue({ secure: true });
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(secureSpy).toHaveBeenCalledWith(
+          '/opt/mcp.sh',
+          expect.anything(),
+        );
+        expect(settings.merged.mcpServers?.['corp-mcp']).toEqual({
+          command: '/opt/mcp.sh',
+        });
+        expect(settings.errors).toEqual([]);
+      });
+
+      it('should validate interpreter script arguments and skip insecure script paths', () => {
+        resetSettingsCacheForTesting();
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) => String(p) === getSystemSettingsPath(),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (String(p) === getSystemSettingsPath()) {
+            return JSON.stringify({
+              mcpServers: {
+                'bash-script': {
+                  command: 'bash',
+                  args: ['/opt/mcp.sh'],
+                },
+                'node-script': {
+                  command: '/usr/bin/node',
+                  args: ['--no-warnings', '/opt/corp/server.mjs'],
+                },
+                'node-preload-bypass': {
+                  command: 'node',
+                  args: [
+                    '--require',
+                    '/usr/local/bin/secure-preload.js',
+                    './insecure-script.js',
+                  ],
+                },
+                'node-inline-flag-path': {
+                  command: 'node',
+                  args: [
+                    '--require=/opt/insecure-preload.js',
+                    '/usr/local/bin/secure-server.js',
+                  ],
+                },
+                'node-preload-before-eval': {
+                  command: 'node',
+                  args: [
+                    '--require',
+                    '/opt/insecure-preload.js',
+                    '-e',
+                    'process.exit(0)',
+                  ],
+                },
+                'node-inline': {
+                  command: 'node',
+                  args: ['-e', 'process.exit(0)'],
+                },
+              },
+            });
+          }
+          return '';
+        });
+        const expectedRelativeInsecure = path.resolve(
+          MOCK_WORKSPACE_DIR,
+          './insecure-script.js',
+        );
+        vi.spyOn(core, 'isFileAndDirectorySecureSync').mockImplementation(
+          (targetPath) => {
+            if (
+              targetPath === '/opt/mcp.sh' ||
+              targetPath === '/opt/corp/server.mjs' ||
+              targetPath === expectedRelativeInsecure ||
+              targetPath === '/opt/insecure-preload.js'
+            ) {
+              return {
+                secure: false,
+                reason: 'File is writable by group or others.',
+              };
+            }
+            return { secure: true };
+          },
+        );
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(settings.merged.mcpServers?.['bash-script']).toBeUndefined();
+        expect(settings.merged.mcpServers?.['node-script']).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['node-preload-bypass'],
+        ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['node-inline-flag-path'],
+        ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['node-preload-before-eval'],
+        ).toBeUndefined();
+        expect(settings.merged.mcpServers?.['node-inline']).toEqual({
+          command: 'node',
+          args: ['-e', 'process.exit(0)'],
+        });
+        expect(settings.errors).toHaveLength(5);
+      });
+
+      it('should resolve relative system MCP command paths against server cwd or workspaceDir', () => {
+        resetSettingsCacheForTesting();
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) => String(p) === getSystemSettingsPath(),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (String(p) === getSystemSettingsPath()) {
+            return JSON.stringify({
+              mcpServers: {
+                'rel-default-cwd': { command: './scripts/start.sh' },
+                'rel-custom-cwd': {
+                  command: './bin/run.sh',
+                  cwd: 'tools/mcp',
+                },
+                'win-drive-path': { command: 'C:\\ProgramData\\Corp\\mcp.cmd' },
+              },
+            });
+          }
+          return '';
+        });
+        const expectedDefaultResolved = path.resolve(
+          MOCK_WORKSPACE_DIR,
+          './scripts/start.sh',
+        );
+        const expectedCustomResolved = path.resolve(
+          MOCK_WORKSPACE_DIR,
+          'tools/mcp',
+          './bin/run.sh',
+        );
+        const expectedWinPath = 'C:\\ProgramData\\Corp\\mcp.cmd';
+        const secureSpy = vi
+          .spyOn(core, 'isFileAndDirectorySecureSync')
+          .mockImplementation((targetPath) => {
+            if (
+              targetPath === expectedDefaultResolved ||
+              targetPath === expectedCustomResolved ||
+              targetPath === expectedWinPath
+            ) {
+              return {
+                secure: false,
+                reason: 'File is not owned by root (uid 0).',
+              };
+            }
+            return { secure: true };
+          });
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(secureSpy).toHaveBeenCalledWith(
+          expectedDefaultResolved,
+          expect.anything(),
+        );
+        expect(secureSpy).toHaveBeenCalledWith(
+          expectedCustomResolved,
+          expect.anything(),
+        );
+        expect(secureSpy).toHaveBeenCalledWith(
+          expectedWinPath,
+          expect.anything(),
+        );
+        expect(settings.merged.mcpServers).toEqual({});
+        expect(settings.errors).toHaveLength(3);
+      });
+
+      it('should skip security path checks for bare command names and remote URL MCP servers', () => {
+        resetSettingsCacheForTesting();
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) => String(p) === getSystemSettingsPath(),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (String(p) === getSystemSettingsPath()) {
+            return JSON.stringify({
+              mcp: { serverCommand: 'npx -y @corp/default-mcp' },
+              mcpServers: {
+                'bare-cmd': { command: 'npx', args: ['-y', '@corp/mcp'] },
+                'remote-sse': { url: 'https://mcp.corp.example/sse' },
+              },
+            });
+          }
+          return '';
+        });
+        const secureSpy = vi
+          .spyOn(core, 'isFileAndDirectorySecureSync')
+          .mockReturnValue({ secure: true });
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(secureSpy).toHaveBeenCalledTimes(1);
+        expect(secureSpy).toHaveBeenCalledWith(
+          getSystemSettingsPath(),
+          expect.anything(),
+        );
+        expect(settings.errors).toEqual([]);
+      });
+
+      it('should skip insecure system MCP commands after env expansion and clear insecure mcp.serverCommand', () => {
+        resetSettingsCacheForTesting();
+        vi.stubEnv('CORP_MCP_ROOT', '/opt/corp-tools');
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) => String(p) === getSystemSettingsPath(),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (String(p) === getSystemSettingsPath()) {
+            return JSON.stringify({
+              mcp: { serverCommand: '/opt/legacy-mcp.sh --stdio' },
+              mcpServers: {
+                'env-mcp': { command: '${CORP_MCP_ROOT}/start.sh' },
+              },
+            });
+          }
+          return '';
+        });
+        vi.spyOn(core, 'isFileAndDirectorySecureSync').mockImplementation(
+          (targetPath) => {
+            if (
+              targetPath === '/opt/corp-tools/start.sh' ||
+              targetPath === '/opt/legacy-mcp.sh'
+            ) {
+              return {
+                secure: false,
+                reason: 'File is writable by group or others.',
+              };
+            }
+            return { secure: true };
+          },
+        );
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(settings.merged.mcpServers?.['env-mcp']).toBeUndefined();
+        expect(settings.merged.mcp?.serverCommand).toBeUndefined();
+        expect(settings.errors).toHaveLength(2);
+        expect(settings.errors[0]?.message).toContain(
+          '/opt/corp-tools/start.sh',
+        );
+        expect(settings.errors[1]?.message).toContain('/opt/legacy-mcp.sh');
+      });
+
+      it('should not run system MCP command security checks on user or workspace MCP servers', () => {
+        resetSettingsCacheForTesting();
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) =>
+            normalizePath(p) === normalizePath(USER_SETTINGS_PATH) ||
+            normalizePath(p) === normalizePath(MOCK_WORKSPACE_SETTINGS_PATH),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (normalizePath(p) === normalizePath(USER_SETTINGS_PATH)) {
+            return JSON.stringify({
+              mcpServers: {
+                'user-mcp': { command: '/mock/home/user/mcp.sh' },
+              },
+            });
+          }
+          if (
+            normalizePath(p) === normalizePath(MOCK_WORKSPACE_SETTINGS_PATH)
+          ) {
+            return JSON.stringify({
+              mcpServers: {
+                'workspace-mcp': { command: './local-mcp.sh' },
+              },
+            });
+          }
+          return '';
+        });
+        const secureSpy = vi
+          .spyOn(core, 'isFileAndDirectorySecureSync')
+          .mockReturnValue({
+            secure: false,
+            reason: 'Not owned by root.',
+          });
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(secureSpy).not.toHaveBeenCalled();
+        expect(settings.errors).toEqual([]);
+      });
+
+      it('should preserve workspace originalSettings on disk while still blocking skipped system MCP servers across setTrusted', () => {
+        resetSettingsCacheForTesting();
+        vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+          isTrusted: false,
+          source: 'file',
+        });
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) =>
+            normalizePath(p) === normalizePath(getSystemSettingsPath()) ||
+            normalizePath(p) === normalizePath(MOCK_WORKSPACE_SETTINGS_PATH),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (normalizePath(p) === normalizePath(getSystemSettingsPath())) {
+            return JSON.stringify({
+              mcp: { allowed: ['corp-mcp'] },
+              mcpServers: {
+                'corp-mcp': { command: '/opt/mcp.sh' },
+              },
+            });
+          }
+          if (
+            normalizePath(p) === normalizePath(MOCK_WORKSPACE_SETTINGS_PATH)
+          ) {
+            return JSON.stringify({
+              mcpServers: {
+                'CORP-MCP': { command: './workspace-override-mcp.sh' },
+                'keep-mcp': { command: './keep-mcp.sh' },
+              },
+            });
+          }
+          return '';
+        });
+        vi.spyOn(core, 'isFileAndDirectorySecureSync').mockImplementation(
+          (targetPath) => {
+            if (targetPath === '/opt/mcp.sh') {
+              return {
+                secure: false,
+                reason: 'File is writable by group or others.',
+              };
+            }
+            return { secure: true };
+          },
+        );
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        // Even before folder trust is granted, getMergedSettingsAsIfTrusted must strip CORP-MCP
+        expect(settings.getMergedSettingsAsIfTrusted().mcpServers).toEqual({
+          'keep-mcp': { command: './keep-mcp.sh' },
+        });
+
+        // Granting trust interactively must still strip CORP-MCP from merged & workspace settings
+        settings.setTrusted(true);
+        expect(settings.merged.mcpServers).toEqual({
+          'keep-mcp': { command: './keep-mcp.sh' },
+        });
+        expect(settings.workspace.settings.mcpServers).toEqual({
+          'keep-mcp': { command: './keep-mcp.sh' },
+        });
+
+        // However, workspace.originalSettings MUST preserve CORP-MCP so saving does not lose user data on disk
+        expect(settings.workspace.originalSettings.mcpServers).toEqual({
+          'CORP-MCP': { command: './workspace-override-mcp.sh' },
+          'keep-mcp': { command: './keep-mcp.sh' },
+        });
+        settings.setValue(SettingScope.Workspace, 'ui.theme', 'Default');
+        expect(updateSettingsFilePreservingFormat).toHaveBeenCalledWith(
+          MOCK_WORKSPACE_SETTINGS_PATH,
+          expect.objectContaining({
+            mcpServers: {
+              'CORP-MCP': { command: './workspace-override-mcp.sh' },
+              'keep-mcp': { command: './keep-mcp.sh' },
+            },
+            ui: { theme: 'Default' },
+          }),
+        );
+      });
+
+      it('should handle malformed mcp.serverCommand gracefully without crashing startup', () => {
+        resetSettingsCacheForTesting();
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) => String(p) === getSystemSettingsPath(),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (String(p) === getSystemSettingsPath()) {
+            return JSON.stringify({
+              mcp: { serverCommand: '/opt/mcp.sh ${}' },
+            });
+          }
+          return '';
+        });
+        vi.spyOn(core, 'isFileAndDirectorySecureSync').mockReturnValue({
+          secure: true,
+        });
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(settings.merged.mcp?.serverCommand).toBeUndefined();
+        expect(settings.errors).toEqual([
+          {
+            message: expect.stringContaining(
+              'Security Warning: Skipping mcp.serverCommand in system settings file',
+            ),
+            path: getSystemSettingsPath(),
+            severity: 'warning',
+          },
+        ]);
+        expect(settings.errors[0]?.message).toContain(
+          'parse failure: Bad substitution',
+        );
+      });
+
+      it('should skip mcp.serverCommand when shell operators are present', () => {
+        resetSettingsCacheForTesting();
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) => String(p) === getSystemSettingsPath(),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (String(p) === getSystemSettingsPath()) {
+            return JSON.stringify({
+              mcp: {
+                serverCommand: '/opt/secure-mcp.sh && /opt/insecure-mcp.sh',
+              },
+            });
+          }
+          return '';
+        });
+        vi.spyOn(core, 'isFileAndDirectorySecureSync').mockReturnValue({
+          secure: true,
+        });
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(settings.merged.mcp?.serverCommand).toBeUndefined();
+        expect(settings.errors).toEqual([
+          {
+            message: expect.stringContaining(
+              'Security Warning: Skipping mcp.serverCommand in system settings file',
+            ),
+            path: getSystemSettingsPath(),
+            severity: 'warning',
+          },
+        ]);
+        expect(settings.errors[0]?.message).toContain(
+          'due to presence of shell operators',
+        );
+      });
+
+      it('should ignore non-path positional arguments on interpreter MCP commands while still validating bare script filenames', () => {
+        resetSettingsCacheForTesting();
+        vi.mocked(fs.existsSync).mockImplementation(
+          (p) =>
+            String(p) === getSystemSettingsPath() ||
+            String(p).endsWith('server.js') ||
+            String(p).endsWith('server') ||
+            String(p).endsWith(`${path.sep}env`) ||
+            String(p).endsWith(`${path.sep}node`),
+        );
+        vi.mocked(fs.readFileSync).mockImplementation((p) => {
+          if (String(p) === getSystemSettingsPath()) {
+            return JSON.stringify({
+              mcpServers: {
+                'secure-with-args': {
+                  command: 'env',
+                  args: [
+                    'NODE_ENV=production',
+                    'node',
+                    '--log-file',
+                    './app.log',
+                    '/opt/corp/server.mjs',
+                    './src',
+                    'production',
+                    '8080',
+                  ],
+                },
+                'bare-script-in-workspace': {
+                  command: 'node',
+                  args: ['--require', '/usr/local/bin/preload.js', 'local.js'],
+                },
+                'flag-value-before-script': {
+                  command: 'node',
+                  args: [
+                    '--max-old-space-size',
+                    '4096',
+                    './insecure-after-flag.js',
+                  ],
+                },
+                'non-script-path-before-script': {
+                  command: 'node',
+                  args: [
+                    '--config',
+                    './config.json',
+                    './insecure-after-config.js',
+                  ],
+                },
+                'extensionless-bare-script': {
+                  command: 'node',
+                  args: ['server'],
+                },
+                'ts-node-with-project-flag': {
+                  command: 'ts-node',
+                  args: ['-P', './tsconfig.json', './insecure-ts-server.ts'],
+                },
+                'python-warning-flag': {
+                  command: 'python3',
+                  args: ['-W', 'ignore', './insecure-py-server.py'],
+                },
+                'env-wrapper-node': {
+                  command: '/usr/bin/env',
+                  args: [
+                    '-i',
+                    'NODE_ENV=production',
+                    'node',
+                    './insecure-env-wrapped.js',
+                  ],
+                },
+                'unlisted-flag-extensionless-val': {
+                  command: 'node',
+                  args: [
+                    '--custom-mode',
+                    'nonexistent_mode',
+                    './insecure-after-mode.js',
+                  ],
+                },
+                'bare-command-script-ext': {
+                  command: 'corp-mcp.sh',
+                },
+                'boolean-short-flags': {
+                  command: 'bash',
+                  args: ['-x', './insecure-xtrace.sh'],
+                },
+                'perl-upper-eval': {
+                  command: 'perl',
+                  args: ['-E', 'say "./not-a-file.pl"'],
+                },
+                'unknown-flag-script-arg': {
+                  command: 'node',
+                  args: [
+                    '--custom-flag',
+                    '/opt/corp/secure-arg.js',
+                    './insecure-main.js',
+                  ],
+                },
+                'cmd-slash-c-bat': {
+                  command: 'cmd.exe',
+                  args: ['/c', 'C:\\opt\\mcp.bat'],
+                },
+                'cscript-nologo-vbs': {
+                  command: 'cscript',
+                  args: ['//Nologo', './insecure-wsh.vbs'],
+                },
+                'osascript-scpt': {
+                  command: 'osascript',
+                  args: ['-l', 'JavaScript', './insecure-osa.scpt'],
+                },
+              },
+            });
+          }
+          return '';
+        });
+        const secureSpy = vi
+          .spyOn(core, 'isFileAndDirectorySecureSync')
+          .mockImplementation((targetPath) => {
+            if (
+              targetPath === 'C:\\opt\\mcp.bat' ||
+              normalizePath(targetPath).startsWith(
+                normalizePath(MOCK_WORKSPACE_DIR),
+              )
+            ) {
+              return {
+                secure: false,
+                reason: 'Workspace directory is not owned by root (uid 0).',
+              };
+            }
+            return { secure: true };
+          });
+
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(settings.merged.mcpServers?.['secure-with-args']).toEqual({
+          command: 'env',
+          args: [
+            'NODE_ENV=production',
+            'node',
+            '--log-file',
+            './app.log',
+            '/opt/corp/server.mjs',
+            './src',
+            'production',
+            '8080',
+          ],
+        });
+        expect(settings.merged.mcpServers?.['perl-upper-eval']).toEqual({
+          command: 'perl',
+          args: ['-E', 'say "./not-a-file.pl"'],
+        });
+        expect(
+          settings.merged.mcpServers?.['bare-script-in-workspace'],
+        ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['flag-value-before-script'],
+        ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['non-script-path-before-script'],
+        ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['extensionless-bare-script'],
+        ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['ts-node-with-project-flag'],
+        ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['python-warning-flag'],
+        ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['env-wrapper-node'],
+        ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['unlisted-flag-extensionless-val'],
+        ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['bare-command-script-ext'],
+        ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['boolean-short-flags'],
+        ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['unknown-flag-script-arg'],
+        ).toBeUndefined();
+        expect(settings.merged.mcpServers?.['cmd-slash-c-bat']).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['cscript-nologo-vbs'],
+        ).toBeUndefined();
+        expect(settings.merged.mcpServers?.['osascript-scpt']).toBeUndefined();
+        expect(secureSpy).not.toHaveBeenCalledWith(
+          path.resolve(MOCK_WORKSPACE_DIR, './app.log'),
+          expect.anything(),
+        );
+        expect(secureSpy).not.toHaveBeenCalledWith(
+          path.resolve(MOCK_WORKSPACE_DIR, './config.json'),
+          expect.anything(),
+        );
+        expect(secureSpy).not.toHaveBeenCalledWith(
+          path.resolve(MOCK_WORKSPACE_DIR, './src'),
+          expect.anything(),
+        );
+        expect(secureSpy).not.toHaveBeenCalledWith(
+          path.resolve(MOCK_WORKSPACE_DIR, 'production'),
+          expect.anything(),
+        );
+        expect(secureSpy).not.toHaveBeenCalledWith(
+          path.resolve(MOCK_WORKSPACE_DIR, '8080'),
+          expect.anything(),
+        );
+        expect(secureSpy).not.toHaveBeenCalledWith(
+          path.resolve(MOCK_WORKSPACE_DIR, 'ignore'),
+          expect.anything(),
+        );
+        expect(secureSpy).not.toHaveBeenCalledWith(
+          path.resolve(MOCK_WORKSPACE_DIR, 'nonexistent_mode'),
+          expect.anything(),
+        );
+        expect(settings.errors).toHaveLength(14);
+        expect(settings.errors[0]?.message).toContain('local.js');
+      });
     });
   });
 });
