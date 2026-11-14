@@ -5079,6 +5079,18 @@ MALICIOUS_VAR=allowed-because-trusted
                     './insecure-main.js',
                   ],
                 },
+                'cmd-slash-c-bat': {
+                  command: 'cmd.exe',
+                  args: ['/c', 'C:\\opt\\mcp.bat'],
+                },
+                'cscript-nologo-vbs': {
+                  command: 'cscript',
+                  args: ['//Nologo', './insecure-wsh.vbs'],
+                },
+                'osascript-scpt': {
+                  command: 'osascript',
+                  args: ['-l', 'JavaScript', './insecure-osa.scpt'],
+                },
               },
             });
           }
@@ -5088,6 +5100,7 @@ MALICIOUS_VAR=allowed-because-trusted
           .spyOn(core, 'isFileAndDirectorySecureSync')
           .mockImplementation((targetPath) => {
             if (
+              targetPath === 'C:\\opt\\mcp.bat' ||
               normalizePath(targetPath).startsWith(
                 normalizePath(MOCK_WORKSPACE_DIR),
               )
@@ -5152,6 +5165,11 @@ MALICIOUS_VAR=allowed-because-trusted
         expect(
           settings.merged.mcpServers?.['unknown-flag-script-arg'],
         ).toBeUndefined();
+        expect(settings.merged.mcpServers?.['cmd-slash-c-bat']).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['cscript-nologo-vbs'],
+        ).toBeUndefined();
+        expect(settings.merged.mcpServers?.['osascript-scpt']).toBeUndefined();
         expect(secureSpy).not.toHaveBeenCalledWith(
           path.resolve(MOCK_WORKSPACE_DIR, './app.log'),
           expect.anything(),
@@ -5180,7 +5198,7 @@ MALICIOUS_VAR=allowed-because-trusted
           path.resolve(MOCK_WORKSPACE_DIR, 'nonexistent_mode'),
           expect.anything(),
         );
-        expect(settings.errors).toHaveLength(11);
+        expect(settings.errors).toHaveLength(14);
         expect(settings.errors[0]?.message).toContain('local.js');
       });
     });

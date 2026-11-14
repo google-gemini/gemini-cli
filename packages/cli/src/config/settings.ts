@@ -948,13 +948,20 @@ const SCRIPT_INTERPRETERS = new Set([
   'zsh',
   'dash',
   'ksh',
+  'fish',
+  'csh',
+  'tcsh',
   'node',
   'nodejs',
   'python',
+  'python2',
   'python3',
+  'py',
   'ruby',
   'perl',
   'php',
+  'lua',
+  'rscript',
   'pwsh',
   'powershell',
   'deno',
@@ -962,7 +969,13 @@ const SCRIPT_INTERPRETERS = new Set([
   'tsx',
   'ts-node',
   'ts-node-esm',
+  'cmd',
+  'osascript',
+  'cscript',
+  'wscript',
 ]);
+
+const WINDOWS_SLASH_FLAG_INTERPRETERS = new Set(['cmd', 'cscript', 'wscript']);
 
 const INLINE_EVAL_FLAGS = new Set([
   '-c',
@@ -1006,15 +1019,27 @@ const SCRIPT_EXTENSIONS = new Set([
   '.bash',
   '.zsh',
   '.ksh',
+  '.fish',
+  '.csh',
   '.pl',
   '.pm',
   '.rb',
   '.php',
   '.phar',
+  '.lua',
+  '.r',
   '.ps1',
   '.psm1',
   '.cmd',
   '.bat',
+  '.vbs',
+  '.vbe',
+  '.jse',
+  '.wsf',
+  '.wsh',
+  '.scpt',
+  '.scptd',
+  '.applescript',
 ]);
 
 const NON_SCRIPT_VALUE_FLAGS = new Set([
@@ -1352,6 +1377,14 @@ function extractInterpreterScriptArgs(
 
     if (trimmed === '--') {
       afterDoubleDash = true;
+      prevWasUnknownFlag = false;
+      continue;
+    }
+
+    if (
+      WINDOWS_SLASH_FLAG_INTERPRETERS.has(baseName) &&
+      /^\/(\/)?[a-zA-Z?][a-zA-Z0-9:_-]*$/.test(trimmed)
+    ) {
       prevWasUnknownFlag = false;
       continue;
     }
