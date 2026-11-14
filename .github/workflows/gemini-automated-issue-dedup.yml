@@ -238,7 +238,8 @@ jobs:
           script: |-
             const rawCsv = process.env.DUPLICATES_OUTPUT;
             core.info(`Raw duplicates CSV: ${rawCsv}`);
-            const duplicateIssues = rawCsv.split(',').map(s => s.trim()).filter(s => s);
+            // Keep only issue numbers; anything else in the model output is dropped.
+            const duplicateIssues = rawCsv.split(',').map(s => s.trim()).filter(s => /^[0-9]+$/.test(s));
 
             if (duplicateIssues.length === 0) {
               core.info('No duplicate issues found. Nothing to do.');
