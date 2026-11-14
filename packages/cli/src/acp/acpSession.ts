@@ -44,7 +44,6 @@ import {
   truncateToolOutputIfNeeded,
   truncateFunctionResponsePart,
   MAX_STORED_TOOL_OUTPUT_BYTES,
-  formatTruncatedToolOutput,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import type { Part, FunctionCall } from '@google/genai';
@@ -910,32 +909,22 @@ export class Session {
         },
       );
 
-      const content = toToolCallContent(toolResult);
+      const content = toToolCallContent({
+        ...toolResult,
+        returnDisplay: outputFile
+          ? typeof truncatedContent === 'string'
+            ? truncatedContent
+            : Array.isArray(truncatedContent) &&
+                typeof truncatedContent[0] === 'object' &&
+                truncatedContent[0] !== null &&
+                'text' in truncatedContent[0] &&
+                typeof truncatedContent[0].text === 'string'
+              ? truncatedContent[0].text
+              : toolResult.returnDisplay
+          : toolResult.returnDisplay,
+      });
 
-      let updateContent: acp.ToolCallContent[] = content ? [content] : [];
-      if (
-        outputFile &&
-        updateContent.length === 1 &&
-        updateContent[0].type === 'content' &&
-        updateContent[0].content.type === 'text'
-      ) {
-        const threshold = this.context.config.getTruncateToolOutputThreshold();
-        if (threshold > 0 && updateContent[0].content.text.length > threshold) {
-          updateContent = [
-            {
-              type: 'content',
-              content: {
-                type: 'text',
-                text: formatTruncatedToolOutput(
-                  updateContent[0].content.text,
-                  outputFile,
-                  threshold,
-                ),
-              },
-            },
-          ];
-        }
-      }
+      const updateContent: acp.ToolCallContent[] = content ? [content] : [];
 
       await this.sendUpdate({
         sessionUpdate: 'tool_call_update',
