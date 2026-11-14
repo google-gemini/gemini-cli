@@ -15,12 +15,14 @@ import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
+import { extensionsCommand } from '../commands/extensionsCommand.js';
 import {
   SlashCommandStatus,
   MCPDiscoveryState,
   ToolConfirmationOutcome,
   makeFakeConfig,
   coreEvents,
+  SkillManager,
   type GeminiClient,
   type SerializableConfirmationDetails,
 } from '@google/gemini-cli-core';
@@ -1499,6 +1501,93 @@ describe('useSlashCommandProcessor', () => {
       });
 
       expect(logSlashCommand).not.toHaveBeenCalled();
+    });
+  });
+
+  it('refreshes skill commands after extension reload finishes', async () => {
+    const skillManager = new SkillManager();
+    const skill = {
+      name: 'old-skill',
+      description: 'An extension skill',
+      location: '/extensions/example/skills/SKILL.md',
+      body: 'Review the changes.',
+      extensionName: 'example',
+    };
+    skillManager.addSkills([skill]);
+    vi.spyOn(mockConfig, 'isSkillsSupportEnabled').mockReturnValue(true);
+    vi.spyOn(mockConfig, 'getSkillManager').mockReturnValue(skillManager);
+    let finishDiscovery!: () => void;
+    const discovering = new Promise<void>((resolve) => {
+      finishDiscovery = resolve;
+    });
+    vi.spyOn(mockConfig, 'reloadSkills').mockImplementation(async () => {
+      await discovering;
+      skillManager.clearSkills();
+      skillManager.addSkills([{ ...skill, name: 'new-skill' }]);
+    });
+    const extensionLoader = mockConfig.getExtensionLoader();
+    vi.spyOn(extensionLoader, 'getExtensions').mockReturnValue([
+      {
+        name: 'example',
+        id: 'example-id',
+        version: '1.0.0',
+        path: '/extensions/example',
+        isActive: true,
+        contextFiles: [],
+      },
+    ]);
+    let finishRestart!: () => void;
+    const restarting = new Promise<void>((resolve) => {
+      finishRestart = resolve;
+    });
+    vi.spyOn(extensionLoader, 'restartExtension').mockImplementation(
+      async () => {
+        // Extension events arrive before the asynchronous skill discovery finishes.
+        coreEvents.emit('extensionsStarting', { total: 1, completed: 1 });
+        await restarting;
+      },
+    );
+
+    const result = await setupProcessorHook({
+      builtinCommands: [extensionsCommand()],
+    });
+    expect(
+      result.current.slashCommands?.map((command) => command.name),
+    ).toContain('example:old-skill');
+
+    let reload!: Promise<unknown>;
+    act(() => {
+      reload = result.current.handleSlashCommand('/extensions reload example');
+    });
+    await waitFor(() =>
+      expect(mockBuiltinLoadCommands).toHaveBeenCalledTimes(2),
+    );
+    await act(async () => {
+      finishRestart();
+    });
+    await act(async () => {
+      finishDiscovery();
+      await reload;
+    });
+
+    await waitFor(() => {
+      const names = result.current.slashCommands?.map(
+        (command) => command.name,
+      );
+      expect(names).toContain('example:new-skill');
+      expect(names).not.toContain('example:old-skill');
+    });
+    await act(async () => {
+      await expect(
+        result.current.handleSlashCommand(
+          '/example:new-skill review this diff',
+        ),
+      ).resolves.toEqual({
+        type: 'schedule_tool',
+        toolName: 'activate_skill',
+        toolArgs: { name: 'new-skill' },
+        postSubmitPrompt: 'review this diff',
+      });
     });
   });
 

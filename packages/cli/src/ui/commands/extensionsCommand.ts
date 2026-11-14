@@ -237,6 +237,7 @@ async function restartAction(
   if (failures.length < extensionsToRestart.length) {
     try {
       await context.services.agentContext?.config.reloadSkills();
+      context.ui.reloadCommands();
       await context.services.agentContext?.config.getAgentRegistry()?.reload();
     } catch (error) {
       context.ui.addItem({
