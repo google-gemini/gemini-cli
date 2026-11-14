@@ -55,11 +55,13 @@ describe('IssuesStore', () => {
       expect.anything(),
       expect.objectContaining({
         status: 'UNTRIAGED',
+        error: null,
         github_metadata: expect.objectContaining({
           owner: 'google',
           repo: 'gemini-cli',
           issue_number: 123,
           title: 'Test Title',
+          pr_number: null,
         }),
       }),
     );

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { ModelAvailabilityService } from './modelAvailabilityService.js';
 
 describe('ModelAvailabilityService', () => {
@@ -207,6 +207,66 @@ describe('ModelAvailabilityService', () => {
 
       expect(service.snapshot('gemini-3-flash-preview')).toEqual({
         available: true,
+      });
+    });
+  });
+
+  describe('Capacity TTL expiration', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('recovers terminal status for capacity after the TTL expires', () => {
+      service.markTerminal(model, 'capacity');
+
+      // Before TTL expiration, model is unavailable
+      expect(service.snapshot(model)).toEqual({
+        available: false,
+        reason: 'capacity',
+      });
+
+      // Fast forward 29 seconds (default is 30s)
+      vi.advanceTimersByTime(29000);
+      expect(service.snapshot(model)).toEqual({
+        available: false,
+        reason: 'capacity',
+      });
+
+      // Fast forward past 30 seconds
+      vi.advanceTimersByTime(1001);
+      expect(service.snapshot(model)).toEqual({
+        available: true,
+      });
+    });
+
+    it('allows custom TTL parameter in snapshot', () => {
+      service.markTerminal(model, 'capacity');
+
+      // Check with a custom 5s TTL
+      expect(service.snapshot(model, 5000)).toEqual({
+        available: false,
+        reason: 'capacity',
+      });
+
+      // Advance 6 seconds
+      vi.advanceTimersByTime(6000);
+      expect(service.snapshot(model, 5000)).toEqual({
+        available: true,
+      });
+    });
+
+    it('does not expire terminal status for non-capacity reasons (e.g. quota)', () => {
+      service.markTerminal(model, 'quota');
+
+      // Even after advance, quota remains terminal
+      vi.advanceTimersByTime(60000);
+      expect(service.snapshot(model)).toEqual({
+        available: false,
+        reason: 'quota',
       });
     });
   });

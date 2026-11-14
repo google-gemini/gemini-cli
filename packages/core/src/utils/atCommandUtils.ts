@@ -28,9 +28,26 @@ export type ResolveAtCommandPathResult =
   | { status: 'invalid'; error: string }
   | { status: 'not_found' };
 
+const LINE_NUMBER_SUFFIX_REGEX =
+  /^(.+?)(?::\d+(?::\d+)?(?:-\d+(?::\d+)?)?:?|#L?\d+(?:-(?:#?L)?\d+)?)$/i;
+
+/**
+ * Strips a trailing line/column/range reference (e.g. `:10`, `:10-20`, `:10:5`,
+ * `#L10`, `#L10-L25`, `#L10-#L25`) from a path string if present.
+ * Returns the base path without the suffix, or null if no suffix was present.
+ */
+export function stripLineNumberSuffix(pathStr: string): string | null {
+  const match = pathStr.match(LINE_NUMBER_SUFFIX_REGEX);
+  if (match && match[1]) {
+    return match[1];
+  }
+  return null;
+}
+
 /**
  * Resolves a path from an @-command, ensuring it is valid and within workspace boundaries.
- * Performs best-effort extraction if the input appears to be a misinterpreted log fragment.
+ * Performs best-effort extraction if the input appears to be a misinterpreted log fragment
+ * or includes a trailing line/range reference (e.g., `file.ts:10` or `file.ts:10-20`).
  */
 export async function resolveAtCommandPath(
   pathName: string,
@@ -92,12 +109,18 @@ export async function resolveAtCommandPath(
         },
       };
     } catch (error) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
-        return { status: 'not_found' };
+      if (!isNodeError(error) || error.code !== 'ENOENT') {
+        onDebugMessage(
+          `Unexpected error stating path ${pathName}: ${getErrorMessage(error)}`,
+        );
       }
-      onDebugMessage(
-        `Unexpected error stating path ${pathName}: ${getErrorMessage(error)}`,
-      );
+      const strippedPath = stripLineNumberSuffix(pathName);
+      if (strippedPath && strippedPath !== pathName) {
+        onDebugMessage(
+          `Path "${pathName}" not found directly, attempting to resolve without line suffix: "${strippedPath}"`,
+        );
+        return resolveAtCommandPath(strippedPath, config, onDebugMessage);
+      }
       return { status: 'not_found' };
     }
   }
@@ -142,6 +165,14 @@ export async function resolveAtCommandPath(
 
   if (lastUnauthorized) {
     return { status: 'unauthorized', ...lastUnauthorized };
+  }
+
+  const strippedPath = stripLineNumberSuffix(pathName);
+  if (strippedPath && strippedPath !== pathName) {
+    onDebugMessage(
+      `Path "${pathName}" not found directly, attempting to resolve without line suffix: "${strippedPath}"`,
+    );
+    return resolveAtCommandPath(strippedPath, config, onDebugMessage);
   }
 
   return { status: 'not_found' };
@@ -191,10 +222,12 @@ function tryExtractPath(noisyString: string): string | null {
 
     if (segmentToClean.length === 0) continue;
 
-    // 2. Strip trailing line/column numbers (e.g. src/main.ts:10:5)
+    // 2. Strip trailing line/column/range numbers (e.g. src/main.ts:10:5, src/main.ts:10-20, src/main.ts#L10-#L25)
     // We handle the case where it might be wrapped in more text, e.g. at (src/index.ts:123)
-    const lineMatch = segmentToClean.match(/^(.+?):(\d+)(?::\d+)?/);
-    const pathOnly = lineMatch ? lineMatch[1] : segmentToClean;
+    const strippedLineSuffix = stripLineNumberSuffix(segmentToClean);
+    const lineMatch =
+      strippedLineSuffix ?? segmentToClean.match(/^(.+?):(\d+)(?::\d+)?/)?.[1];
+    const pathOnly = lineMatch ?? segmentToClean;
 
     // 3. Validate the extracted segment using centralized heuristics.
     // We rely on validatePath and Config.validatePathAccess for robust checking

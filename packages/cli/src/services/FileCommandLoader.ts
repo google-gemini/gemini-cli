@@ -93,10 +93,6 @@ export class FileCommandLoader implements ICommandLoader {
    * @returns A promise that resolves to an array of all loaded SlashCommands.
    */
   async loadCommands(signal: AbortSignal): Promise<SlashCommand[]> {
-    if (this.folderTrustEnabled && !this.isTrustedFolder) {
-      return [];
-    }
-
     const allCommands: SlashCommand[] = [];
     const globOptions = {
       nodir: true,
@@ -220,7 +216,10 @@ export class FileCommandLoader implements ICommandLoader {
 
     // 2. Project commands (skip if same directory as user commands, e.g. when
     //    cwd is the user's home directory, to avoid false conflict warnings)
-    if (!storage.isWorkspaceHomeDir()) {
+    if (
+      !storage.isWorkspaceHomeDir() &&
+      (!this.folderTrustEnabled || this.isTrustedFolder)
+    ) {
       dirs.push({
         path: storage.getProjectCommandsDir(),
         kind: CommandKind.WORKSPACE_FILE,
@@ -228,7 +227,7 @@ export class FileCommandLoader implements ICommandLoader {
     }
 
     // 3. Extension commands (processed last to detect all conflicts)
-    if (this.config) {
+    if (this.config && (!this.folderTrustEnabled || this.isTrustedFolder)) {
       const activeExtensions = this.config
         .getExtensions()
         .filter((ext) => ext.isActive)

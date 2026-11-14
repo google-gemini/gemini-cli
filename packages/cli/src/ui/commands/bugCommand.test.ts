@@ -341,4 +341,58 @@ describe('bugCommand', () => {
     expect(lastCall.type).toBe(MessageType.ERROR);
     expect(lastCall.text).toContain('inspector failure');
   });
+
+  it('wraps Windows file paths containing \\.gemini in backticks to prevent Markdown backslash escaping', async () => {
+    memoryUsageMock.mockReturnValue({
+      rss: 3 * 1024 * 1024 * 1024,
+      heapTotal: 0,
+      heapUsed: 0,
+      external: 0,
+      arrayBuffers: 0,
+    });
+    vi.mocked(captureHeapSnapshot).mockResolvedValueOnce(undefined);
+    vi.mocked(exportHistoryToFile).mockResolvedValueOnce(undefined);
+
+    const windowsTempDir = 'C:\\Users\\ASUS\\.gemini\\tmp\\aicode';
+    const mockContext = createMockCommandContext({
+      services: {
+        agentContext: {
+          config: {
+            getModel: () => 'gemini-pro',
+            getBugCommand: () => undefined,
+            getIdeMode: () => false,
+            getContentGeneratorConfig: () => ({ authType: 'oauth-personal' }),
+            storage: { getProjectTempDir: () => windowsTempDir },
+            getSessionId: vi.fn().mockReturnValue('test-session-id'),
+          } as unknown as Config,
+          geminiClient: {
+            getChat: () => ({
+              getHistory: () => [
+                { role: 'user', parts: [{ text: 'hello' }] },
+                { role: 'model', parts: [{ text: 'hi' }] },
+              ],
+            }),
+          },
+        },
+      },
+    });
+
+    if (!bugCommand.action) throw new Error('Action is not defined');
+    await bugCommand.action(mockContext, 'Windows path bug');
+
+    const now = new Date('2024-01-01T00:00:00Z').getTime();
+    const expectedHistoryPath = path.join(
+      windowsTempDir,
+      `bug-report-history-${now}.json`,
+    );
+    const expectedSnapshotPath = path.join(
+      windowsTempDir,
+      `bug-memory-${now}.heapsnapshot`,
+    );
+
+    const addItemCalls = vi.mocked(mockContext.ui.addItem).mock.calls;
+    expect(addItemCalls[0][0].text).toContain(`\`${expectedHistoryPath}\``);
+    expect(addItemCalls[1][0].text).toContain(`\`${expectedSnapshotPath}\``);
+    expect(addItemCalls[2][0].text).toContain(`\`${expectedSnapshotPath}\``);
+  });
 });

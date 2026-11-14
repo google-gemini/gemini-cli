@@ -655,4 +655,111 @@ describe('Scheduler Parallel Execution', () => {
       ]);
     },
   );
+
+  describe('Tool call groups', () => {
+    const topicReq: ToolCallRequestInfo = {
+      callId: 'call-topic',
+      name: UPDATE_TOPIC_TOOL_NAME,
+      args: { title: 'New Topic' },
+      isClientInitiated: false,
+      prompt_id: 'p1',
+      schedulerId: ROOT_SCHEDULER_ID,
+    };
+    const agentReq3: ToolCallRequestInfo = { ...agentReq1, callId: 'agent-3' };
+    const agentReq4: ToolCallRequestInfo = { ...agentReq2, callId: 'agent-4' };
+
+    // Schedules the requests and returns the group ID the scheduler gave to
+    // each call, in the order the calls were handed to the state manager.
+    const scheduleAndGetGroupIds = async (
+      requests: ToolCallRequestInfo[],
+    ): Promise<Array<[string, string | undefined]>> => {
+      mockExecutor.execute.mockImplementation(
+        async ({ call }) =>
+          ({
+            status: 'success',
+            response: { callId: call.request.callId, responseParts: [] },
+          }) as unknown as SuccessfulToolCall,
+      );
+
+      await scheduler.schedule(requests, signal);
+
+      return mockStateManager.enqueue.mock.calls[0][0].map(
+        (call): [string, string | undefined] => [
+          call.request.callId,
+          call.request.groupId,
+        ],
+      );
+    };
+
+    it('gives contiguous agent calls the ID of the first call in the run', async () => {
+      expect(
+        await scheduleAndGetGroupIds([agentReq1, agentReq2, agentReq3]),
+      ).toEqual([
+        ['agent-1', 'agent-1'],
+        ['agent-2', 'agent-1'],
+        ['agent-3', 'agent-1'],
+      ]);
+    });
+
+    it('does not group a lone agent call', async () => {
+      expect(await scheduleAndGetGroupIds([agentReq1, req1])).toEqual([
+        ['agent-1', undefined],
+        ['call-1', undefined],
+      ]);
+    });
+
+    it('starts a new group after a call that is not an agent', async () => {
+      expect(
+        await scheduleAndGetGroupIds([
+          agentReq1,
+          agentReq2,
+          req1,
+          agentReq3,
+          agentReq4,
+        ]),
+      ).toEqual([
+        ['agent-1', 'agent-1'],
+        ['agent-2', 'agent-1'],
+        ['call-1', undefined],
+        ['agent-3', 'agent-3'],
+        ['agent-4', 'agent-3'],
+      ]);
+    });
+
+    it('does not group agent calls that are separated by another call', async () => {
+      expect(
+        await scheduleAndGetGroupIds([agentReq1, req1, agentReq2]),
+      ).toEqual([
+        ['agent-1', undefined],
+        ['call-1', undefined],
+        ['agent-2', undefined],
+      ]);
+    });
+
+    it('does not group agent calls that are separated by a tool that is not registered', async () => {
+      const unknownReq: ToolCallRequestInfo = {
+        ...req1,
+        callId: 'call-unknown',
+        name: 'unknown-tool',
+      };
+
+      expect(
+        await scheduleAndGetGroupIds([agentReq1, unknownReq, agentReq2]),
+      ).toEqual([
+        ['agent-1', undefined],
+        ['call-unknown', undefined],
+        ['agent-2', undefined],
+      ]);
+    });
+
+    it('groups calls in the order they are queued, after topic updates move to the front', async () => {
+      expect(
+        await scheduleAndGetGroupIds([agentReq1, topicReq, agentReq2]),
+      ).toEqual([
+        ['call-topic', undefined],
+        ['agent-1', 'agent-1'],
+        ['agent-2', 'agent-1'],
+      ]);
+    });
+  });
 });

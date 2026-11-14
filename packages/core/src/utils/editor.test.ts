@@ -26,6 +26,7 @@ import {
   getEditorExtraArgs,
   resolveEditorAsync,
   resolveEditorTypeFromCommand,
+  quoteCmdArg,
   type EditorType,
 } from './editor.js';
 import { coreEvents, CoreEvent } from './events.js';
@@ -569,6 +570,198 @@ describe('editor utils', () => {
       await openDiff('old.txt', 'new.txt', 'foobar');
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'No diff tool available. Install a supported editor.',
+      );
+    });
+
+    it('should strictly quote arguments with spaces or shell characters on Windows', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      const mockSpawnOn = vi.fn((event, cb) => {
+        if (event === 'close') cb(0);
+      });
+      (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+
+      await openDiff(
+        'C:\\Users\\John Doe\\My Projects\\old_v1.txt',
+        'file & calc.exe | dir',
+        'vscode',
+      );
+
+      expect(spawn).toHaveBeenCalledWith(
+        'code.cmd',
+        [
+          '--wait',
+          '--diff',
+          '"C:\\Users\\John Doe\\My Projects\\old_v1.txt"',
+          '"file & calc.exe | dir"',
+        ],
+        {
+          stdio: 'inherit',
+          shell: true,
+        },
+      );
+    });
+
+    it.each(['linux', 'darwin'])(
+      'should not quote arguments on non-Windows platforms (%s)',
+      async (platform) => {
+        Object.defineProperty(process, 'platform', { value: platform });
+        const mockSpawnOn = vi.fn((event, cb) => {
+          if (event === 'close') cb(0);
+        });
+        (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+
+        await openDiff(
+          'path with spaces/old.txt',
+          'file & calc.exe | dir',
+          'vscode',
+        );
+
+        expect(spawn).toHaveBeenCalledWith(
+          'code',
+          [
+            '--wait',
+            '--diff',
+            'path with spaces/old.txt',
+            'file & calc.exe | dir',
+          ],
+          {
+            stdio: 'inherit',
+            shell: false,
+          },
+        );
+      },
+    );
+
+    it('should not pre-quote arguments for terminal editors on Windows (spawnSync without shell)', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      (execSync as Mock).mockReturnValue(Buffer.from('C:\\vim\\vim.exe'));
+
+      await openDiff(
+        'C:\\Users\\John Doe\\old.txt',
+        'C:\\Users\\John Doe\\new.txt',
+        'vim',
+      );
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        'vim',
+        expect.arrayContaining([
+          'C:\\Users\\John Doe\\old.txt',
+          'C:\\Users\\John Doe\\new.txt',
+        ]),
+        {
+          stdio: 'inherit',
+        },
+      );
+    });
+
+    it('should reject, not spawn, and emit ExternalEditorClosed on Windows if path contains newline or double quotes', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      const emitSpy = vi.spyOn(coreEvents, 'emit');
+
+      await expect(
+        openDiff('old\nfile.txt', 'new.txt', 'vscode'),
+      ).rejects.toThrow('Invalid argument: newlines are not allowed');
+      await expect(
+        openDiff('old"file".txt', 'new.txt', 'vscode'),
+      ).rejects.toThrow(
+        'Invalid argument: double quotes are not allowed on Windows',
+      );
+      expect(spawn).not.toHaveBeenCalled();
+      expect(emitSpy).toHaveBeenCalledWith(CoreEvent.ExternalEditorClosed);
+    });
+  });
+
+  describe('quoteCmdArg', () => {
+    it('should return empty quotes for empty string', () => {
+      expect(quoteCmdArg('')).toBe('""');
+    });
+
+    it('should leave safe alphanumeric and path characters unquoted', () => {
+      expect(quoteCmdArg('--wait')).toBe('--wait');
+      expect(quoteCmdArg('--diff')).toBe('--diff');
+      expect(quoteCmdArg('simple_file.txt')).toBe('simple_file.txt');
+      expect(quoteCmdArg('C:\\path\\to\\file-1.2.txt')).toBe(
+        'C:\\path\\to\\file-1.2.txt',
+      );
+      expect(quoteCmdArg('C:\\temp\\')).toBe('C:\\temp\\');
+      expect(quoteCmdArg('relative/path/to/file.ts')).toBe(
+        'relative/path/to/file.ts',
+      );
+    });
+
+    it('should quote paths with multiple spaced tokens or whitespace', () => {
+      expect(
+        quoteCmdArg('C:\\Users\\John Doe\\My Documents\\Project One\\file.txt'),
+      ).toBe('"C:\\Users\\John Doe\\My Documents\\Project One\\file.txt"');
+      expect(quoteCmdArg('   ')).toBe('"   "');
+      expect(quoteCmdArg('file\tname.txt')).toBe('"file\tname.txt"');
+    });
+
+    it('should quote strings containing shell operators and delimiters (&, &&, |, ||, <, >, ^, parentheses, ;, ,, =, !)', () => {
+      expect(quoteCmdArg('file & calc.exe')).toBe('"file & calc.exe"');
+      expect(quoteCmdArg('file && calc.exe')).toBe('"file && calc.exe"');
+      expect(quoteCmdArg('file | dir')).toBe('"file | dir"');
+      expect(quoteCmdArg('file || dir')).toBe('"file || dir"');
+      expect(quoteCmdArg('file&whoami.txt')).toBe('"file&whoami.txt"');
+      expect(quoteCmdArg('file|pipe.txt')).toBe('"file|pipe.txt"');
+      expect(quoteCmdArg('file<in>out.txt')).toBe('"file<in>out.txt"');
+      expect(quoteCmdArg('file^caret.txt')).toBe('"file^caret.txt"');
+      expect(quoteCmdArg('file(1).txt')).toBe('"file(1).txt"');
+      expect(quoteCmdArg('file;name.txt')).toBe('"file;name.txt"');
+      expect(quoteCmdArg('file,name.txt')).toBe('"file,name.txt"');
+      expect(quoteCmdArg('file=name.txt')).toBe('"file=name.txt"');
+      expect(quoteCmdArg('file!var!.txt')).toBe('"file!var!.txt"');
+    });
+
+    it('should preserve percent signs without carets inside quotes', () => {
+      expect(quoteCmdArg('file%TEMP%.txt')).toBe('"file%TEMP%.txt"');
+    });
+
+    it('should throw an error if argument contains double quotes', () => {
+      expect(() => quoteCmdArg('file"name".txt')).toThrow(
+        'Invalid argument: double quotes are not allowed on Windows',
+      );
+      expect(() => quoteCmdArg('"quoted"')).toThrow(
+        'Invalid argument: double quotes are not allowed on Windows',
+      );
+      expect(() => quoteCmdArg('file\\"name".txt')).toThrow(
+        'Invalid argument: double quotes are not allowed on Windows',
+      );
+      expect(() => quoteCmdArg('foo\\" & calc.exe & "bar')).toThrow(
+        'Invalid argument: double quotes are not allowed on Windows',
+      );
+      expect(() => quoteCmdArg('C:\\dir\\"sub"\\')).toThrow(
+        'Invalid argument: double quotes are not allowed on Windows',
+      );
+    });
+
+    it('should double trailing backslashes to prevent escaping the closing quote', () => {
+      expect(quoteCmdArg('C:\\dir with spaces\\')).toBe(
+        '"C:\\dir with spaces\\\\"',
+      );
+      expect(quoteCmdArg('C:\\dir with spaces\\\\')).toBe(
+        '"C:\\dir with spaces\\\\\\\\"',
+      );
+      const manyBackslashes = '\\'.repeat(5000) + ' trailing space';
+      expect(quoteCmdArg(manyBackslashes)).toBe(`"${manyBackslashes}"`);
+      const manyTrailingBackslashes = 'leading space ' + '\\'.repeat(5000);
+      expect(quoteCmdArg(manyTrailingBackslashes)).toBe(
+        `"leading space ${'\\'.repeat(10000)}"`,
+      );
+    });
+
+    it('should throw an error if argument contains newline, carriage return, or null characters', () => {
+      expect(() => quoteCmdArg('file\nname.txt')).toThrow(
+        'Invalid argument: newlines are not allowed',
+      );
+      expect(() => quoteCmdArg('file\rname.txt')).toThrow(
+        'Invalid argument: newlines are not allowed',
+      );
+      expect(() => quoteCmdArg('file\r\nname.txt')).toThrow(
+        'Invalid argument: newlines are not allowed',
+      );
+      expect(() => quoteCmdArg('file\0name.txt')).toThrow(
+        'Invalid argument: newlines are not allowed',
       );
     });
   });

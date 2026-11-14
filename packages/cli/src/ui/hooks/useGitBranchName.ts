@@ -5,7 +5,11 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { spawnAsync, getAbsoluteGitDir } from '@google/gemini-cli-core';
+import {
+  spawnAsync,
+  getAbsoluteGitDir,
+  debugLogger,
+} from '@google/gemini-cli-core';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 
@@ -66,6 +70,24 @@ export function useGitBranchName(cwd: string): string | undefined {
             }
           },
         );
+
+        // fs.watch reports some failures asynchronously through the watcher's
+        // 'error' event instead of throwing, so the surrounding try/catch
+        // cannot catch them. For example, under the macOS Seatbelt sandbox
+        // FSEvents is unavailable and the watcher emits EMFILE. Without a
+        // listener, Node turns that event into an uncaught exception that
+        // crashes the CLI (https://github.com/google-gemini/gemini-cli/issues/28598).
+        w.on('error', (error: Error) => {
+          debugLogger.debug(
+            'Git branch watcher failed; branch name will not update automatically:',
+            error,
+          );
+          try {
+            w.close();
+          } catch {
+            // Ignore close failures; this handler must never throw.
+          }
+        });
 
         if (cancelled) {
           w.close();

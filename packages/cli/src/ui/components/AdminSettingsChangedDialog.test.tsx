@@ -23,23 +23,6 @@ describe('AdminSettingsChangedDialog', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('restarts on "r" key press', async () => {
-    const { stdin } = await renderWithProviders(
-      <AdminSettingsChangedDialog />,
-      {
-        uiActions: {
-          handleRestart: handleRestartMock,
-        },
-      },
-    );
-
-    act(() => {
-      stdin.write('r');
-    });
-
-    expect(handleRestartMock).toHaveBeenCalled();
-  });
-
   it.each(['r', 'R'])('restarts on "%s" key press', async (key) => {
     const { stdin } = await renderWithProviders(
       <AdminSettingsChangedDialog />,

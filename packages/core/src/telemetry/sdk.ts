@@ -19,6 +19,7 @@ import { OTLPTraceExporter as OTLPTraceExporterHttp } from '@opentelemetry/expor
 import { OTLPLogExporter as OTLPLogExporterHttp } from '@opentelemetry/exporter-logs-otlp-http';
 import { OTLPMetricExporter as OTLPMetricExporterHttp } from '@opentelemetry/exporter-metrics-otlp-http';
 import { CompressionAlgorithm } from '@opentelemetry/otlp-exporter-base';
+import { Metadata } from '@grpc/grpc-js';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
 import { resourceFromAttributes } from '@opentelemetry/resources';
@@ -107,6 +108,7 @@ let keychainAvailabilityListener:
 let tokenStorageTypeListener:
   | ((event: TokenStorageInitializationEvent) => void)
   | undefined = undefined;
+const MAX_TELEMETRY_BUFFER_SIZE = 100;
 const telemetryBuffer: Array<() => void | Promise<void>> = [];
 let activeTelemetryEmail: string | undefined;
 
@@ -114,13 +116,34 @@ export function isTelemetrySdkInitialized(): boolean {
   return telemetryInitialized;
 }
 
-export function bufferTelemetryEvent(fn: () => void | Promise<void>): void {
-  if (telemetryInitialized) {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    fn();
-  } else {
-    telemetryBuffer.push(fn);
+export function bufferTelemetryEvent(
+  fn: () => void | Promise<void>,
+  config?: Config,
+): void {
+  if (
+    config &&
+    typeof config.getTelemetryEnabled === 'function' &&
+    !config.getTelemetryEnabled()
+  ) {
+    return;
   }
+  if (telemetryInitialized) {
+    try {
+      const result = fn();
+      if (result instanceof Promise) {
+        result.catch((e) => {
+          debugLogger.error('Error executing telemetry event promise', e);
+        });
+      }
+    } catch (e) {
+      debugLogger.error('Error executing telemetry event', e);
+    }
+    return;
+  }
+  if (telemetryBuffer.length >= MAX_TELEMETRY_BUFFER_SIZE) {
+    telemetryBuffer.shift();
+  }
+  telemetryBuffer.push(fn);
 }
 
 async function flushTelemetryBuffer(): Promise<void> {
@@ -279,6 +302,9 @@ export async function initializeTelemetry(
       exportIntervalMillis: 30000,
     });
   } else if (useOtlp) {
+    const otlpHeaders = config.getTelemetryOtlpHeaders?.() ?? {};
+    const hasHeaders = Object.keys(otlpHeaders).length > 0;
+
     if (otlpProtocol === 'http') {
       const buildUrl = (path: string) => {
         const url = new URL(parsedEndpoint);
@@ -288,30 +314,55 @@ export async function initializeTelemetry(
       };
       spanExporter = new OTLPTraceExporterHttp({
         url: buildUrl('v1/traces'),
+        headers: hasHeaders ? otlpHeaders : undefined,
       });
       logExporter = new OTLPLogExporterHttp({
         url: buildUrl('v1/logs'),
+        headers: hasHeaders ? otlpHeaders : undefined,
       });
       metricReader = new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporterHttp({
           url: buildUrl('v1/metrics'),
+          headers: hasHeaders ? otlpHeaders : undefined,
         }),
         exportIntervalMillis: 10000,
       });
     } else {
       // grpc
+      let metadata: Metadata | undefined;
+      if (hasHeaders) {
+        const candidateMetadata = new Metadata();
+        let validCount = 0;
+        for (const [key, value] of Object.entries(otlpHeaders)) {
+          try {
+            candidateMetadata.set(key, value);
+            validCount++;
+          } catch (error) {
+            debugLogger.warn(
+              `[Telemetry] Skipping invalid gRPC metadata key "${key}":`,
+              error,
+            );
+          }
+        }
+        if (validCount > 0) {
+          metadata = candidateMetadata;
+        }
+      }
       spanExporter = new OTLPTraceExporter({
         url: parsedEndpoint,
         compression: CompressionAlgorithm.GZIP,
+        ...(metadata && { metadata }),
       });
       logExporter = new OTLPLogExporter({
         url: parsedEndpoint,
         compression: CompressionAlgorithm.GZIP,
+        ...(metadata && { metadata }),
       });
       metricReader = new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporter({
           url: parsedEndpoint,
           compression: CompressionAlgorithm.GZIP,
+          ...(metadata && { metadata }),
         }),
         exportIntervalMillis: 10000,
       });
@@ -430,6 +481,7 @@ export async function shutdownTelemetry(
     debugLogger.error('Error shutting down SDK:', error);
   } finally {
     telemetryInitialized = false;
+    telemetryBuffer.length = 0;
     sdk = undefined;
     // Fully reset the global APIs to allow for re-initialization.
     // This is primarily for testing environments where the SDK is started

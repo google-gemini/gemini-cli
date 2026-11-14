@@ -60,10 +60,12 @@ jobs:
         if: |-
           github.event_name == 'workflow_dispatch'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        env:
+          ISSUE_NUMBER: '${{ github.event.inputs.issue_number || inputs.issue_number }}'
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           script: |
-            const issueNumber = ${{ github.event.inputs.issue_number || inputs.issue_number }};
+            const issueNumber = Number(process.env.ISSUE_NUMBER);
             const { data: issue } = await github.rest.issues.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -145,7 +147,7 @@ jobs:
           echo "${ISSUE_BODY}" >> issue_context.md
 
       - name: 'Run Gemini Issue Analysis'
-        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        uses: 'google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_issue_analysis'
         env:
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
@@ -172,7 +174,6 @@ jobs:
               },
               "tools": {
                 "core": [
-                  "run_shell_command(echo)",
                   "read_file"
                 ]
               }

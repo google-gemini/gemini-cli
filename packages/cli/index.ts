@@ -7,45 +7,20 @@
  */
 
 import { spawn } from 'node:child_process';
+import { realpath } from 'node:fs/promises';
 import os from 'node:os';
+import { isAbsolute, resolve } from 'node:path';
 import v8 from 'node:v8';
 import {
   RELAUNCH_EXIT_CODE,
   getSpawnConfig,
   getScriptArgs,
+  isSeaEnvironment,
+  setupSignalForwarding,
+  handleChildProcessClose,
 } from './src/utils/processUtils.js';
 
 // --- Global Entry Point ---
-
-// Suppress known race condition error in node-pty on Windows and Linux
-// Tracking bug: https://github.com/microsoft/node-pty/issues/827
-process.on('uncaughtException', (error) => {
-  if (error instanceof Error) {
-    const message = error.message || '';
-    const isPtyResizeError =
-      message === 'Cannot resize a pty that has already exited';
-    const isEbadfError =
-      message.includes('EBADF') ||
-      (error as { code?: string }).code === 'EBADF';
-    const isFromNodePty =
-      error.stack?.includes('node-pty') || error.stack?.includes('PtyResize');
-
-    if ((isPtyResizeError || isEbadfError) && isFromNodePty) {
-      // This error happens with node-pty when resizing a pty that has just exited.
-      // It is a race condition in node-pty that we cannot prevent, so we silence it.
-      return;
-    }
-  }
-
-  // For other errors, we rely on the default behavior, but since we attached a listener,
-  // we must manually replicate it.
-  if (error instanceof Error) {
-    process.stderr.write(error.stack + '\n');
-  } else {
-    process.stderr.write(String(error) + '\n');
-  }
-  process.exit(1);
-});
 
 async function getMemoryNodeArgs(): Promise<string[]> {
   let autoConfigureMemory = true;
@@ -86,17 +61,20 @@ async function run() {
     // --- Lightweight Parent Process / Daemon ---
     // We avoid importing heavy dependencies here to save ~1.5s of startup time.
 
+    if (
+      !isSeaEnvironment() &&
+      process.argv[1] &&
+      !isAbsolute(process.argv[1])
+    ) {
+      process.argv[1] = resolve(process.argv[1]);
+    }
+
     const scriptArgs = getScriptArgs();
     const memoryArgs = await getMemoryNodeArgs();
     const { spawnArgs, env: newEnv } = getSpawnConfig(memoryArgs, scriptArgs);
 
     let latestAdminSettings: unknown = undefined;
-
-    // Prevent the parent process from exiting prematurely on signals.
-    // The child process will receive the same signals and handle its own cleanup.
-    for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-      process.on(sig as NodeJS.Signals, () => {});
-    }
+    let selectedWorktreePath: string | undefined = undefined;
 
     const runner = () => {
       process.stdin.pause();
@@ -104,28 +82,62 @@ async function run() {
       const child = spawn(process.execPath, spawnArgs, {
         stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
         env: newEnv,
+        ...(selectedWorktreePath ? { cwd: selectedWorktreePath } : {}),
       });
+
+      // Clear one-time auth override from supervisor environment after passing to child
+      delete process.env['GEMINI_CLI_AUTH_OVERRIDE'];
+      delete newEnv['GEMINI_CLI_AUTH_OVERRIDE'];
 
       if (latestAdminSettings) {
         child.send({ type: 'admin-settings', settings: latestAdminSettings });
       }
 
-      child.on('message', (msg: { type?: string; settings?: unknown }) => {
-        if (msg.type === 'admin-settings-update' && msg.settings) {
-          latestAdminSettings = msg.settings;
-        }
-      });
+      child.on(
+        'message',
+        async (msg: {
+          type?: string;
+          settings?: unknown;
+          authType?: string;
+          path?: string;
+        }) => {
+          if (msg?.type === 'admin-settings-update' && msg.settings) {
+            latestAdminSettings = msg.settings;
+          }
+          if (msg?.type === 'auth-selected-type' && msg.authType) {
+            process.env['GEMINI_CLI_AUTH_OVERRIDE'] = msg.authType;
+            newEnv['GEMINI_CLI_AUTH_OVERRIDE'] = msg.authType;
+          }
+          if (
+            msg?.type === 'worktree-selected' &&
+            typeof msg.path === 'string' &&
+            msg.path.length > 0
+          ) {
+            try {
+              const resolvedWorktreePath = await realpath(resolve(msg.path));
+              process.chdir(resolvedWorktreePath);
+              selectedWorktreePath = resolvedWorktreePath;
+              process.env['GEMINI_CLI_WORKTREE_HANDLED'] = '1';
+              newEnv['GEMINI_CLI_WORKTREE_HANDLED'] = '1';
+            } catch {
+              // Ignore chdir or path validation errors if path is inaccessible
+            }
+          }
+        },
+      );
+
+      const removeForwarders = setupSignalForwarding(child);
 
       return new Promise<number>((resolve) => {
         child.on('error', (err) => {
+          removeForwarders();
           process.stderr.write(
             'Error: Failed to start child process: ' + err.message + '\n',
           );
           resolve(1);
         });
-        child.on('close', (code) => {
-          process.stdin.resume();
-          resolve(code ?? 1);
+        child.on('close', (code, signal) => {
+          handleChildProcessClose(code, signal, removeForwarders, resolve);
         });
       });
     };
@@ -152,6 +164,9 @@ async function run() {
       '@google/gemini-cli-core'
     );
     const { runExitCleanup } = await import('./src/utils/cleanup.js');
+    const { formatCliError, isCliDebugEnabled } = await import(
+      './src/utils/formatError.js'
+    );
 
     main().catch(async (error: unknown) => {
       // Set a timeout to force exit if cleanup hangs
@@ -179,12 +194,12 @@ async function run() {
         process.exit(error.exitCode);
       }
 
-      writeToStderr('An unexpected critical error occurred:');
-      if (error instanceof Error) {
-        writeToStderr(error.stack + '\n');
-      } else {
-        writeToStderr(String(error) + '\n');
-      }
+      writeToStderr(
+        formatCliError(error, {
+          debug: isCliDebugEnabled(),
+          prefix: 'An unexpected critical error occurred: ',
+        }) + '\n',
+      );
       process.exit(1);
     });
   }

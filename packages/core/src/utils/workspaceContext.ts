@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { debugLogger } from './debugLogger.js';
-import { resolveToRealPath } from './paths.js';
+import { resolveToRealPath, hasBlockedPathSegment } from './paths.js';
 
 export type Unsubscribe = () => void;
 
@@ -124,8 +124,10 @@ export class WorkspaceContext {
       if (!fs.existsSync(pathToAdd)) {
         return;
       }
-      // Resolve symlinks
-      const resolved = fs.realpathSync(path.resolve(this.targetDir, pathToAdd));
+      // Resolve symlinks and SFNs canonically
+      const resolved = resolveToRealPath(
+        path.resolve(this.targetDir, pathToAdd),
+      );
       this.readOnlyPaths.add(resolved);
     } catch (e) {
       debugLogger.warn(`Failed to add read-only path ${pathToAdd}:`, e);
@@ -143,7 +145,8 @@ export class WorkspaceContext {
       throw new Error(`Path is not a directory: ${absolutePath}`);
     }
 
-    return fs.realpathSync(absolutePath);
+    // Resolve workspace directory canonically (supporting Windows SFNs)
+    return resolveToRealPath(absolutePath);
   }
 
   /**
@@ -184,27 +187,8 @@ export class WorkspaceContext {
 
       for (const dir of this.directories) {
         if (this.isPathWithinRoot(fullyResolvedPath, dir)) {
-          // Check for blocked segments case-insensitively
           const relative = path.relative(dir, fullyResolvedPath);
-          const segments = relative.split(path.sep);
-          const hasBlockedSegment = segments.some((segment) => {
-            const clean = trimTrailingSpacesAndDots(
-              segment.split(':')[0],
-            ).toLowerCase();
-            if (
-              clean === '.git' ||
-              clean === '.env' ||
-              clean === 'node_modules'
-            ) {
-              return true;
-            }
-            // Block GitHub Actions Workload Identity credentials
-            if (clean.startsWith('gha-creds-') && clean.endsWith('.json')) {
-              return true;
-            }
-            return false;
-          });
-          if (hasBlockedSegment) {
+          if (hasBlockedPathSegment(relative)) {
             return false;
           }
           return true;
@@ -270,16 +254,4 @@ export class WorkspaceContext {
       !path.isAbsolute(relative)
     );
   }
-}
-
-/**
- * Trims trailing spaces and dots from a string without using regular expressions
- * to completely eliminate any potential ReDoS (Regular Expression Denial of Service) risk.
- */
-function trimTrailingSpacesAndDots(str: string): string {
-  let end = str.length - 1;
-  while (end >= 0 && (str[end] === ' ' || str[end] === '.')) {
-    end--;
-  }
-  return str.slice(0, end + 1);
 }

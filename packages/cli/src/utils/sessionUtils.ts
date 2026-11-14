@@ -141,19 +141,14 @@ export interface SessionSelectionResult {
 
 /**
  * Cleans and sanitizes message content for display by:
- * - Converting newlines to spaces
- * - Collapsing multiple whitespace to single spaces
- * - Removing non-printable characters (keeping only ASCII 32-126)
+ * - Stripping unsafe terminal control sequences (ANSI, C0/C1, VT sequences)
+ * - Collapsing multiple whitespace and newlines to single spaces
  * - Trimming leading/trailing whitespace
  * @param message - The raw message content to clean
  * @returns Sanitized message suitable for display
  */
 export const cleanMessage = (message: string): string =>
-  message
-    .replace(/\n+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/[^\x20-\x7E]+/g, '') // Non-printable.
-    .trim();
+  stripUnsafeCharacters(message).replace(/\s+/g, ' ').trim();
 
 /**
  * Extracts the first meaningful user message from conversation messages.
@@ -228,6 +223,17 @@ export const formatRelativeTime = (
 export interface GetSessionOptions {
   /** Whether to load full message content (needed for search) */
   includeFullContent?: boolean;
+}
+
+/**
+ * Options for resolving sessions.
+ */
+export interface ResolveSessionOptions {
+  /**
+   * Whether to allow resolving sessions that have no resumable content yet
+   * (e.g., newly established ACP sessions).
+   */
+  allowEmpty?: boolean;
 }
 
 /**
@@ -492,14 +498,102 @@ export class SessionSelector {
   }
 
   /**
+   * Resolves a session directly by its full UUID, bypassing interactive terminal list
+   * filtering (such as `hasResumableContent: false`).
+   *
+   * @param id - Full session UUID
+   * @returns Promise resolving to session selection result
+   * @throws SessionError if the session file does not exist or is invalid
+   */
+  async resolveSessionById(id: string): Promise<SessionSelectionResult> {
+    const trimmedId = id.trim();
+    const chatsDir = path.join(this.storage.getProjectTempDir(), 'chats');
+    const files = await fs.readdir(chatsDir).catch(() => []);
+
+    const shortId = trimmedId.slice(0, 8);
+    const candidateFiles = files.filter(
+      (f) =>
+        f.startsWith(SESSION_FILE_PREFIX) &&
+        (f.endsWith(`-${shortId}.json`) || f.endsWith(`-${shortId}.jsonl`)),
+    );
+
+    const matches: Array<{
+      filePath: string;
+      sessionData: ConversationRecord;
+    }> = [];
+
+    for (const fileName of candidateFiles) {
+      try {
+        const sessionPath = path.join(chatsDir, fileName);
+        const sessionData = await loadConversationRecord(sessionPath);
+        if (
+          sessionData &&
+          sessionData.sessionId === trimmedId &&
+          sessionData.kind !== 'subagent'
+        ) {
+          matches.push({ filePath: sessionPath, sessionData });
+        }
+      } catch {
+        // Ignore unparseable files
+      }
+    }
+
+    if (matches.length === 0) {
+      throw SessionError.invalidSessionIdentifier(trimmedId, chatsDir);
+    }
+
+    // If duplicate records exist, choose the most recently updated one
+    matches.sort((a, b) => {
+      const getTime = (dateStr: string | undefined) => {
+        if (!dateStr) return 0;
+        const t = new Date(dateStr).getTime();
+        return isNaN(t) ? 0 : t;
+      };
+      const timeA = getTime(
+        a.sessionData.lastUpdated?.trim() || a.sessionData.startTime,
+      );
+      const timeB = getTime(
+        b.sessionData.lastUpdated?.trim() || b.sessionData.startTime,
+      );
+      return timeB - timeA;
+    });
+
+    const { filePath, sessionData } = matches[0];
+    const messages = sessionData.messages ?? [];
+    const firstUserMsg = extractFirstUserMessage(messages);
+    const messageCount = messages.length;
+    const timestamp =
+      sessionData.lastUpdated?.trim() ||
+      sessionData.startTime?.trim() ||
+      new Date().toISOString();
+    const displayInfo = `Session ${sessionData.sessionId}: ${firstUserMsg} (${messageCount} messages, ${formatRelativeTime(timestamp)})`;
+
+    return {
+      sessionPath: filePath,
+      sessionData,
+      displayInfo,
+    };
+  }
+
+  /**
    * Resolves a resume argument to a specific session.
    *
    * @param resumeArg - Can be "latest", a full UUID, or an index number (1-based)
+   * @param options - Optional resolution options (e.g. allowEmpty to bypass resumable content filtering for exact UUIDs)
    * @returns Promise resolving to session selection result
    */
-  async resolveSession(resumeArg: string): Promise<SessionSelectionResult> {
-    let selectedSession: SessionInfo;
+  async resolveSession(
+    resumeArg: string,
+    options?: ResolveSessionOptions,
+  ): Promise<SessionSelectionResult> {
     const trimmedResumeArg = resumeArg.trim();
+
+    const isIndex = /^\d+$/.test(trimmedResumeArg);
+    if (options?.allowEmpty && trimmedResumeArg !== RESUME_LATEST && !isIndex) {
+      return this.resolveSessionById(trimmedResumeArg);
+    }
+
+    let selectedSession: SessionInfo;
 
     if (trimmedResumeArg === RESUME_LATEST) {
       const sessions = await this.listSessions();

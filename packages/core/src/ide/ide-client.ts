@@ -20,10 +20,14 @@ import {
   CallToolResultSchema,
   ListToolsResultSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { IDE_REQUEST_TIMEOUT_MS } from './constants.js';
+import {
+  IDE_REQUEST_TIMEOUT_MS,
+  IDE_CLOSE_DIFF_TIMEOUT_MS,
+} from './constants.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   getConnectionConfigFromFile,
+  getConnectionFailureAdvice,
   getIdeServerHost,
   getPortFromEnv,
   getStdioConfigFromEnv,
@@ -196,7 +200,7 @@ export class IdeClient {
 
     this.setState(
       IDEConnectionStatus.Disconnected,
-      `Failed to connect to IDE companion extension in ${this.currentIde.displayName}. Please ensure the extension is running. To install the extension, run /ide install.`,
+      `Failed to connect to IDE companion extension in ${this.currentIde.displayName}. ${getConnectionFailureAdvice()}`,
       logError,
     );
   }
@@ -272,10 +276,9 @@ export class IdeClient {
     });
 
     // Ensure the mutex is released only after the diff interaction is complete.
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    promise.finally(release);
-
-    return promise;
+    // Returning the chained promise keeps a rejected diff from surfacing as an
+    // unhandled rejection in addition to the caller's error.
+    return promise.finally(release);
   }
 
   /**
@@ -325,7 +328,7 @@ export class IdeClient {
           },
         },
         CallToolResultSchema,
-        { timeout: IDE_REQUEST_TIMEOUT_MS },
+        { timeout: IDE_CLOSE_DIFF_TIMEOUT_MS },
       );
 
       if (!resultData) {
@@ -379,11 +382,17 @@ export class IdeClient {
   // manually resolves the diff resolver as the desired outcome.
   async resolveDiffFromCli(filePath: string, outcome: 'accepted' | 'rejected') {
     const resolver = this.diffResponses.get(filePath);
-    const content = await this.closeDiff(filePath, {
-      // Suppress notification to avoid race where closing the diff rejects the
-      // request.
-      suppressNotification: true,
-    });
+    this.diffResponses.delete(filePath);
+    let content: string | undefined;
+    try {
+      content = await this.closeDiff(filePath, {
+        // Suppress notification to avoid race where closing the diff rejects the
+        // request.
+        suppressNotification: true,
+      });
+    } catch (e) {
+      logger.debug(`closeDiff failed for ${filePath}:`, e);
+    }
 
     if (resolver) {
       if (outcome === 'accepted') {
@@ -391,7 +400,6 @@ export class IdeClient {
       } else {
         resolver({ status: 'rejected', content: undefined });
       }
-      this.diffResponses.delete(filePath);
     }
   }
 

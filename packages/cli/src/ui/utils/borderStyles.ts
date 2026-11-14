@@ -7,6 +7,11 @@
 import { CoreToolCallStatus } from '@google/gemini-cli-core';
 import { isShellTool } from '../components/messages/ToolShared.js';
 import { theme } from '../semantic-colors.js';
+export {
+  renderBorder,
+  safeRepeat,
+  renderNodeToOutput,
+} from './renderBorder.js';
 import type {
   HistoryItem,
   HistoryItemWithoutId,

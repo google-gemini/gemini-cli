@@ -8,7 +8,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CommandService } from './CommandService.js';
 import { type ICommandLoader } from './types.js';
 import { CommandKind, type SlashCommand } from '../ui/commands/types.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 
 const createMockCommand = (name: string, kind: CommandKind): SlashCommand => ({
   name,
@@ -99,6 +99,41 @@ describe('CommandService', () => {
       expect(service.getCommands().map((c) => c.name)).toContain('help');
       expect(service.getCommands().map((c) => c.name)).toContain('user.help');
       expect(service.getConflicts()).toHaveLength(1);
+    });
+
+    it('should emit empty conflict events when no conflicts exist so resolved conflicts can be cleared', async () => {
+      const emitConflictsSpy = vi.spyOn(
+        coreEvents,
+        'emitSlashCommandConflicts',
+      );
+      const builtin = createMockCommand('help', CommandKind.BUILT_IN);
+
+      await CommandService.create(
+        [new MockCommandLoader([builtin])],
+        new AbortController().signal,
+      );
+
+      expect(emitConflictsSpy).toHaveBeenCalledWith([]);
+    });
+
+    it('should not emit conflict events when the load signal is aborted', async () => {
+      const emitConflictsSpy = vi.spyOn(
+        coreEvents,
+        'emitSlashCommandConflicts',
+      );
+      const controller = new AbortController();
+      controller.abort();
+
+      await CommandService.create(
+        [
+          new MockCommandLoader([
+            createMockCommand('help', CommandKind.BUILT_IN),
+          ]),
+        ],
+        controller.signal,
+      );
+
+      expect(emitConflictsSpy).not.toHaveBeenCalled();
     });
   });
 });

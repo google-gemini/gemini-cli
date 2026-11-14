@@ -38,6 +38,19 @@ dialog will automatically appear, prompting you to make a choice:
 Your choice is saved in a central file (`~/.gemini/trustedFolders.json`), so you
 will only be asked once per folder.
 
+### Trust prompt in the macOS Seatbelt sandbox
+
+When you run Gemini CLI in the [macOS Seatbelt sandbox](./sandbox.md), Gemini
+CLI can't read or write `~/.gemini/trustedFolders.json` from inside the sandbox.
+Instead, it resolves folder trust before it starts the sandbox:
+
+- If the folder already has a trust decision, Gemini CLI applies it to the
+  sandboxed session without asking again.
+- If the folder doesn't have a trust decision yet, Gemini CLI asks you in the
+  terminal before the sandbox starts. The prompt offers the same choices and
+  discovery results as the trust dialog, and it saves your choice to
+  `~/.gemini/trustedFolders.json`.
+
 ## Understanding folder contents: The discovery phase
 
 Before you make a choice, Gemini CLI performs a **discovery phase** to scan the

@@ -735,4 +735,76 @@ describe('ExecutionLifecycleService', () => {
       expect(injectionListener).not.toHaveBeenCalled();
     });
   });
+
+  describe('resetForTest teardown', () => {
+    it('kills active executions and resolves pending resolvers with an aborted result', async () => {
+      const terminate = vi.fn();
+      const exitListener = vi.fn();
+      const handle = ExecutionLifecycleService.attachExecution(6000, {
+        executionMethod: 'child_process',
+        initialOutput: 'hello',
+        kill: terminate,
+      });
+      ExecutionLifecycleService.onExit(6000, exitListener);
+
+      ExecutionLifecycleService.resetForTest();
+
+      const result = await handle.result;
+      expect(terminate).toHaveBeenCalledTimes(1);
+      expect(exitListener).toHaveBeenCalledWith(130, undefined);
+      expect(result.aborted).toBe(true);
+      expect(result.exitCode).toBe(130);
+      expect(result.error?.message).toContain('Aborted by test reset.');
+    });
+
+    it('invokes onKill for virtual executions during reset', async () => {
+      const onKill = vi.fn();
+      const handle = ExecutionLifecycleService.createExecution(
+        'partial output',
+        onKill,
+      );
+
+      ExecutionLifecycleService.resetForTest();
+
+      const result = await handle.result;
+      expect(onKill).toHaveBeenCalledTimes(1);
+      expect(result.aborted).toBe(true);
+      expect(result.output).toBe('partial output');
+    });
+  });
+
+  describe('background() return value', () => {
+    it('returns true on successful background transition and false on subsequent or invalid calls', async () => {
+      const handle = ExecutionLifecycleService.createExecution();
+      if (handle.pid === undefined) {
+        throw new Error('Expected execution ID.');
+      }
+
+      // First call should succeed and return true
+      const firstResult = ExecutionLifecycleService.background(handle.pid);
+      expect(firstResult).toBe(true);
+
+      const backgroundResult = await handle.result;
+      expect(backgroundResult.backgrounded).toBe(true);
+
+      // Calling background again on an already-backgrounded execution returns false
+      const secondResult = ExecutionLifecycleService.background(handle.pid);
+      expect(secondResult).toBe(false);
+
+      // Calling background on an unknown ID returns false
+      expect(ExecutionLifecycleService.background(999999)).toBe(false);
+    });
+
+    it('returns false when called on an already settled execution', async () => {
+      const handle = ExecutionLifecycleService.createExecution();
+      if (handle.pid === undefined) {
+        throw new Error('Expected execution ID.');
+      }
+
+      ExecutionLifecycleService.completeExecution(handle.pid, { exitCode: 0 });
+      await handle.result;
+
+      expect(ExecutionLifecycleService.background(handle.pid)).toBe(false);
+    });
+  });
 });

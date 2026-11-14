@@ -59,6 +59,7 @@ describe('Webhook Server Endpoint', () => {
   beforeAll(async () => {
     vi.stubEnv('PROJECT_ID', 'test-project');
     vi.stubEnv('TOPIC_ID', 'test-topic');
+    vi.stubEnv('EGRESS_TOPIC_ID', 'test-egress-topic');
     vi.stubEnv('GITHUB_WEBHOOK_SECRET', 'test-secret');
     vi.stubEnv('FIRESTORE_DATABASE', 'test-db');
     vi.stubEnv('FIRESTORE_COLLECTION', 'test-collection');
@@ -363,5 +364,66 @@ describe('Webhook Server Endpoint', () => {
       reason: 'issue already exists: google/gemini-cli#4',
     });
     expect(mockPublishMessage).not.toHaveBeenCalled();
+  });
+
+  describe('issue_comment webhooks', () => {
+    const postComment = (comment: object, sender = 'bob', issueUser = 'bob') =>
+      request(app)
+        .post('/webhook')
+        .set('x-hub-signature-256', 'valid-sig')
+        .set('x-github-event', 'issue_comment')
+        .send({
+          action: 'created',
+          issue: { number: 1, user: { login: issueUser }, title: 'Bug' },
+          comment,
+          repository: { full_name: 'google/gemini-cli' },
+          sender: { login: sender, type: 'User' },
+        });
+
+    it('should ignore @caretaker-agent comment if status is not NEEDS_INFO', async () => {
+      mockVerifyGithubSignature.mockReturnValue(true);
+      mockGetDoc.mockResolvedValue({
+        exists: true,
+        get: (f: string) => (f === 'status' ? 'TRIAGED' : undefined),
+      });
+
+      const res = await postComment({
+        id: 100,
+        body: '@caretaker-agent info',
+        author_association: 'NONE',
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('ignored');
+      expect(mockPublishMessage).not.toHaveBeenCalled();
+    });
+
+    it('should accept valid @caretaker-agent comment or /caretaker triage command', async () => {
+      mockVerifyGithubSignature.mockReturnValue(true);
+      const mockUpdate = vi.fn().mockResolvedValue(undefined);
+      mockGetDoc.mockResolvedValue({
+        exists: true,
+        get: (f: string) => (f === 'status' ? 'NEEDS_INFO' : 'Bug'),
+      });
+      mockGetIssueRef.mockReturnValue({ get: mockGetDoc, update: mockUpdate });
+      mockPublishMessage.mockResolvedValue('msg-101');
+
+      // Test 1: @caretaker-agent mention
+      const resMention = await postComment({
+        id: 123,
+        body: '@caretaker-agent trace',
+        author_association: 'NONE',
+      });
+      expect(resMention.status).toBe(202);
+
+      // Test 2: /caretaker triage command
+      const resTriage = await postComment(
+        { id: 124, body: '/caretaker triage', author_association: 'MEMBER' },
+        'alice',
+      );
+      expect(resTriage.status).toBe(202);
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'UNTRIAGED' }),
+      );
+    });
   });
 });

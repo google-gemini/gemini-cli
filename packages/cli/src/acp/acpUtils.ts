@@ -5,6 +5,7 @@
  */
 
 import {
+  type AnsiOutput,
   type Config,
   type ToolResult,
   type ToolCallConfirmationDetails,
@@ -44,6 +45,38 @@ export const RequestPermissionResponseSchema = z.object({
   ]),
 });
 
+/**
+ * Returns true if `value` is an {@link AnsiOutput}: an array of lines, where
+ * each line is an array of tokens that each carry a `text` string.
+ */
+function isAnsiOutput(value: unknown): value is AnsiOutput {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (line: unknown) =>
+        Array.isArray(line) &&
+        line.every(
+          (token: unknown) =>
+            typeof token === 'object' &&
+            token !== null &&
+            'text' in token &&
+            typeof token.text === 'string',
+        ),
+    )
+  );
+}
+
+/**
+ * Flattens an {@link AnsiOutput} into plain text by concatenating the token
+ * texts of each line, joining the lines with newlines and trimming the result.
+ */
+function ansiOutputToPlainText(ansiOutput: AnsiOutput): string {
+  return ansiOutput
+    .map((line) => line.map((token) => token.text).join(''))
+    .join('\n')
+    .trim();
+}
+
 export function toToolCallContent(
   toolResult: ToolResult,
 ): acp.ToolCallContent | null {
@@ -57,6 +90,14 @@ export function toToolCallContent(
         type: 'content',
         content: { type: 'text', text: toolResult.returnDisplay },
       };
+    } else if (isAnsiOutput(toolResult.returnDisplay)) {
+      // Shell commands report their terminal output as AnsiOutput. Flatten it
+      // to plain text so that the output is not dropped from the update.
+      const text = ansiOutputToPlainText(toolResult.returnDisplay);
+      if (!text) {
+        return null;
+      }
+      return { type: 'content', content: { type: 'text', text } };
     } else {
       if ('fileName' in toolResult.returnDisplay) {
         return {
@@ -133,27 +174,30 @@ export function toPermissionOptions(
           });
         }
         break;
-      case 'mcp':
+      case 'mcp': {
+        const serverName = confirmation.serverName?.trim() || 'generic_server';
+        const toolName = confirmation.toolName?.trim() || 'generic_tool';
         options.push(
           {
             optionId: ToolConfirmationOutcome.ProceedAlwaysServer,
-            name: 'Allow all server tools for this session',
+            name: `Allow all "${serverName}" server tools for this session`,
             kind: 'allow_always',
           },
           {
             optionId: ToolConfirmationOutcome.ProceedAlwaysTool,
-            name: 'Allow tool for this session',
+            name: `Allow tool "${toolName}" for this session`,
             kind: 'allow_always',
           },
         );
         if (enablePermanentToolApproval) {
           options.push({
             optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-            name: 'Allow tool for all future sessions',
+            name: `Allow tool "${toolName}" for all future sessions`,
             kind: 'allow_always',
           });
         }
         break;
+      }
       case 'info':
         options.push({
           optionId: ToolConfirmationOutcome.ProceedAlways,
@@ -265,8 +309,11 @@ export function buildAvailableModels(
   const preferredModel = config.getModel() || GEMINI_MODEL_ALIAS_AUTO;
   const shouldShowPreviewModels = config.getHasAccessToPreviewModel();
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
-  const useGemini3_5Flash = config.hasGemini35FlashGAAccess?.() ?? false;
-  const selectedAuthType = settings.merged.security.auth.selectedType;
+  const useLatestFlash = config.hasLatestFlashGAAccess?.() ?? false;
+  const useLatestFlashLite = config.hasLatestFlashLiteGAAccess?.() ?? false;
+  const selectedAuthType =
+    settings.merged.security?.auth?.selectedType ??
+    config.getContentGeneratorConfig?.()?.authType;
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
 
@@ -277,7 +324,8 @@ export function buildAvailableModels(
   ) {
     const options = config.getModelConfigService().getAvailableModelOptions({
       useGemini3_1: useGemini31,
-      useGemini3_5Flash,
+      useLatestFlash,
+      useLatestFlashLite,
       useCustomTools: useCustomToolModel,
       hasAccessToPreview: shouldShowPreviewModels,
     });
@@ -296,7 +344,7 @@ export function buildAvailableModels(
       description: getAutoModelDescription(
         shouldShowPreviewModels,
         useGemini31,
-        useGemini3_5Flash,
+        useLatestFlash,
       ),
     },
   ];
@@ -346,6 +394,15 @@ export function buildAvailableModels(
     manualOptions.unshift(...previewOptions);
   }
 
+  const seen = new Set<string>();
+  const uniqueManualOptions = manualOptions.filter((option) => {
+    if (seen.has(option.value)) {
+      return false;
+    }
+    seen.add(option.value);
+    return true;
+  });
+
   const scaleOptions = (
     options: Array<{ value: string; title: string; description?: string }>,
   ) =>
@@ -358,7 +415,7 @@ export function buildAvailableModels(
   return {
     availableModels: [
       ...scaleOptions(mainOptions),
-      ...scaleOptions(manualOptions),
+      ...scaleOptions(uniqueManualOptions),
     ],
     currentModelId: preferredModel,
   };
