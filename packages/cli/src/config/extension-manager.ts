@@ -363,6 +363,11 @@ Would you like to attempt to install via "git clone" instead?`,
             previous.installMetadata.source !== installMetadata.source,
         );
 
+        const previousLinkedSource =
+          previous?.installMetadata?.type === 'link'
+            ? previous?.installMetadata?.source?.trim()
+            : undefined;
+
         await maybeRequestConsentOrFail(
           newExtensionConfig,
           requestConsentOverride ?? this.requestConsent,
@@ -373,13 +378,8 @@ Would you like to attempt to install via "git clone" instead?`,
           previousSkills,
           isMigrating,
           installMetadata.type === 'link' ? localSourcePath : undefined,
-          previous?.installMetadata?.type === 'link'
-            ? getRealPath(
-                path.resolve(
-                  this.workspaceDir,
-                  previous.installMetadata.source,
-                ),
-              )
+          previousLinkedSource
+            ? getRealPath(path.resolve(this.workspaceDir, previousLinkedSource))
             : undefined,
         );
         const extensionId = getExtensionId(newExtensionConfig, installMetadata);
