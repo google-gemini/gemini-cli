@@ -90,10 +90,13 @@ export const useLoadingIndicator = ({
     (retryStatus !== null &&
       prevRetryStatus !== null &&
       retryStatus.attempt === prevRetryStatus.attempt &&
+      retryStatus.maxAttempts === prevRetryStatus.maxAttempts &&
       retryStatus.delayMs === prevRetryStatus.delayMs &&
       retryStatus.model === prevRetryStatus.model &&
       retryStatus.status === prevRetryStatus.status &&
-      retryStatus.error === prevRetryStatus.error);
+      retryStatus.error === prevRetryStatus.error &&
+      retryStatus.role === prevRetryStatus.role &&
+      retryStatus.promptId === prevRetryStatus.promptId);
 
   if (!isSameRetry) {
     setPrevRetryStatus(retryStatus);
@@ -107,6 +110,8 @@ export const useLoadingIndicator = ({
   const attempt = retryStatus?.attempt ?? 0;
   const delayMs = retryStatus?.delayMs ?? 0;
   const model = retryStatus?.model ?? '';
+  const role = retryStatus?.role;
+  const promptId = retryStatus?.promptId;
 
   useEffect(() => {
     if (
@@ -130,7 +135,16 @@ export const useLoadingIndicator = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [attempt, delayMs, model, isTimerActive, isRateLimit, countdownSeconds]);
+  }, [
+    attempt,
+    delayMs,
+    model,
+    role,
+    promptId,
+    isTimerActive,
+    isRateLimit,
+    countdownSeconds,
+  ]);
 
   useEffect(() => {
     if (
