@@ -174,14 +174,50 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
       );
 
       let content = '';
-      let position = 0;
+      let isLogTruncated = false;
       try {
         const stats = await fileHandle.stat();
         const readSize = Math.min(stats.size, MAX_BUFFER_LOAD_CAP_BYTES);
-        position = Math.max(0, stats.size - readSize);
+        const position = Math.max(0, stats.size - readSize);
+        isLogTruncated = position > 0;
 
-        const buffer = Buffer.alloc(readSize);
+        let buffer = Buffer.alloc(readSize);
         await fileHandle.read(buffer, 0, readSize, position);
+
+        if (isLogTruncated) {
+          // Inspect the byte preceding the window to tell whether the window
+          // starts exactly on a line boundary or in the middle of a line.
+          const precedingByte = Buffer.alloc(1);
+          await fileHandle.read(precedingByte, 0, 1, position - 1);
+
+          if (precedingByte[0] !== 0x0a /* '\n' */) {
+            const firstNewlineOffset = buffer.indexOf(0x0a);
+            if (
+              firstNewlineOffset !== -1 &&
+              firstNewlineOffset < buffer.length - 1
+            ) {
+              // The first line of the window is a partial fragment of a longer
+              // line and complete lines follow it: drop only the fragment.
+              // (The byte after a newline is always a UTF-8 boundary.)
+              buffer = buffer.subarray(firstNewlineOffset + 1);
+            } else {
+              // The window holds the tail of a single line longer than the read
+              // cap (no newline inside, or only the file's trailing one): keep
+              // the available fragment instead of losing all content.
+              // A multibyte UTF-8 sequence may be split by the window start;
+              // strip leading continuation bytes so it is not corrupted.
+              let charBoundary = 0;
+              while (
+                charBoundary < buffer.length &&
+                (buffer[charBoundary] & 0xc0) === 0x80
+              ) {
+                charBoundary++;
+              }
+              buffer = buffer.subarray(charBoundary);
+            }
+          }
+        }
+
         content = buffer.toString('utf-8');
       } finally {
         await fileHandle.close();
@@ -199,19 +235,19 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
         logLines.pop();
       }
 
-      // Discard first line if we started reading from middle of file to avoid partial lines
-      if (position > 0 && logLines.length > 0) {
-        logLines.shift();
-      }
-
       const requestedLinesCount = this.params.lines ?? DEFAULT_TAIL_LINES_COUNT;
       const tailLines = logLines.slice(-requestedLinesCount);
       const output = tailLines.join('\n');
 
+      const truncatedNote = isLogTruncated
+        ? ` (log truncated to last ${MAX_BUFFER_LOAD_CAP_BYTES / 1024}KB)`
+        : '';
       const header =
         requestedLinesCount < logLines.length
-          ? `Showing last ${requestedLinesCount} of ${logLines.length} lines:\n`
-          : 'Full Log Output:\n';
+          ? `Showing last ${requestedLinesCount} of ${logLines.length} lines${truncatedNote}:\n`
+          : isLogTruncated
+            ? `Showing last ${logLines.length} line${logLines.length === 1 ? '' : 's'}${truncatedNote}:\n`
+            : 'Full Log Output:\n';
 
       const responseContent = header + output;
 
