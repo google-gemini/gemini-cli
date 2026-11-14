@@ -551,6 +551,102 @@ describe('PolicyEngine', () => {
 
       expect(decision).toBe(PolicyDecision.DENY);
     });
+
+    it('should preserve explicit ASK_USER rules in YOLO mode when shell parsing fails', async () => {
+      const originalMock = vi
+        .mocked(parseCommandDetails)
+        .getMockImplementation();
+      vi.mocked(parseCommandDetails).mockImplementation((command: string) => {
+        if (command === 'rm -rf build @(Get-Process)') {
+          return { details: [], hasError: true };
+        }
+        return originalMock!(command);
+      });
+
+      const askRule: PolicyRule = {
+        toolName: 'run_shell_command',
+        decision: PolicyDecision.ASK_USER,
+      };
+
+      try {
+        engine = new PolicyEngine({
+          rules: [askRule],
+          approvalMode: ApprovalMode.YOLO,
+        });
+
+        const interactiveResult = await engine.check(
+          {
+            name: 'run_shell_command',
+            args: { command: 'rm -rf build @(Get-Process)' },
+          },
+          undefined,
+        );
+        expect(interactiveResult.decision).toBe(PolicyDecision.ASK_USER);
+        expect(interactiveResult.rule).toBe(askRule);
+
+        const nonInteractiveEngine = new PolicyEngine({
+          rules: [askRule],
+          approvalMode: ApprovalMode.YOLO,
+          nonInteractive: true,
+        });
+
+        const nonInteractiveResult = await nonInteractiveEngine.check(
+          {
+            name: 'run_shell_command',
+            args: { command: 'rm -rf build @(Get-Process)' },
+          },
+          undefined,
+        );
+        expect(nonInteractiveResult.decision).toBe(PolicyDecision.DENY);
+      } finally {
+        vi.mocked(parseCommandDetails).mockImplementation(originalMock!);
+      }
+    });
+
+    it('should preserve heuristic ASK_USER downgrade for untrusted Git commands in YOLO mode when shell parsing fails', async () => {
+      const originalMock = vi
+        .mocked(parseCommandDetails)
+        .getMockImplementation();
+      vi.mocked(parseCommandDetails).mockImplementationOnce(
+        (command: string) => {
+          if (command === 'git status @(Get-Process)') {
+            return {
+              details: [
+                {
+                  name: 'git',
+                  text: 'git status @(Get-Process)',
+                  startIndex: 0,
+                },
+              ],
+              hasError: true,
+            };
+          }
+          return originalMock!(command);
+        },
+      );
+
+      const allowAllRule: PolicyRule = {
+        toolName: '*',
+        decision: PolicyDecision.ALLOW,
+      };
+
+      engine = new PolicyEngine({
+        rules: [allowAllRule],
+        approvalMode: ApprovalMode.YOLO,
+        isTrustedFolder: () => false,
+      });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'git status @(Get-Process)' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+      expect(result.rule).toBeUndefined();
+    });
   });
 
   describe('addRule', () => {

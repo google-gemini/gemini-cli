@@ -508,10 +508,9 @@ export class PolicyEngine {
           );
           return { decision: PolicyDecision.DENY, rule };
         }
-        // Allow if no argument restrictions apply
         return {
-          decision: PolicyDecision.ALLOW,
-          rule,
+          decision: ruleDecision,
+          rule: rule && ruleDecision === rule.decision ? rule : undefined,
         };
       }
 
