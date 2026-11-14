@@ -74,6 +74,10 @@ export class Session {
     return `${name}-${Date.now()}-${++this.callIdCounter}`;
   }
 
+  private getChat(): GeminiChat {
+    return this.context.geminiClient?.getChat?.() ?? this.chat;
+  }
+
   constructor(
     private readonly id: string,
     private readonly chat: GeminiChat,
@@ -923,7 +927,7 @@ export class Session {
         ),
       );
 
-      this.chat.recordCompletedToolCalls(this.context.config.getActiveModel(), [
+      this.getChat().recordCompletedToolCalls(this.context.config.getActiveModel(), [
         {
           status: CoreToolCallStatus.Success,
           request: {
@@ -971,7 +975,7 @@ export class Session {
         kind: toAcpToolKind(tool.kind),
       });
 
-      this.chat.recordCompletedToolCalls(this.context.config.getActiveModel(), [
+      this.getChat().recordCompletedToolCalls(this.context.config.getActiveModel(), [
         {
           status: CoreToolCallStatus.Error,
           request: {
