@@ -335,4 +335,182 @@ describe('Background Tools', () => {
 
     fs.unlinkSync(logPath);
   });
+
+  it('read_background_output should preserve the tail fragment of an oversized single line', async () => {
+    const pid = 55501;
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const logDir = ShellExecutionService.getLogDir();
+
+    const history = new Map();
+    history.set(pid, {
+      command: 'oversized line command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    fs.mkdirSync(logDir, { recursive: true });
+    // A single line (70KB) longer than the 64KB read cap, with a trailing
+    // newline as the last byte of the read window.
+    fs.writeFileSync(logPath, 'a'.repeat(70000) + '\n');
+
+    const invocation = readTool.build({ pid });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.llmContent).toContain('truncated');
+    expect(result.llmContent).toContain('a'.repeat(65535));
+
+    fs.unlinkSync(logPath);
+  });
+
+  it('read_background_output should keep a complete first line at an exact read boundary', async () => {
+    const pid = 55502;
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const logDir = ShellExecutionService.getLogDir();
+
+    const history = new Map();
+    history.set(pid, {
+      command: 'boundary command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    fs.mkdirSync(logDir, { recursive: true });
+    // 100-byte head line so the 64KB read window starts exactly on the
+    // boundary of the second (complete) line.
+    fs.writeFileSync(logPath, 'H'.repeat(99) + '\n' + 'y'.repeat(65536));
+
+    const invocation = readTool.build({ pid });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.llmContent).toContain('truncated');
+    expect(result.llmContent).toContain('y'.repeat(65536));
+
+    fs.unlinkSync(logPath);
+  });
+
+  it('read_background_output should mark byte-truncated output as truncated', async () => {
+    const pid = 55503;
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const logDir = ShellExecutionService.getLogDir();
+
+    const history = new Map();
+    history.set(pid, {
+      command: 'long log command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    fs.mkdirSync(logDir, { recursive: true });
+    // 50 x 2KB lines = 100KB total: the 64KB window is byte-truncated, yet
+    // holds fewer lines than the default tail count.
+    fs.writeFileSync(logPath, ('q'.repeat(1999) + '\n').repeat(50));
+
+    const invocation = readTool.build({ pid });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.llmContent).not.toContain('Full Log Output');
+    expect(result.llmContent).toContain('truncated');
+    expect(result.llmContent).toContain('q'.repeat(1999));
+
+    fs.unlinkSync(logPath);
+  });
+
+  it('read_background_output should drop a partial first line but keep following complete lines', async () => {
+    const pid = 55504;
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const logDir = ShellExecutionService.getLogDir();
+
+    const history = new Map();
+    history.set(pid, {
+      command: 'mixed lines command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    fs.mkdirSync(logDir, { recursive: true });
+    // Window starts inside the 70KB first line; the two short lines that
+    // follow it are complete and must be returned.
+    fs.writeFileSync(logPath, 'a'.repeat(70000) + '\n' + 'b1\nb2\n');
+
+    const invocation = readTool.build({ pid });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.llmContent).toContain('truncated');
+    expect(result.llmContent).toContain('b1\nb2');
+    expect(result.llmContent).not.toContain('aaaa');
+
+    fs.unlinkSync(logPath);
+  });
+
+  it('read_background_output should not corrupt a UTF-8 character split by the window start', async () => {
+    const pid = 55505;
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const logDir = ShellExecutionService.getLogDir();
+
+    const history = new Map();
+    history.set(pid, {
+      command: 'unicode command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    fs.mkdirSync(logDir, { recursive: true });
+    // 120003 bytes of multibyte content: the 64KB window begins in the middle
+    // of a multibyte character (offset 54467 % 3 !== 0).
+    fs.writeFileSync(logPath, '€'.repeat(40000) + 'é' + '\n');
+
+    const invocation = readTool.build({ pid });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.llmContent).not.toContain('�');
+    expect(result.llmContent).toContain('€');
+    expect(result.llmContent).toContain('truncated');
+
+    fs.unlinkSync(logPath);
+  });
 });
