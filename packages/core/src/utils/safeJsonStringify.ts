@@ -6,6 +6,8 @@
 
 /**
  * Safely stringifies an object to JSON, handling circular references by replacing them with [Circular].
+ * Only true cycles are replaced: an object that is referenced more than once but is not
+ * its own ancestor is serialized in full each time.
  *
  * @param obj - The object to stringify
  * @param space - Optional space parameter for formatting (defaults to no formatting)
@@ -17,15 +19,24 @@ export function safeJsonStringify(
   obj: unknown,
   space?: string | number,
 ): string {
-  const seen = new WeakSet();
+  // Objects on the path from the root to the value being visited.
+  const ancestors: unknown[] = [];
   return JSON.stringify(
     obj,
-    (key, value) => {
+    function (this: unknown, _key, value) {
       if (typeof value === 'object' && value !== null) {
-        if (seen.has(value)) {
+        // `this` is the object holding `value`; drop any finished branches
+        // so the stack only contains the holder and its own ancestors.
+        while (
+          ancestors.length > 0 &&
+          ancestors[ancestors.length - 1] !== this
+        ) {
+          ancestors.pop();
+        }
+        if (ancestors.includes(value)) {
           return '[Circular]';
         }
-        seen.add(value);
+        ancestors.push(value);
       }
       return value as unknown;
     },
