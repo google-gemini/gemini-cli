@@ -1175,7 +1175,10 @@ function unwrapEnvInvocation(
   const wrapperPaths: string[] = [];
 
   while (currentCmd && getCommandBaseName(currentCmd) === 'env') {
-    if (isExplicitCommandPath(currentCmd)) {
+    if (
+      isExplicitCommandPath(currentCmd) ||
+      isScriptPathCandidate(currentCmd, effectiveCwd, workspaceDir)
+    ) {
       wrapperPaths.push(currentCmd);
     }
     let idx = 0;
@@ -1418,7 +1421,10 @@ function findInsecureMcpTarget(
   }
   const effectiveCwd = unwrapped.cwd;
   const candidates: string[] = [];
-  if (isExplicitCommandPath(unwrapped.command)) {
+  if (
+    isExplicitCommandPath(unwrapped.command) ||
+    isScriptPathCandidate(unwrapped.command, effectiveCwd, ctx.workspaceDir)
+  ) {
     candidates.push(unwrapped.command);
   }
   candidates.push(

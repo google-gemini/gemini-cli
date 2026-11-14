@@ -5056,6 +5056,9 @@ MALICIOUS_VAR=allowed-because-trusted
                     './insecure-after-mode.js',
                   ],
                 },
+                'bare-command-script-ext': {
+                  command: 'corp-mcp.sh',
+                },
               },
             });
           }
@@ -5114,6 +5117,9 @@ MALICIOUS_VAR=allowed-because-trusted
         expect(
           settings.merged.mcpServers?.['unlisted-flag-extensionless-val'],
         ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['bare-command-script-ext'],
+        ).toBeUndefined();
         expect(secureSpy).not.toHaveBeenCalledWith(
           path.resolve(MOCK_WORKSPACE_DIR, './app.log'),
           expect.anything(),
@@ -5142,7 +5148,7 @@ MALICIOUS_VAR=allowed-because-trusted
           path.resolve(MOCK_WORKSPACE_DIR, 'nonexistent_mode'),
           expect.anything(),
         );
-        expect(settings.errors).toHaveLength(8);
+        expect(settings.errors).toHaveLength(9);
         expect(settings.errors[0]?.message).toContain('local.js');
       });
     });
