@@ -13,6 +13,7 @@ import {
   convertSessionToClientHistory,
   createPolicyUpdater,
   Storage,
+  SessionStartSource,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { randomUUID } from 'node:crypto';
@@ -145,6 +146,8 @@ export class AcpSessionManager {
         ? geminiClient.getChat()
         : await geminiClient.startChat();
 
+      await this.fireSessionStartHook(config, SessionStartSource.Startup);
+
       session = new Session(
         sessionId,
         chat,
@@ -254,6 +257,8 @@ export class AcpSessionManager {
         filePath: sessionPath,
       });
 
+      await this.fireSessionStartHook(config, SessionStartSource.Resume);
+
       session = new Session(
         sessionId,
         geminiClient.getChat(),
@@ -312,6 +317,39 @@ export class AcpSessionManager {
         }
       }
       throw error;
+    }
+  }
+
+  private async fireSessionStartHook(
+    config: Config,
+    source: SessionStartSource,
+  ): Promise<void> {
+    const hookSystem = config.getHookSystem();
+    if (!hookSystem) {
+      return;
+    }
+    try {
+      const result = await hookSystem.fireSessionStartEvent(source);
+      if (result) {
+        const additionalContext = result.getAdditionalContext();
+        if (additionalContext) {
+          const geminiClient = config.getGeminiClient();
+          const chat = geminiClient?.getChat();
+          if (chat) {
+            chat.addHistory({
+              role: 'user',
+              parts: [
+                { text: `<hook_context>${additionalContext}</hook_context>` },
+              ],
+            });
+          }
+        }
+      }
+    } catch (error) {
+      debugLogger.warn(
+        `Error firing SessionStart hook (${source}) in ACP:`,
+        error,
+      );
     }
   }
 
