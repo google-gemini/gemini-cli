@@ -122,6 +122,32 @@ describe('SuggestionsDisplay', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
+  it('renders Skill tag for skill commands', async () => {
+    const skillSuggestions = [
+      {
+        label: 'my-skill',
+        value: 'my-skill',
+        description: 'Activate my skill',
+        commandKind: CommandKind.SKILL,
+      },
+    ];
+
+    const { lastFrame } = await render(
+      <SuggestionsDisplay
+        suggestions={skillSuggestions}
+        activeIndex={0}
+        isLoading={false}
+        width={80}
+        scrollOffset={0}
+        userInput=""
+        mode="reverse"
+      />,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain('[Skill]');
+    expect(frame).toMatchSnapshot();
+  });
+
   it('renders command section separators for slash mode', async () => {
     const groupedSuggestions = [
       {
