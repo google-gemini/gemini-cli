@@ -4987,7 +4987,10 @@ MALICIOUS_VAR=allowed-because-trusted
       it('should ignore non-path positional arguments on interpreter MCP commands while still validating bare script filenames', () => {
         resetSettingsCacheForTesting();
         vi.mocked(fs.existsSync).mockImplementation(
-          (p) => String(p) === getSystemSettingsPath(),
+          (p) =>
+            String(p) === getSystemSettingsPath() ||
+            String(p).endsWith('server.js') ||
+            String(p).endsWith('server'),
         );
         vi.mocked(fs.readFileSync).mockImplementation((p) => {
           if (String(p) === getSystemSettingsPath()) {
@@ -5035,6 +5038,23 @@ MALICIOUS_VAR=allowed-because-trusted
                 'python-warning-flag': {
                   command: 'python3',
                   args: ['-W', 'ignore', './insecure-py-server.py'],
+                },
+                'env-wrapper-node': {
+                  command: '/usr/bin/env',
+                  args: [
+                    '-i',
+                    'NODE_ENV=production',
+                    'node',
+                    './insecure-env-wrapped.js',
+                  ],
+                },
+                'unlisted-flag-extensionless-val': {
+                  command: 'node',
+                  args: [
+                    '--custom-mode',
+                    'nonexistent_mode',
+                    './insecure-after-mode.js',
+                  ],
                 },
               },
             });
@@ -5088,6 +5108,12 @@ MALICIOUS_VAR=allowed-because-trusted
         expect(
           settings.merged.mcpServers?.['python-warning-flag'],
         ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['env-wrapper-node'],
+        ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['unlisted-flag-extensionless-val'],
+        ).toBeUndefined();
         expect(secureSpy).not.toHaveBeenCalledWith(
           path.resolve(MOCK_WORKSPACE_DIR, './app.log'),
           expect.anything(),
@@ -5112,7 +5138,11 @@ MALICIOUS_VAR=allowed-because-trusted
           path.resolve(MOCK_WORKSPACE_DIR, 'ignore'),
           expect.anything(),
         );
-        expect(settings.errors).toHaveLength(6);
+        expect(secureSpy).not.toHaveBeenCalledWith(
+          path.resolve(MOCK_WORKSPACE_DIR, 'nonexistent_mode'),
+          expect.anything(),
+        );
+        expect(settings.errors).toHaveLength(8);
         expect(settings.errors[0]?.message).toContain('local.js');
       });
     });

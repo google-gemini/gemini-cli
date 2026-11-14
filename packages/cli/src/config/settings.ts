@@ -943,7 +943,6 @@ function resolveSettings(
 }
 
 const SCRIPT_INTERPRETERS = new Set([
-  'env',
   'sh',
   'bash',
   'zsh',
@@ -1067,25 +1066,18 @@ interface SystemMcpCommandCheckContext {
   settingsErrors: SettingsError[];
 }
 
+function getCommandBaseName(command: string): string | undefined {
+  return command
+    .split(/[\\/]/)
+    .pop()
+    ?.toLowerCase()
+    .replace(/\.(exe|cmd|bat)$/, '');
+}
+
 function isExplicitCommandPath(command: string): boolean {
   return (
     path.isAbsolute(command) || command.includes('/') || command.includes('\\')
   );
-}
-
-function isScriptPathCandidate(token: string): boolean {
-  if (/^\d+$/.test(token)) {
-    return false;
-  }
-  const ext = path.extname(token).toLowerCase();
-  if (ext !== '') {
-    return SCRIPT_EXTENSIONS.has(ext);
-  }
-  return true;
-}
-
-function isPreloadTargetCandidate(token: string): boolean {
-  return isExplicitCommandPath(token) || isScriptPathCandidate(token);
 }
 
 function resolveMcpCommandPath(
@@ -1098,6 +1090,53 @@ function resolveMcpCommandPath(
   }
   const baseDir = cwd ? path.resolve(workspaceDir, cwd) : workspaceDir;
   return path.resolve(baseDir, command);
+}
+
+function hasExistingScriptOnDisk(resolvedPath: string): boolean {
+  try {
+    if (fs.existsSync(resolvedPath)) {
+      return true;
+    }
+    for (const ext of IMPLICIT_SCRIPT_EXTENSIONS) {
+      if (fs.existsSync(`${resolvedPath}${ext}`)) {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+function isScriptPathCandidate(
+  token: string,
+  cwd: string | undefined,
+  workspaceDir: string,
+): boolean {
+  if (/^\d+$/.test(token)) {
+    return false;
+  }
+  const ext = path.extname(token).toLowerCase();
+  if (ext !== '') {
+    return SCRIPT_EXTENSIONS.has(ext);
+  }
+  if (isExplicitCommandPath(token)) {
+    return true;
+  }
+  return hasExistingScriptOnDisk(
+    resolveMcpCommandPath(token, cwd, workspaceDir),
+  );
+}
+
+function isPreloadTargetCandidate(
+  token: string,
+  cwd: string | undefined,
+  workspaceDir: string,
+): boolean {
+  return (
+    isExplicitCommandPath(token) ||
+    isScriptPathCandidate(token, cwd, workspaceDir)
+  );
 }
 
 function expandCandidatePaths(resolvedPath: string): string[] {
@@ -1118,18 +1157,141 @@ function expandCandidatePaths(resolvedPath: string): string[] {
   return paths;
 }
 
+function unwrapEnvInvocation(
+  command: string,
+  args: string[] | undefined,
+  cwd: string | undefined,
+  workspaceDir: string,
+): {
+  command: string;
+  args: string[];
+  cwd: string | undefined;
+  wrapperPaths: string[];
+  unsafeSplitString?: string;
+} {
+  let currentCmd = command.trim();
+  let currentArgs = [...(args ?? [])];
+  let effectiveCwd = cwd;
+  const wrapperPaths: string[] = [];
+
+  while (currentCmd && getCommandBaseName(currentCmd) === 'env') {
+    if (isExplicitCommandPath(currentCmd)) {
+      wrapperPaths.push(currentCmd);
+    }
+    let idx = 0;
+    let stopEnvOptions = false;
+    while (idx < currentArgs.length) {
+      const token = currentArgs[idx]?.trim() ?? '';
+      if (!token) {
+        idx++;
+        continue;
+      }
+      if (!stopEnvOptions && token === '--') {
+        stopEnvOptions = true;
+        idx++;
+        continue;
+      }
+      if (!stopEnvOptions && token.startsWith('-') && token !== '-') {
+        if (token === '-u' || token === '--unset') {
+          idx += 2;
+          continue;
+        }
+        if (token === '-C' || token === '--chdir') {
+          const dirArg = currentArgs[idx + 1]?.trim();
+          if (dirArg) {
+            effectiveCwd = effectiveCwd
+              ? path.resolve(workspaceDir, effectiveCwd, dirArg)
+              : dirArg;
+          }
+          idx += 2;
+          continue;
+        }
+        if (token.startsWith('--chdir=')) {
+          const dirArg = token.slice('--chdir='.length).trim();
+          if (dirArg) {
+            effectiveCwd = effectiveCwd
+              ? path.resolve(workspaceDir, effectiveCwd, dirArg)
+              : dirArg;
+          }
+          idx++;
+          continue;
+        }
+        if (
+          token === '-S' ||
+          token === '--split-string' ||
+          token.startsWith('-S') ||
+          token.startsWith('--split-string=')
+        ) {
+          const splitRaw =
+            token === '-S' || token === '--split-string'
+              ? (currentArgs[idx + 1] ?? '')
+              : token.startsWith('--split-string=')
+                ? token.slice('--split-string='.length)
+                : token.slice(2);
+          const consumed = token === '-S' || token === '--split-string' ? 2 : 1;
+          try {
+            const parsed = parse(splitRaw);
+            const strTokens = parsed.filter(
+              (t): t is string => typeof t === 'string',
+            );
+            if (strTokens.length !== parsed.length) {
+              return {
+                command: '',
+                args: [],
+                cwd: effectiveCwd,
+                wrapperPaths,
+                unsafeSplitString: splitRaw,
+              };
+            }
+            currentArgs = [...strTokens, ...currentArgs.slice(idx + consumed)];
+            idx = 0;
+            continue;
+          } catch {
+            return {
+              command: '',
+              args: [],
+              cwd: effectiveCwd,
+              wrapperPaths,
+              unsafeSplitString: splitRaw,
+            };
+          }
+        }
+        idx++;
+        continue;
+      }
+      if (token.includes('=') && !token.startsWith('=')) {
+        idx++;
+        continue;
+      }
+      break;
+    }
+    if (idx < currentArgs.length) {
+      currentCmd = currentArgs[idx]?.trim() ?? '';
+      currentArgs = currentArgs.slice(idx + 1);
+    } else {
+      currentCmd = '';
+      currentArgs = [];
+    }
+  }
+
+  return {
+    command: currentCmd,
+    args: currentArgs,
+    cwd: effectiveCwd,
+    wrapperPaths,
+  };
+}
+
 function extractInterpreterScriptArgs(
   command: string,
   args: string[] | undefined,
+  cwd: string | undefined,
+  workspaceDir: string,
 ): string[] {
   if (!args || args.length === 0) {
     return [];
   }
-  const baseName = command
-    .split(/[\\/]/)
-    .pop()
-    ?.toLowerCase()
-    .replace(/\.(exe|cmd|bat)$/, '');
+  const baseName = getCommandBaseName(command);
   if (!baseName || !SCRIPT_INTERPRETERS.has(baseName)) {
     return [];
   }
@@ -1144,14 +1306,14 @@ function extractInterpreterScriptArgs(
     if (!trimmed) continue;
 
     if (afterDoubleDash) {
-      if (isPreloadTargetCandidate(trimmed)) {
+      if (isPreloadTargetCandidate(trimmed, cwd, workspaceDir)) {
         candidates.push(trimmed);
       }
       break;
     }
 
     if (expectPreloadValue) {
-      if (isPreloadTargetCandidate(trimmed)) {
+      if (isPreloadTargetCandidate(trimmed, cwd, workspaceDir)) {
         candidates.push(trimmed);
       }
       expectPreloadValue = false;
@@ -1178,7 +1340,10 @@ function extractInterpreterScriptArgs(
       if (PRELOAD_FLAGS.has(flagName)) {
         if (eqIndex >= 0) {
           const inlineValue = trimmed.slice(eqIndex + 1).trim();
-          if (inlineValue && isPreloadTargetCandidate(inlineValue)) {
+          if (
+            inlineValue &&
+            isPreloadTargetCandidate(inlineValue, cwd, workspaceDir)
+          ) {
             candidates.push(inlineValue);
           }
         } else {
@@ -1200,7 +1365,7 @@ function extractInterpreterScriptArgs(
       continue;
     }
 
-    if (isScriptPathCandidate(trimmed)) {
+    if (isScriptPathCandidate(trimmed, cwd, workspaceDir)) {
       candidates.push(trimmed);
       break;
     }
@@ -1215,17 +1380,61 @@ function findInsecureMcpTarget(
   cwd: string | undefined,
   ctx: SystemMcpCommandCheckContext,
 ): { target: string; reason: string } | undefined {
-  const trimmed = command?.trim();
-  if (!trimmed) {
+  const initialCmd = command?.trim();
+  if (!initialCmd) {
     return undefined;
   }
-  const candidates: string[] = [];
-  if (isExplicitCommandPath(trimmed)) {
-    candidates.push(trimmed);
+  const unwrapped = unwrapEnvInvocation(
+    initialCmd,
+    args,
+    cwd,
+    ctx.workspaceDir,
+  );
+  if (unwrapped.unsafeSplitString !== undefined) {
+    return {
+      target: unwrapped.unsafeSplitString,
+      reason: 'Unsupported shell operators or malformed env -S string.',
+    };
   }
-  candidates.push(...extractInterpreterScriptArgs(trimmed, args));
+  for (const wrapperPath of unwrapped.wrapperPaths) {
+    const resolvedWrapper = resolveMcpCommandPath(
+      wrapperPath,
+      cwd,
+      ctx.workspaceDir,
+    );
+    const wrapperCheck = isFileAndDirectorySecureSync(
+      resolvedWrapper,
+      ctx.securityCache,
+    );
+    if (!wrapperCheck.secure) {
+      return {
+        target: wrapperPath,
+        reason: wrapperCheck.reason ?? 'Insecure file or directory.',
+      };
+    }
+  }
+  if (!unwrapped.command) {
+    return undefined;
+  }
+  const effectiveCwd = unwrapped.cwd;
+  const candidates: string[] = [];
+  if (isExplicitCommandPath(unwrapped.command)) {
+    candidates.push(unwrapped.command);
+  }
+  candidates.push(
+    ...extractInterpreterScriptArgs(
+      unwrapped.command,
+      unwrapped.args,
+      effectiveCwd,
+      ctx.workspaceDir,
+    ),
+  );
   for (const target of candidates) {
-    const resolved = resolveMcpCommandPath(target, cwd, ctx.workspaceDir);
+    const resolved = resolveMcpCommandPath(
+      target,
+      effectiveCwd,
+      ctx.workspaceDir,
+    );
     for (const candidatePath of expandCandidatePaths(resolved)) {
       const check = isFileAndDirectorySecureSync(
         candidatePath,
