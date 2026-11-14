@@ -5,9 +5,9 @@
  */
 
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import type { Content } from '@google/genai';
+import { Storage } from '../config/storage.js';
 import { debugLogger } from './debugLogger.js';
 
 interface ErrorReportData {
@@ -17,7 +17,23 @@ interface ErrorReportData {
 }
 
 /**
- * Generates an error report, writes it to a temporary file, and logs information to user
+ * Error reports can include the full chat history, so they are kept under the
+ * user's own Gemini directory rather than the shared system temp directory.
+ */
+export function getErrorReportsDir(): string {
+  return path.join(Storage.getGlobalTempDir(), 'error-reports');
+}
+
+/**
+ * Writes a report file that only the current user can read.
+ */
+async function writeReport(reportPath: string, content: string): Promise<void> {
+  await fs.mkdir(path.dirname(reportPath), { recursive: true, mode: 0o700 });
+  await fs.writeFile(reportPath, content, { mode: 0o600 });
+}
+
+/**
+ * Generates an error report, writes it to a private file, and logs information to user
  * @param error The error object.
  * @param context The relevant context (e.g., chat history, request contents).
  * @param type A string to identify the type of error (e.g., 'startChat', 'generateJson-api').
@@ -28,7 +44,7 @@ export async function reportError(
   baseMessage: string,
   context?: Content[] | Record<string, unknown> | unknown[],
   type = 'general',
-  reportingDir = os.tmpdir(), // for testing
+  reportingDir = getErrorReportsDir(), // for testing
 ): Promise<void> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const reportFileName = `gemini-client-error-${type}-${timestamp}.json`;
@@ -78,7 +94,7 @@ export async function reportError(
       const minimalReportContent = { error: errorToReport };
       stringifiedReportContent = JSON.stringify(minimalReportContent, null, 2);
       // Still try to write the minimal report
-      await fs.writeFile(reportPath, stringifiedReportContent);
+      await writeReport(reportPath, stringifiedReportContent);
       debugLogger.error(
         `${baseMessage} Partial report (excluding context) available at: ${reportPath}`,
         error,
@@ -93,7 +109,7 @@ export async function reportError(
   }
 
   try {
-    await fs.writeFile(reportPath, stringifiedReportContent);
+    await writeReport(reportPath, stringifiedReportContent);
     debugLogger.error(
       `${baseMessage} Full report available at: ${reportPath}`,
       error,
