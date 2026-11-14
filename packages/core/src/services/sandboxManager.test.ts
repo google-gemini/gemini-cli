@@ -356,6 +356,10 @@ describe('SandboxManager', () => {
 
       vi.spyOn(os, 'platform').mockReturnValue('win32');
       expect(sandboxManager.isKnownSafeCommand(['dir'])).toBe(true);
+      expect(sandboxManager.isKnownSafeCommand(['git', 'status'])).toBe(true);
+      expect(
+        sandboxManager.isKnownSafeCommand(['git', 'diff', '--output=out.txt']),
+      ).toBe(false);
     });
 
     it('should delegate isDangerousCommand to platform specific checkers', () => {
@@ -365,6 +369,9 @@ describe('SandboxManager', () => {
 
       vi.spyOn(os, 'platform').mockReturnValue('win32');
       expect(sandboxManager.isDangerousCommand(['del'])).toBe(true);
+      expect(
+        sandboxManager.isDangerousCommand(['git', 'diff', '--output=out.txt']),
+      ).toBe(true);
     });
   });
 
