@@ -196,6 +196,41 @@ describe('Turn', () => {
       expect(turn.getDebugResponses().length).toBe(1);
     });
 
+    it('should not reuse a synthesized call ID across turns in the same millisecond', async () => {
+      // Each tool round runs in a new Turn. With a fast provider and tool, two
+      // rounds can land in the same millisecond.
+      vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+      const callIds: string[] = [];
+      for (let round = 0; round < 2; round++) {
+        mockSendMessageStream.mockResolvedValueOnce(
+          (async function* () {
+            yield {
+              type: StreamEventType.CHUNK,
+              value: {
+                functionCalls: [{ name: 'run_shell_command', args: {} }],
+              } as unknown as GenerateContentResponse,
+            };
+          })(),
+        );
+        const roundTurn = new Turn(
+          mockChatInstance as unknown as GeminiChat,
+          'prompt-id-1',
+        );
+        for await (const event of roundTurn.run(
+          { model: 'gemini' },
+          [{ text: 'Use tools' }],
+          new AbortController().signal,
+        )) {
+          if (event.type === GeminiEventType.ToolCallRequest) {
+            callIds.push(event.value.callId);
+          }
+        }
+      }
+
+      expect(callIds).toHaveLength(2);
+      expect(new Set(callIds).size).toBe(2);
+    });
+
     it('should yield UserCancelled event if signal is aborted', async () => {
       const abortController = new AbortController();
       const mockResponseStream = (async function* () {

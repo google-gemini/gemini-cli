@@ -17,6 +17,7 @@ import {
 import readline from 'node:readline';
 import { randomUUID } from 'node:crypto';
 import type {
+  Part,
   PartListUnion,
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
@@ -226,6 +227,34 @@ function updateFingerprintIfChanged(
   }
   fp.digest = nextDigest;
   return true;
+}
+
+/**
+ * Splits a tool response turn into the parts of each call: its
+ * functionResponse plus the sibling parts (e.g. inlineData) that follow it.
+ * Parts before the first functionResponse go to the first call, so each part
+ * is stored on exactly one call.
+ */
+export function splitPartsByCallId(
+  parts: readonly Part[],
+): Map<string, Part[]> {
+  const partsByCallId = new Map<string, Part[]>();
+  let current: Part[] = [];
+  let seenResponse = false;
+  for (const part of parts) {
+    if (part.functionResponse) {
+      const callId = part.functionResponse.id;
+      // A response without an id, or a repeated id, stays in the current group
+      // so its siblings are not dropped.
+      if (callId && !partsByCallId.has(callId)) {
+        if (seenResponse) current = [];
+        seenResponse = true;
+        partsByCallId.set(callId, current);
+      }
+    }
+    current.push(part);
+  }
+  return partsByCallId;
 }
 
 /**
@@ -1613,43 +1642,40 @@ export class ChatRecordingService {
 
       // 2. Specialized 'Masking Sync' for tool call results
       // If a user turn in history contains a functionResponse, we update the
-      // corresponding ToolCallRecord in the preceding gemini message.
+      // corresponding ToolCallRecord in the preceding gemini message with
+      // that call's own parts (not its siblings' responses).
       for (const turn of history) {
         if (turn.content.role !== 'user') continue;
-        const turnParts = turn.content.parts || [];
-        for (const part of turnParts) {
-          if (part.functionResponse) {
-            const callId = part.functionResponse.id;
-            if (!callId) continue;
-            const tcMeta = this.toolCallMetaMap.get(callId);
-            if (tcMeta) {
-              if (updateFingerprintIfChanged(tcMeta.resultFp, turnParts)) {
-                anyChange = true;
-                const geminiMsg = this.cachedConversation.messages.find(
-                  (m) => m.id === tcMeta.messageId && m.type === 'gemini',
-                );
-                if (
-                  geminiMsg &&
-                  geminiMsg.type === 'gemini' &&
-                  geminiMsg.toolCalls
-                ) {
-                  const tc = geminiMsg.toolCalls.find((t) => t.id === callId);
-                  if (tc) {
-                    tc.result = turnParts;
-                  }
+        const partsByCallId = splitPartsByCallId(turn.content.parts || []);
+        for (const [callId, callParts] of partsByCallId) {
+          const tcMeta = this.toolCallMetaMap.get(callId);
+          if (tcMeta) {
+            if (updateFingerprintIfChanged(tcMeta.resultFp, callParts)) {
+              anyChange = true;
+              const geminiMsg = this.cachedConversation.messages.find(
+                (m) => m.id === tcMeta.messageId && m.type === 'gemini',
+              );
+              if (
+                geminiMsg &&
+                geminiMsg.type === 'gemini' &&
+                geminiMsg.toolCalls
+              ) {
+                const tc = geminiMsg.toolCalls.find((t) => t.id === callId);
+                if (tc) {
+                  tc.result = callParts;
                 }
-                const patch = getOrCreatePatch(tcMeta.messageId);
-                if (!patch.toolCalls) {
-                  patch.toolCalls = [];
-                }
-                const existingTcPatch = patch.toolCalls.find(
-                  (t) => t.id === callId,
-                );
-                if (existingTcPatch) {
-                  existingTcPatch.result = turnParts;
-                } else {
-                  patch.toolCalls.push({ id: callId, result: turnParts });
-                }
+              }
+              const patch = getOrCreatePatch(tcMeta.messageId);
+              if (!patch.toolCalls) {
+                patch.toolCalls = [];
+              }
+              const existingTcPatch = patch.toolCalls.find(
+                (t) => t.id === callId,
+              );
+              if (existingTcPatch) {
+                existingTcPatch.result = callParts;
+              } else {
+                patch.toolCalls.push({ id: callId, result: callParts });
               }
             }
           }
