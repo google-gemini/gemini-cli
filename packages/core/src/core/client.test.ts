@@ -51,7 +51,12 @@ import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js'
 import * as policyCatalog from '../availability/policyCatalog.js';
 import { LlmRole, LoopType } from '../telemetry/types.js';
 import { partToString } from '../utils/partUtils.js';
-import { coreEvents, CoreEvent } from '../utils/events.js';
+import {
+  coreEvents,
+  CoreEvent,
+  type RetryAttemptPayload,
+} from '../utils/events.js';
+import { promptIdContext } from '../utils/promptIdContext.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 // Mock fs module to prevent actual file system operations during tests
@@ -3321,6 +3326,102 @@ ${JSON.stringify(
         'test-session-id',
         LlmRole.MAIN,
       );
+    });
+
+    it('should include role, promptId, and updated model policy maxAttempts in RetryAttempt events', async () => {
+      vi.useFakeTimers();
+      const contents = [{ role: 'user', parts: [{ text: 'test retry' }] }];
+      vi.spyOn(policyCatalog, 'getModelPolicyChain').mockReturnValue([
+        {
+          model: 'test-model',
+          maxAttempts: 3,
+          actions: { terminal: 'prompt', transient: 'prompt' },
+          stateTransitions: { terminal: 'terminal', transient: 'sticky_retry' },
+        },
+        {
+          model: 'fallback-model',
+          maxAttempts: 5,
+          actions: { terminal: 'prompt', transient: 'prompt' },
+          stateTransitions: { terminal: 'terminal', transient: 'terminal' },
+        },
+      ]);
+
+      let activeModel = 'test-model';
+      vi.mocked(mockConfig.getModel).mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
+      vi.mocked(mockConfig.getActiveModel).mockImplementation(
+        () => activeModel,
+      );
+      const mockAvailabilityService = createAvailabilityServiceMock();
+      vi.mocked(
+        mockAvailabilityService.selectFirstAvailable,
+      ).mockImplementation((models: readonly string[]) => ({
+        selectedModel: models[0],
+        attempts: models[0] === 'test-model' ? 3 : 5,
+        skipped: [],
+      }));
+      vi.mocked(mockConfig.getModelAvailabilityService).mockReturnValue(
+        mockAvailabilityService,
+      );
+
+      const error503 = Object.assign(new Error('Service Unavailable'), {
+        status: 503,
+      });
+      mockGenerateContentFn
+        .mockImplementationOnce(async () => {
+          throw error503;
+        })
+        .mockImplementationOnce(async () => {
+          throw error503;
+        })
+        .mockResolvedValueOnce({
+          candidates: [{ content: { parts: [{ text: 'ok' }] } }],
+        });
+
+      const retryPayloads: RetryAttemptPayload[] = [];
+      const onRetryAttempt = (payload: RetryAttemptPayload) => {
+        retryPayloads.push(payload);
+        if (retryPayloads.length === 1) {
+          activeModel = 'fallback-model';
+        }
+      };
+      coreEvents.on(CoreEvent.RetryAttempt, onRetryAttempt);
+
+      try {
+        const promise = promptIdContext.run('prompt-client-1', () =>
+          client.generateContent(
+            { model: 'test-model' },
+            contents,
+            new AbortController().signal,
+            LlmRole.SUBAGENT,
+          ),
+        );
+
+        await vi.runAllTimersAsync();
+        await promise;
+
+        expect(retryPayloads).toHaveLength(2);
+        expect(retryPayloads[0]).toEqual(
+          expect.objectContaining({
+            attempt: 1,
+            maxAttempts: 3,
+            model: 'test-model',
+            role: LlmRole.SUBAGENT,
+            promptId: 'prompt-client-1',
+          }),
+        );
+        expect(retryPayloads[1]).toEqual(
+          expect.objectContaining({
+            attempt: 2,
+            maxAttempts: 5,
+            model: 'fallback-model',
+            role: LlmRole.SUBAGENT,
+            promptId: 'prompt-client-1',
+          }),
+        );
+      } finally {
+        coreEvents.off(CoreEvent.RetryAttempt, onRetryAttempt);
+        vi.useRealTimers();
+      }
     });
 
     describe('Hook System', () => {
