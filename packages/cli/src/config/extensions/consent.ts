@@ -22,6 +22,10 @@ export const INSTALL_WARNING_MESSAGE = chalk.yellow(
   'The extension you are about to install may have been created by a third-party developer and sourced from a public repository. Google does not vet, endorse, or guarantee the functionality or security of extensions. Please carefully inspect any extension and its source code before installing to understand the permissions it requires and the actions it may perform.',
 );
 
+export const LINK_WARNING_MESSAGE = chalk.yellow(
+  '⚠️  Warning: Linking creates a live symbolic link to the target directory. Any future changes made to code, MCP servers, hooks, or prompts inside that directory will take effect automatically upon CLI startup without further warnings.',
+);
+
 export const SKILLS_WARNING_MESSAGE = chalk.yellow(
   "Agent skills inject specialized instructions and domain-specific knowledge into the agent's system prompt. This can change how the agent interprets your requests and interacts with your environment. Review the skill definitions at the location(s) provided below to ensure they meet your security standards.",
 );
@@ -66,7 +70,8 @@ export async function requestConsentNonInteractive(
 ): Promise<boolean> {
   debugLogger.log(consentDescription);
   const result = await promptForConsentNonInteractive(
-    'Do you want to continue? [Y/n]: ',
+    'Do you want to continue? [y/N]: ',
+    false,
   );
   return result;
 }
@@ -103,8 +108,12 @@ export async function requestConsentInteractive(
  */
 export async function promptForConsentNonInteractive(
   prompt: string,
-  defaultValue = true,
+  defaultValue = false,
 ): Promise<boolean> {
+  if (!process.stdin.isTTY) {
+    return false;
+  }
+
   const readline = await import('node:readline');
   const rl = readline.createInterface({
     input: process.stdin,
@@ -192,8 +201,12 @@ async function extensionConsentString(
   skills: SkillDefinition[] = [],
   previousName?: string,
   wasMigrated?: boolean,
+  linkedSourcePath?: string,
 ): Promise<string> {
   const sanitizedConfig = escapeAnsiCtrlCodes(extensionConfig);
+  const sanitizedLinkedPath = linkedSourcePath
+    ? escapeAnsiCtrlCodes(linkedSourcePath)
+    : undefined;
   const output: string[] = [];
   const mcpServerEntries = Object.entries(sanitizedConfig.mcpServers || {});
 
@@ -210,6 +223,10 @@ async function extensionConsentString(
   } else if (previousName && previousName !== sanitizedConfig.name) {
     output.push(
       `Renaming extension "${previousName}" to "${sanitizedConfig.name}" and installing updates.`,
+    );
+  } else if (sanitizedLinkedPath) {
+    output.push(
+      `Linking extension "${sanitizedConfig.name}" from canonical path "${sanitizedLinkedPath}".`,
     );
   } else {
     output.push(`Installing extension "${sanitizedConfig.name}".`);
@@ -328,6 +345,14 @@ async function extensionConsentString(
     output.push(...(await renderSkillsList(skills)));
   }
 
+  if (sanitizedLinkedPath) {
+    output.push(
+      '\n' +
+        chalk.yellow(
+          `⚠️  Warning: Linking creates a live symbolic link to "${sanitizedLinkedPath}". Any future changes made to code, MCP servers, hooks, or prompts inside that directory will take effect automatically upon CLI startup without further warnings.`,
+        ),
+    );
+  }
   output.push('\n' + INSTALL_WARNING_MESSAGE);
   if (skills.length > 0) {
     output.push('\n' + SKILLS_WARNING_MESSAGE);
@@ -375,6 +400,8 @@ export async function maybeRequestConsentOrFail(
   skills: SkillDefinition[] = [],
   previousSkills: SkillDefinition[] = [],
   isMigrating: boolean = false,
+  linkedSourcePath?: string,
+  previousLinkedSourcePath?: string,
 ) {
   const extensionConsent = await extensionConsentString(
     extensionConfig,
@@ -382,12 +409,16 @@ export async function maybeRequestConsentOrFail(
     skills,
     previousExtensionConfig?.name,
     isMigrating,
+    linkedSourcePath,
   );
   if (previousExtensionConfig) {
     const previousExtensionConsent = await extensionConsentString(
       previousExtensionConfig,
       previousHasHooks ?? false,
       previousSkills,
+      undefined,
+      false,
+      previousLinkedSourcePath,
     );
     if (previousExtensionConsent === extensionConsent) {
       return;
