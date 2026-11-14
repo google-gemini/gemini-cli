@@ -842,6 +842,8 @@ export class GeminiChat {
                   model,
                   status: getErrorStatus(error),
                   sessionId: this.context.config.getSessionId?.(),
+                  role,
+                  promptId: prompt_id,
                 });
                 await new Promise((res) => setTimeout(res, delayMs));
                 continue;
@@ -1061,6 +1063,7 @@ export class GeminiChat {
     } = applyModelSelection(this.context.config, modelConfigKey);
 
     let lastModelToUse = availabilityFinalModel;
+    let currentAvailabilityMaxAttempts = availabilityMaxAttempts;
     let currentGenerateContentConfig: GenerateContentConfig =
       newAvailabilityConfig;
     let lastConfig: GenerateContentConfig = currentGenerateContentConfig;
@@ -1115,14 +1118,18 @@ export class GeminiChat {
           useLatestFlash,
           useLatestFlashLite,
         );
+        currentAvailabilityMaxAttempts = undefined;
       } else if (
         !firstAttempt &&
         (this.context.config
           .getModelAvailabilityService?.()
           ?.snapshot(modelToUse)?.available ?? true) === false
       ) {
-        const { model: reselectedModel, config: reselectedConfig } =
-          applyModelSelection(this.context.config, modelConfigKey);
+        const {
+          model: reselectedModel,
+          config: reselectedConfig,
+          maxAttempts: reselectedMaxAttempts,
+        } = applyModelSelection(this.context.config, modelConfigKey);
         modelToUse = resolveModel(
           reselectedModel,
           useGemini3_1,
@@ -1135,6 +1142,7 @@ export class GeminiChat {
         if (reselectedConfig) {
           currentGenerateContentConfig = reselectedConfig;
         }
+        currentAvailabilityMaxAttempts = reselectedMaxAttempts;
         initialActiveModel = this.context.config.getActiveModel();
       }
 
@@ -1328,15 +1336,20 @@ export class GeminiChat {
         availabilityMaxAttempts ?? this.context.config.getMaxAttempts(),
       getAvailabilityContext,
       onRetry: (attempt, error, delayMs) => {
+        const actualMaxAttempts =
+          getAvailabilityContext()?.policy.maxAttempts ??
+          currentAvailabilityMaxAttempts ??
+          this.context.config.getMaxAttempts();
         coreEvents.emitRetryAttempt({
           attempt,
-          maxAttempts:
-            availabilityMaxAttempts ?? this.context.config.getMaxAttempts(),
+          maxAttempts: actualMaxAttempts,
           delayMs,
           error: error instanceof Error ? error.message : String(error),
           model: lastModelToUse,
           status: getErrorStatus(error),
           sessionId: this.context.config.getSessionId?.(),
+          role,
+          promptId: prompt_id,
         });
       },
     });

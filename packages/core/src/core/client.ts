@@ -80,6 +80,7 @@ import {
   CoreEvent,
   type ApprovalModeChangedPayload,
 } from '../utils/events.js';
+import { promptIdContext } from '../utils/promptIdContext.js';
 import { initializeContextManager } from '../context/initializer.js';
 
 const MAX_TURNS = 100;
@@ -1115,6 +1116,8 @@ export class GeminiClient {
     abortSignal: AbortSignal,
     role: LlmRole,
   ): Promise<GenerateContentResponse> {
+    const requestPromptId = promptIdContext.getStore() ?? this.lastPromptId;
+    const requestRole = role;
     const desiredModelConfig =
       this.config.modelConfigService.getResolvedConfig(modelConfigKey);
     let {
@@ -1134,6 +1137,7 @@ export class GeminiClient {
       if (newConfig) {
         currentAttemptGenerateContentConfig = newConfig;
       }
+      let currentAvailabilityMaxAttempts = availabilityMaxAttempts;
 
       // Define callback to refresh context based on currentAttemptModel which might be updated by fallback handler
       const getAvailabilityContext: () => RetryAvailabilityContext | undefined =
@@ -1160,18 +1164,23 @@ export class GeminiClient {
             });
           currentAttemptModel = resolvedModel;
           currentAttemptGenerateContentConfig = generateContentConfig;
+          currentAvailabilityMaxAttempts = undefined;
         } else if (
           !firstAttempt &&
           (this.config
             .getModelAvailabilityService?.()
             ?.snapshot(currentAttemptModel)?.available ?? true) === false
         ) {
-          const { model: reselectedModel, config: reselectedConfig } =
-            applyModelSelection(this.config, modelConfigKey);
+          const {
+            model: reselectedModel,
+            config: reselectedConfig,
+            maxAttempts: reselectedMaxAttempts,
+          } = applyModelSelection(this.config, modelConfigKey);
           currentAttemptModel = reselectedModel;
           if (reselectedConfig) {
             currentAttemptGenerateContentConfig = reselectedConfig;
           }
+          currentAvailabilityMaxAttempts = reselectedMaxAttempts;
           initialActiveModel = this.config.getActiveModel();
         }
 
@@ -1187,8 +1196,8 @@ export class GeminiClient {
             config: requestConfig,
             contents,
           },
-          this.lastPromptId,
-          role,
+          requestPromptId,
+          requestRole,
         );
       };
       const onPersistent429Callback = async (
@@ -1226,15 +1235,20 @@ export class GeminiClient {
         retryFetchErrors: this.config.getRetryFetchErrors(),
         getAvailabilityContext,
         onRetry: (attempt, error, delayMs) => {
+          const actualMaxAttempts =
+            getAvailabilityContext()?.policy.maxAttempts ??
+            currentAvailabilityMaxAttempts ??
+            this.config.getMaxAttempts();
           coreEvents.emitRetryAttempt({
             attempt,
-            maxAttempts:
-              availabilityMaxAttempts ?? this.config.getMaxAttempts(),
+            maxAttempts: actualMaxAttempts,
             delayMs,
             error: error instanceof Error ? error.message : String(error),
             model: getDisplayString(currentAttemptModel),
             status: getErrorStatus(error),
             sessionId: this.config.getSessionId?.(),
+            role: requestRole,
+            promptId: requestPromptId,
           });
         },
       });
