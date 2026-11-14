@@ -55,6 +55,9 @@ describe('ModelRouterService', () => {
       mockLocalLiteRtLmClient,
     );
     vi.spyOn(mockConfig, 'getNumericalRoutingEnabled').mockResolvedValue(true);
+    vi.spyOn(mockConfig, 'hasCustomNumericalRoutingRules').mockReturnValue(
+      false,
+    );
     vi.spyOn(mockConfig, 'getResolvedClassifierThreshold').mockResolvedValue(
       90,
     );
@@ -142,6 +145,25 @@ describe('ModelRouterService', () => {
     expect(childStrategies[5]).toBeInstanceOf(NumericalClassifierStrategy);
     expect(childStrategies[6]).toBeInstanceOf(DefaultStrategy);
     expect(compositeStrategyArgs[1]).toBe('agent-router');
+  });
+
+  it('should prioritize numerical routing when custom rules are configured', () => {
+    vi.spyOn(mockConfig, 'hasCustomNumericalRoutingRules').mockReturnValue(
+      true,
+    );
+    vi.mocked(CompositeStrategy).mockClear();
+
+    service = new ModelRouterService(mockConfig);
+
+    const compositeStrategyArgs = vi.mocked(CompositeStrategy).mock.calls[0];
+    const childStrategies = compositeStrategyArgs[0];
+
+    expect(childStrategies[0]).toBeInstanceOf(FallbackStrategy);
+    expect(childStrategies[1]).toBeInstanceOf(OverrideStrategy);
+    expect(childStrategies[2]).toBeInstanceOf(ApprovalModeStrategy);
+    expect(childStrategies[3]).toBeInstanceOf(NumericalClassifierStrategy);
+    expect(childStrategies[4]).toBeInstanceOf(ClassifierStrategy);
+    expect(childStrategies[5]).toBeInstanceOf(DefaultStrategy);
   });
 
   describe('route()', () => {

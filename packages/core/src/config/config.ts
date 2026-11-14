@@ -237,6 +237,19 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
+export interface NumericalRoutingRule {
+  /** Inclusive upper bound for the complexity score (1-100). */
+  maxScore: number;
+  /** Model ID or configured model alias to use for this score band. */
+  model: string;
+}
+
+export interface RoutingSettings {
+  numericalRules?: NumericalRoutingRule[];
+}
+
+export type NumericalRoutingSettings = RoutingSettings;
+
 export interface GemmaModelRouterSettings {
   enabled?: boolean;
   autoStartServer?: boolean;
@@ -696,6 +709,7 @@ export interface ConfigParameters {
   directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
+  routing?: RoutingSettings;
   gemmaModelRouter?: GemmaModelRouterSettings;
   adk?: ADKSettings;
   disableModelRouterForAuth?: AuthType[];
@@ -932,6 +946,7 @@ export class Config implements McpContext, AgentLoopContext {
     | undefined;
   private readonly outputSettings: OutputSettings;
 
+  private readonly routingSettings?: RoutingSettings;
   private readonly gemmaModelRouter: GemmaModelRouterSettings;
   private readonly agentSessionNoninteractiveEnabled: boolean;
   private readonly agentSessionInteractiveEnabled: boolean;
@@ -1373,6 +1388,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
+    this.routingSettings = params.routing;
     this.gemmaModelRouter = {
       enabled: params.gemmaModelRouter?.enabled ?? false,
       autoStartServer: params.gemmaModelRouter?.autoStartServer ?? true,
@@ -3945,6 +3961,14 @@ export class Config implements McpContext, AgentLoopContext {
 
   getGemmaModelRouterSettings(): GemmaModelRouterSettings {
     return this.gemmaModelRouter;
+  }
+
+  getNumericalRoutingRules(): NumericalRoutingRule[] {
+    return this.routingSettings?.numericalRules ?? [];
+  }
+
+  hasCustomNumericalRoutingRules(): boolean {
+    return this.getNumericalRoutingRules().length > 0;
   }
 
   getAgentSessionNoninteractiveEnabled(): boolean {
