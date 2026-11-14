@@ -432,10 +432,18 @@ export async function getOauthClient(
   authType: AuthType,
   config: Config,
 ): Promise<AuthClient> {
-  if (!oauthClientPromises.has(authType)) {
-    oauthClientPromises.set(authType, initOauthClient(authType, config));
+  let clientPromise = oauthClientPromises.get(authType);
+  if (!clientPromise) {
+    const pendingPromise = initOauthClient(authType, config).catch((error) => {
+      if (oauthClientPromises.get(authType) === pendingPromise) {
+        oauthClientPromises.delete(authType);
+      }
+      throw error;
+    });
+    oauthClientPromises.set(authType, pendingPromise);
+    clientPromise = pendingPromise;
   }
-  return oauthClientPromises.get(authType)!;
+  return clientPromise;
 }
 
 async function authWithUserCode(client: OAuth2Client): Promise<boolean> {

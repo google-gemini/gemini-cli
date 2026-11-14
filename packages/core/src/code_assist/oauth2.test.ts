@@ -1731,6 +1731,96 @@ describe('oauth2', () => {
         await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
         expect(OAuth2Client).toHaveBeenCalledTimes(2);
       });
+
+      it('should evict rejected initialization promises so subsequent calls retry', async () => {
+        const mockConfigNonInteractive = {
+          getNoBrowser: () => true,
+          getProxy: () => 'http://test.proxy.com:8080',
+          isBrowserLaunchSuppressed: () => true,
+          isInteractive: () => false,
+        } as unknown as Config;
+
+        await expect(
+          getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfigNonInteractive),
+        ).rejects.toThrow(FatalAuthenticationError);
+
+        const mockOAuth2Client = {
+          setCredentials: vi.fn(),
+          getAccessToken: vi.fn().mockResolvedValue({ token: 'test-token' }),
+          getTokenInfo: vi.fn().mockResolvedValue({}),
+          on: vi.fn(),
+        } as unknown as OAuth2Client;
+        vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
+
+        const credsPath = path.join(
+          tempHomeDir,
+          GEMINI_DIR,
+          'oauth_creds.json',
+        );
+        await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+        await fs.promises.writeFile(
+          credsPath,
+          JSON.stringify({ refresh_token: 'token' }),
+        );
+
+        const recoveredClient = await getOauthClient(
+          AuthType.LOGIN_WITH_GOOGLE,
+          mockConfig,
+        );
+        expect(recoveredClient).toBe(mockOAuth2Client);
+        expect(OAuth2Client).toHaveBeenCalledTimes(2);
+
+        const cachedClient = await getOauthClient(
+          AuthType.LOGIN_WITH_GOOGLE,
+          mockConfig,
+        );
+        expect(cachedClient).toBe(mockOAuth2Client);
+        expect(OAuth2Client).toHaveBeenCalledTimes(2);
+      });
+
+      it('should not evict a newer cached client when an earlier cleared attempt rejects late', async () => {
+        let rejectFirst: ((reason?: unknown) => void) | undefined;
+        const firstAccessTokenPromise = new Promise<{ token: string }>(
+          (_resolve, reject) => {
+            rejectFirst = reject;
+          },
+        );
+
+        const firstComputeClient = {
+          credentials: { refresh_token: 'first-token' },
+          getAccessToken: vi.fn().mockReturnValue(firstAccessTokenPromise),
+        } as unknown as Compute;
+        const secondComputeClient = {
+          credentials: { refresh_token: 'second-token' },
+          getAccessToken: vi.fn().mockResolvedValue({ token: 'second-token' }),
+        } as unknown as Compute;
+
+        (Compute as unknown as Mock)
+          .mockImplementationOnce(() => firstComputeClient)
+          .mockImplementation(() => secondComputeClient);
+
+        const firstAttempt = getOauthClient(AuthType.COMPUTE_ADC, mockConfig);
+        clearOauthClientCache();
+
+        const secondClient = await getOauthClient(
+          AuthType.COMPUTE_ADC,
+          mockConfig,
+        );
+        expect(secondClient).toBe(secondComputeClient);
+        expect(Compute).toHaveBeenCalledTimes(2);
+
+        rejectFirst?.(new Error('transient metadata timeout'));
+        await expect(firstAttempt).rejects.toThrow(
+          'transient metadata timeout',
+        );
+
+        const thirdClient = await getOauthClient(
+          AuthType.COMPUTE_ADC,
+          mockConfig,
+        );
+        expect(thirdClient).toBe(secondComputeClient);
+        expect(Compute).toHaveBeenCalledTimes(2);
+      });
     });
   });
 
