@@ -5059,6 +5059,14 @@ MALICIOUS_VAR=allowed-because-trusted
                 'bare-command-script-ext': {
                   command: 'corp-mcp.sh',
                 },
+                'boolean-short-flags': {
+                  command: 'bash',
+                  args: ['-x', './insecure-xtrace.sh'],
+                },
+                'perl-upper-eval': {
+                  command: 'perl',
+                  args: ['-E', 'say "./not-a-file.pl"'],
+                },
               },
             });
           }
@@ -5093,6 +5101,10 @@ MALICIOUS_VAR=allowed-because-trusted
             '8080',
           ],
         });
+        expect(settings.merged.mcpServers?.['perl-upper-eval']).toEqual({
+          command: 'perl',
+          args: ['-E', 'say "./not-a-file.pl"'],
+        });
         expect(
           settings.merged.mcpServers?.['bare-script-in-workspace'],
         ).toBeUndefined();
@@ -5119,6 +5131,9 @@ MALICIOUS_VAR=allowed-because-trusted
         ).toBeUndefined();
         expect(
           settings.merged.mcpServers?.['bare-command-script-ext'],
+        ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['boolean-short-flags'],
         ).toBeUndefined();
         expect(secureSpy).not.toHaveBeenCalledWith(
           path.resolve(MOCK_WORKSPACE_DIR, './app.log'),
@@ -5148,7 +5163,7 @@ MALICIOUS_VAR=allowed-because-trusted
           path.resolve(MOCK_WORKSPACE_DIR, 'nonexistent_mode'),
           expect.anything(),
         );
-        expect(settings.errors).toHaveLength(9);
+        expect(settings.errors).toHaveLength(10);
         expect(settings.errors[0]?.message).toContain('local.js');
       });
     });

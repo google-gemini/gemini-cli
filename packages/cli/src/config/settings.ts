@@ -967,6 +967,7 @@ const SCRIPT_INTERPRETERS = new Set([
 const INLINE_EVAL_FLAGS = new Set([
   '-c',
   '-e',
+  '-E',
   '--eval',
   '-p',
   '--print',
@@ -1017,20 +1018,13 @@ const SCRIPT_EXTENSIONS = new Set([
 ]);
 
 const NON_SCRIPT_VALUE_FLAGS = new Set([
-  '-w',
   '-W',
-  '-x',
-  '-X',
-  '-o',
-  '-O',
-  '-d',
   '-m',
   '-I',
   '-M',
   '-K',
   '-F',
   '-C',
-  '-E',
   '-P',
   '--project',
   '--config',
