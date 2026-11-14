@@ -31,9 +31,13 @@ interface InstallArgs {
 
 export async function handleLink(args: InstallArgs) {
   try {
+    const trimmedPath = args.path.trim();
+    if (!trimmedPath) {
+      throw new Error('Extension path cannot be empty.');
+    }
     const workspaceDir = process.cwd();
     const canonicalPath = fs.realpathSync(
-      path.resolve(workspaceDir, args.path),
+      path.resolve(workspaceDir, trimmedPath),
     );
     const installMetadata: ExtensionInstallMetadata = {
       source: canonicalPath,

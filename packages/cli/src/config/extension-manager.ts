@@ -374,7 +374,12 @@ Would you like to attempt to install via "git clone" instead?`,
           isMigrating,
           installMetadata.type === 'link' ? localSourcePath : undefined,
           previous?.installMetadata?.type === 'link'
-            ? previous.installMetadata.source
+            ? getRealPath(
+                path.resolve(
+                  this.workspaceDir,
+                  previous.installMetadata.source,
+                ),
+              )
             : undefined,
         );
         const extensionId = getExtensionId(newExtensionConfig, installMetadata);

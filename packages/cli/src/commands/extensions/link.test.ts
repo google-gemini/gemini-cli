@@ -260,6 +260,25 @@ describe('extensions link command', () => {
       mockProcessExit.mockRestore();
     });
 
+    it('should reject empty or whitespace-only extension paths before resolving', async () => {
+      const mockProcessExit = vi
+        .spyOn(process, 'exit')
+        .mockImplementation((() => {}) as (
+          code?: string | number | null | undefined,
+        ) => never);
+
+      await handleLink({ path: '   ' });
+
+      expect(mockRealpathSync).not.toHaveBeenCalled();
+      expect(mockExtensionManager).not.toHaveBeenCalled();
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
+        'error',
+        'Extension path cannot be empty.',
+      );
+      expect(mockProcessExit).toHaveBeenCalledWith(1);
+      mockProcessExit.mockRestore();
+    });
+
     it('should log an error message and exit with code 1 when linking fails', async () => {
       const mockProcessExit = vi
         .spyOn(process, 'exit')
