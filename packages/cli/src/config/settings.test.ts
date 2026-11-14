@@ -5028,6 +5028,14 @@ MALICIOUS_VAR=allowed-because-trusted
                   command: 'node',
                   args: ['server'],
                 },
+                'ts-node-with-project-flag': {
+                  command: 'ts-node',
+                  args: ['-P', './tsconfig.json', './insecure-ts-server.ts'],
+                },
+                'python-warning-flag': {
+                  command: 'python3',
+                  args: ['-W', 'ignore', './insecure-py-server.py'],
+                },
               },
             });
           }
@@ -5074,6 +5082,12 @@ MALICIOUS_VAR=allowed-because-trusted
         expect(
           settings.merged.mcpServers?.['extensionless-bare-script'],
         ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['ts-node-with-project-flag'],
+        ).toBeUndefined();
+        expect(
+          settings.merged.mcpServers?.['python-warning-flag'],
+        ).toBeUndefined();
         expect(secureSpy).not.toHaveBeenCalledWith(
           path.resolve(MOCK_WORKSPACE_DIR, './app.log'),
           expect.anything(),
@@ -5094,7 +5108,11 @@ MALICIOUS_VAR=allowed-because-trusted
           path.resolve(MOCK_WORKSPACE_DIR, '8080'),
           expect.anything(),
         );
-        expect(settings.errors).toHaveLength(4);
+        expect(secureSpy).not.toHaveBeenCalledWith(
+          path.resolve(MOCK_WORKSPACE_DIR, 'ignore'),
+          expect.anything(),
+        );
+        expect(settings.errors).toHaveLength(6);
         expect(settings.errors[0]?.message).toContain('local.js');
       });
     });

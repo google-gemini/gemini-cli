@@ -961,6 +961,8 @@ const SCRIPT_INTERPRETERS = new Set([
   'deno',
   'bun',
   'tsx',
+  'ts-node',
+  'ts-node-esm',
 ]);
 
 const INLINE_EVAL_FLAGS = new Set([
@@ -1017,9 +1019,21 @@ const SCRIPT_EXTENSIONS = new Set([
 
 const NON_SCRIPT_VALUE_FLAGS = new Set([
   '-w',
+  '-W',
   '-x',
+  '-X',
   '-o',
+  '-O',
   '-d',
+  '-m',
+  '-I',
+  '-M',
+  '-K',
+  '-F',
+  '-C',
+  '-E',
+  '-P',
+  '--project',
   '--config',
   '--log-file',
   '--max-old-space-size',
@@ -1156,9 +1170,8 @@ function extractInterpreterScriptArgs(
 
     if (trimmed.startsWith('-') && trimmed !== '-') {
       const eqIndex = trimmed.indexOf('=');
-      const flagName = (
-        eqIndex >= 0 ? trimmed.slice(0, eqIndex) : trimmed
-      ).toLowerCase();
+      const rawFlag = eqIndex >= 0 ? trimmed.slice(0, eqIndex) : trimmed;
+      const flagName = rawFlag.length === 2 ? rawFlag : rawFlag.toLowerCase();
       if (INLINE_EVAL_FLAGS.has(flagName)) {
         break;
       }
