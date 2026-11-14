@@ -56,6 +56,7 @@ export function partitionToolCallRequestsIntoWaves(
 
   // Sort requests to ensure Topic changes happen before actions in the same batch.
   const sortedRequests = [...requests].sort((a, b) => {
+    if (a.name === b.name) return 0;
     if (a.name === UPDATE_TOPIC_TOOL_NAME) return -1;
     if (b.name === UPDATE_TOPIC_TOOL_NAME) return 1;
     return 0;
