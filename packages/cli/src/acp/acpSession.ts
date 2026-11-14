@@ -18,6 +18,7 @@ import {
   getErrorStatus,
   DiscoveredMCPTool,
   ToolCallEvent,
+  ToolExecutor,
   debugLogger,
   ReadManyFilesTool,
   partListUnionToString,
@@ -894,6 +895,22 @@ export class Session {
         abortSignal,
       });
       const content = toToolCallContent(toolResult);
+      // Bound a large output for the model the way the CLI's scheduler does.
+      const { truncatedContent: llmContent } = await new ToolExecutor(
+        this.context,
+      ).truncateOutputIfNeeded(
+        {
+          request: {
+            callId,
+            name: fc.name,
+            args,
+            isClientInitiated: false,
+            prompt_id: promptId,
+          },
+          tool,
+        },
+        toolResult.llmContent,
+      );
 
       const updateContent: acp.ToolCallContent[] = content ? [content] : [];
 
@@ -940,7 +957,7 @@ export class Session {
             responseParts: convertToFunctionResponse(
               fc.name,
               callId,
-              toolResult.llmContent,
+              llmContent,
               this.context.config.getActiveModel(),
               this.context.config,
             ),
@@ -954,7 +971,7 @@ export class Session {
       return convertToFunctionResponse(
         fc.name,
         callId,
-        toolResult.llmContent,
+        llmContent,
         this.context.config.getActiveModel(),
         this.context.config,
       );
