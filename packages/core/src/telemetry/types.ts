@@ -2155,6 +2155,13 @@ export class RecoveryAttemptEvent extends BaseAgentEvent {
   duration_ms: number;
   success: boolean;
   turn_count: number;
+  /**
+   * Whether the recovery produced partial/salvaged output rather than
+   * a genuine completion.  When `true`, the final terminate_reason
+   * stays as the original limit reason (MAX_TURNS, TIMEOUT) instead
+   * of being promoted to GOAL.
+   */
+  salvaged: boolean;
 
   constructor(
     agent_id: string,
@@ -2163,12 +2170,14 @@ export class RecoveryAttemptEvent extends BaseAgentEvent {
     duration_ms: number,
     success: boolean,
     turn_count: number,
+    salvaged: boolean = false,
   ) {
     super(agent_id, agent_name);
     this.reason = reason;
     this.duration_ms = duration_ms;
     this.success = success;
     this.turn_count = turn_count;
+    this.salvaged = salvaged;
   }
 
   override toOpenTelemetryAttributes(config: Config): LogAttributes {
@@ -2179,11 +2188,12 @@ export class RecoveryAttemptEvent extends BaseAgentEvent {
       duration_ms: this.duration_ms,
       success: this.success,
       turn_count: this.turn_count,
+      salvaged: this.salvaged,
     };
   }
 
   toLogBody(): string {
-    return `Agent ${this.agent_name} recovery attempt. Reason: ${this.reason}. Success: ${this.success}. Duration: ${this.duration_ms}ms.`;
+    return `Agent ${this.agent_name} recovery attempt. Reason: ${this.reason}. Success: ${this.success}. Salvaged: ${this.salvaged}. Duration: ${this.duration_ms}ms.`;
   }
 }
 
