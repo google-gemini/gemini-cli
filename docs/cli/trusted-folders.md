@@ -91,8 +91,10 @@ protect you. In this mode, the following features are disabled:
     `.gemini/settings.json` file from the project. This prevents the loading of
     custom tools and other potentially dangerous configurations.
 
-2.  **Environment variables are ignored**: The CLI will **not** load any `.env`
-    files from the project.
+2.  **Environment variables are ignored**: The CLI only loads the authentication
+    variables `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `GOOGLE_CLOUD_PROJECT`, and
+    `GOOGLE_CLOUD_LOCATION` from the project's `.env` file or your user-level
+    `~/.gemini/.env` (or `~/.env`). Other variables in these files are ignored.
 
 3.  **Extension management is restricted**: You **cannot install, update, or
     uninstall** extensions.
