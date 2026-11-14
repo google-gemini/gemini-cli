@@ -142,19 +142,23 @@ describe('extensions link command', () => {
   describe('handleLink', () => {
     it('should link an extension from a local path, display canonical path and live-symlink warning, and succeed when user confirms with y', async () => {
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      const expectedPath = path.resolve(
+        '/test/dir',
+        '/local/path/to/extension',
+      );
       await handleLink({ path: '/local/path/to/extension' });
 
-      expect(mockRealpathSync).toHaveBeenCalledWith('/local/path/to/extension');
+      expect(mockRealpathSync).toHaveBeenCalledWith(expectedPath);
       expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         expect.stringContaining(
-          'Linking extension "my-linked-extension" from canonical path "/local/path/to/extension".',
+          `Linking extension "my-linked-extension" from canonical path "${expectedPath}".`,
         ),
       );
       expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         expect.stringContaining(
-          'Linking creates a live symbolic link to "/local/path/to/extension".',
+          `Linking creates a live symbolic link to "${expectedPath}".`,
         ),
       );
       expect(questionMock).toHaveBeenCalledWith(
@@ -170,7 +174,7 @@ describe('extensions link command', () => {
       expect(
         mockExtensionManager.prototype.installOrUpdateExtension,
       ).toHaveBeenCalledWith({
-        source: '/local/path/to/extension',
+        source: expectedPath,
         type: 'link',
       });
       expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
@@ -348,6 +352,10 @@ describe('extensions link command', () => {
 
     it('handler should call handleLink', async () => {
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      const expectedPath = path.resolve(
+        '/test/dir',
+        '/local/path/to/extension',
+      );
       interface TestArgv {
         path: string;
         [key: string]: unknown;
@@ -364,7 +372,7 @@ describe('extensions link command', () => {
       expect(
         mockExtensionManager.prototype.installOrUpdateExtension,
       ).toHaveBeenCalledWith({
-        source: '/local/path/to/extension',
+        source: expectedPath,
         type: 'link',
       });
       mockCwd.mockRestore();
