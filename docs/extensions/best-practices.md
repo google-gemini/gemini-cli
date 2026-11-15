@@ -66,17 +66,24 @@ Only request the permissions your MCP server needs to function. Avoid giving the
 model broad access (such as full shell access) if restricted tools are
 sufficient.
 
-If your extension uses powerful tools like `run_shell_command`, restrict them in
+If your extension uses powerful tools like `run_shell_command`, exclude them in
 your `gemini-extension.json` file:
 
 ```json
 {
   "name": "my-safe-extension",
-  "excludeTools": ["run_shell_command(rm -rf *)"]
+  "excludeTools": ["run_shell_command"]
 }
 ```
 
-This ensures the CLI blocks dangerous commands even if the model attempts to
+`excludeTools` matches whole tool names, so the entry must name the tool on its
+own. A value such as `"run_shell_command(rm -rf)"` matches no tool and leaves
+`run_shell_command` enabled without warning. To block individual commands while
+keeping the tool available, add a [policy](../reference/policy-engine.md) rule
+with a `commandPrefix` and a `deny` decision instead; extension policies live in
+a `policies/` directory at the extension root.
+
+This ensures the CLI blocks the excluded tools even if the model attempts to
 execute them.
 
 ### Validate inputs

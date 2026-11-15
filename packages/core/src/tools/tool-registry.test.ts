@@ -393,6 +393,31 @@ describe('ToolRegistry', () => {
         }
       }
     });
+
+    it('does not exclude a tool when the entry carries arguments', () => {
+      // excludeTools compares whole tool names. The `toolName(args)` form is
+      // parsed for `tools.allowed` and policy rules, never here, so an entry
+      // copied from that syntax must leave the tool enabled instead of
+      // standing in for a command-scoped restriction.
+      const shellTool = new MockTool({
+        name: 'run_shell_command',
+        displayName: 'Run Shell Command',
+      });
+      toolRegistry.registerTool(allowedTool);
+      toolRegistry.registerTool(shellTool);
+
+      for (const entry of [
+        'run_shell_command(rm -rf)',
+        'run_shell_command(rm -rf *)',
+      ]) {
+        mockConfigGetExcludedTools.mockReturnValue(new Set([entry]));
+
+        expect(toolRegistry.getTool(shellTool.name)).toBeDefined();
+        expect(toolRegistry.getAllToolNames()).toEqual(
+          expect.arrayContaining([allowedTool.name, shellTool.name]),
+        );
+      }
+    });
   });
 
   describe('getAllTools', () => {
