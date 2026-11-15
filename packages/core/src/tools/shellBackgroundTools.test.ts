@@ -114,7 +114,7 @@ describe('Background Tools', () => {
       command: 'killed command',
       status: 'exited',
       exitCode: null,
-      signal: 'SIGTERM',
+      signal: 15,
       startTime: Date.now(),
     });
     history.set(successPid, {
@@ -138,7 +138,7 @@ describe('Background Tools', () => {
 
     expect(result.llmContent).not.toContain('Exit Code: null');
     expect(result.llmContent).toContain(
-      `- [PID ${killedPid}] EXITED: \`killed command\` (Signal: SIGTERM)`,
+      `- [PID ${killedPid}] EXITED: \`killed command\` (Signal: 15)`,
     );
     expect(result.llmContent).toContain(
       `- [PID ${successPid}] EXITED: \`ok command\` (Exit Code: 0)`,
