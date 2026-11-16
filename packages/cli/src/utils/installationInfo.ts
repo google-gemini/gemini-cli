@@ -147,13 +147,12 @@ export function getInstallationInfo(
     // process.cwd(), so running a source checkout from another directory is not
     // misclassified as a global npm install.
     const isSourceCheckoutPath =
-      realPath.includes('/packages/cli/') ||
       realPath.endsWith('/packages/cli') ||
-      realPath.includes('/bundle/');
+      /\/(?:packages\/cli(?:\/dist)?|bundle)\/[^/]+$/.test(realPath);
     if (
       !realPath.includes('/node_modules/') &&
       isSourceCheckoutPath &&
-      isGitRepository(path.dirname(realPath))
+      isGitRepository(path.posix.dirname(realPath))
     ) {
       return {
         packageManager: PackageManager.UNKNOWN, // Not managed by a package manager in this sense

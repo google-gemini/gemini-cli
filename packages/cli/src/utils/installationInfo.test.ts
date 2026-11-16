@@ -367,6 +367,22 @@ describe('getInstallationInfo', () => {
     expect(info.updateMessage).toBe('Running via bunx, update not applicable.');
   });
 
+  it('should NOT classify a path with an ancestor directory named bundle as a local git clone', () => {
+    const unrelatedPath = '/home/user/bundle/projects/my-app/index.js';
+    process.argv[1] = unrelatedPath;
+    mockedRealPathSync.mockReturnValue(unrelatedPath);
+    mockedIsGitRepository.mockReturnValue(true);
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('Command failed');
+    });
+
+    const info = getInstallationInfo(projectRoot, true);
+
+    expect(mockedIsGitRepository).not.toHaveBeenCalled();
+    expect(info.packageManager).toBe(PackageManager.NPM);
+    expect(info.isGlobal).toBe(true);
+  });
+
   it('should detect running via npx', () => {
     const npxPath = `/Users/test/.npm/_npx/12345/bin/gemini`;
     process.argv[1] = npxPath;
