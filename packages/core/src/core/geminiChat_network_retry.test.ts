@@ -14,6 +14,16 @@ import { HookSystem } from '../hooks/hookSystem.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import { LlmRole } from '../telemetry/types.js';
+import {
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+} from '../config/models.js';
+import * as policyCatalog from '../availability/policyCatalog.js';
+import {
+  coreEvents,
+  CoreEvent,
+  type RetryAttemptPayload,
+} from '../utils/events.js';
 
 // Mock fs module
 vi.mock('node:fs', async (importOriginal) => {
@@ -649,5 +659,121 @@ describe('GeminiChat Network Retries', () => {
         error_type: 'ERR_STREAM_PREMATURE_CLOSE',
       }),
     );
+  });
+
+  it('should include request role, promptId, and updated model policy maxAttempts in emitted RetryAttempt events', async () => {
+    const emittedRetries: RetryAttemptPayload[] = [];
+    const listener = (payload: RetryAttemptPayload) => {
+      emittedRetries.push(payload);
+    };
+    coreEvents.on(CoreEvent.RetryAttempt, listener);
+
+    try {
+      const { retryWithBackoff: actualRetryWithBackoff } =
+        await vi.importActual<typeof import('../utils/retry.js')>(
+          '../utils/retry.js',
+        );
+      let activeModel = DEFAULT_GEMINI_MODEL;
+      mockConfig.getActiveModel = vi.fn(() => activeModel);
+      mockConfig.getModel = vi.fn(() => DEFAULT_GEMINI_MODEL_AUTO);
+      mockConfig.getMaxAttempts = vi.fn(() => 5);
+      mockConfig.getUserTier = vi.fn(() => undefined);
+      vi.spyOn(policyCatalog, 'getModelPolicyChain').mockReturnValue([
+        {
+          model: DEFAULT_GEMINI_MODEL,
+          maxAttempts: 2,
+          actions: {},
+          stateTransitions: {},
+        },
+        {
+          model: 'gemini-2.5-flash',
+          maxAttempts: 4,
+          isLastResort: true,
+          actions: {},
+          stateTransitions: {},
+        },
+      ]);
+      const mockAvailabilityService = createAvailabilityServiceMock();
+      vi.mocked(
+        mockAvailabilityService.selectFirstAvailable,
+      ).mockImplementation((models: readonly string[]) => ({
+        selectedModel: models[0],
+        skipped: [],
+      }));
+      mockConfig.getModelAvailabilityService = vi
+        .fn()
+        .mockReturnValue(mockAvailabilityService);
+
+      mockRetryWithBackoff.mockImplementationOnce((apiCall, options) =>
+        actualRetryWithBackoff(apiCall, {
+          ...options,
+          initialDelayMs: 1,
+          maxDelayMs: 2,
+        }),
+      );
+
+      let callCount = 0;
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async () => {
+          callCount++;
+          if (callCount === 1) {
+            activeModel = 'gemini-2.5-flash';
+            throw Object.assign(new Error('Service Unavailable'), {
+              status: 503,
+            });
+          }
+          if (callCount === 2) {
+            throw Object.assign(new Error('Service Unavailable'), {
+              status: 503,
+            });
+          }
+          return (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Success' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })();
+        },
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: DEFAULT_GEMINI_MODEL },
+        'test message',
+        'prompt-main-1',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      expect(emittedRetries).toHaveLength(2);
+      expect(emittedRetries[0]).toEqual(
+        expect.objectContaining({
+          attempt: 1,
+          model: DEFAULT_GEMINI_MODEL,
+          maxAttempts: 2,
+          role: LlmRole.MAIN,
+          promptId: 'prompt-main-1',
+          status: 503,
+        }),
+      );
+      expect(emittedRetries[1]).toEqual(
+        expect.objectContaining({
+          attempt: 2,
+          model: 'gemini-2.5-flash',
+          maxAttempts: 4,
+          role: LlmRole.MAIN,
+          promptId: 'prompt-main-1',
+          status: 503,
+        }),
+      );
+    } finally {
+      coreEvents.off(CoreEvent.RetryAttempt, listener);
+    }
   });
 });

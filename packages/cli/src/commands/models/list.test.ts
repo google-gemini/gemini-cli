@@ -15,7 +15,13 @@ import {
 } from 'vitest';
 import type { Argv } from 'yargs';
 import stripAnsi from 'strip-ansi';
-import { type Config } from '@google/gemini-cli-core';
+import {
+  type Config,
+  AuthType,
+  LATEST_GEMINI_FLASH_MODEL,
+  setFlashModels,
+  resetModelsForTesting,
+} from '@google/gemini-cli-core';
 import {
   handleList,
   listCommand,
@@ -23,11 +29,15 @@ import {
   type ModelListing,
 } from './list.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
+import { validateAuthMethod } from '../../config/auth.js';
 import { loadCliConfig } from '../../config/config.js';
 import { buildAvailableModels } from '../../acp/acpUtils.js';
 import { exitCli } from '../utils.js';
 
 vi.mock('../../config/settings.js');
+vi.mock('../../config/auth.js', () => ({
+  validateAuthMethod: vi.fn().mockResolvedValue(null),
+}));
 vi.mock('../../config/config.js');
 vi.mock('../../acp/acpUtils.js');
 vi.mock('../utils.js', () => ({
@@ -40,6 +50,7 @@ vi.mock('../../gemini.js', () => ({
 describe('models list command', () => {
   const originalExitCode = process.exitCode;
   const mockLoadSettings = vi.mocked(loadSettings);
+  const mockValidateAuthMethod = vi.mocked(validateAuthMethod);
   const mockLoadCliConfig = vi.mocked(loadCliConfig);
   const mockBuildAvailableModels = vi.mocked(buildAvailableModels);
   const mockExitCli = vi.mocked(exitCli);
@@ -65,6 +76,7 @@ describe('models list command', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockValidateAuthMethod.mockResolvedValue(null);
     mockLoadSettings.mockReturnValue({
       merged: {},
     } as unknown as LoadedSettings);
@@ -82,6 +94,8 @@ describe('models list command', () => {
 
   afterEach(() => {
     process.exitCode = originalExitCode;
+    resetModelsForTesting();
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -255,6 +269,348 @@ describe('models list command', () => {
       );
       expect(mockStorage.initialize).toHaveBeenCalled();
     });
+
+    it('should refresh auth before listing models so gemini-3.8-flash and updated Auto description are included without duplicates', async () => {
+      const { buildAvailableModels: actualBuildAvailableModels } =
+        await vi.importActual<typeof import('../../acp/acpUtils.js')>(
+          '../../acp/acpUtils.js',
+        );
+      mockBuildAvailableModels.mockImplementation(actualBuildAvailableModels);
+
+      let authRefreshed = false;
+      const mockRefreshAuth = vi.fn().mockImplementation(async () => {
+        authRefreshed = true;
+      });
+
+      const mockConfig = {
+        storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+        refreshAuth: mockRefreshAuth,
+        getModel: vi.fn().mockReturnValue('auto'),
+        getHasAccessToPreviewModel: vi
+          .fn()
+          .mockImplementation(() => authRefreshed),
+        getGemini31LaunchedSync: vi
+          .fn()
+          .mockImplementation(() => authRefreshed),
+        hasLatestFlashGAAccess: vi.fn().mockImplementation(() => {
+          if (authRefreshed) {
+            setFlashModels(
+              LATEST_GEMINI_FLASH_MODEL,
+              LATEST_GEMINI_FLASH_MODEL,
+            );
+            return true;
+          }
+          return false;
+        }),
+        hasLatestFlashLiteGAAccess: vi.fn().mockReturnValue(false),
+        getExperimentalDynamicModelConfiguration: vi
+          .fn()
+          .mockReturnValue(false),
+      } as unknown as Config;
+
+      mockLoadCliConfig.mockResolvedValueOnce(mockConfig);
+
+      const loadedSettings = {
+        merged: {
+          security: {
+            auth: {
+              selectedType: AuthType.LOGIN_WITH_GOOGLE,
+            },
+          },
+        },
+      } as unknown as LoadedSettings;
+
+      await handleList({
+        outputFormat: 'json',
+        loadedSettings,
+      });
+
+      const output = stdoutWriteSpy.mock.calls
+        .map((call) => call[0].toString())
+        .join('');
+      const parsed = JSON.parse(output) as ModelListing[];
+      const modelIds = parsed.map((m) => m.modelId);
+
+      expect(modelIds).toEqual([
+        'auto',
+        'gemini-3.1-pro-preview',
+        'gemini-3.8-flash',
+        'gemini-2.5-pro',
+        'gemini-3.1-flash-lite',
+      ]);
+      expect(parsed[0]).toMatchObject({
+        modelId: 'auto',
+        description:
+          'Let Gemini CLI decide the best model for the task: gemini-3.1-pro-preview, gemini-3.8-flash',
+      });
+      expect(mockRefreshAuth).toHaveBeenCalledWith(AuthType.LOGIN_WITH_GOOGLE);
+    });
+
+    it('should fall back to getAuthTypeFromEnv when selectedType is not set', async () => {
+      vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+      const mockRefreshAuth = vi.fn().mockResolvedValue(undefined);
+      mockLoadCliConfig.mockResolvedValueOnce({
+        storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+        refreshAuth: mockRefreshAuth,
+      } as unknown as Config);
+
+      await handleList({
+        outputFormat: 'json',
+        loadedSettings: { merged: {} } as unknown as LoadedSettings,
+      });
+
+      expect(mockRefreshAuth).toHaveBeenCalledWith(AuthType.USE_GEMINI);
+    });
+
+    it('should skip refreshAuth when security.auth.useExternal is true', async () => {
+      const mockRefreshAuth = vi.fn().mockResolvedValue(undefined);
+      mockLoadCliConfig.mockResolvedValueOnce({
+        storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+        refreshAuth: mockRefreshAuth,
+      } as unknown as Config);
+
+      await handleList({
+        outputFormat: 'json',
+        loadedSettings: {
+          merged: {
+            security: {
+              auth: {
+                selectedType: AuthType.LOGIN_WITH_GOOGLE,
+                useExternal: true,
+              },
+            },
+          },
+        } as unknown as LoadedSettings,
+      });
+
+      expect(mockRefreshAuth).not.toHaveBeenCalled();
+    });
+
+    it('should gracefully fall back to default catalog when refreshAuth fails', async () => {
+      const mockRefreshAuth = vi
+        .fn()
+        .mockRejectedValue(new Error('Auth failed'));
+      mockLoadCliConfig.mockResolvedValueOnce({
+        storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+        refreshAuth: mockRefreshAuth,
+      } as unknown as Config);
+
+      await handleList({
+        outputFormat: 'json',
+        loadedSettings: {
+          merged: {
+            security: {
+              auth: {
+                selectedType: AuthType.LOGIN_WITH_GOOGLE,
+              },
+            },
+          },
+        } as unknown as LoadedSettings,
+      });
+
+      expect(mockRefreshAuth).toHaveBeenCalledWith(AuthType.LOGIN_WITH_GOOGLE);
+      expect(stdoutWriteSpy).toHaveBeenCalled();
+    });
+
+    it('should suppress browser launch on config before calling refreshAuth', async () => {
+      let browserSuppressedDuringRefresh = false;
+      const mockConfig = {
+        storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+        isBrowserLaunchSuppressed: () => false,
+        refreshAuth: vi.fn().mockImplementation(async () => {
+          browserSuppressedDuringRefresh =
+            mockConfig.isBrowserLaunchSuppressed();
+        }),
+      } as unknown as Config;
+      mockLoadCliConfig.mockResolvedValueOnce(mockConfig);
+
+      await handleList({
+        outputFormat: 'json',
+        loadedSettings: {
+          merged: {
+            security: {
+              auth: {
+                selectedType: AuthType.LOGIN_WITH_GOOGLE,
+              },
+            },
+          },
+        } as unknown as LoadedSettings,
+      });
+
+      expect(browserSuppressedDuringRefresh).toBe(true);
+    });
+
+    it('should fall back to default catalog without calling refreshAuth when validateAuthMethod returns an error', async () => {
+      mockValidateAuthMethod.mockResolvedValueOnce(
+        'When using Vertex AI, you must specify GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION',
+      );
+      const mockRefreshAuth = vi.fn().mockResolvedValue(undefined);
+      mockLoadCliConfig.mockResolvedValueOnce({
+        storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+        refreshAuth: mockRefreshAuth,
+      } as unknown as Config);
+
+      await handleList({
+        outputFormat: 'json',
+        loadedSettings: {
+          merged: {
+            security: {
+              auth: {
+                selectedType: AuthType.USE_VERTEX_AI,
+              },
+            },
+          },
+        } as unknown as LoadedSettings,
+      });
+
+      expect(mockValidateAuthMethod).toHaveBeenCalledWith(
+        AuthType.USE_VERTEX_AI,
+      );
+      expect(mockRefreshAuth).not.toHaveBeenCalled();
+      expect(stdoutWriteSpy).toHaveBeenCalled();
+    });
+
+    it('should skip validateAuthMethod when authType is GATEWAY', async () => {
+      vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'https://gateway.example.com');
+      const mockRefreshAuth = vi.fn().mockResolvedValue(undefined);
+      mockLoadCliConfig.mockResolvedValueOnce({
+        storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+        refreshAuth: mockRefreshAuth,
+      } as unknown as Config);
+
+      await handleList({
+        outputFormat: 'json',
+        loadedSettings: { merged: {} } as unknown as LoadedSettings,
+      });
+
+      expect(mockValidateAuthMethod).not.toHaveBeenCalled();
+      expect(mockRefreshAuth).toHaveBeenCalledWith(AuthType.GATEWAY);
+    });
+
+    it('should throw before refreshing auth when enforcedType conflicts with selectedType', async () => {
+      const mockRefreshAuth = vi.fn().mockResolvedValue(undefined);
+      mockLoadCliConfig.mockResolvedValueOnce({
+        storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+        refreshAuth: mockRefreshAuth,
+      } as unknown as Config);
+
+      await expect(
+        handleList({
+          outputFormat: 'json',
+          loadedSettings: {
+            merged: {
+              security: {
+                auth: {
+                  selectedType: AuthType.LOGIN_WITH_GOOGLE,
+                  enforcedType: AuthType.USE_GEMINI,
+                },
+              },
+            },
+          } as unknown as LoadedSettings,
+        }),
+      ).rejects.toThrow(
+        "The enforced authentication type is 'gemini-api-key', but the current type is 'oauth-personal'. Please re-authenticate with the correct type.",
+      );
+
+      expect(mockRefreshAuth).not.toHaveBeenCalled();
+      expect(stdoutWriteSpy).not.toHaveBeenCalled();
+    });
+
+    it('should throw when enforcedType is set and no authentication is configured', async () => {
+      vi.stubEnv('GEMINI_API_KEY', '');
+      vi.stubEnv('GOOGLE_GENAI_USE_VERTEXAI', '');
+      vi.stubEnv('GOOGLE_GENAI_USE_GCA', '');
+      vi.stubEnv('GOOGLE_GEMINI_BASE_URL', '');
+      vi.stubEnv('CLOUD_SHELL', '');
+      vi.stubEnv('GEMINI_CLI_USE_COMPUTE_ADC', '');
+
+      const mockRefreshAuth = vi.fn().mockResolvedValue(undefined);
+      mockLoadCliConfig.mockResolvedValueOnce({
+        storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+        refreshAuth: mockRefreshAuth,
+      } as unknown as Config);
+
+      await expect(
+        handleList({
+          outputFormat: 'json',
+          loadedSettings: {
+            merged: {
+              security: {
+                auth: {
+                  enforcedType: AuthType.LOGIN_WITH_GOOGLE,
+                },
+              },
+            },
+          } as unknown as LoadedSettings,
+        }),
+      ).rejects.toThrow(
+        "The auth type 'oauth-personal' is enforced, but no authentication is configured.",
+      );
+
+      expect(mockRefreshAuth).not.toHaveBeenCalled();
+      expect(stdoutWriteSpy).not.toHaveBeenCalled();
+    });
+
+    it('should propagate error when enforcedType matches selectedType but validateAuthMethod fails', async () => {
+      mockValidateAuthMethod.mockResolvedValueOnce(
+        'When using Gemini API, you must specify the GEMINI_API_KEY environment variable.',
+      );
+      const mockRefreshAuth = vi.fn().mockResolvedValue(undefined);
+      mockLoadCliConfig.mockResolvedValueOnce({
+        storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+        refreshAuth: mockRefreshAuth,
+      } as unknown as Config);
+
+      await expect(
+        handleList({
+          outputFormat: 'json',
+          loadedSettings: {
+            merged: {
+              security: {
+                auth: {
+                  selectedType: AuthType.USE_GEMINI,
+                  enforcedType: AuthType.USE_GEMINI,
+                },
+              },
+            },
+          } as unknown as LoadedSettings,
+        }),
+      ).rejects.toThrow(
+        'When using Gemini API, you must specify the GEMINI_API_KEY environment variable.',
+      );
+
+      expect(mockRefreshAuth).not.toHaveBeenCalled();
+      expect(stdoutWriteSpy).not.toHaveBeenCalled();
+    });
+
+    it('should propagate error when enforcedType matches selectedType but refreshAuth fails', async () => {
+      const mockRefreshAuth = vi
+        .fn()
+        .mockRejectedValue(new Error('OAuth credentials missing'));
+      mockLoadCliConfig.mockResolvedValueOnce({
+        storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+        refreshAuth: mockRefreshAuth,
+      } as unknown as Config);
+
+      await expect(
+        handleList({
+          outputFormat: 'json',
+          loadedSettings: {
+            merged: {
+              security: {
+                auth: {
+                  selectedType: AuthType.LOGIN_WITH_GOOGLE,
+                  enforcedType: AuthType.LOGIN_WITH_GOOGLE,
+                },
+              },
+            },
+          } as unknown as LoadedSettings,
+        }),
+      ).rejects.toThrow('OAuth credentials missing');
+
+      expect(mockRefreshAuth).toHaveBeenCalledWith(AuthType.LOGIN_WITH_GOOGLE);
+      expect(stdoutWriteSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('listCommand module', () => {
@@ -321,7 +677,7 @@ describe('models list command', () => {
         expect.stringContaining('Error: Config load failure'),
       );
       expect(process.exitCode).toBe(1);
-      expect(mockExitCli).toHaveBeenCalled();
+      expect(mockExitCli).toHaveBeenCalledWith(1);
     });
   });
 });
