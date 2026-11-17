@@ -171,6 +171,195 @@ describe('mcp add command', () => {
     );
   });
 
+  describe('when filtering tools', () => {
+    it('should add a single include-tools name', async () => {
+      await parser.parseAsync(
+        'add my-server /path/to/server --include-tools read_file',
+      );
+
+      expect(mockSetValue).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'mcpServers',
+        {
+          'my-server': {
+            command: '/path/to/server',
+            args: [],
+            includeTools: ['read_file'],
+          },
+        },
+      );
+    });
+
+    it('should split comma-separated include-tools names', async () => {
+      await parser.parseAsync(
+        'add my-server /path/to/server --include-tools read_file,write_file',
+      );
+
+      expect(mockSetValue).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'mcpServers',
+        {
+          'my-server': {
+            command: '/path/to/server',
+            args: [],
+            includeTools: ['read_file', 'write_file'],
+          },
+        },
+      );
+    });
+
+    it('should trim whitespace around comma-separated include-tools names', async () => {
+      await parser.parseAsync([
+        'add',
+        'my-server',
+        '/path/to/server',
+        '--include-tools',
+        ' read_file , write_file ,  list_dir ',
+      ]);
+
+      expect(mockSetValue).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'mcpServers',
+        {
+          'my-server': {
+            command: '/path/to/server',
+            args: [],
+            includeTools: ['read_file', 'write_file', 'list_dir'],
+          },
+        },
+      );
+    });
+
+    it('should support repeated include-tools flags', async () => {
+      await parser.parseAsync(
+        'add my-server /path/to/server --include-tools read_file --include-tools write_file',
+      );
+
+      expect(mockSetValue).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'mcpServers',
+        {
+          'my-server': {
+            command: '/path/to/server',
+            args: [],
+            includeTools: ['read_file', 'write_file'],
+          },
+        },
+      );
+    });
+
+    it('should split comma-separated exclude-tools names', async () => {
+      await parser.parseAsync(
+        'add my-server /path/to/server --exclude-tools shell,write_file',
+      );
+
+      expect(mockSetValue).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'mcpServers',
+        {
+          'my-server': {
+            command: '/path/to/server',
+            args: [],
+            excludeTools: ['shell', 'write_file'],
+          },
+        },
+      );
+    });
+
+    it('should support repeated exclude-tools flags', async () => {
+      await parser.parseAsync(
+        'add my-server /path/to/server --exclude-tools shell --exclude-tools write_file',
+      );
+
+      expect(mockSetValue).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'mcpServers',
+        {
+          'my-server': {
+            command: '/path/to/server',
+            args: [],
+            excludeTools: ['shell', 'write_file'],
+          },
+        },
+      );
+    });
+
+    it('should preserve include and exclude filters together', async () => {
+      await parser.parseAsync(
+        'add my-server /path/to/server --include-tools read_file,list_dir --exclude-tools shell,write_file',
+      );
+
+      expect(mockSetValue).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'mcpServers',
+        {
+          'my-server': {
+            command: '/path/to/server',
+            args: [],
+            includeTools: ['read_file', 'list_dir'],
+            excludeTools: ['shell', 'write_file'],
+          },
+        },
+      );
+    });
+
+    it('should split filters for an sse server', async () => {
+      await parser.parseAsync(
+        'add --transport sse sse-server https://example.com/sse --include-tools a,b --exclude-tools x,y',
+      );
+
+      expect(mockSetValue).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'mcpServers',
+        {
+          'sse-server': {
+            url: 'https://example.com/sse',
+            type: 'sse',
+            includeTools: ['a', 'b'],
+            excludeTools: ['x', 'y'],
+          },
+        },
+      );
+    });
+
+    it('should split filters for an http server', async () => {
+      await parser.parseAsync(
+        'add --transport http http-server https://example.com/mcp --include-tools a,b --exclude-tools x,y',
+      );
+
+      expect(mockSetValue).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'mcpServers',
+        {
+          'http-server': {
+            url: 'https://example.com/mcp',
+            type: 'http',
+            includeTools: ['a', 'b'],
+            excludeTools: ['x', 'y'],
+          },
+        },
+      );
+    });
+
+    it('should keep server args when tool filters are provided', async () => {
+      await parser.parseAsync(
+        'add my-server npx -y http://example.com/some-package --include-tools a,b',
+      );
+
+      expect(mockSetValue).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'mcpServers',
+        {
+          'my-server': {
+            command: 'npx',
+            args: ['-y', 'http://example.com/some-package'],
+            includeTools: ['a', 'b'],
+          },
+        },
+      );
+    });
+  });
+
   it('should handle MCP server args with -- separator', async () => {
     await parser.parseAsync(
       'add my-server npx -- -y http://example.com/some-package',
