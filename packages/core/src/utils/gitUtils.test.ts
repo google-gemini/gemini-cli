@@ -77,7 +77,7 @@ describe('gitUtils', () => {
       expect(safeEnv['GIT_CONFIG_KEY_2']).toBe('core.hooksPath');
       expect(safeEnv['GIT_CONFIG_VALUE_2']).toBe('');
       expect(safeEnv['GIT_CONFIG_KEY_3']).toBe('core.sshCommand');
-      expect(safeEnv['GIT_CONFIG_VALUE_3']).toBe('');
+      expect(safeEnv['GIT_CONFIG_VALUE_3']).toBe('ssh -o BatchMode=yes');
       expect(safeEnv['GIT_CONFIG_KEY_4']).toBe('core.pager');
       expect(safeEnv['GIT_CONFIG_VALUE_4']).toBe('cat');
       expect(safeEnv['GIT_CONFIG_KEY_5']).toBe('core.editor');
@@ -238,6 +238,52 @@ describe('gitUtils', () => {
       // diff.external should not be overridden to empty string because Git treats
       // diff.external="" as an attempt to execute an executable named "", which fails.
       expect(configuredKeys).not.toContain('diff.external');
+    });
+
+    it('should not configure core.sshCommand to an empty string', () => {
+      for (const baseEnv of [
+        {},
+        { GIT_SSH_COMMAND: 'ssh -i /path/to/key' },
+        { GIT_SSH: 'plink' },
+      ]) {
+        const safeEnv = getSafeGitEnv(baseEnv);
+        const count = parseInt(safeEnv['GIT_CONFIG_COUNT'] || '0', 10);
+        const overrides = new Map<string, string>();
+        for (let i = 0; i < count; i++) {
+          overrides.set(
+            safeEnv[`GIT_CONFIG_KEY_${i}`] || '',
+            safeEnv[`GIT_CONFIG_VALUE_${i}`] || '',
+          );
+        }
+
+        // Git executes core.sshCommand, so an empty value fails with
+        // "cannot run : No such file or directory" / "fatal: unable to fork".
+        expect(overrides.get('core.sshCommand')).toBe(
+          safeEnv['GIT_SSH_COMMAND'],
+        );
+        expect(overrides.get('core.sshCommand')).not.toBe('');
+      }
+    });
+
+    it('should not make git try to execute an empty ssh command', async () => {
+      spawnSync('git', ['init'], { cwd: tempDir, stdio: 'ignore' });
+      spawnSync(
+        'git',
+        ['remote', 'add', 'origin', 'ssh://localhost/nonexistent/repo.git'],
+        { cwd: tempDir, stdio: 'ignore' },
+      );
+
+      // No SSH server is needed: the point is that Git gets as far as running
+      // ssh instead of failing to execute an empty command.
+      const result = spawnSync('git', ['fetch', 'origin'], {
+        cwd: tempDir,
+        env: getSafeGitEnv({}) as NodeJS.ProcessEnv,
+        encoding: 'utf-8',
+        timeout: 20000,
+      });
+
+      expect(result.stderr).not.toContain('cannot run');
+      expect(result.stderr).not.toContain('unable to fork');
     });
 
     it('should allow git diff to run successfully on a repository with modifications', async () => {

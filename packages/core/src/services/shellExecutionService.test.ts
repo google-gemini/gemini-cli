@@ -2926,7 +2926,11 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_4', 'core.hooksPath');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_4', '');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_5', 'core.sshCommand');
-    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_5', '');
+    // Git executes core.sshCommand, so it must never be empty.
+    expect(cpEnv).toHaveProperty(
+      'GIT_CONFIG_VALUE_5',
+      cpEnv.GIT_SSH_COMMAND || 'ssh -o BatchMode=yes',
+    );
     expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_6', 'core.pager');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_6', 'cat');
     expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_7', 'core.editor');

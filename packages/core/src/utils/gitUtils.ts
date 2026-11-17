@@ -77,7 +77,11 @@ export function getSafeGitEnv(
     GIT_CONFIG_KEY_2: 'core.hooksPath',
     GIT_CONFIG_VALUE_2: '',
     GIT_CONFIG_KEY_3: 'core.sshCommand',
-    GIT_CONFIG_VALUE_3: '',
+    // Git executes core.sshCommand, so an empty override fails with
+    // "cannot run : No such file or directory" / "fatal: unable to fork".
+    // Pin it to the same BatchMode command as GIT_SSH_COMMAND instead, which
+    // also keeps it ahead of any core.sshCommand in the user's gitconfig.
+    GIT_CONFIG_VALUE_3: gitSshCommand,
     GIT_CONFIG_KEY_4: 'core.pager',
     GIT_CONFIG_VALUE_4: 'cat',
     GIT_CONFIG_KEY_5: 'core.editor',

@@ -635,7 +635,10 @@ export class ShellExecutionService {
       ['credential.helper', ''],
       ['core.fsmonitor', ''],
       ['core.hooksPath', ''],
-      ['core.sshCommand', ''],
+      // An empty core.sshCommand makes Git try to execute an empty command
+      // ("fatal: unable to fork"). Use BatchMode ssh so pushes over SSH still
+      // work while remaining non-interactive.
+      ['core.sshCommand', baseEnv['GIT_SSH_COMMAND'] || 'ssh -o BatchMode=yes'],
       ['core.pager', 'cat'],
       ['core.editor', ''],
       ['sequence.editor', ''],
