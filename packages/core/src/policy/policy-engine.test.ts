@@ -25,11 +25,19 @@ import {
   parseCommandDetails,
 } from '../utils/shell-utils.js';
 import { buildArgsPatterns } from './utils.js';
+import { SafeRegExp } from './safe-regex.js';
 import {
   NoopSandboxManager,
   LocalSandboxManager,
   type SandboxManager,
 } from '../services/sandboxManager.js';
+
+/**
+ * Compiles the text of a regex literal with the linear-time engine that
+ * policy rules require. Using a literal keeps the pattern text unchanged.
+ */
+const safe = (pattern: RegExp): SafeRegExp =>
+  SafeRegExp.compile(pattern.source);
 
 // Mock shell-utils to ensure consistent behavior across platforms (especially Windows CI)
 // We want to test PolicyEngine logic, not the shell parser's ability to parse commands
@@ -219,7 +227,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'shell',
-          argsPattern: /rm -rf/,
+          argsPattern: safe(/rm -rf/),
           decision: PolicyDecision.DENY,
         },
         {
@@ -501,7 +509,7 @@ describe('PolicyEngine', () => {
         {
           toolName: 'run_shell_command',
           decision: PolicyDecision.ALLOW,
-          argsPattern: /"command":"echo/,
+          argsPattern: safe(/"command":"echo/),
         },
       ];
 
@@ -538,7 +546,7 @@ describe('PolicyEngine', () => {
         {
           toolName: 'run_shell_command',
           decision: PolicyDecision.ALLOW,
-          argsPattern: /"command":"echo/,
+          argsPattern: safe(/"command":"echo/),
         },
       ];
 
@@ -868,7 +876,7 @@ describe('PolicyEngine', () => {
         { toolName: 'shell', decision: PolicyDecision.ASK_USER, priority: 5 },
         {
           toolName: 'shell',
-          argsPattern: /"command":"ls/,
+          argsPattern: safe(/"command":"ls/),
           decision: PolicyDecision.ALLOW,
           priority: 10,
         },
@@ -908,7 +916,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(patterns[0]!),
+          argsPattern: SafeRegExp.compile(patterns[0]!),
           decision: PolicyDecision.ALLOW,
         },
       ];
@@ -929,7 +937,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'read',
-          argsPattern: /secret/,
+          argsPattern: safe(/secret/),
           decision: PolicyDecision.DENY,
         },
       ];
@@ -967,7 +975,7 @@ describe('PolicyEngine', () => {
         {
           toolName: 'shell',
           // Pattern matches the stable stringified format
-          argsPattern: /"command":"rm[^"]*-rf/,
+          argsPattern: safe(/"command":"rm[^"]*-rf/),
           decision: PolicyDecision.DENY,
         },
       ];
@@ -999,7 +1007,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'api',
-          argsPattern: /"sensitive":true/,
+          argsPattern: safe(/"sensitive":true/),
           decision: PolicyDecision.DENY,
         },
       ];
@@ -1028,7 +1036,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'test',
-          argsPattern: /\[Circular\]/,
+          argsPattern: safe(/\[Circular\]/),
           decision: PolicyDecision.DENY,
         },
       ];
@@ -1070,7 +1078,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'deep',
-          argsPattern: /\[Circular\]/,
+          argsPattern: safe(/\[Circular\]/),
           decision: PolicyDecision.DENY,
         },
       ];
@@ -1112,12 +1120,12 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'test',
-          argsPattern: /\[Circular\]/,
+          argsPattern: safe(/\[Circular\]/),
           decision: PolicyDecision.DENY,
         },
         {
           toolName: 'test',
-          argsPattern: /"value":"shared"/,
+          argsPattern: safe(/"value":"shared"/),
           decision: PolicyDecision.ALLOW,
           priority: 10,
         },
@@ -1143,7 +1151,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'test',
-          argsPattern: /"definedValue":"test"/,
+          argsPattern: safe(/"definedValue":"test"/),
           decision: PolicyDecision.ALLOW,
         },
       ];
@@ -1166,7 +1174,7 @@ describe('PolicyEngine', () => {
       const rulesWithUndefined: PolicyRule[] = [
         {
           toolName: 'test',
-          argsPattern: /undefinedValue/,
+          argsPattern: safe(/undefinedValue/),
           decision: PolicyDecision.DENY,
         },
       ];
@@ -1179,7 +1187,7 @@ describe('PolicyEngine', () => {
       const rulesWithFunction: PolicyRule[] = [
         {
           toolName: 'test',
-          argsPattern: /functionValue/,
+          argsPattern: safe(/functionValue/),
           decision: PolicyDecision.DENY,
         },
       ];
@@ -1193,7 +1201,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'test',
-          argsPattern: /\["value",null,null,null\]/,
+          argsPattern: safe(/\["value",null,null,null\]/),
           decision: PolicyDecision.ALLOW,
         },
       ];
@@ -1234,7 +1242,7 @@ describe('PolicyEngine', () => {
         const rules: PolicyRule[] = [
           {
             toolName: 'test',
-            argsPattern: /.*/,
+            argsPattern: safe(/.*/),
             decision: PolicyDecision.ALLOW,
           },
         ];
@@ -1257,12 +1265,12 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'test',
-          argsPattern: /"sanitized":"safe"/,
+          argsPattern: safe(/"sanitized":"safe"/),
           decision: PolicyDecision.ALLOW,
         },
         {
           toolName: 'test',
-          argsPattern: /"dangerous":"data"/,
+          argsPattern: safe(/"dangerous":"data"/),
           decision: PolicyDecision.DENY,
         },
       ];
@@ -1287,7 +1295,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'test',
-          argsPattern: /"value":"string-value"/,
+          argsPattern: safe(/"value":"string-value"/),
           decision: PolicyDecision.ALLOW,
         },
       ];
@@ -1311,7 +1319,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'test',
-          argsPattern: /"fallback":"value"/,
+          argsPattern: safe(/"fallback":"value"/),
           decision: PolicyDecision.ALLOW,
         },
       ];
@@ -1337,7 +1345,7 @@ describe('PolicyEngine', () => {
         {
           toolName: 'run_shell_command',
           // Matches "echo" prefix
-          argsPattern: /"command":"echo/,
+          argsPattern: safe(/"command":"echo/),
           decision: PolicyDecision.ALLOW,
         },
       ];
@@ -1373,7 +1381,7 @@ describe('PolicyEngine', () => {
         {
           toolName: 'run_shell_command',
           // Matches "echo" prefix
-          argsPattern: /"command":"echo/,
+          argsPattern: safe(/"command":"echo/),
           decision: PolicyDecision.ALLOW,
           allowRedirection: true,
         },
@@ -1444,7 +1452,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"echo/,
+          argsPattern: safe(/"command":"echo/),
           decision: PolicyDecision.ALLOW,
         },
       ];
@@ -1471,7 +1479,9 @@ describe('PolicyEngine', () => {
           toolName: 'run_shell_command',
           // Rule that only allows echo in a specific directory
           // Note: stableStringify sorts keys alphabetically and has no spaces: {"command":"echo hello","dir_path":"/safe/path"}
-          argsPattern: /"command":"echo hello".*"dir_path":"\/safe\/path"/,
+          argsPattern: safe(
+            /"command":"echo hello".*"dir_path":"\/safe\/path"/,
+          ),
           decision: PolicyDecision.ALLOW,
         },
         {
@@ -1571,13 +1581,13 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"git status/,
+          argsPattern: safe(/"command":"git status/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"ls/,
+          argsPattern: safe(/"command":"ls/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
@@ -1608,13 +1618,13 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"git status"/,
+          argsPattern: safe(/"command":"git status"/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"ls"/,
+          argsPattern: safe(/"command":"ls"/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
@@ -1651,13 +1661,13 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"echo/,
+          argsPattern: safe(/"command":"echo/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"git/,
+          argsPattern: safe(/"command":"git/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
@@ -1708,7 +1718,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"ls"/,
+          argsPattern: safe(/"command":"ls"/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
@@ -1809,7 +1819,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"echo/,
+          argsPattern: safe(/"command":"echo/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
@@ -1912,7 +1922,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"git status"/,
+          argsPattern: safe(/"command":"git status"/),
           decision: PolicyDecision.DENY,
           priority: 100,
         },
@@ -1956,19 +1966,19 @@ describe('PolicyEngine', () => {
         {
           // Explicitly DENY the compound command
           toolName: 'run_shell_command',
-          argsPattern: /"command":"git status && ls"/,
+          argsPattern: safe(/"command":"git status && ls"/),
           decision: PolicyDecision.DENY,
           priority: 30,
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"git status/,
+          argsPattern: safe(/"command":"git status/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"ls/,
+          argsPattern: safe(/"command":"ls/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
@@ -1991,13 +2001,13 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"rm/,
+          argsPattern: safe(/"command":"rm/),
           decision: PolicyDecision.DENY,
           priority: 20,
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"echo/,
+          argsPattern: safe(/"command":"echo/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
@@ -2136,13 +2146,13 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"mkdir\b/,
+          argsPattern: safe(/"command":"mkdir\b/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"echo\b/,
+          argsPattern: safe(/"command":"echo\b/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
@@ -2168,13 +2178,13 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"mkdir\b/,
+          argsPattern: safe(/"command":"mkdir\b/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"echo\b/,
+          argsPattern: safe(/"command":"echo\b/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
@@ -2205,7 +2215,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"echo\b/,
+          argsPattern: safe(/"command":"echo\b/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
           allowRedirection: true,
@@ -2233,7 +2243,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"echo\b/,
+          argsPattern: safe(/"command":"echo\b/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
@@ -2260,7 +2270,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"echo\b/,
+          argsPattern: safe(/"command":"echo\b/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
@@ -2287,7 +2297,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"echo\b/,
+          argsPattern: safe(/"command":"echo\b/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
@@ -2315,7 +2325,7 @@ describe('PolicyEngine', () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'run_shell_command',
-          argsPattern: /"command":"echo\b/,
+          argsPattern: safe(/"command":"echo\b/),
           decision: PolicyDecision.ALLOW,
           priority: 20,
         },
@@ -2796,7 +2806,7 @@ describe('PolicyEngine', () => {
       const matchingChecker: SafetyCheckerRule = {
         checker: { type: 'external', name: 'matching' },
         toolName: 'tool',
-        argsPattern: /"safe":true/,
+        argsPattern: safe(/"safe":true/),
       };
       const nonMatchingChecker: SafetyCheckerRule = {
         checker: { type: 'external', name: 'non-matching' },
@@ -2994,7 +3004,7 @@ describe('PolicyEngine', () => {
           {
             toolName: 'tool1',
             decision: PolicyDecision.ALLOW,
-            argsPattern: /safe/,
+            argsPattern: safe(/safe/),
             priority: 100,
             modes: [ApprovalMode.DEFAULT],
           },
@@ -3106,7 +3116,7 @@ describe('PolicyEngine', () => {
           {
             toolName: 'tool1',
             decision: PolicyDecision.DENY,
-            argsPattern: /something/,
+            argsPattern: safe(/something/),
             modes: [ApprovalMode.DEFAULT],
           },
         ],
@@ -3215,7 +3225,7 @@ describe('PolicyEngine', () => {
             toolName: 'write_file',
             decision: PolicyDecision.ALLOW,
             priority: 70,
-            argsPattern: /plans/,
+            argsPattern: safe(/plans/),
             modes: [ApprovalMode.PLAN],
           },
           {
@@ -4569,6 +4579,86 @@ describe('PolicyEngine', () => {
         undefined,
       );
       expect(buildCheck.decision).toBe(PolicyDecision.DENY);
+    });
+  });
+
+  describe('argsPattern evaluation (linear-time matching)', () => {
+    const timedCheck = async (policyEngine: PolicyEngine, value: string) => {
+      const start = performance.now();
+      const result = await policyEngine.check(
+        { name: 'test_tool', args: { value } },
+        undefined,
+      );
+      return { result, elapsed: performance.now() - start };
+    };
+
+    // `firstSize` is checked before the 50-character input so that a slowdown
+    // is reported by an assertion on a short input rather than by a
+    // long-running test.
+    it.each([
+      { pattern: '(a+)+$', firstSize: 26 },
+      { pattern: '(a|aa)+$', firstSize: 38 },
+    ])(
+      'should evaluate the nested quantifier or alternation pattern $pattern in linear time',
+      async ({ pattern, firstSize }) => {
+        const policyEngine = new PolicyEngine({
+          rules: [
+            {
+              toolName: 'test_tool',
+              argsPattern: SafeRegExp.compile(pattern),
+              decision: PolicyDecision.DENY,
+            },
+          ],
+          defaultDecision: PolicyDecision.ALLOW,
+        });
+        await timedCheck(policyEngine, 'warm-up');
+
+        for (const size of [firstSize, 50]) {
+          const { result, elapsed } = await timedCheck(
+            policyEngine,
+            'a'.repeat(size) + '!',
+          );
+
+          expect(elapsed).toBeLessThan(50);
+          // The stringified arguments end with JSON punctuation, so `$` cannot
+          // match after the run of "a"s and the DENY rule does not apply.
+          expect(result.decision).toBe(PolicyDecision.ALLOW);
+        }
+      },
+    );
+
+    it('should reject a native RegExp argsPattern', () => {
+      // Simulates a caller that is not type-checked.
+      const rule = {
+        toolName: 'test_tool',
+        argsPattern: /native-pattern/,
+        decision: PolicyDecision.DENY,
+        source: 'untyped caller',
+      } as unknown as PolicyRule;
+      const checker = {
+        toolName: 'test_tool',
+        argsPattern: /native-pattern/,
+        checker: {
+          type: 'in-process',
+          name: InProcessCheckerType.ALLOWED_PATH,
+        },
+        source: 'untyped caller',
+      } as unknown as SafetyCheckerRule;
+      const expectedMessage =
+        /argsPattern must be created with SafeRegExp\.compile\(\).*Source: untyped caller/;
+
+      expect(() => new PolicyEngine({ rules: [rule] })).toThrow(
+        expectedMessage,
+      );
+      expect(() => new PolicyEngine({ checkers: [checker] })).toThrow(
+        expectedMessage,
+      );
+
+      const policyEngine = new PolicyEngine();
+      expect(() => policyEngine.addRule(rule)).toThrow(expectedMessage);
+      expect(() => policyEngine.addChecker(checker)).toThrow(expectedMessage);
+      expect(policyEngine.getRules()).toHaveLength(0);
+      expect(policyEngine.getCheckers()).toHaveLength(0);
     });
   });
 });

@@ -6,5 +6,6 @@
 
 export * from './policy-engine.js';
 export * from './types.js';
+export * from './safe-regex.js';
 export * from './toml-loader.js';
 export * from './config.js';
