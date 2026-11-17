@@ -549,38 +549,21 @@ export class Session {
               stopReason = 'max_tokens';
               break;
 
-            case GeminiEventType.AgentExecutionStopped: {
-              const value = event.value ?? {};
-              const rawMessage =
-                value.systemMessage?.trim() ||
-                value.reason?.trim() ||
-                'No reason provided';
-              let text = rawMessage.startsWith('Agent execution stopped')
-                ? rawMessage
-                : `Agent execution stopped: ${rawMessage}`;
-              if (value.contextCleared) {
-                text += '\nConversation context has been cleared.';
-              }
-
-              await this.sendUpdate({
-                sessionUpdate: 'agent_message_chunk',
-                content: {
-                  type: 'text',
-                  text,
-                },
-              });
-              break;
-            }
-
+            case GeminiEventType.AgentExecutionStopped:
             case GeminiEventType.AgentExecutionBlocked: {
+              const AGENT_EXECUTION_PREFIX = 'Agent execution ';
+              const isStopped =
+                event.type === GeminiEventType.AgentExecutionStopped;
+              const label = isStopped ? 'stopped' : 'blocked';
+              const prefix = AGENT_EXECUTION_PREFIX + label;
               const value = event.value ?? {};
               const rawMessage =
                 value.systemMessage?.trim() ||
                 value.reason?.trim() ||
                 'No reason provided';
-              let text = rawMessage.startsWith('Agent execution blocked')
+              let text = rawMessage.startsWith(prefix)
                 ? rawMessage
-                : `Agent execution blocked: ${rawMessage}`;
+                : `${prefix}: ${rawMessage}`;
               if (value.contextCleared) {
                 text += '\nConversation context has been cleared.';
               }
