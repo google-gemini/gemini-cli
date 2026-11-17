@@ -658,7 +658,7 @@ describe('ide-connection-utils', () => {
       },
     );
 
-    it('should reject config files that are non-regular files (e.g. FIFOs) or group/world-writable', async () => {
+    it('should reject config files that are non-regular files (e.g. FIFOs) or accessible by group/other', async () => {
       const currentUid = process.getuid ? process.getuid() : 1000;
       vi.mocked(fs.promises.readFile).mockResolvedValue(
         JSON.stringify({ port: '1111', workspacePath: '/test/workspace' }),
@@ -672,7 +672,23 @@ describe('ide-connection-utils', () => {
       } as unknown as fs.Stats);
       expect(await getConnectionConfigFromFile(12345)).toBeUndefined();
 
-      // World-writable regular file
+      // Group/world-readable regular file (0o644)
+      vi.mocked(fs.promises.stat).mockResolvedValue({
+        uid: currentUid,
+        mode: 0o100644,
+        isFile: () => true,
+      } as unknown as fs.Stats);
+      expect(await getConnectionConfigFromFile(12345)).toBeUndefined();
+
+      // Group-readable regular file (0o640)
+      vi.mocked(fs.promises.stat).mockResolvedValue({
+        uid: currentUid,
+        mode: 0o100640,
+        isFile: () => true,
+      } as unknown as fs.Stats);
+      expect(await getConnectionConfigFromFile(12345)).toBeUndefined();
+
+      // World-writable regular file (0o666)
       vi.mocked(fs.promises.stat).mockResolvedValue({
         uid: currentUid,
         mode: 0o100666,

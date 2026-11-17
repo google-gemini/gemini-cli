@@ -189,7 +189,7 @@ async function verifyAndReadFile(
     if (
       os.platform() !== 'win32' &&
       typeof stat.mode === 'number' &&
-      (stat.mode & 0o022) !== 0
+      (stat.mode & 0o077) !== 0
     ) {
       return undefined;
     }
