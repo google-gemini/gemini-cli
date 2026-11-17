@@ -110,10 +110,6 @@ export async function promptForConsentNonInteractive(
   prompt: string,
   defaultValue = false,
 ): Promise<boolean> {
-  if (!process.stdin.isTTY) {
-    return false;
-  }
-
   const readline = await import('node:readline');
   const rl = readline.createInterface({
     input: process.stdin,
@@ -121,13 +117,26 @@ export async function promptForConsentNonInteractive(
   });
 
   return new Promise((resolve) => {
-    rl.question(prompt, (answer) => {
+    let settled = false;
+    const finish = (value: boolean) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       rl.close();
+      resolve(value);
+    };
+
+    rl.on?.('close', () => {
+      finish(false);
+    });
+
+    rl.question(prompt, (answer) => {
       const trimmedAnswer = answer.trim().toLowerCase();
       if (trimmedAnswer === '') {
-        resolve(defaultValue);
+        finish(defaultValue);
       } else {
-        resolve(['y', 'yes'].includes(trimmedAnswer));
+        finish(['y', 'yes'].includes(trimmedAnswer));
       }
     });
   });

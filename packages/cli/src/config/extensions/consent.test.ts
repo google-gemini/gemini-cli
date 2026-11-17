@@ -132,15 +132,23 @@ describe('consent', () => {
       },
     );
 
-    it('should fail closed and return false without prompting when stdin is not a TTY', async () => {
-      Object.defineProperty(process.stdin, 'isTTY', {
-        value: false,
-        configurable: true,
+    it('should fail closed and return false when readline closes on EOF without an answer', async () => {
+      let closeHandler: (() => void) | undefined;
+      const questionMock = vi.fn().mockImplementation(() => {
+        closeHandler?.();
+      });
+      mockReadline.createInterface.mockReturnValue({
+        question: questionMock,
+        on: vi.fn().mockImplementation((event: string, cb: () => void) => {
+          if (event === 'close') {
+            closeHandler = cb;
+          }
+        }),
+        close: vi.fn(),
       });
 
       const consent = await requestConsentNonInteractive('Test consent');
       expect(debugLogger.log).toHaveBeenCalledWith('Test consent');
-      expect(mockReadline.createInterface).not.toHaveBeenCalled();
       expect(consent).toBe(false);
     });
   });

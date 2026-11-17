@@ -45,7 +45,13 @@ export async function handleLink(args: InstallArgs) {
     };
     const requestConsent = args.consent
       ? () => Promise.resolve(true)
-      : requestConsentNonInteractive;
+      : async (consentDescription: string) => {
+          if (!process.stdin.isTTY) {
+            debugLogger.log(consentDescription);
+            return false;
+          }
+          return requestConsentNonInteractive(consentDescription);
+        };
     if (args.consent) {
       debugLogger.log('You have consented to the following:');
       debugLogger.log(LINK_WARNING_MESSAGE);
