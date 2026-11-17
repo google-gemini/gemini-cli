@@ -106,8 +106,7 @@ COPY --chown=node:node packages/cli/dist/google-gemini-cli-*.tgz /tmp/gemini-cli
 COPY --chown=node:node packages/core/dist/google-gemini-cli-core-*.tgz /tmp/gemini-core.tgz
 RUN node -e "const fs=require('node:fs'); const root=JSON.parse(fs.readFileSync('/tmp/root-package.json','utf8')); fs.writeFileSync('/usr/local/share/npm-global/lib/package.json', JSON.stringify({name:'gemini-cli-sandbox-global',private:true,dependencies:{'@google/gemini-cli-core':'file:/tmp/gemini-core.tgz','@google/gemini-cli':'file:/tmp/gemini-cli.tgz'},overrides:{...(root.overrides||{}),'@google/gemini-cli-core':'file:/tmp/gemini-core.tgz'}}, null, 2));" \
   && npm install --prefix /usr/local/share/npm-global/lib --omit=dev --no-audit --no-fund \
-  && chmod +x /usr/local/share/npm-global/lib/node_modules/@google/gemini-cli/dist/index.js \
-  && ln -sf ../lib/node_modules/@google/gemini-cli/dist/index.js /usr/local/share/npm-global/bin/gemini \
+  && ln -sf ../lib/node_modules/.bin/gemini /usr/local/share/npm-global/bin/gemini \
   && rm -f /usr/local/share/npm-global/lib/package.json /usr/local/share/npm-global/lib/package-lock.json /tmp/root-package.json /tmp/gemini-cli.tgz /tmp/gemini-core.tgz \
   && node -e "const fs=require('node:fs'); JSON.parse(fs.readFileSync('/usr/local/share/npm-global/lib/node_modules/@google/gemini-cli/package.json','utf8')); JSON.parse(fs.readFileSync('/usr/local/share/npm-global/lib/node_modules/@google/gemini-cli-core/package.json','utf8'));" \
   && gemini --version > /dev/null \
