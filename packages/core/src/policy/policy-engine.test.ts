@@ -80,6 +80,9 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
         // Simple mock: true if '>' is present, unless it looks like "-> arrow"
         command.includes('>') && !command.includes('-> arrow'),
     ),
+    // The real parser isn't loaded here. Expansion handling is covered with
+    // the real parser in shell-argument-expansion.test.ts.
+    hasUnresolvedShellExpansion: vi.fn().mockReturnValue(false),
   };
 });
 

@@ -864,6 +864,155 @@ export function hasRedirection(command: string): boolean {
   return fallbackCheck();
 }
 
+/**
+ * Syntax tree node types whose value bash computes when the command runs:
+ * parameter and variable expansion, ANSI-C quoting, arithmetic expansion,
+ * command and process substitution, and brace sequence expressions.
+ */
+const SHELL_EXPANSION_NODE_TYPES = new Set([
+  'simple_expansion',
+  'expansion',
+  'ansi_c_string',
+  'arithmetic_expansion',
+  'command_substitution',
+  'process_substitution',
+  'brace_expression',
+]);
+
+/**
+ * Returns the text of a `word` or `concatenation` node with every quoted part
+ * replaced by a placeholder, because quoted text is never globbed or brace
+ * expanded.
+ */
+function getUnquotedWordText(node: Node): string {
+  if (node.type !== 'concatenation') {
+    return node.text;
+  }
+  let text = '';
+  for (let i = 0; i < node.childCount; i += 1) {
+    const child = node.child(i);
+    if (!child) {
+      continue;
+    }
+    const isQuoted =
+      child.type === 'raw_string' ||
+      child.type === 'string' ||
+      child.type === 'ansi_c_string';
+    text += isQuoted ? '_' : child.text;
+  }
+  return text;
+}
+
+/**
+ * Checks unquoted word text for glob patterns (`*`, `?`, `[...]`) and for
+ * brace groups that contain a `,` or `..` at their own nesting level, such as
+ * `{a,b}` or `{a..c}`. Backslash-escaped characters are literal.
+ */
+function hasGlobOrBraceGroup(text: string): boolean {
+  let hasOpenBracket = false;
+  // One entry per open brace group: whether it contains a separator.
+  const braceGroups: boolean[] = [];
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (char === '\\') {
+      i += 1;
+    } else if (char === '*' || char === '?') {
+      return true;
+    } else if (char === '[') {
+      hasOpenBracket = true;
+    } else if (char === ']' && hasOpenBracket) {
+      return true;
+    } else if (char === '{') {
+      braceGroups.push(false);
+    } else if (char === '}' && braceGroups.length > 0) {
+      if (braceGroups.pop()) {
+        return true;
+      }
+    } else if (
+      braceGroups.length > 0 &&
+      (char === ',' || (char === '.' && text[i + 1] === '.'))
+    ) {
+      braceGroups[braceGroups.length - 1] = true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Checks whether bash would rewrite the arguments of a command before running
+ * it, so the unexpanded text doesn't describe what runs. This covers brace
+ * expansion, parameter and variable expansion, ANSI-C (`$'...'`) and locale
+ * (`$"..."`) quoting, arithmetic expansion, command and process substitution,
+ * and unquoted glob patterns. Tilde expansion isn't reported.
+ *
+ * Returns `true` when the command can't be parsed (parser unavailable, parse
+ * timeout, or syntax errors), and `false` when the configured shell isn't
+ * bash.
+ */
+export function hasUnresolvedShellExpansion(command: string): boolean {
+  if (getShellConfiguration().shell !== 'bash') {
+    return false;
+  }
+  if (!bashLanguage) {
+    return true;
+  }
+
+  const tree = parseCommandTree(command);
+  if (!tree) {
+    return true;
+  }
+
+  try {
+    if (tree.rootNode.hasError) {
+      return true;
+    }
+
+    const stack: Node[] = [tree.rootNode];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+
+      // Single-quoted text never expands.
+      if (current.type === 'raw_string') {
+        continue;
+      }
+
+      if (SHELL_EXPANSION_NODE_TYPES.has(current.type)) {
+        return true;
+      }
+
+      if (current.type === 'string') {
+        // tree-sitter-bash parses locale quoting (`$"..."`) as a `$` token
+        // directly followed by a `string` node. Inside double quotes, only
+        // the `$` forms above expand, and they're checked as child nodes.
+        const previous = current.previousSibling;
+        if (
+          previous?.type === '$' &&
+          previous.endIndex === current.startIndex
+        ) {
+          return true;
+        }
+      } else if (
+        current.type === 'concatenation' ||
+        (current.type === 'word' && current.parent?.type !== 'concatenation')
+      ) {
+        if (hasGlobOrBraceGroup(getUnquotedWordText(current))) {
+          return true;
+        }
+      }
+
+      for (let i = current.childCount - 1; i >= 0; i -= 1) {
+        const child = current.child(i);
+        if (child) {
+          stack.push(child);
+        }
+      }
+    }
+    return false;
+  } finally {
+    tree.delete();
+  }
+}
+
 export function splitCommands(command: string): string[] {
   const parsed = parseCommandDetails(command);
   if (!parsed || parsed.hasError) {

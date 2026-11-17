@@ -23,6 +23,7 @@ import {
   stripShellWrapper,
   normalizeCommand,
   hasRedirection,
+  hasUnresolvedShellExpansion,
   detectCommandSubstitution,
   resolveExecutable,
   isInteractiveGeminiCommand,
@@ -289,6 +290,106 @@ describe('hasRedirection', () => {
   it('should return false when redirection characters are inside quotes in bash', () => {
     mockPlatform.mockReturnValue('linux');
     expect(hasRedirection('echo "a > b"')).toBe(false);
+  });
+});
+
+describe('hasUnresolvedShellExpansion', () => {
+  // Test titles use template literals because `it.each` title formatting
+  // treats `$1` in a command as a placeholder.
+  for (const command of [
+    'find . {-exec,sh,marker.sh,\\;}',
+    'echo {1..3}',
+    'echo a{b,c}d',
+    'echo $HOME',
+    'echo ${HOME}',
+    'ls ${d:-/etc}',
+    'ls "$HOME"',
+    'echo $1',
+    'echo $@',
+    "echo $'x'",
+    'echo $"x"',
+    'echo $((1+2))',
+    'echo $(pwd)',
+    'echo `pwd`',
+    'cat <(ls)',
+    'ls *.md',
+    'ls ?.md',
+    'ls [ab].md',
+    'find . -exe[c]',
+    'ls && echo {a,b}',
+  ]) {
+    it(`returns true when arguments change after shell expansion: ${command}`, () => {
+      expect(hasUnresolvedShellExpansion(command)).toBe(true);
+    });
+  }
+
+  for (const command of [
+    'ls -la',
+    "echo '{a,b}'",
+    'echo "{a,b}"',
+    "grep -E 'a{1,3}' f.txt",
+    "cat 'file{1,2}.txt'",
+    'echo {}',
+    'echo {id}',
+    "awk '{print $1}' f.txt",
+    "echo '$HOME'",
+    "ls '*.md'",
+    'ls "*.md"',
+    'ls \\*.md',
+    'cat ~/notes.txt',
+    "find . -name '*.md'",
+  ]) {
+    it(`returns false when arguments are literal: ${command}`, () => {
+      expect(hasUnresolvedShellExpansion(command)).toBe(false);
+    });
+  }
+
+  it('returns true when the command has a syntax error', () => {
+    expect(hasUnresolvedShellExpansion('echo "unterminated')).toBe(true);
+  });
+
+  it('returns true when parsing times out', () => {
+    const nowSpy = vi.spyOn(performance, 'now');
+    nowSpy.mockReturnValueOnce(0).mockReturnValue(2000);
+    try {
+      const complexCommand =
+        'ls -la && ' + Array(100).fill('echo "hello"').join(' && ');
+      expect(hasUnresolvedShellExpansion(complexCommand)).toBe(true);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('returns true when the bash parser is unavailable', async () => {
+    vi.resetModules();
+    vi.doMock('./fileUtils.js', () => ({
+      loadWasmBinary: vi.fn().mockRejectedValue(new Error('Wasm load failed')),
+    }));
+    try {
+      const shellUtils = await import('./shell-utils.js');
+      await shellUtils.initializeShellParsers();
+      expect(shellUtils.hasUnresolvedShellExpansion('ls -la')).toBe(true);
+    } finally {
+      vi.doUnmock('./fileUtils.js');
+    }
+  });
+
+  describe('when the shell is PowerShell', () => {
+    beforeEach(() => {
+      mockPlatform.mockReturnValue('win32');
+      vi.stubEnv('ComSpec', 'powershell.exe');
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it.each(['echo $HOME', 'ls *.md', 'find . {-exec,sh,marker.sh,\\;}'])(
+      'returns false for any command: %s',
+      (command) => {
+        expect(hasUnresolvedShellExpansion(command)).toBe(false);
+      },
+    );
   });
 });
 

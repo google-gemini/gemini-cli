@@ -128,6 +128,22 @@ describe('commandSafety', () => {
         false,
       );
     });
+
+    it('approves known read-only commands with literal arguments', async () => {
+      expect(await isStrictlyApproved('ls', ['-la'], ['cat'])).toBe(true);
+    });
+
+    it('approves commands whose root tools are all explicitly approved', async () => {
+      expect(
+        await isStrictlyApproved('bash', ['-c', 'find . {-delete,}'], ['find']),
+      ).toBe(true);
+    });
+
+    it('does not approve unlisted tools whose arguments change after shell expansion', async () => {
+      expect(
+        await isStrictlyApproved('bash', ['-c', 'find . {-delete,}'], ['cat']),
+      ).toBe(false);
+    });
   });
 
   describe('workspace path boundary validation in isKnownSafeCommand', () => {
