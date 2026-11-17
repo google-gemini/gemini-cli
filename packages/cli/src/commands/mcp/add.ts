@@ -112,10 +112,13 @@ async function addMcpServer(
         args: args?.map(String),
         env: env?.reduce(
           (acc, curr) => {
-            const [key, value] = curr.split('=');
-            if (key && value) {
-              acc[key] = value;
+            const separator = curr.indexOf('=');
+            if (separator <= 0) {
+              return acc;
             }
+            const key = curr.slice(0, separator);
+            const value = curr.slice(separator + 1);
+            acc[key] = value;
             return acc;
           },
           {} as Record<string, string>,
