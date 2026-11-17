@@ -549,6 +549,52 @@ export class Session {
               stopReason = 'max_tokens';
               break;
 
+            case GeminiEventType.AgentExecutionStopped: {
+              const value = event.value ?? {};
+              const rawMessage =
+                value.systemMessage?.trim() ||
+                value.reason?.trim() ||
+                'No reason provided';
+              let text = rawMessage.startsWith('Agent execution stopped')
+                ? rawMessage
+                : `Agent execution stopped: ${rawMessage}`;
+              if (value.contextCleared) {
+                text += '\nConversation context has been cleared.';
+              }
+
+              await this.sendUpdate({
+                sessionUpdate: 'agent_message_chunk',
+                content: {
+                  type: 'text',
+                  text,
+                },
+              });
+              break;
+            }
+
+            case GeminiEventType.AgentExecutionBlocked: {
+              const value = event.value ?? {};
+              const rawMessage =
+                value.systemMessage?.trim() ||
+                value.reason?.trim() ||
+                'No reason provided';
+              let text = rawMessage.startsWith('Agent execution blocked')
+                ? rawMessage
+                : `Agent execution blocked: ${rawMessage}`;
+              if (value.contextCleared) {
+                text += '\nConversation context has been cleared.';
+              }
+
+              await this.sendUpdate({
+                sessionUpdate: 'agent_message_chunk',
+                content: {
+                  type: 'text',
+                  text,
+                },
+              });
+              break;
+            }
+
             case GeminiEventType.Error: {
               const parseResult = StructuredErrorSchema.safeParse(
                 event.value.error,
