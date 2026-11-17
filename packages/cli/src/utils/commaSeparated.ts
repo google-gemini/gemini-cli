@@ -7,14 +7,25 @@
 /**
  * Coerces comma-separated or multiple flag values into a flat array.
  */
-export const coerceCommaSeparated = (values: string[]): string[] => {
-  if (values.length === 1 && values[0] === '') {
+export const coerceCommaSeparated = (values: unknown): string[] => {
+  if (values == null) {
+    return [];
+  }
+
+  const arrayValues = Array.isArray(values) ? values : [values];
+
+  if (arrayValues.length === 1 && arrayValues[0] === '') {
     return [''];
   }
-  return values.flatMap((v) =>
-    v
+
+  return arrayValues.flatMap((value) => {
+    if (typeof value !== 'string') {
+      return [];
+    }
+
+    return value
       .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean),
-  );
+      .map((item) => item.trim())
+      .filter(Boolean);
+  });
 };
