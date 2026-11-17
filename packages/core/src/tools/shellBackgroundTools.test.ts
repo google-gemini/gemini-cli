@@ -442,6 +442,42 @@ describe('Background Tools', () => {
     fs.unlinkSync(logPath);
   });
 
+  it('read_background_output should mark truncation when the line count is also limited', async () => {
+    const pid = 55509;
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const logDir = ShellExecutionService.getLogDir();
+
+    const history = new Map();
+    history.set(pid, {
+      command: 'many lines command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    fs.mkdirSync(logDir, { recursive: true });
+    // 200 x 400-byte lines = 80KB: the window is byte-truncated and still
+    // holds more lines than the requested tail count.
+    fs.writeFileSync(logPath, ('n'.repeat(399) + '\n').repeat(200));
+
+    const invocation = readTool.build({ pid, lines: 2 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.llmContent).toContain('Showing last 2 of');
+    expect(result.llmContent).toContain('truncated');
+    expect(result.llmContent).not.toContain('Full Log Output');
+
+    fs.unlinkSync(logPath);
+  });
+
   it('read_background_output should drop a partial first line but keep following complete lines', async () => {
     const pid = 55504;
     const logPath = ShellExecutionService.getLogFilePath(pid);
@@ -474,6 +510,112 @@ describe('Background Tools', () => {
     expect(result.llmContent).toContain('truncated');
     expect(result.llmContent).toContain('b1\nb2');
     expect(result.llmContent).not.toContain('aaaa');
+
+    fs.unlinkSync(logPath);
+  });
+
+  it('read_background_output should keep the fragment when the log ends without a newline', async () => {
+    const pid = 55507;
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const logDir = ShellExecutionService.getLogDir();
+
+    const history = new Map();
+    history.set(pid, {
+      command: 'no trailing newline command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    fs.mkdirSync(logDir, { recursive: true });
+    // A 70KB line with no trailing newline: the window holds no newline at all.
+    fs.writeFileSync(logPath, 'a'.repeat(70000));
+
+    const invocation = readTool.build({ pid });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.llmContent).toContain('truncated');
+    expect(result.llmContent).toContain('a'.repeat(65536));
+
+    fs.unlinkSync(logPath);
+  });
+
+  it('read_background_output should keep the fragment when only newlines follow it', async () => {
+    const pid = 55506;
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const logDir = ShellExecutionService.getLogDir();
+
+    const history = new Map();
+    history.set(pid, {
+      command: 'blank line after oversized line command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    fs.mkdirSync(logDir, { recursive: true });
+    // A 70KB line followed by a blank line: after the fragment's newline
+    // there is only another newline, so the fragment must be kept.
+    fs.writeFileSync(logPath, 'a'.repeat(70000) + '\n\n');
+
+    const invocation = readTool.build({ pid });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.llmContent).toContain('truncated');
+    expect(result.llmContent).toContain('a'.repeat(65534));
+
+    fs.unlinkSync(logPath);
+  });
+
+  it('read_background_output should strip multiple UTF-8 continuation bytes split by the window start', async () => {
+    const pid = 55508;
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const logDir = ShellExecutionService.getLogDir();
+
+    const history = new Map();
+    history.set(pid, {
+      command: 'emoji command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    fs.mkdirSync(logDir, { recursive: true });
+    // 20000 x 🚀 (4 bytes) + é (2 bytes) = 80002 bytes. The 64KB window
+    // starts at offset 14466, which is byte 2 of a 4-byte sequence, so two
+    // continuation bytes must be stripped before decoding.
+    fs.writeFileSync(logPath, '🚀'.repeat(20000) + 'é');
+
+    const invocation = readTool.build({ pid });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.llmContent).not.toContain('�');
+    expect(result.llmContent).toContain('🚀');
+    expect(result.llmContent).toContain('truncated');
 
     fs.unlinkSync(logPath);
   });
@@ -512,5 +654,149 @@ describe('Background Tools', () => {
     expect(result.llmContent).toContain('truncated');
 
     fs.unlinkSync(logPath);
+  });
+
+  it('read_background_output should satisfy window invariants for randomized logs', async () => {
+    // Seeded PRNG (mulberry32) so failures reproduce exactly.
+    let state = 0x2f6e2b1;
+    const nextRandom = () => {
+      state |= 0;
+      state = (state + 0x6d2b79f5) | 0;
+      let t = Math.imul(state ^ (state >>> 15), 1 | state);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const randInt = (max: number) => Math.floor(nextRandom() * max);
+
+    // Newline-free characters, mixing 1-, 2-, 3- and 4-byte UTF-8 sequences.
+    const alphabet = [
+      'a',
+      'b',
+      'Z',
+      '0',
+      '9',
+      ' ',
+      '.',
+      '-',
+      '_',
+      '/',
+      '=',
+      '$',
+      '#',
+      '€',
+      'é',
+      '字',
+      '🚀',
+    ];
+    const randomSegment = (length: number) => {
+      let s = '';
+      for (let i = 0; i < length; i++) {
+        s += alphabet[randInt(alphabet.length)];
+      }
+      return s;
+    };
+
+    const logDir = ShellExecutionService.getLogDir();
+    fs.mkdirSync(logDir, { recursive: true });
+
+    const iterations = 300;
+    for (let iter = 0; iter < iterations; iter++) {
+      const pid = 60000 + iter;
+      const logPath = ShellExecutionService.getLogFilePath(pid);
+
+      const history = new Map();
+      history.set(pid, {
+        command: 'randomized command',
+        status: 'running',
+        startTime: Date.now(),
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (ShellExecutionService as any).backgroundProcessHistory.set(
+        'default',
+        history,
+      );
+
+      // Build a random log from newline-free segments; ~70% exceed the 64KB
+      // read window, the rest fit into it entirely.
+      const oversized = nextRandom() < 0.7;
+      const targetBytes = oversized
+        ? 65537 + randInt(4000)
+        : 1 + randInt(65534);
+      let log = '';
+      while (Buffer.byteLength(log, 'utf-8') < targetBytes) {
+        // Occasionally emit a line longer than the whole window.
+        const segmentLength =
+          nextRandom() < 0.15 ? 1000 + randInt(89000) : randInt(200);
+        log += randomSegment(segmentLength);
+        if (nextRandom() < 0.8) {
+          log += '\n';
+        }
+      }
+      log += '\n'.repeat(randInt(4));
+      if (log.length === 0) {
+        log = 'x';
+      }
+      const logBuf = Buffer.from(log, 'utf-8');
+      fs.writeFileSync(logPath, logBuf);
+
+      try {
+        // Disable the line-count limit so only the byte window matters.
+        const invocation = readTool.build({ pid, lines: 1_000_000 });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (invocation as any).context = {
+          config: { getSessionId: () => 'default' },
+        };
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
+
+        const text = result.llmContent as string;
+        // Invariant 1: decoding never produces replacement characters.
+        expect(text).not.toContain('�');
+
+        const headerEnd = text.indexOf('\n');
+        const header = text.slice(0, headerEnd);
+        const body = text.slice(headerEnd + 1);
+
+        const size = logBuf.length;
+        if (size > 65536) {
+          expect(header).toContain('truncated');
+          const position = size - 65536;
+          const window = logBuf.subarray(position);
+          // Line splitting drops at most one trailing newline.
+          const bodyBuf = Buffer.from(body, 'utf-8');
+          let kept = bodyBuf;
+          if (!window.subarray(window.length - kept.length).equals(kept)) {
+            kept = Buffer.concat([bodyBuf, Buffer.from('\n')]);
+          }
+          // Invariant 2: the returned bytes are a contiguous suffix of the
+          // read window (nothing reordered, invented or lost in the middle).
+          expect(
+            window.subarray(window.length - kept.length).equals(kept),
+          ).toBe(true);
+          // Invariant 3: the dropped window prefix holds no complete line:
+          // at most one newline, and only as its final byte.
+          const dropped = window.subarray(0, window.length - kept.length);
+          const newlineIndex = dropped.indexOf(0x0a);
+          expect(
+            newlineIndex === -1 || newlineIndex === dropped.length - 1,
+          ).toBe(true);
+          // Invariant 4: a window starting on a line boundary keeps all bytes.
+          if (logBuf[position - 1] === 0x0a) {
+            expect(dropped.length).toBe(0);
+          }
+        } else {
+          expect(header).toBe('Full Log Output:');
+          const expected = log.endsWith('\n') ? log.slice(0, -1) : log;
+          expect(body).toBe(expected);
+        }
+      } catch (error) {
+        // Re-throw with the iteration number so a failure can be reproduced
+        // from the fixed seed.
+        throw new Error(`iteration ${iter} (pid ${pid}): ${error}`);
+      } finally {
+        fs.unlinkSync(logPath);
+      }
+    }
   });
 });

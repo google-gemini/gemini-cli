@@ -192,10 +192,19 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
 
           if (precedingByte[0] !== 0x0a /* '\n' */) {
             const firstNewlineOffset = buffer.indexOf(0x0a);
-            if (
-              firstNewlineOffset !== -1 &&
-              firstNewlineOffset < buffer.length - 1
-            ) {
+            // The fragment is dropped only when at least one complete line
+            // follows it: something other than more newlines must come after
+            // the first one.
+            let hasCompleteLineAfterFragment = false;
+            if (firstNewlineOffset !== -1) {
+              for (let i = firstNewlineOffset + 1; i < buffer.length; i++) {
+                if (buffer[i] !== 0x0a) {
+                  hasCompleteLineAfterFragment = true;
+                  break;
+                }
+              }
+            }
+            if (hasCompleteLineAfterFragment) {
               // The first line of the window is a partial fragment of a longer
               // line and complete lines follow it: drop only the fragment.
               // (The byte after a newline is always a UTF-8 boundary.)
