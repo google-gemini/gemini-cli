@@ -732,6 +732,7 @@ async function parsePowerShellCommandDetailsAsync(
   command: string,
   executable: string,
   cache?: CommandParseCache,
+  signal?: AbortSignal,
 ): Promise<CommandParseResult | null> {
   const trimmed = command.trim();
   if (!trimmed) {
@@ -739,6 +740,10 @@ async function parsePowerShellCommandDetailsAsync(
       details: [],
       hasError: true,
     };
+  }
+
+  if (signal?.aborted) {
+    return null;
   }
 
   const activeCache = cache ?? getActiveCommandParseCache();
@@ -752,24 +757,29 @@ async function parsePowerShellCommandDetailsAsync(
   }
 
   const globalKey = `${executable}\0${command}`;
-  const existingGlobalInFlight = globalInFlightPowerShellParses.get(globalKey);
-  if (existingGlobalInFlight) {
-    const joinedPromise = existingGlobalInFlight.then((result) => {
-      activeCache?.setCompleted(executable, command, result);
-      return result;
-    });
-    if (activeCache) {
-      return activeCache.trackInFlight(executable, command, joinedPromise);
+  if (!signal) {
+    const existingGlobalInFlight =
+      globalInFlightPowerShellParses.get(globalKey);
+    if (existingGlobalInFlight) {
+      const joinedPromise = existingGlobalInFlight.then((result) => {
+        activeCache?.setCompleted(executable, command, result);
+        return result;
+      });
+      if (activeCache) {
+        return activeCache.trackInFlight(executable, command, joinedPromise);
+      }
+      return joinedPromise;
     }
-    return joinedPromise;
   }
 
   const parsePromise = new Promise<CommandParseResult | null>((resolve) => {
     let settled = false;
-    const finish = (value: CommandParseResult | null) => {
+    const finish = (value: CommandParseResult | null, cacheResult = true) => {
       if (!settled) {
         settled = true;
-        activeCache?.setCompleted(executable, command, value);
+        if (cacheResult && !signal?.aborted) {
+          activeCache?.setCompleted(executable, command, value);
+        }
         resolve(value);
       }
     };
@@ -792,10 +802,11 @@ async function parsePowerShellCommandDetailsAsync(
           },
           stdio: ['ignore', 'pipe', 'pipe'],
           windowsHide: true,
+          ...(signal ? { signal } : {}),
         },
       );
     } catch {
-      finish(null);
+      finish(null, !signal?.aborted);
       return;
     }
 
@@ -807,10 +818,18 @@ async function parsePowerShellCommandDetailsAsync(
     child.stderr?.on('data', () => {
       // Drain stderr to avoid blocking child exit if diagnostics are written.
     });
-    child.on('error', () => {
+    child.on('error', (err) => {
+      if (err.name === 'AbortError' || signal?.aborted) {
+        finish(null, false);
+        return;
+      }
       finish(null);
     });
     child.on('close', (code) => {
+      if (signal?.aborted) {
+        finish(null, false);
+        return;
+      }
       if (code !== 0) {
         finish(null);
         return;
@@ -820,12 +839,14 @@ async function parsePowerShellCommandDetailsAsync(
     });
   });
 
-  globalInFlightPowerShellParses.set(globalKey, parsePromise);
-  void parsePromise.finally(() => {
-    if (globalInFlightPowerShellParses.get(globalKey) === parsePromise) {
-      globalInFlightPowerShellParses.delete(globalKey);
-    }
-  });
+  if (!signal) {
+    globalInFlightPowerShellParses.set(globalKey, parsePromise);
+    void parsePromise.finally(() => {
+      if (globalInFlightPowerShellParses.get(globalKey) === parsePromise) {
+        globalInFlightPowerShellParses.delete(globalKey);
+      }
+    });
+  }
 
   if (activeCache) {
     return activeCache.trackInFlight(executable, command, parsePromise);
@@ -873,7 +894,12 @@ export function parseCommandDetails(
 export async function parseCommandDetailsAsync(
   command: string,
   cache?: CommandParseCache,
+  signal?: AbortSignal,
 ): Promise<CommandParseResult | null> {
+  if (signal?.aborted) {
+    return null;
+  }
+
   const configuration = getShellConfiguration();
 
   if (configuration.shell === 'powershell') {
@@ -881,7 +907,11 @@ export async function parseCommandDetailsAsync(
       command,
       configuration.executable,
       cache,
+      signal,
     );
+    if (signal?.aborted) {
+      return null;
+    }
     if (!result || result.hasError) {
       if (detectPowerShellSubstitution(command)) {
         return result ?? { details: [], hasError: true };
@@ -1078,7 +1108,12 @@ export function hasRedirection(
 export async function hasRedirectionAsync(
   command: string,
   cache?: CommandParseCache,
+  signal?: AbortSignal,
 ): Promise<boolean> {
+  if (signal?.aborted) {
+    return false;
+  }
+
   const fallbackCheck = () => /[><]/.test(command);
 
   if (!fallbackCheck()) {
@@ -1092,7 +1127,11 @@ export async function hasRedirectionAsync(
       command,
       configuration.executable,
       cache,
+      signal,
     );
+    if (signal?.aborted) {
+      return false;
+    }
     return parsed && !parsed.hasError
       ? !!parsed.hasRedirection
       : fallbackCheck();
@@ -1126,8 +1165,9 @@ export function splitCommands(
 export async function splitCommandsAsync(
   command: string,
   cache?: CommandParseCache,
+  signal?: AbortSignal,
 ): Promise<string[]> {
-  const parsed = await parseCommandDetailsAsync(command, cache);
+  const parsed = await parseCommandDetailsAsync(command, cache, signal);
   if (!parsed || parsed.hasError) {
     return [];
   }
@@ -1161,8 +1201,9 @@ export function getCommandRoot(
 export async function getCommandRootAsync(
   command: string,
   cache?: CommandParseCache,
+  signal?: AbortSignal,
 ): Promise<string | undefined> {
-  const parsed = await parseCommandDetailsAsync(command, cache);
+  const parsed = await parseCommandDetailsAsync(command, cache, signal);
   if (!parsed || parsed.hasError || parsed.details.length === 0) {
     return undefined;
   }
@@ -1192,12 +1233,13 @@ export function getCommandRoots(
 export async function getCommandRootsAsync(
   command: string,
   cache?: CommandParseCache,
+  signal?: AbortSignal,
 ): Promise<string[]> {
   if (!command) {
     return [];
   }
 
-  const parsed = await parseCommandDetailsAsync(command, cache);
+  const parsed = await parseCommandDetailsAsync(command, cache, signal);
   if (!parsed || parsed.hasError) {
     return [];
   }
@@ -2947,14 +2989,19 @@ export function isInteractiveGeminiCommand(
 export async function isInteractiveGeminiCommandAsync(
   command: string,
   cache?: CommandParseCache,
+  signal?: AbortSignal,
 ): Promise<boolean> {
+  if (signal?.aborted) {
+    return false;
+  }
+
   const fastResult = isKnownInteractiveGeminiCommandSync(command);
   if (fastResult !== undefined) {
     return fastResult;
   }
 
   const unwrapped = unwrapCommandForGeminiCheck(command);
-  const parsedSegments = await splitCommandsAsync(unwrapped, cache);
+  const parsedSegments = await splitCommandsAsync(unwrapped, cache, signal);
   return parsedSegments.some((segment) => isInteractiveGeminiSegment(segment));
 }
 

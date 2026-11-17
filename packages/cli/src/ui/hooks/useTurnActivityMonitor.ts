@@ -86,6 +86,18 @@ export const useTurnActivityMonitor = (
     EMPTY_REDIRECTION_MAP,
   );
   const inFlightCommandsRef = useRef<Set<string>>(new Set());
+  const turnEpochRef = useRef(0);
+  const turnAbortControllerRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      turnAbortControllerRef.current?.abort();
+      turnAbortControllerRef.current = null;
+    };
+  }, []);
 
   // Reset operation start time whenever a new operation begins.
   // We consider an operation to have started when we enter Responding state,
@@ -114,6 +126,9 @@ export const useTurnActivityMonitor = (
       streamingState === StreamingState.Idle &&
       pendingToolCalls.length === 0
     ) {
+      turnEpochRef.current += 1;
+      turnAbortControllerRef.current?.abort();
+      turnAbortControllerRef.current = null;
       inFlightCommandsRef.current.clear();
       dispatchRedirection({ type: 'reset' });
       return;
@@ -123,7 +138,15 @@ export const useTurnActivityMonitor = (
       return;
     }
 
-    let cancelled = false;
+    if (
+      !turnAbortControllerRef.current ||
+      turnAbortControllerRef.current.signal.aborted
+    ) {
+      turnAbortControllerRef.current = new AbortController();
+    }
+    const turnSignal = turnAbortControllerRef.current.signal;
+    const epoch = turnEpochRef.current;
+
     for (const tc of pendingToolCalls) {
       if (tc.request.name !== 'run_shell_command') {
         continue;
@@ -145,21 +168,25 @@ export const useTurnActivityMonitor = (
       }
 
       inFlightCommandsRef.current.add(command);
-      void hasRedirectionAsync(command).then((redirected) => {
-        inFlightCommandsRef.current.delete(command);
-        if (!cancelled) {
-          dispatchRedirection({
-            type: 'set',
-            command,
-            hasRedirection: redirected,
-          });
-        }
-      });
+      void hasRedirectionAsync(command, undefined, turnSignal)
+        .then((redirected) => {
+          inFlightCommandsRef.current.delete(command);
+          if (
+            isMountedRef.current &&
+            turnEpochRef.current === epoch &&
+            !turnSignal.aborted
+          ) {
+            dispatchRedirection({
+              type: 'set',
+              command,
+              hasRedirection: redirected,
+            });
+          }
+        })
+        .catch(() => {
+          inFlightCommandsRef.current.delete(command);
+        });
     }
-
-    return () => {
-      cancelled = true;
-    };
   }, [streamingState, pendingToolCalls, resolvedRedirections]);
 
   // Detect redirection in the current query or tool calls without blocking the

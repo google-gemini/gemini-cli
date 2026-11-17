@@ -253,7 +253,23 @@ describe('Windows PowerShell CLI UI non-blocking parsing (#30249)', () => {
     });
     expect(result.current.isRedirectionActive).toBe(false);
 
-    // 3. Real PowerShell redirection without confirmationDetails resolves to true asynchronously
+    // 3. Real PowerShell redirection still resolves even if pendingToolCalls updates (Validating -> Executing) while in-flight
+    rerender({
+      state: StreamingState.Responding,
+      calls: [
+        {
+          status: CoreToolCallStatus.Validating,
+          request: {
+            callId: 'call-redir',
+            name: 'run_shell_command',
+            args: { command: 'Get-ChildItem > out.txt' },
+            isClientInitiated: false,
+            prompt_id: 'p1',
+          },
+        },
+      ],
+    });
+    // Trigger an intermediate pendingToolCalls update before the 25ms PowerShell helper finishes
     rerender({
       state: StreamingState.Responding,
       calls: [
@@ -277,15 +293,16 @@ describe('Windows PowerShell CLI UI non-blocking parsing (#30249)', () => {
     expect(getPowerShellSpawnSyncCount()).toBe(0);
   });
 
-  it('ToolConfirmationMessage uses precomputed confirmationDetails.hasRedirection without calling spawnSync or spawn', async () => {
+  it('ToolConfirmationMessage uses precomputed confirmationDetails.hasRedirection (including multi-command details) without calling spawnSync or spawn', async () => {
     const config = createMockUiConfig();
 
     const quotedArrowDetails: SerializableConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Shell Command',
-      command: 'Write-Output "a -> b"',
-      rootCommand: 'Write-Output',
-      rootCommands: ['Write-Output'],
+      command: 'Get-ChildItem; Write-Output "a -> b"',
+      commands: ['Get-ChildItem', 'Write-Output "a -> b"'],
+      rootCommand: 'Get-ChildItem, Write-Output',
+      rootCommands: ['Get-ChildItem', 'Write-Output'],
       hasRedirection: false,
     };
 

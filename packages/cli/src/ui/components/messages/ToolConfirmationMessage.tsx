@@ -493,8 +493,7 @@ export const ToolConfirmationMessage: React.FC<
           ? executionProps.commands
           : [executionProps.command];
       const containsRedirection =
-        typeof executionProps.hasRedirection === 'boolean' &&
-        (!executionProps.commands || executionProps.commands.length <= 1)
+        typeof executionProps.hasRedirection === 'boolean'
           ? executionProps.hasRedirection
           : commandsToDisplay.some((cmd) => hasRedirection(cmd));
       const isAutoEdit =
@@ -805,8 +804,7 @@ export const ToolConfirmationMessage: React.FC<
             ? executionProps.commands
             : [executionProps.command];
         const containsRedirection =
-          typeof executionProps.hasRedirection === 'boolean' &&
-          (!executionProps.commands || executionProps.commands.length <= 1)
+          typeof executionProps.hasRedirection === 'boolean'
             ? executionProps.hasRedirection
             : commandsToDisplay.some((cmd) => hasRedirection(cmd));
         const isAutoEdit =

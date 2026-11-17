@@ -391,7 +391,11 @@ export const useExecutionLifecycle = (
       const executeCommand = async () => {
         if (
           syncInteractiveGeminiCheck === undefined &&
-          (await isInteractiveGeminiCommandAsync(rawQuery))
+          (await isInteractiveGeminiCommandAsync(
+            rawQuery,
+            undefined,
+            abortSignal,
+          ))
         ) {
           addItemToHistory(
             { type: 'error', text: INTERACTIVE_GEMINI_SHELL_ERROR },

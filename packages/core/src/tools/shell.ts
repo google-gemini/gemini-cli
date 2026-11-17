@@ -142,8 +142,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return runWithCommandParseCache(fn, this.parseCache);
   }
 
-  async prepareCommandParseCache(): Promise<void> {
+  async prepareCommandParseCache(signal?: AbortSignal): Promise<void> {
     if (
+      signal?.aborted ||
       typeof stripShellWrapper !== 'function' ||
       !isDefaultParseCommandDetails(parseCommandDetails)
     ) {
@@ -159,9 +160,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
       unwrapped = next;
     }
-    await parseCommandDetailsAsync(stripped, this.parseCache);
-    if (unwrapped !== stripped) {
-      await parseCommandDetailsAsync(unwrapped, this.parseCache);
+    await parseCommandDetailsAsync(stripped, this.parseCache, signal);
+    if (unwrapped !== stripped && !signal?.aborted) {
+      await parseCommandDetailsAsync(unwrapped, this.parseCache, signal);
     }
   }
 
@@ -428,7 +429,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
     return this.runInCommandParseCache(async () => {
-      await this.prepareCommandParseCache();
+      await this.prepareCommandParseCache(abortSignal);
       const strippedForInteractiveCheck = stripShellWrapper(
         this.params.command,
       );
@@ -438,6 +439,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         ? await isInteractiveGeminiCommandAsync(
             strippedForInteractiveCheck,
             this.parseCache,
+            abortSignal,
           )
         : isInteractiveGeminiCommand(strippedForInteractiveCheck);
       if (isInteractive) {
@@ -466,7 +468,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (this.context.config.getSandboxEnabled()) {
         const command = stripShellWrapper(this.params.command);
         const rootCommands = isDefaultGetCommandRoots(getCommandRoots)
-          ? await getCommandRootsAsync(command, this.parseCache)
+          ? await getCommandRootsAsync(command, this.parseCache, abortSignal)
           : getCommandRoots(command);
         const rawRootCommand = rootCommands[0];
 
@@ -487,7 +489,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
             // Detect commands or sub-commands that definitely need network
             const parsed = isDefaultParseCommandDetails(parseCommandDetails)
-              ? await parseCommandDetailsAsync(command, this.parseCache)
+              ? await parseCommandDetailsAsync(
+                  command,
+                  this.parseCache,
+                  abortSignal,
+                )
               : parseCommandDetails(command);
             const subCommand = parsed?.details[0]?.args?.[0];
             const needsNetwork = isNetworkReliantCommand(
@@ -575,17 +581,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   protected override async getConfirmationDetails(
-    _abortSignal: AbortSignal,
+    abortSignal: AbortSignal,
     proactivePermissions?: SandboxPermissions,
   ): Promise<ToolCallConfirmationDetails | false> {
     return this.runInCommandParseCache(async () => {
       const command = stripShellWrapper(this.params.command);
 
       const parsed = isDefaultParseCommandDetails(parseCommandDetails)
-        ? await parseCommandDetailsAsync(command, this.parseCache)
+        ? await parseCommandDetailsAsync(command, this.parseCache, abortSignal)
         : parseCommandDetails(command);
       const commandHasRedirection = isDefaultHasRedirection(hasRedirection)
-        ? await hasRedirectionAsync(command, this.parseCache)
+        ? await hasRedirectionAsync(command, this.parseCache, abortSignal)
         : hasRedirection(command);
       let rootCommandDisplay = '';
 
@@ -605,7 +611,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       let rootCommands: string[] = [];
       try {
         const computedRoots = isDefaultGetCommandRoots(getCommandRoots)
-          ? await getCommandRootsAsync(command, this.parseCache)
+          ? await getCommandRootsAsync(command, this.parseCache, abortSignal)
           : getCommandRoots(command);
         rootCommands = [...new Set(computedRoots)];
       } catch {
@@ -710,7 +716,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return true;
     }
 
-    await this.prepareCommandParseCache();
+    await this.prepareCommandParseCache(options.abortSignal);
     if (this.hasTaintedOrBuildFileRisk()) {
       return false;
     }
@@ -755,6 +761,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           ? await isInteractiveGeminiCommandAsync(
               strippedCommand,
               this.parseCache,
+              signal,
             )
           : false
       : isInteractiveGeminiCommand(strippedCommand);

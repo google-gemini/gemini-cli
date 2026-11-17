@@ -73,7 +73,7 @@ export interface SchedulerOptions {
 
 interface CommandParseCacheAware {
   runInCommandParseCache: <T>(fn: () => T) => T;
-  prepareCommandParseCache: () => Promise<void>;
+  prepareCommandParseCache: (signal?: AbortSignal) => Promise<void>;
 }
 
 function isCommandParseCacheAware(
@@ -712,7 +712,7 @@ export class Scheduler {
       }
 
       if (isCommandParseCacheAware(toolCall.invocation)) {
-        await toolCall.invocation.prepareCommandParseCache();
+        await toolCall.invocation.prepareCommandParseCache(signal);
       }
       const hasTaintRisk =
         isTaintRiskDetectable(toolCall.invocation) &&

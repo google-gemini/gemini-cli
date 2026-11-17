@@ -69,6 +69,7 @@ interface FakeChildOptions {
   exitCode?: number | null;
   emitError?: Error;
   delayMs?: number;
+  signal?: AbortSignal;
 }
 
 function createFakeChildProcess(options: FakeChildOptions) {
@@ -83,7 +84,7 @@ function createFakeChildProcess(options: FakeChildOptions) {
   });
 
   const delay = options.delayMs ?? 5;
-  setTimeout(() => {
+  const timer = setTimeout(() => {
     if (options.emitError) {
       emitter.emit('error', options.emitError);
       return;
@@ -98,6 +99,20 @@ function createFakeChildProcess(options: FakeChildOptions) {
     stdoutStream.end();
     emitter.emit('close', options.exitCode ?? 0);
   }, delay);
+
+  if (options.signal) {
+    const onAbort = () => {
+      clearTimeout(timer);
+      const abortErr = new Error('The operation was aborted');
+      abortErr.name = 'AbortError';
+      emitter.emit('error', abortErr);
+    };
+    if (options.signal.aborted) {
+      queueMicrotask(onAbort);
+    } else {
+      options.signal.addEventListener('abort', onAbort, { once: true });
+    }
+  }
 
   return proc;
 }
@@ -557,6 +572,83 @@ describe('CommandParseCache and async PowerShell parsing (#30249)', () => {
         ),
       ).toBe(true);
       expect(mockSpawn).toHaveBeenCalledTimes(2);
+      expect(mockSpawnSync).not.toHaveBeenCalled();
+    });
+
+    it('propagates AbortSignal to spawn and avoids caching null when aborted', async () => {
+      const cmd = 'Get-ChildItem > aborted.txt';
+      const preAborted = new AbortController();
+      preAborted.abort();
+
+      await runWithCommandParseCache(async (cache) => {
+        expect(
+          await parseCommandDetailsAsync(cmd, cache, preAborted.signal),
+        ).toBeNull();
+        expect(await hasRedirectionAsync(cmd, cache, preAborted.signal)).toBe(
+          false,
+        );
+        expect(mockSpawn).not.toHaveBeenCalled();
+        expect(
+          cache.hasCompleted(
+            'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+            cmd,
+          ),
+        ).toBe(false);
+      });
+
+      const inFlightAbort = new AbortController();
+      mockSpawn.mockImplementationOnce(
+        (_exe: string, _args: string[], opts?: { signal?: AbortSignal }) =>
+          createFakeChildProcess({
+            delayMs: 100,
+            signal: opts?.signal,
+            stdout: JSON.stringify({ success: true, commands: [] }),
+          }),
+      );
+
+      await runWithCommandParseCache(async (cache) => {
+        const pending = parseCommandDetailsAsync(
+          cmd,
+          cache,
+          inFlightAbort.signal,
+        );
+        inFlightAbort.abort();
+        expect(await pending).toBeNull();
+        expect(mockSpawn).toHaveBeenCalledTimes(1);
+        expect(mockSpawn).toHaveBeenLastCalledWith(
+          'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+          expect.any(Array),
+          expect.objectContaining({ signal: inFlightAbort.signal }),
+        );
+        // Aborted parse must not poison the cache with null
+        expect(
+          cache.hasCompleted(
+            'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+            cmd,
+          ),
+        ).toBe(false);
+
+        // Subsequent un-aborted parse in the same cache succeeds cleanly
+        mockSpawn.mockImplementationOnce(() =>
+          createFakeChildProcess({
+            stdout: JSON.stringify({
+              success: true,
+              commands: [
+                {
+                  name: 'Get-ChildItem',
+                  text: cmd,
+                  startIndex: 0,
+                  args: [],
+                },
+              ],
+              hasRedirection: true,
+            }),
+          }),
+        );
+        expect(await hasRedirectionAsync(cmd, cache)).toBe(true);
+        expect(mockSpawn).toHaveBeenCalledTimes(2);
+      });
+
       expect(mockSpawnSync).not.toHaveBeenCalled();
     });
   });
