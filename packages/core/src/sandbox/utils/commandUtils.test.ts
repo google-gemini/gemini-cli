@@ -4,9 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { isStrictlyApproved } from './commandUtils.js';
 import type { SandboxRequest } from '../../services/sandboxManager.js';
+
+// These cases describe bash semantics. Report a POSIX platform on every host
+// (including Windows CI) so that the shell configuration resolves to bash.
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      platform: () => 'linux',
+    },
+    platform: () => 'linux',
+  };
+});
 
 const createRequest = (command: string, args: string[]): SandboxRequest => ({
   command,

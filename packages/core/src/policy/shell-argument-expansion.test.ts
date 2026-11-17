@@ -7,11 +7,26 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PolicyEngine } from './policy-engine.js';
 import { ApprovalMode, PolicyDecision, type PolicyRule } from './types.js';
 import { NoopSandboxManager } from '../services/sandboxManager.js';
 import { initializeShellParsers } from '../utils/shell-utils.js';
+
+// These cases describe bash semantics. Report a POSIX platform on every host
+// (including Windows CI) so that the shell configuration resolves to bash and
+// NoopSandboxManager uses the POSIX command classifier.
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      platform: () => 'linux',
+    },
+    platform: () => 'linux',
+  };
+});
 
 // Mirrors the default `run_shell_command` rule in `policies/write.toml`
 // (default tier 1 + priority 10 / 1000, interactive sessions only).
