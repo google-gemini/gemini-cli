@@ -23,7 +23,7 @@ import { randomUUID } from 'node:crypto';
 import { type Server as HTTPServer } from 'node:http';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import { tmpdir } from '@google/gemini-cli-core/src/utils/paths.js';
+import { getIdeConnectionDir } from '@google/gemini-cli-core/src/utils/paths.js';
 import type { z } from 'zod';
 import type { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
@@ -39,6 +39,75 @@ const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
 const IDE_WORKSPACE_PATH_ENV_VAR = 'GEMINI_CLI_IDE_WORKSPACE_PATH';
 const IDE_AUTH_TOKEN_ENV_VAR = 'GEMINI_CLI_IDE_AUTH_TOKEN';
+
+let tempFileCounter = 0;
+
+/**
+ * Creates (if absent) and validates the IDE discovery directory:
+ * 1. Verifies it is a regular directory (not a symbolic link).
+ * 2. On POSIX, verifies it is owned by the current process UID.
+ * 3. On POSIX, enforces 0o700 permissions.
+ */
+async function ensurePortDir(portDir: string): Promise<void> {
+  await fs.mkdir(portDir, { recursive: true, mode: 0o700 });
+  const stat = await fs.lstat(portDir);
+  if (stat.isSymbolicLink() || !stat.isDirectory()) {
+    throw new Error(`IDE port path is not a regular directory: ${portDir}`);
+  }
+  if (process.getuid && stat.uid !== process.getuid()) {
+    throw new Error(
+      `IDE port directory is owned by UID ${stat.uid}, expected ${process.getuid()}: ${portDir}`,
+    );
+  }
+  if (process.platform !== 'win32' && (stat.mode & 0o777) !== 0o700) {
+    await fs.chmod(portDir, 0o700);
+    const updatedStat = await fs.lstat(portDir);
+    if (
+      updatedStat.isSymbolicLink() ||
+      !updatedStat.isDirectory() ||
+      (process.getuid && updatedStat.uid !== process.getuid()) ||
+      (updatedStat.mode & 0o777) !== 0o700
+    ) {
+      throw new Error(
+        `Failed to enforce 0700 permissions on IDE port directory: ${portDir}`,
+      );
+    }
+  }
+}
+
+/**
+ * Writes the discovery file atomically by writing to an exclusive 0o600
+ * temporary file in the validated discovery directory and renaming it into
+ * place.
+ */
+async function writePortFileAtomically(
+  portFile: string,
+  content: string,
+): Promise<void> {
+  const portDir = path.dirname(portFile);
+  await ensurePortDir(portDir);
+
+  const uniqueSuffix = `${process.pid}-${Date.now()}-${++tempFileCounter}-${Math.random().toString(16).slice(2)}`;
+  const tempFile = `${portFile}.${uniqueSuffix}.tmp`;
+
+  let handle: fs.FileHandle | undefined;
+  try {
+    handle = await fs.open(tempFile, 'wx', 0o600);
+    if (process.platform !== 'win32') {
+      await handle.chmod(0o600);
+    }
+    await handle.writeFile(content, { encoding: 'utf8' });
+    await handle.close();
+    handle = undefined;
+    await fs.rename(tempFile, portFile);
+  } catch (err) {
+    if (handle) {
+      await handle.close().catch(() => {});
+    }
+    await fs.unlink(tempFile).catch(() => {});
+    throw err;
+  }
+}
 
 interface WritePortAndWorkspaceArgs {
   context: vscode.ExtensionContext;
@@ -88,7 +157,7 @@ async function writePortAndWorkspace({
   log(`Writing port file to: ${portFile}`);
 
   try {
-    await fs.writeFile(portFile, content).then(() => fs.chmod(portFile, 0o600));
+    await writePortFileAtomically(portFile, content);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log(`Failed to write port to file: ${message}`);
@@ -366,8 +435,8 @@ export class IDEServer {
           this.log(`IDE server listening on http://127.0.0.1:${this.port}`);
           let portFile: string | undefined;
           try {
-            const portDir = path.join(tmpdir(), 'gemini', 'ide');
-            await fs.mkdir(portDir, { recursive: true });
+            const portDir = getIdeConnectionDir();
+            await ensurePortDir(portDir);
             portFile = path.join(
               portDir,
               `gemini-ide-server-${process.ppid}-${this.port}.json`,
