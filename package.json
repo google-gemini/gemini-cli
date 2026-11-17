@@ -84,10 +84,36 @@
     "cliui": {
       "wrap-ansi": "7.0.0"
     },
-    "glob": "12.0.0",
+    "glob": "14.0.6",
     "node-domexception": "npm:empty@^0.10.1",
     "prebuild-install": "npm:nop@1.0.0",
-    "cross-spawn": "7.0.6"
+    "cross-spawn": "7.0.6",
+    "basic-ftp": "6.2.6",
+    "ip-address": "10.7.6",
+    "fast-uri": "3.1.9",
+    "hono": "4.13.19",
+    "@grpc/grpc-js": "1.14.7",
+    "tar": "7.5.23",
+    "undici": "7.30.2",
+    "ws": "8.23.0",
+    "@google-cloud/logging": {
+      "uuid": "11.1.1"
+    },
+    "@google-cloud/storage": {
+      "uuid": "11.1.1"
+    },
+    "gaxios": {
+      "uuid": "11.1.1"
+    },
+    "google-gax": {
+      "uuid": "11.1.1"
+    },
+    "googleapis-common": {
+      "uuid": "11.1.1"
+    },
+    "teeny-request": {
+      "uuid": "11.1.1"
+    }
   },
   "bin": {
     "gemini": "bundle/gemini.js"
@@ -99,7 +125,7 @@
   ],
   "devDependencies": {
     "@agentclientprotocol/sdk": "0.16.1",
-    "@modelcontextprotocol/sdk": "1.23.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "read-package-up": "11.0.0",
     "@octokit/rest": "22.0.0",
     "@types/express": "5.0.3",
@@ -128,7 +154,7 @@
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "5.2.0",
     "express": "5.1.0",
-    "glob": "12.0.0",
+    "glob": "14.0.6",
     "globals": "16.0.0",
     "google-artifactregistry-auth": "3.4.0",
     "husky": "9.1.7",
@@ -157,7 +183,7 @@
     "node-fetch-native": "1.6.7",
     "proper-lockfile": "4.1.2",
     "punycode": "2.3.1",
-    "simple-git": "3.28.0"
+    "simple-git": "3.36.0"
   },
   "optionalDependencies": {
     "@github/keytar": "7.10.6",
