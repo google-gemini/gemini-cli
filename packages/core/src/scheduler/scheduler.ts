@@ -45,6 +45,7 @@ import {
   type ToolConfirmationRequest,
 } from '../confirmation-bus/types.js';
 import { runWithToolCallContext } from '../utils/toolCallContext.js';
+import { runWithCommandParseCache } from '../utils/shell-parse-cache.js';
 import {
   coreEvents,
   CoreEvent,
@@ -68,6 +69,31 @@ export interface SchedulerOptions {
   parentCallId?: string;
   onWaitingForConfirmation?: (waiting: boolean) => void;
   cancelAllQueuedOnCancel?: boolean;
+}
+
+interface CommandParseCacheAware {
+  runInCommandParseCache: <T>(fn: () => T) => T;
+  prepareCommandParseCache: () => Promise<void>;
+}
+
+function isCommandParseCacheAware(
+  invocation: unknown,
+): invocation is CommandParseCacheAware {
+  return (
+    typeof invocation === 'object' &&
+    invocation !== null &&
+    'runInCommandParseCache' in invocation &&
+    typeof invocation.runInCommandParseCache === 'function' &&
+    'prepareCommandParseCache' in invocation &&
+    typeof invocation.prepareCommandParseCache === 'function'
+  );
+}
+
+function runWithInvocationParseCache<T>(invocation: unknown, fn: () => T): T {
+  if (isCommandParseCacheAware(invocation)) {
+    return invocation.runInCommandParseCache(fn);
+  }
+  return runWithCommandParseCache(fn);
 }
 
 interface TaintRiskDetectable {
@@ -674,109 +700,114 @@ export class Scheduler {
     }
 
     // 2. Policy & Security
-    const { decision: policyDecision, rule } = await checkPolicy(
-      toolCall,
-      this.config,
-      this.subagent,
-    );
-    let decision = policyDecision;
-    if (hookDecision === 'ask') {
-      decision = PolicyDecision.ASK_USER;
-    }
-
-    const hasTaintRisk =
-      isTaintRiskDetectable(toolCall.invocation) &&
-      toolCall.invocation.hasTaintedOrBuildFileRisk();
-
-    if (decision === PolicyDecision.ALLOW && hasTaintRisk) {
-      decision =
-        (this.config.isInteractive?.() ?? true)
-          ? PolicyDecision.ASK_USER
-          : PolicyDecision.DENY;
-    }
-
-    if (decision === PolicyDecision.DENY) {
-      const { errorMessage, errorType } = getPolicyDenialError(
+    await runWithInvocationParseCache(toolCall.invocation, async () => {
+      const { decision: policyDecision, rule } = await checkPolicy(
+        toolCall,
         this.config,
-        rule,
+        this.subagent,
       );
+      let decision = policyDecision;
+      if (hookDecision === 'ask') {
+        decision = PolicyDecision.ASK_USER;
+      }
 
-      this.state.updateStatus(
-        callId,
-        CoreToolCallStatus.Error,
-        createErrorResponse(
-          toolCall.request,
-          new Error(errorMessage),
-          errorType,
-        ),
-      );
-      return;
-    }
+      if (isCommandParseCacheAware(toolCall.invocation)) {
+        await toolCall.invocation.prepareCommandParseCache();
+      }
+      const hasTaintRisk =
+        isTaintRiskDetectable(toolCall.invocation) &&
+        toolCall.invocation.hasTaintedOrBuildFileRisk();
 
-    // User Confirmation Loop
-    let outcome = ToolConfirmationOutcome.ProceedOnce;
-    let lastDetails: SerializableConfirmationDetails | undefined;
+      if (decision === PolicyDecision.ALLOW && hasTaintRisk) {
+        decision =
+          (this.config.isInteractive?.() ?? true)
+            ? PolicyDecision.ASK_USER
+            : PolicyDecision.DENY;
+      }
 
-    if (decision === PolicyDecision.ASK_USER) {
-      const forcedDecision =
-        hookDecision === 'ask' ||
-        (policyDecision === PolicyDecision.ALLOW && hasTaintRisk)
-          ? 'ask_user'
-          : undefined;
+      if (decision === PolicyDecision.DENY) {
+        const { errorMessage, errorType } = getPolicyDenialError(
+          this.config,
+          rule,
+        );
 
-      const result = await resolveConfirmation(toolCall, signal, {
-        config: this.config,
-        messageBus: this.messageBus,
-        state: this.state,
-        modifier: this.modifier,
-        getPreferredEditor: this.getPreferredEditor,
-        schedulerId: this.schedulerId,
-        onWaitingForConfirmation: this.onWaitingForConfirmation,
-        systemMessage: hookSystemMessage,
-        forcedDecision,
-      });
-      outcome = result.outcome;
-      lastDetails = result.lastDetails;
-      if (
-        (result.confirmedByUser ?? false) &&
-        outcome !== ToolConfirmationOutcome.Cancel
-      ) {
-        toolCall.request.isUserConfirmed = true;
-        const updatedCall = this.state.getToolCall(callId);
-        if (updatedCall) {
-          updatedCall.request.isUserConfirmed = true;
+        this.state.updateStatus(
+          callId,
+          CoreToolCallStatus.Error,
+          createErrorResponse(
+            toolCall.request,
+            new Error(errorMessage),
+            errorType,
+          ),
+        );
+        return;
+      }
+
+      // User Confirmation Loop
+      let outcome = ToolConfirmationOutcome.ProceedOnce;
+      let lastDetails: SerializableConfirmationDetails | undefined;
+
+      if (decision === PolicyDecision.ASK_USER) {
+        const forcedDecision =
+          hookDecision === 'ask' ||
+          (policyDecision === PolicyDecision.ALLOW && hasTaintRisk)
+            ? 'ask_user'
+            : undefined;
+
+        const result = await resolveConfirmation(toolCall, signal, {
+          config: this.config,
+          messageBus: this.messageBus,
+          state: this.state,
+          modifier: this.modifier,
+          getPreferredEditor: this.getPreferredEditor,
+          schedulerId: this.schedulerId,
+          onWaitingForConfirmation: this.onWaitingForConfirmation,
+          systemMessage: hookSystemMessage,
+          forcedDecision,
+        });
+        outcome = result.outcome;
+        lastDetails = result.lastDetails;
+        if (
+          (result.confirmedByUser ?? false) &&
+          outcome !== ToolConfirmationOutcome.Cancel
+        ) {
+          toolCall.request.isUserConfirmed = true;
+          const updatedCall = this.state.getToolCall(callId);
+          if (updatedCall) {
+            updatedCall.request.isUserConfirmed = true;
+          }
         }
       }
-    }
 
-    this.state.setOutcome(callId, outcome);
+      this.state.setOutcome(callId, outcome);
 
-    // Handle Policy Updates
-    if (decision === PolicyDecision.ASK_USER && outcome) {
-      await updatePolicy(
-        toolCall.tool,
-        outcome,
-        lastDetails,
-        this.context,
-        this.messageBus,
-        toolCall.invocation,
-      );
-    }
-
-    // Handle cancellation (cascades to entire batch by default unless disabled)
-    if (outcome === ToolConfirmationOutcome.Cancel) {
-      this.state.updateStatus(
-        callId,
-        CoreToolCallStatus.Cancelled,
-        'User denied execution.',
-      );
-      if (this.cancelAllQueuedOnCancel) {
-        this.state.cancelAllQueued('User cancelled operation');
+      // Handle Policy Updates
+      if (decision === PolicyDecision.ASK_USER && outcome) {
+        await updatePolicy(
+          toolCall.tool,
+          outcome,
+          lastDetails,
+          this.context,
+          this.messageBus,
+          toolCall.invocation,
+        );
       }
-      return; // Skip execution
-    }
 
-    this.state.updateStatus(callId, CoreToolCallStatus.Scheduled);
+      // Handle cancellation (cascades to entire batch by default unless disabled)
+      if (outcome === ToolConfirmationOutcome.Cancel) {
+        this.state.updateStatus(
+          callId,
+          CoreToolCallStatus.Cancelled,
+          'User denied execution.',
+        );
+        if (this.cancelAllQueuedOnCancel) {
+          this.state.cancelAllQueued('User cancelled operation');
+        }
+        return; // Skip execution
+      }
+
+      this.state.updateStatus(callId, CoreToolCallStatus.Scheduled);
+    });
   }
 
   // --- Sub-phase Handlers ---

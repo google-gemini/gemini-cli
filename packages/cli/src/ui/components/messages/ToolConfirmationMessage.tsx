@@ -492,9 +492,11 @@ export const ToolConfirmationMessage: React.FC<
         executionProps.commands && executionProps.commands.length > 0
           ? executionProps.commands
           : [executionProps.command];
-      const containsRedirection = commandsToDisplay.some((cmd) =>
-        hasRedirection(cmd),
-      );
+      const containsRedirection =
+        typeof executionProps.hasRedirection === 'boolean' &&
+        (!executionProps.commands || executionProps.commands.length <= 1)
+          ? executionProps.hasRedirection
+          : commandsToDisplay.some((cmd) => hasRedirection(cmd));
       const isAutoEdit =
         config.getApprovalMode() === ApprovalMode.YOLO ||
         config.getApprovalMode() === ApprovalMode.AUTO_EDIT;
@@ -802,9 +804,11 @@ export const ToolConfirmationMessage: React.FC<
           executionProps.commands && executionProps.commands.length > 1
             ? executionProps.commands
             : [executionProps.command];
-        const containsRedirection = commandsToDisplay.some((cmd) =>
-          hasRedirection(cmd),
-        );
+        const containsRedirection =
+          typeof executionProps.hasRedirection === 'boolean' &&
+          (!executionProps.commands || executionProps.commands.length <= 1)
+            ? executionProps.hasRedirection
+            : commandsToDisplay.some((cmd) => hasRedirection(cmd));
         const isAutoEdit =
           config.getApprovalMode() === ApprovalMode.YOLO ||
           config.getApprovalMode() === ApprovalMode.AUTO_EDIT;
