@@ -4628,13 +4628,13 @@ describe('PolicyEngine', () => {
       // Simulates a caller that is not type-checked.
       const rule = {
         toolName: 'test_tool',
-        argsPattern: /(a+)+$/,
+        argsPattern: /native-pattern/,
         decision: PolicyDecision.DENY,
         source: 'untyped caller',
       } as unknown as PolicyRule;
       const checker = {
         toolName: 'test_tool',
-        argsPattern: /(a+)+$/,
+        argsPattern: /native-pattern/,
         checker: {
           type: 'in-process',
           name: InProcessCheckerType.ALLOWED_PATH,
