@@ -169,6 +169,44 @@ describe('Background Tools', () => {
     fs.unlinkSync(logPath);
   });
 
+  it('read_background_output should not claim full output when the log is truncated', async () => {
+    const pid = 86666 + Math.floor(Math.random() * 1000);
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const history = new Map();
+    history.set(pid, {
+      command: 'noisy command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+    fs.mkdirSync(ShellExecutionService.getLogDir(), { recursive: true });
+
+    // ~100KB of output, larger than the 64KB read cap.
+    const lines = Array.from(
+      { length: 2000 },
+      (_, i) => `line ${i} ${'x'.repeat(40)}`,
+    );
+    fs.writeFileSync(logPath, lines.join('\n') + '\n');
+
+    const invocation = readTool.build({ pid, lines: 100000 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.llmContent).not.toContain('Full Log Output');
+    expect(result.llmContent).toContain('(earlier output truncated)');
+    expect(result.llmContent).not.toContain('line 0 ');
+    expect(result.llmContent).toContain('line 1999 ');
+
+    fs.unlinkSync(logPath);
+  });
+
   it('read_background_output should return Access Denied for processes in other sessions', async () => {
     const pid = 77777;
     const history = new Map();
