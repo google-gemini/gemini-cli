@@ -9,6 +9,7 @@ import { PolicyEngine } from './policy-engine.js';
 import { PolicyDecision, ApprovalMode } from './types.js';
 import { initializeShellParsers } from '../utils/shell-utils.js';
 import { buildArgsPatterns } from './utils.js';
+import { SafeRegExp } from './safe-regex.js';
 
 describe('PolicyEngine - Shell Safety Regression Suite', () => {
   let engine: PolicyEngine;
@@ -25,7 +26,7 @@ describe('PolicyEngine - Shell Safety Regression Suite', () => {
     const rules = allowedCommands.map((cmd) => ({
       toolName: 'run_shell_command',
       decision: PolicyDecision.ALLOW,
-      argsPattern: new RegExp(buildArgsPatterns(undefined, cmd)[0]!),
+      argsPattern: SafeRegExp.compile(buildArgsPatterns(undefined, cmd)[0]!),
       allowCommandSubstitution,
       priority: 10,
     }));

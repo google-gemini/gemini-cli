@@ -20,6 +20,7 @@ import {
   type PolicyLoadResult,
 } from './toml-loader.js';
 import { PolicyEngine } from './policy-engine.js';
+import { SafeRegExp } from './safe-regex.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -537,6 +538,185 @@ name = "allowed-path"
         ]),
       );
       expect(getErrors(result)).toHaveLength(0);
+    });
+  });
+
+  describe('Linear-time regex engine', () => {
+    it('should compile argsPattern into a SafeRegExp', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+argsPattern = '"command":"(git|npm)'
+decision = "allow"
+priority = 100
+`);
+
+      expect(getErrors(result)).toHaveLength(0);
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].argsPattern).toBeInstanceOf(SafeRegExp);
+      expect(result.rules[0].argsPattern?.source).toBe('"command":"(git|npm)');
+    });
+
+    it('should evaluate an alternation pattern with overlapping branches in linear time', async () => {
+      // This pattern passes the nested-quantifier check, so it loads.
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+argsPattern = '(a|aa)+$'
+decision = "deny"
+priority = 100
+`);
+
+      expect(getErrors(result)).toHaveLength(0);
+      expect(result.rules).toHaveLength(1);
+      const argsPattern = result.rules[0].argsPattern!;
+      argsPattern.test('warm-up');
+
+      // The smaller size is checked first so that a slowdown is reported by
+      // an assertion on a short input rather than by a long-running test.
+      for (const size of [38, 50]) {
+        const input = 'a'.repeat(size) + '!';
+        const start = performance.now();
+        const matched = argsPattern.test(input);
+        const elapsed = performance.now() - start;
+
+        expect(matched).toBe(false);
+        expect(elapsed).toBeLessThan(50);
+      }
+    });
+
+    it('should still reject a nested-quantifier pattern at load time', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+argsPattern = '(a+)+$'
+decision = "deny"
+priority = 100
+`);
+
+      const errors = getErrors(result);
+      expect(result.rules).toHaveLength(0);
+      expect(errors).toHaveLength(1);
+      expect(errors[0].errorType).toBe('regex_compilation');
+      expect(errors[0].details).toBe('Pattern: (a+)+$');
+      expect(errors[0].suggestion).toBe(
+        'Avoid nested quantifiers or extremely long patterns',
+      );
+    });
+
+    it('should report a pattern that compiles beyond the size limit', async () => {
+      const largePattern = '"command":".{1000}.{1000}';
+      const compiledSize = SafeRegExp.compile(largePattern).programSize;
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+argsPattern = '${largePattern}'
+decision = "deny"
+priority = 200
+
+[[rule]]
+toolName = "run_shell_command"
+argsPattern = '"command":".{1000}'
+decision = "deny"
+priority = 100
+
+[[safety_checker]]
+toolName = "write_file"
+argsPattern = '.{1000}.{1000}'
+priority = 100
+[safety_checker.checker]
+type = "in-process"
+name = "allowed-path"
+`);
+
+      const errors = getErrors(result);
+      expect(compiledSize).toBeGreaterThan(2000);
+      expect(errors).toHaveLength(2);
+      expect(errors[0].errorType).toBe('regex_compilation');
+      expect(errors[0].message).toBe('Regex pattern exceeds the size limit');
+      expect(errors[0].details).toBe(
+        `Pattern: ${largePattern}\nCompiled size: ${compiledSize} (limit: 2000)`,
+      );
+      expect(errors[0].suggestion).toContain('smaller repetition counts');
+      expect(errors[1].message).toBe(
+        'Regex pattern in safety checker exceeds the size limit',
+      );
+      // The pattern within the limit loads. The other two are skipped.
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].argsPattern?.source).toBe('"command":".{1000}');
+      expect(result.checkers).toHaveLength(0);
+    });
+
+    it.each([
+      ['lookahead', '"command":"git (?!push)'],
+      ['lookbehind', '(?<=git )status'],
+      ['a backreference', '(a)\\1'],
+    ])(
+      'should report %s as a validation error and keep loading other rules',
+      async (_name, pattern) => {
+        const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+argsPattern = '${pattern}'
+decision = "deny"
+priority = 200
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "git status"
+decision = "allow"
+priority = 100
+`);
+
+        const errors = getErrors(result);
+        expect(errors).toHaveLength(1);
+        expect(errors[0].errorType).toBe('regex_compilation');
+        expect(errors[0].message).toBe('Invalid regex pattern');
+        expect(errors[0].details).toContain(pattern);
+        expect(errors[0].suggestion).toContain('RE2 syntax');
+        // The rule with the unsupported pattern is skipped. The valid one loads.
+        expect(result.rules).toHaveLength(1);
+        expect(result.rules[0].decision).toBe(PolicyDecision.ALLOW);
+      },
+    );
+
+    it('should report an unsupported pattern in a safety checker', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+toolName = "write_file"
+argsPattern = '(?!tmp)'
+priority = 100
+[safety_checker.checker]
+type = "in-process"
+name = "allowed-path"
+`);
+
+      const errors = getErrors(result);
+      expect(result.checkers).toHaveLength(0);
+      expect(errors).toHaveLength(1);
+      expect(errors[0].errorType).toBe('regex_compilation');
+      expect(errors[0].message).toBe('Invalid regex pattern in safety checker');
+      expect(errors[0].suggestion).toContain('RE2 syntax');
+    });
+
+    it('should load every built-in policy file without regex errors', async () => {
+      const result = await loadPoliciesFromToml(
+        [path.join(__dirname, 'policies')],
+        (_dir) => 1,
+      );
+
+      const regexErrors = result.errors.filter(
+        (error) => error.errorType === 'regex_compilation',
+      );
+      const rulesWithPattern = result.rules.filter((rule) => rule.argsPattern);
+
+      expect(regexErrors).toEqual([]);
+      expect(rulesWithPattern.length).toBeGreaterThan(0);
+      expect(
+        rulesWithPattern.every(
+          (rule) => rule.argsPattern instanceof SafeRegExp,
+        ),
+      ).toBe(true);
     });
   });
 
@@ -1072,7 +1252,9 @@ priority = 100
         // 3. Simulate an unknown Subagent being registered (Dynamic Rule)
         engine.addRule({
           toolName: 'invoke_agent',
-          argsPattern: /"agent_name":\s*"unknown_subagent"/,
+          argsPattern: SafeRegExp.compile(
+            /"agent_name":\s*"unknown_subagent"/.source,
+          ),
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
           source: 'AgentRegistry (Dynamic)',
