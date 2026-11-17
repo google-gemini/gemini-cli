@@ -272,8 +272,6 @@ export class IDEServer {
         next();
       });
 
-      const mcpServer = createMcpServer(this.diffManager, this.log);
-
       this.disposeResources();
       this.openFilesManager = new OpenFilesManager(context);
       const onDidChangeSubscription = this.openFilesManager.onDidChange(() => {
@@ -346,8 +344,8 @@ export class IDEServer {
             }
           };
 
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          mcpServer.connect(transport);
+          const mcpServer = createMcpServer(this.diffManager, this.log);
+          await mcpServer.connect(transport);
         } else {
           this.log(
             'Bad Request: No valid session ID provided for non-initialize request.',
@@ -392,6 +390,31 @@ export class IDEServer {
         }
 
         const transport = this.transports[sessionId];
+        const maybeSendInitialNotification = () => {
+          if (
+            res.statusCode === 200 &&
+            this.openFilesManager &&
+            !sessionsWithInitialNotification.has(sessionId)
+          ) {
+            sessionsWithInitialNotification.add(sessionId);
+            const openFilesManager = this.openFilesManager;
+            setImmediate(() => {
+              if (this.transports[sessionId] === transport) {
+                sendIdeContextUpdateNotification(
+                  transport,
+                  this.log.bind(this),
+                  openFilesManager,
+                );
+              }
+            });
+          }
+        };
+        const originalFlushHeaders = res.flushHeaders.bind(res);
+        res.flushHeaders = () => {
+          originalFlushHeaders();
+          maybeSendInitialNotification();
+        };
+
         try {
           await transport.handleRequest(req, res);
         } catch (error) {
@@ -403,16 +426,8 @@ export class IDEServer {
           }
         }
 
-        if (
-          this.openFilesManager &&
-          !sessionsWithInitialNotification.has(sessionId)
-        ) {
-          sendIdeContextUpdateNotification(
-            transport,
-            this.log.bind(this),
-            this.openFilesManager,
-          );
-          sessionsWithInitialNotification.add(sessionId);
+        if (!res.writableEnded) {
+          maybeSendInitialNotification();
         }
       };
 
