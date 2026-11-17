@@ -38,6 +38,14 @@ jobs:
           username: '${{ github.actor }}'
           password: '${{ secrets.GITHUB_TOKEN }}'
 
+      - name: 'Pre-pull Triage Image and Scrub Credentials'
+        run: |
+          # Pull the MCP server image while the registry login is valid, then
+          # remove the Docker client config. Keep this image reference identical
+          # to the one in the MCP settings below.
+          docker pull ghcr.io/google-gemini/gemini-cli-issue-triage@sha256:e3de1523f6c83aabb3c54b76d08940a2bf42febcb789dd2da6f95169641f94d3
+          rm -f ~/.docker/config.json
+
       - name: 'Run Gemini Issue Deduplication Refresh'
         uses: 'google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_refresh_embeddings'
