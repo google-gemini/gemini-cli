@@ -15,6 +15,7 @@ import {
   InProcessCheckerType,
   type PolicySettings,
 } from './types.js';
+import { SafeRegExp } from './safe-regex.js';
 import { isDirectorySecure } from '../utils/security.js';
 import {
   createPolicyEngineConfig,
@@ -703,7 +704,7 @@ describe('createPolicyEngineConfig', () => {
     expect(rule).toBeDefined();
     // Priority 150 in default tier → 1.150
     expect(rule?.priority).toBeCloseTo(1.15, 5);
-    expect(rule?.argsPattern).toBeInstanceOf(RegExp);
+    expect(rule?.argsPattern).toBeInstanceOf(SafeRegExp);
     expect(rule?.argsPattern?.test('{"command":"git status"}')).toBe(true);
     expect(rule?.argsPattern?.test('{"command":"git commit"}')).toBe(false);
   });
