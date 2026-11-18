@@ -62,8 +62,16 @@ export type ArgsPatternResult =
  *
  * This is the single entry point for pattern text that the CLI did not build
  * itself. It never constructs a native `RegExp` from the pattern.
+ *
+ * @param pattern The full pattern to compile.
+ * @param authoredPattern The part of the pattern written by the policy author.
+ *   The nested-quantifier check runs on this text, so wrappers that the CLI
+ *   adds aren't treated as nested quantifiers. Defaults to `pattern`.
  */
-export function compileArgsPattern(pattern: string): ArgsPatternResult {
+export function compileArgsPattern(
+  pattern: string,
+  authoredPattern: string = pattern,
+): ArgsPatternResult {
   if (pattern.length > MAX_PATTERN_LENGTH) {
     return { ok: false, reason: 'restricted' };
   }
@@ -79,7 +87,7 @@ export function compileArgsPattern(pattern: string): ArgsPatternResult {
     };
   }
 
-  if (NESTED_QUANTIFIER.test(pattern)) {
+  if (NESTED_QUANTIFIER.test(authoredPattern)) {
     return { ok: false, reason: 'restricted' };
   }
 
@@ -149,12 +157,16 @@ export function buildArgsPatterns(
       // The prefix must be followed by whitespace, ["], or the specific
       // sequence [\"] (for escaped quotes in JSON). We do NOT allow generic
       // [\\], which would match "git\status" -> "gitstatus".
-      return `${matchSegment}${COMMAND_PREFIX_BOUNDARY}`;
+      // Anchor the pattern to the top-level marker that stableStringify()
+      // adds, so only the top-level `command` argument can match.
+      return `\\x00${matchSegment}${COMMAND_PREFIX_BOUNDARY}`;
     });
   }
 
   if (commandRegex) {
-    return [`"command":"${commandRegex}`];
+    // Same anchor as above. The group keeps a top-level alternation in the
+    // regex within the `command` value.
+    return [`\\x00"command":"(?:${commandRegex})`];
   }
 
   return [argsPattern];

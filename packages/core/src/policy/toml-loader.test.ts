@@ -21,6 +21,7 @@ import {
 } from './toml-loader.js';
 import { PolicyEngine } from './policy-engine.js';
 import { SafeRegExp } from './safe-regex.js';
+import { stableStringify } from './stable-stringify.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -95,11 +96,15 @@ priority = 100
       expect(result.rules[0].toolName).toBe('run_shell_command');
       expect(result.rules[1].toolName).toBe('run_shell_command');
       expect(
-        result.rules[0].argsPattern?.test('{"command":"git status"}'),
+        result.rules[0].argsPattern?.test(
+          stableStringify({ command: 'git status' }),
+        ),
       ).toBe(true);
-      expect(result.rules[1].argsPattern?.test('{"command":"git log"}')).toBe(
-        true,
-      );
+      expect(
+        result.rules[1].argsPattern?.test(
+          stableStringify({ command: 'git log' }),
+        ),
+      ).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -161,15 +166,53 @@ priority = 100
 
       expect(result.rules).toHaveLength(1);
       expect(
-        result.rules[0].argsPattern?.test('{"command":"git status"}'),
+        result.rules[0].argsPattern?.test(
+          stableStringify({ command: 'git status' }),
+        ),
       ).toBe(true);
       expect(
-        result.rules[0].argsPattern?.test('{"command":"git log --all"}'),
+        result.rules[0].argsPattern?.test(
+          stableStringify({ command: 'git log --all' }),
+        ),
       ).toBe(true);
       expect(
-        result.rules[0].argsPattern?.test('{"command":"git branch"}'),
+        result.rules[0].argsPattern?.test(
+          stableStringify({ command: 'git branch' }),
+        ),
       ).toBe(false);
       expect(result.errors).toHaveLength(0);
+    });
+
+    it('should load a commandRegex that contains a quantified group', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "npm run (test|lint)?"
+decision = "allow"
+priority = 100
+`);
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.rules).toHaveLength(1);
+      expect(
+        result.rules[0].argsPattern?.test(
+          stableStringify({ command: 'npm run test' }),
+        ),
+      ).toBe(true);
+    });
+
+    it('should still reject a commandRegex with nested quantifiers', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "(a+)+"
+decision = "allow"
+priority = 100
+`);
+
+      expect(result.rules).toHaveLength(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].errorType).toBe('regex_compilation');
     });
 
     it('should NOT match if ^ is used in commandRegex because it matches against full JSON', async () => {
@@ -182,10 +225,12 @@ priority = 100
 `);
 
       expect(result.rules).toHaveLength(1);
-      // The generated pattern is "command":"^git status
-      // This will NOT match '{"command":"git status"}' because of the '{"' at the start.
+      // The generated pattern is \x00"command":"(?:^git status)
+      // This will NOT match because ^ only matches at the start of the full JSON.
       expect(
-        result.rules[0].argsPattern?.test('{"command":"git status"}'),
+        result.rules[0].argsPattern?.test(
+          stableStringify({ command: 'git status' }),
+        ),
       ).toBe(false);
       expect(result.errors).toHaveLength(0);
     });
@@ -445,10 +490,14 @@ priority = 100
       expect(result.rules).toHaveLength(1);
       // The regex should have escaped the * and .
       expect(
-        result.rules[0].argsPattern?.test('{"command":"git log file.txt"}'),
+        result.rules[0].argsPattern?.test(
+          stableStringify({ command: 'git log file.txt' }),
+        ),
       ).toBe(false);
       expect(
-        result.rules[0].argsPattern?.test('{"command":"git log *.txt"}'),
+        result.rules[0].argsPattern?.test(
+          stableStringify({ command: 'git log *.txt' }),
+        ),
       ).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
