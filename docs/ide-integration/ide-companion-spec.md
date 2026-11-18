@@ -1,6 +1,6 @@
 # Gemini CLI companion plugin: Interface specification
 
-> Last Updated: September 15, 2025
+> Last Updated: November 17, 2026
 
 This document defines the contract for building a companion plugin to enable
 Gemini CLI's IDE mode. For VS Code, these features (native diffing, context
@@ -34,9 +34,15 @@ creating a "discovery file."
 - **How the CLI finds the file:** The CLI determines the Process ID (PID) of the
   IDE it's running in by traversing the process tree. It then looks for a
   discovery file that contains this PID in its name.
-- **File location:** The file must be created in a specific directory:
-  `os.tmpdir()/gemini/ide/`. Your plugin must create this directory if it
-  doesn't exist.
+- **File location and permissions:** On POSIX systems (Linux and macOS), you
+  **MUST** create the file in `os.tmpdir()/gemini-ide-${UID}/` (where `${UID}`
+  is the numeric user ID of the current process). Your plugin **MUST** create
+  this directory with `0700` permissions, verify with `lstat` that it isn't a
+  symbolic link and is owned by `${UID}`, and write the discovery file
+  atomically with `0600` permissions (for example, opening a temporary file in
+  that directory with exclusive creation `wx` and mode `0600`, then renaming it
+  into place). On Windows, where `%TEMP%` is already scoped to the current user,
+  create the file in `os.tmpdir()\gemini\ide\`.
 - **File naming convention:** The filename is critical and **MUST** follow the
   pattern: `gemini-ide-server-${PID}-${PORT}.json`
   - `${PID}`: The process ID of the parent IDE process. Your plugin must

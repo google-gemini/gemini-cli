@@ -30,6 +30,11 @@ const mocks = vi.hoisted(() => ({
   diffManager: {
     onDidChange: vi.fn(() => ({ dispose: vi.fn() })),
   } as unknown as DiffManager,
+  fileHandle: {
+    chmod: vi.fn(() => Promise.resolve(undefined)),
+    writeFile: vi.fn(() => Promise.resolve(undefined)),
+    close: vi.fn(() => Promise.resolve(undefined)),
+  },
 }));
 
 vi.mock('node:fs/promises', () => ({
@@ -37,7 +42,21 @@ vi.mock('node:fs/promises', () => ({
   unlink: vi.fn(() => Promise.resolve(undefined)),
   chmod: vi.fn(() => Promise.resolve(undefined)),
   mkdir: vi.fn(() => Promise.resolve(undefined)),
+  lstat: vi.fn(() =>
+    Promise.resolve({
+      uid: process.getuid ? process.getuid() : 1000,
+      mode: 0o40700,
+      isSymbolicLink: () => false,
+      isDirectory: () => true,
+    }),
+  ),
+  open: vi.fn(() => Promise.resolve(mocks.fileHandle)),
+  rename: vi.fn(() => Promise.resolve(undefined)),
 }));
+
+const expectedPortDir = process.getuid
+  ? path.join('/tmp', `gemini-ide-${process.getuid()}`)
+  : path.join('/tmp', 'gemini', 'ide');
 
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof os>();
@@ -57,6 +76,7 @@ vi.mock(
     return {
       ...actual,
       tmpdir: vi.fn(() => '/tmp'),
+      getIdeConnectionDir: vi.fn(() => expectedPortDir),
     };
   },
 );
@@ -116,6 +136,21 @@ describe('IDEServer', () => {
   let mockLog: (message: string) => void;
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(fs.lstat).mockResolvedValue({
+      uid: process.getuid ? process.getuid() : 1000,
+      mode: 0o40700,
+      isSymbolicLink: () => false,
+      isDirectory: () => true,
+    } as unknown as Awaited<ReturnType<typeof fs.lstat>>);
+    vi.mocked(fs.open).mockResolvedValue(
+      mocks.fileHandle as unknown as fs.FileHandle,
+    );
+    mocks.fileHandle.chmod.mockResolvedValue(undefined);
+    mocks.fileHandle.writeFile.mockResolvedValue(undefined);
+    mocks.fileHandle.close.mockResolvedValue(undefined);
+    vi.mocked(fs.rename).mockResolvedValue(undefined);
+
     mockLog = vi.fn();
     ideServer = new IDEServer(mockLog, mocks.diffManager);
     mockContext = {
@@ -167,9 +202,7 @@ describe('IDEServer', () => {
 
     const port = getPortFromMock(replaceMock);
     const expectedPortFile = path.join(
-      '/tmp',
-      'gemini',
-      'ide',
+      expectedPortDir,
       `gemini-ide-server-${process.ppid}-${port}.json`,
     );
     const expectedContent = JSON.stringify({
@@ -177,14 +210,27 @@ describe('IDEServer', () => {
       workspacePath: expectedWorkspacePaths,
       authToken: 'test-auth-token',
     });
-    expect(fs.mkdir).toHaveBeenCalledWith(path.join('/tmp', 'gemini', 'ide'), {
+    expect(fs.mkdir).toHaveBeenCalledWith(expectedPortDir, {
       recursive: true,
+      mode: 0o700,
     });
-    expect(fs.writeFile).toHaveBeenCalledWith(
-      expectedPortFile,
-      expectedContent,
+    expect(fs.open).toHaveBeenCalledWith(
+      expect.stringContaining(`${expectedPortFile}.`),
+      'wx',
+      0o600,
     );
-    expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
+    if (process.platform !== 'win32') {
+      expect(mocks.fileHandle.chmod).toHaveBeenCalledWith(0o600);
+    }
+    expect(mocks.fileHandle.writeFile).toHaveBeenCalledWith(expectedContent, {
+      encoding: 'utf8',
+    });
+    expect(mocks.fileHandle.close).toHaveBeenCalled();
+    expect(fs.rename).toHaveBeenCalledWith(
+      expect.stringContaining(`${expectedPortFile}.`),
+      expectedPortFile,
+    );
+    expect(fs.writeFile).not.toHaveBeenCalled();
   });
 
   it('should set a single folder path', async () => {
@@ -200,9 +246,7 @@ describe('IDEServer', () => {
 
     const port = getPortFromMock(replaceMock);
     const expectedPortFile = path.join(
-      '/tmp',
-      'gemini',
-      'ide',
+      expectedPortDir,
       `gemini-ide-server-${process.ppid}-${port}.json`,
     );
     const expectedContent = JSON.stringify({
@@ -210,11 +254,13 @@ describe('IDEServer', () => {
       workspacePath: '/foo/bar',
       authToken: 'test-auth-token',
     });
-    expect(fs.writeFile).toHaveBeenCalledWith(
+    expect(mocks.fileHandle.writeFile).toHaveBeenCalledWith(expectedContent, {
+      encoding: 'utf8',
+    });
+    expect(fs.rename).toHaveBeenCalledWith(
+      expect.stringContaining(`${expectedPortFile}.`),
       expectedPortFile,
-      expectedContent,
     );
-    expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
   });
 
   it('should set an empty string if no folders are open', async () => {
@@ -230,9 +276,7 @@ describe('IDEServer', () => {
 
     const port = getPortFromMock(replaceMock);
     const expectedPortFile = path.join(
-      '/tmp',
-      'gemini',
-      'ide',
+      expectedPortDir,
       `gemini-ide-server-${process.ppid}-${port}.json`,
     );
     const expectedContent = JSON.stringify({
@@ -240,11 +284,13 @@ describe('IDEServer', () => {
       workspacePath: '',
       authToken: 'test-auth-token',
     });
-    expect(fs.writeFile).toHaveBeenCalledWith(
+    expect(mocks.fileHandle.writeFile).toHaveBeenCalledWith(expectedContent, {
+      encoding: 'utf8',
+    });
+    expect(fs.rename).toHaveBeenCalledWith(
+      expect.stringContaining(`${expectedPortFile}.`),
       expectedPortFile,
-      expectedContent,
     );
-    expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
   });
 
   it('should update the path when workspace folders change', async () => {
@@ -278,9 +324,7 @@ describe('IDEServer', () => {
 
     const port = getPortFromMock(replaceMock);
     const expectedPortFile = path.join(
-      '/tmp',
-      'gemini',
-      'ide',
+      expectedPortDir,
       `gemini-ide-server-${process.ppid}-${port}.json`,
     );
     const expectedContent = JSON.stringify({
@@ -288,11 +332,13 @@ describe('IDEServer', () => {
       workspacePath: expectedWorkspacePaths,
       authToken: 'test-auth-token',
     });
-    expect(fs.writeFile).toHaveBeenCalledWith(
+    expect(mocks.fileHandle.writeFile).toHaveBeenCalledWith(expectedContent, {
+      encoding: 'utf8',
+    });
+    expect(fs.rename).toHaveBeenCalledWith(
+      expect.stringContaining(`${expectedPortFile}.`),
       expectedPortFile,
-      expectedContent,
     );
-    expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
 
     // Simulate removing a folder
     vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: '/baz/qux' } }];
@@ -307,11 +353,13 @@ describe('IDEServer', () => {
       workspacePath: '/baz/qux',
       authToken: 'test-auth-token',
     });
-    expect(fs.writeFile).toHaveBeenCalledWith(
+    expect(mocks.fileHandle.writeFile).toHaveBeenCalledWith(expectedContent2, {
+      encoding: 'utf8',
+    });
+    expect(fs.rename).toHaveBeenCalledWith(
+      expect.stringContaining(`${expectedPortFile}.`),
       expectedPortFile,
-      expectedContent2,
     );
-    expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
   });
 
   it('should clear env vars and delete port file on stop', async () => {
@@ -319,17 +367,98 @@ describe('IDEServer', () => {
     const replaceMock = mockContext.environmentVariableCollection.replace;
     const port = getPortFromMock(replaceMock);
     const portFile = path.join(
-      '/tmp',
-      'gemini',
-      'ide',
+      expectedPortDir,
       `gemini-ide-server-${process.ppid}-${port}.json`,
     );
-    expect(fs.writeFile).toHaveBeenCalledWith(portFile, expect.any(String));
+    expect(fs.rename).toHaveBeenCalledWith(
+      expect.stringContaining(`${portFile}.`),
+      portFile,
+    );
 
     await ideServer.stop();
 
     expect(mockContext.environmentVariableCollection.clear).toHaveBeenCalled();
     expect(fs.unlink).toHaveBeenCalledWith(portFile);
+  });
+
+  it.runIf(process.getuid !== undefined)(
+    'should refuse to write port file when port directory is owned by another UID',
+    async () => {
+      const otherUid = (process.getuid ? process.getuid() : 1000) + 1;
+      vi.mocked(fs.lstat).mockResolvedValue({
+        uid: otherUid,
+        mode: 0o40700,
+        isSymbolicLink: () => false,
+        isDirectory: () => true,
+      } as unknown as Awaited<ReturnType<typeof fs.lstat>>);
+
+      await ideServer.start(mockContext);
+
+      expect(fs.open).not.toHaveBeenCalled();
+      expect(fs.rename).not.toHaveBeenCalled();
+      expect(mockLog).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to create IDE port file'),
+      );
+      expect(
+        mockContext.environmentVariableCollection.replace,
+      ).toHaveBeenCalledWith('GEMINI_CLI_IDE_AUTH_TOKEN', 'test-auth-token');
+    },
+  );
+
+  it('should refuse to write port file when port directory is a symlink', async () => {
+    vi.mocked(fs.lstat).mockResolvedValue({
+      uid: process.getuid ? process.getuid() : 1000,
+      mode: 0o120777,
+      isSymbolicLink: () => true,
+      isDirectory: () => false,
+    } as unknown as Awaited<ReturnType<typeof fs.lstat>>);
+
+    await ideServer.start(mockContext);
+
+    expect(fs.open).not.toHaveBeenCalled();
+    expect(fs.rename).not.toHaveBeenCalled();
+    expect(mockLog).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to create IDE port file'),
+    );
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'should tighten permissions to 0o700 if existing user-owned port directory has looser mode',
+    async () => {
+      const uid = process.getuid ? process.getuid() : 1000;
+      vi.mocked(fs.lstat)
+        .mockResolvedValueOnce({
+          uid,
+          mode: 0o40755,
+          isSymbolicLink: () => false,
+          isDirectory: () => true,
+        } as unknown as Awaited<ReturnType<typeof fs.lstat>>)
+        .mockResolvedValue({
+          uid,
+          mode: 0o40700,
+          isSymbolicLink: () => false,
+          isDirectory: () => true,
+        } as unknown as Awaited<ReturnType<typeof fs.lstat>>);
+
+      await ideServer.start(mockContext);
+
+      expect(fs.chmod).toHaveBeenCalledWith(expectedPortDir, 0o700);
+      expect(fs.open).toHaveBeenCalled();
+      expect(fs.rename).toHaveBeenCalled();
+    },
+  );
+
+  it('should clean up temporary file and close handle if rename fails', async () => {
+    vi.mocked(fs.rename).mockRejectedValueOnce(new Error('rename failed'));
+
+    await ideServer.start(mockContext);
+
+    const tempPath = vi.mocked(fs.open).mock.calls[0]?.[0] as string;
+    expect(tempPath).toContain('.tmp');
+    expect(fs.unlink).toHaveBeenCalledWith(tempPath);
+    expect(mockLog).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to write port to file: rename failed'),
+    );
   });
 
   it('should dispose OpenFilesManager and event subscriptions on stop', async () => {
@@ -425,12 +554,7 @@ describe('IDEServer', () => {
         .at(-1)?.[1] as string;
 
     const portFileFor = (p: string) =>
-      path.join(
-        '/tmp',
-        'gemini',
-        'ide',
-        `gemini-ide-server-${process.ppid}-${p}.json`,
-      );
+      path.join(expectedPortDir, `gemini-ide-server-${process.ppid}-${p}.json`);
 
     const shutdownLogCount = () =>
       vi
@@ -735,9 +859,7 @@ describe('IDEServer', () => {
 
       const port = getPortFromMock(replaceMock);
       const expectedPortFile = path.join(
-        '/tmp',
-        'gemini',
-        'ide',
+        expectedPortDir,
         `gemini-ide-server-${process.ppid}-${port}.json`,
       );
       const expectedContent = JSON.stringify({
@@ -745,11 +867,13 @@ describe('IDEServer', () => {
         workspacePath: expectedWorkspacePaths,
         authToken: 'test-auth-token',
       });
-      expect(fs.writeFile).toHaveBeenCalledWith(
+      expect(mocks.fileHandle.writeFile).toHaveBeenCalledWith(expectedContent, {
+        encoding: 'utf8',
+      });
+      expect(fs.rename).toHaveBeenCalledWith(
+        expect.stringContaining(`${expectedPortFile}.`),
         expectedPortFile,
-        expectedContent,
       );
-      expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
     },
   );
 

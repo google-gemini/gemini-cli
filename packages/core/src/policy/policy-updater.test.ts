@@ -19,7 +19,9 @@ import {
   type PolicyUpdateOptions,
 } from '../tools/tools.js';
 import * as shellUtils from '../utils/shell-utils.js';
-import { escapeRegex } from './utils.js';
+import { escapeRegex, COMMAND_PREFIX_BOUNDARY } from './utils.js';
+import { SafeRegExp } from './safe-regex.js';
+import { coreEvents } from '../utils/events.js';
 
 vi.mock('node:fs/promises');
 vi.mock('../config/storage.js');
@@ -82,8 +84,8 @@ describe('createPolicyUpdater', () => {
         toolName: 'run_shell_command',
         priority: ALWAYS_ALLOW_PRIORITY,
         mcpName: 'test-mcp',
-        argsPattern: new RegExp(
-          escapeRegex('"command":"echo') + '(?:[\\s"]|\\\\")',
+        argsPattern: SafeRegExp.compile(
+          escapeRegex('"command":"echo') + COMMAND_PREFIX_BOUNDARY,
         ),
       }),
     );
@@ -93,8 +95,8 @@ describe('createPolicyUpdater', () => {
         toolName: 'run_shell_command',
         priority: ALWAYS_ALLOW_PRIORITY,
         mcpName: 'test-mcp',
-        argsPattern: new RegExp(
-          escapeRegex('"command":"ls') + '(?:[\\s"]|\\\\")',
+        argsPattern: SafeRegExp.compile(
+          escapeRegex('"command":"ls') + COMMAND_PREFIX_BOUNDARY,
         ),
       }),
     );
@@ -115,7 +117,7 @@ describe('createPolicyUpdater', () => {
       expect.objectContaining({
         toolName: 'test_tool',
         mcpName: 'test-mcp',
-        argsPattern: /"foo":"bar"/,
+        argsPattern: SafeRegExp.compile('"foo":"bar"'),
       }),
     );
   });
@@ -176,8 +178,8 @@ describe('createPolicyUpdater', () => {
       expect.objectContaining({
         toolName: 'run_shell_command',
         priority: ALWAYS_ALLOW_PRIORITY,
-        argsPattern: new RegExp(
-          escapeRegex('"command":"git') + '(?:[\\s"]|\\\\")',
+        argsPattern: SafeRegExp.compile(
+          escapeRegex('"command":"git') + COMMAND_PREFIX_BOUNDARY,
         ),
       }),
     );
@@ -252,6 +254,26 @@ describe('createPolicyUpdater', () => {
     });
 
     expect(policyEngine.addRule).not.toHaveBeenCalled();
+  });
+
+  it('should report a pattern the linear-time engine does not support', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+    const emitFeedback = vi.spyOn(coreEvents, 'emitFeedback');
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      argsPattern: '"command":"git (?!push)',
+      persist: false,
+    });
+
+    expect(policyEngine.addRule).not.toHaveBeenCalled();
+    expect(emitFeedback).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining(
+        'regular expression for tool test_tool: "command":"git (?!push)',
+      ),
+    );
   });
 });
 

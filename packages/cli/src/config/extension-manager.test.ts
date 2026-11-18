@@ -414,6 +414,59 @@ describe('ExtensionManager', () => {
         );
       }
     });
+
+    it('canonicalizes previousLinkedSourcePath during link updates and ignores empty previous sources', async () => {
+      const requestConsent = vi.fn().mockResolvedValue(true);
+      const manager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        settings: {
+          security: {
+            folderTrust: { enabled: false },
+          },
+          experimental: { extensionConfig: false },
+          admin: { extensions: { enabled: true }, mcp: { enabled: true } },
+          hooksConfig: { enabled: true },
+        } as unknown as MergedSettings,
+        requestConsent,
+        requestSetting: null,
+        integrityManager: mockIntegrityManager,
+      });
+
+      await manager.loadExtensions();
+      const initialInstall = await manager.installOrUpdateExtension({
+        source: symlinkDir,
+        type: 'link',
+      });
+      expect(requestConsent).toHaveBeenCalledTimes(1);
+
+      // Updating the same linked extension when previous source is a symlink to the same canonical path should not re-prompt.
+      requestConsent.mockClear();
+      await manager.installOrUpdateExtension(
+        {
+          source: symlinkDir,
+          type: 'link',
+        },
+        initialInstall,
+      );
+      expect(requestConsent).not.toHaveBeenCalled();
+
+      // If previous installMetadata.source is empty/whitespace-only, it must not resolve to workspaceDir and must re-prompt.
+      const installed = manager
+        .getExtensions()
+        .find((ext) => ext.name === 'test-ext');
+      if (installed?.installMetadata) {
+        installed.installMetadata.source = '   ';
+      }
+      requestConsent.mockClear();
+      await manager.installOrUpdateExtension(
+        {
+          source: extensionDir,
+          type: 'link',
+        },
+        initialInstall,
+      );
+      expect(requestConsent).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Extension Renaming', () => {
