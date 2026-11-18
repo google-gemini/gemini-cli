@@ -149,3 +149,98 @@ describe('PolicyEngine - Shell Safety Regression Suite', () => {
     expect(result.decision).toBe(PolicyDecision.ASK_USER);
   });
 });
+
+describe('PolicyEngine - top-level command argument matching', () => {
+  beforeAll(async () => {
+    await initializeShellParsers();
+  });
+
+  const setupEngine = (
+    argsPattern: string,
+    options?: { nonInteractive?: boolean; defaultDecision?: PolicyDecision },
+  ) =>
+    new PolicyEngine({
+      rules: [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          argsPattern: SafeRegExp.compile(argsPattern),
+          priority: 10,
+        },
+      ],
+      approvalMode: ApprovalMode.DEFAULT,
+      nonInteractive: options?.nonInteractive,
+      defaultDecision: options?.defaultDecision ?? PolicyDecision.ASK_USER,
+    });
+
+  const checkCommand = async (
+    engine: PolicyEngine,
+    args: Record<string, unknown>,
+  ) =>
+    (await engine.check({ name: 'run_shell_command', args }, undefined))
+      .decision;
+
+  const nestedArgumentCases: Array<Record<string, unknown>> = [
+    {
+      command: 'touch /tmp/gcli_policy_marker',
+      extra: { command: 'git status' },
+    },
+    {
+      command: 'touch /tmp/gcli_policy_marker',
+      extra: [{ command: 'git status' }],
+    },
+    {
+      command: 'touch /tmp/gcli_policy_marker',
+      additional_permissions: { command: 'git status' },
+    },
+    { command: "eval 'date'", extra: { command: 'git status' } },
+    {
+      command: "env sh -c 'date > /tmp/gcli_policy_marker'",
+      extra: { command: 'git status' },
+    },
+  ];
+
+  it('should ask the user when only a nested argument matches a commandPrefix rule', async () => {
+    const engine = setupEngine(buildArgsPatterns(undefined, 'git')[0]!);
+
+    for (const args of nestedArgumentCases) {
+      expect(await checkCommand(engine, args)).toBe(PolicyDecision.ASK_USER);
+    }
+  });
+
+  it('should ask the user when only a nested argument matches a commandRegex rule', async () => {
+    const engine = setupEngine(
+      buildArgsPatterns(undefined, undefined, 'git (status|log)')[0]!,
+    );
+
+    for (const args of nestedArgumentCases) {
+      expect(await checkCommand(engine, args)).toBe(PolicyDecision.ASK_USER);
+    }
+  });
+
+  it('should allow an approved command when other top-level arguments are present', async () => {
+    const engine = setupEngine(buildArgsPatterns(undefined, 'git')[0]!);
+
+    expect(
+      await checkCommand(engine, {
+        command: 'git status',
+        description: 'Show status',
+        dir_path: '.',
+      }),
+    ).toBe(PolicyDecision.ALLOW);
+  });
+
+  it('should deny in non-interactive mode when only a nested argument matches', async () => {
+    const engine = setupEngine(buildArgsPatterns(undefined, 'git')[0]!, {
+      nonInteractive: true,
+      defaultDecision: PolicyDecision.DENY,
+    });
+
+    expect(
+      await checkCommand(engine, {
+        command: 'touch /tmp/gcli_policy_marker',
+        extra: { command: 'git status' },
+      }),
+    ).toBe(PolicyDecision.DENY);
+  });
+});

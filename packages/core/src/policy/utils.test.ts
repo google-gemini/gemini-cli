@@ -14,6 +14,7 @@ import {
   MAX_PROGRAM_SIZE,
 } from './utils.js';
 import { SafeRegExp } from './safe-regex.js';
+import { stableStringify } from './stable-stringify.js';
 
 describe('policy/utils', () => {
   describe('escapeRegex', () => {
@@ -210,6 +211,19 @@ describe('policy/utils', () => {
       });
     });
 
+    it('should run the nested-quantifier check on the authored pattern', () => {
+      expect(
+        compileArgsPattern(
+          '\\x00"command":"(?:npm run (test|lint)?)',
+          'npm run (test|lint)?',
+        ).ok,
+      ).toBe(true);
+      expect(compileArgsPattern('(a+)+')).toEqual({
+        ok: false,
+        reason: 'restricted',
+      });
+    });
+
     it('should report a pattern that compiles beyond the size limit', () => {
       // Repetition counts multiply the compiled size of a pattern.
       expect(MAX_PROGRAM_SIZE).toBe(2000);
@@ -251,38 +265,40 @@ describe('policy/utils', () => {
 
     it('should build pattern from a single commandPrefix', () => {
       const result = buildArgsPatterns(undefined, 'ls', undefined);
-      expect(result).toEqual(['\\"command\\":\\"ls' + COMMAND_PREFIX_BOUNDARY]);
+      expect(result).toEqual([
+        '\\x00\\"command\\":\\"ls' + COMMAND_PREFIX_BOUNDARY,
+      ]);
     });
 
     it('should build patterns from an array of commandPrefixes', () => {
       const result = buildArgsPatterns(undefined, ['echo', 'ls'], undefined);
       expect(result).toEqual([
-        '\\"command\\":\\"echo' + COMMAND_PREFIX_BOUNDARY,
-        '\\"command\\":\\"ls' + COMMAND_PREFIX_BOUNDARY,
+        '\\x00\\"command\\":\\"echo' + COMMAND_PREFIX_BOUNDARY,
+        '\\x00\\"command\\":\\"ls' + COMMAND_PREFIX_BOUNDARY,
       ]);
     });
 
     it('should build pattern from commandRegex', () => {
       const result = buildArgsPatterns(undefined, undefined, 'rm -rf .*');
-      expect(result).toEqual(['"command":"rm -rf .*']);
+      expect(result).toEqual(['\\x00"command":"(?:rm -rf .*)']);
     });
 
     it('should prioritize commandPrefix over commandRegex and argsPattern', () => {
       const result = buildArgsPatterns('raw', 'prefix', 'regex');
       expect(result).toEqual([
-        '\\"command\\":\\"prefix' + COMMAND_PREFIX_BOUNDARY,
+        '\\x00\\"command\\":\\"prefix' + COMMAND_PREFIX_BOUNDARY,
       ]);
     });
 
     it('should prioritize commandRegex over argsPattern if no commandPrefix', () => {
       const result = buildArgsPatterns('raw', undefined, 'regex');
-      expect(result).toEqual(['"command":"regex']);
+      expect(result).toEqual(['\\x00"command":"(?:regex)']);
     });
 
     it('should escape characters in commandPrefix', () => {
       const result = buildArgsPatterns(undefined, 'git checkout -b', undefined);
       expect(result).toEqual([
-        '\\"command\\":\\"git\\ checkout\\ \\-b' + COMMAND_PREFIX_BOUNDARY,
+        '\\x00\\"command\\":\\"git\\ checkout\\ \\-b' + COMMAND_PREFIX_BOUNDARY,
       ]);
     });
 
@@ -290,7 +306,7 @@ describe('policy/utils', () => {
       const result = buildArgsPatterns(undefined, 'git "fix"', undefined);
       expect(result).toEqual([
         // eslint-disable-next-line no-useless-escape
-        '\\\"command\\\":\\\"git\\ \\\\\\\"fix\\\\\\\"' +
+        '\\x00\\\"command\\\":\\\"git\\ \\\\\\\"fix\\\\\\\"' +
           COMMAND_PREFIX_BOUNDARY,
       ]);
     });
@@ -306,9 +322,9 @@ describe('policy/utils', () => {
       const patterns = buildArgsPatterns(undefined, prefix, undefined);
       const regex = SafeRegExp.compile(patterns[0]!);
 
-      // Mimic JSON stringified args
-      // echo "foo" -> {"command":"echo \"foo\""}
-      const validJsonArgs = '{"command":"echo \\"foo\\""}';
+      // Mimic stableStringify output
+      // echo "foo" -> {\0"command":"echo \"foo\""\0}
+      const validJsonArgs = stableStringify({ command: 'echo "foo"' });
       expect(regex.test(validJsonArgs)).toBe(true);
     });
 
@@ -318,16 +334,16 @@ describe('policy/utils', () => {
       const patterns = buildArgsPatterns(undefined, prefix, undefined);
       const regex = SafeRegExp.compile(patterns[0]!);
 
-      // echo\foo -> {"command":"echo\\foo"}
+      // echo\foo -> {\0"command":"echo\\foo"\0}
       // In regex matching: "echo " is followed by "\" which is NOT in [\s"] and is not \"
-      const attackJsonArgs = '{"command":"echo\\\\foo"}';
-      expect(regex.test(attackJsonArgs)).toBe(false);
+      const backslashArgs = stableStringify({ command: 'echo\\foo' });
+      expect(regex.test(backslashArgs)).toBe(false);
 
       // Also validation for "git " matching "git\status"
       const gitPatterns = buildArgsPatterns(undefined, 'git ', undefined);
       const gitRegex = SafeRegExp.compile(gitPatterns[0]!);
-      // git\status -> {"command":"git\\status"}
-      const gitBackslashArgs = '{"command":"git\\\\status"}';
+      // git\status -> {\0"command":"git\\status"\0}
+      const gitBackslashArgs = stableStringify({ command: 'git\\status' });
       expect(gitRegex.test(gitBackslashArgs)).toBe(false);
     });
 
@@ -342,7 +358,7 @@ describe('policy/utils', () => {
       // linear-time engine's `\s` is ASCII-only, so the pattern spells the set
       // out. For example, a rule on "rm" must keep matching "rm<U+00A0>-rf".
       const regex = SafeRegExp.compile(buildArgsPatterns(undefined, 'rm')[0]!);
-      const legacy = /"command":"rm(?:[\s"]|\\")/;
+      const legacy = new RegExp('\\x00' + /"command":"rm(?:[\s"]|\\")/.source);
 
       const differences: string[] = [];
       for (let code = 0; code <= 0xffff; code++) {
@@ -350,7 +366,7 @@ describe('policy/utils', () => {
         if (code >= 0xd800 && code <= 0xdfff) {
           continue;
         }
-        const args = JSON.stringify({
+        const args = stableStringify({
           command: `rm${String.fromCharCode(code)}-rf x`,
         });
         if (regex.test(args) !== legacy.test(args)) {
@@ -364,7 +380,7 @@ describe('policy/utils', () => {
     it('should end a prefix at whitespace or a quote, but not at a backslash', () => {
       const regex = SafeRegExp.compile(buildArgsPatterns(undefined, 'git')[0]!);
       const matches = (command: string) =>
-        regex.test(JSON.stringify({ command }));
+        regex.test(stableStringify({ command }));
 
       expect(matches('git')).toBe(true);
       expect(matches('git status')).toBe(true);
@@ -373,6 +389,75 @@ describe('policy/utils', () => {
       expect(matches('git"status')).toBe(true);
       expect(matches('gitstatus')).toBe(false);
       expect(matches('git\\status')).toBe(false);
+    });
+
+    const nestedCommandArgs = [
+      {
+        command: 'touch /tmp/gcli_policy_marker',
+        extra: { command: 'git status' },
+      },
+      {
+        command: 'touch /tmp/gcli_policy_marker',
+        extra: [{ command: 'git status' }],
+      },
+      {
+        command: 'touch /tmp/gcli_policy_marker',
+        description: '"command":"git status"',
+      },
+    ];
+
+    it('should anchor commandPrefix patterns to the top-level command argument', () => {
+      const regex = SafeRegExp.compile(buildArgsPatterns(undefined, 'git')[0]!);
+
+      expect(regex.test(stableStringify({ command: 'git status' }))).toBe(true);
+      expect(
+        regex.test(
+          stableStringify({
+            command: 'git status',
+            description: 'Show status',
+            dir_path: '.',
+          }),
+        ),
+      ).toBe(true);
+      for (const args of nestedCommandArgs) {
+        expect(regex.test(stableStringify(args))).toBe(false);
+      }
+    });
+
+    it('should anchor commandRegex patterns to the top-level command argument', () => {
+      const regex = SafeRegExp.compile(
+        buildArgsPatterns(undefined, undefined, 'git (status|log)')[0]!,
+      );
+
+      expect(regex.test(stableStringify({ command: 'git status' }))).toBe(true);
+      expect(
+        regex.test(
+          stableStringify({
+            command: 'git status',
+            description: 'Show status',
+            dir_path: '.',
+          }),
+        ),
+      ).toBe(true);
+      for (const args of nestedCommandArgs) {
+        expect(regex.test(stableStringify(args))).toBe(false);
+      }
+    });
+
+    it('should apply commandRegex alternation to the top-level command argument only', () => {
+      const regex = SafeRegExp.compile(
+        buildArgsPatterns(undefined, undefined, 'ls|pwd')[0]!,
+      );
+
+      expect(regex.test(stableStringify({ command: 'pwd' }))).toBe(true);
+      expect(
+        regex.test(
+          stableStringify({
+            command: 'touch /tmp/gcli_policy_marker',
+            description: 'print pwd',
+          }),
+        ),
+      ).toBe(false);
     });
   });
 });
