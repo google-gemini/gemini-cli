@@ -651,5 +651,37 @@ describe('CommandParseCache and async PowerShell parsing (#30249)', () => {
 
       expect(mockSpawnSync).not.toHaveBeenCalled();
     });
+
+    it('runs isKnownInteractiveGeminiCommandSync in linear time on adversarial non-matching input and handles multiline subsequences', () => {
+      // Adversarial input that triggers O(N^5) backtracking on /g[\s\S]*e[\s\S]*m[\s\S]*i[\s\S]*n[\s\S]*i/i
+      const adversarial =
+        'g'.repeat(10_000) +
+        'e'.repeat(10_000) +
+        'm'.repeat(10_000) +
+        'i'.repeat(10_000) +
+        'n'.repeat(10_000);
+
+      const start = performance.now();
+      expect(isKnownInteractiveGeminiCommandSync(adversarial)).toBe(false);
+      const elapsedMs = performance.now() - start;
+      expect(elapsedMs).toBeLessThan(200);
+
+      // Multiline subsequence (e.g. PowerShell backtick-newline continuation) must still be considered a candidate
+      expect(
+        isKnownInteractiveGeminiCommandSync(
+          'Write-Output "g`\ne`\nm`\ni`\nn`\ni"',
+        ),
+      ).toBeUndefined();
+      // Non-candidate multiline command returns false immediately
+      expect(
+        isKnownInteractiveGeminiCommandSync('Get-ChildItem\nSort-Object Name'),
+      ).toBe(false);
+      // Direct interactive invocation still returns true synchronously
+      expect(isKnownInteractiveGeminiCommandSync('GEMINI config list')).toBe(
+        true,
+      );
+      expect(mockSpawn).not.toHaveBeenCalled();
+      expect(mockSpawnSync).not.toHaveBeenCalled();
+    });
   });
 });

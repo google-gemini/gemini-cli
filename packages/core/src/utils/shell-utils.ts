@@ -2938,7 +2938,25 @@ function unwrapCommandForGeminiCheck(command: string): string {
   return unwrapped;
 }
 
-const GEMINI_CANDIDATE_PATTERN = /g[\s\S]*e[\s\S]*m[\s\S]*i[\s\S]*n[\s\S]*i/i;
+const GEMINI_SUBSEQUENCE = 'gemini';
+
+/**
+ * Checks in O(n) time whether `input` contains the characters `g`, `e`, `m`,
+ * `i`, `n`, `i` in order (case-insensitively, including across newlines)
+ * without regex backtracking.
+ */
+function containsGeminiSubsequence(input: string): boolean {
+  const lower = input.toLowerCase();
+  let pos = 0;
+  for (const ch of GEMINI_SUBSEQUENCE) {
+    const found = lower.indexOf(ch, pos);
+    if (found === -1) {
+      return false;
+    }
+    pos = found + 1;
+  }
+  return true;
+}
 
 /**
  * Performs purely in-process checks for interactive `gemini` commands without
@@ -2955,7 +2973,7 @@ export function isKnownInteractiveGeminiCommandSync(
   }
 
   const unwrapped = unwrapCommandForGeminiCheck(command);
-  if (!GEMINI_CANDIDATE_PATTERN.test(unwrapped)) {
+  if (!containsGeminiSubsequence(unwrapped)) {
     return false;
   }
 

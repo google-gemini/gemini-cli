@@ -52,6 +52,7 @@ import {
   escapeShellArg,
   isInteractiveGeminiCommand,
   isInteractiveGeminiCommandAsync,
+  isKnownInteractiveGeminiCommandSync,
   isDefaultIsInteractiveGeminiCommand,
   INTERACTIVE_GEMINI_SHELL_ERROR,
 } from '../utils/shell-utils.js';
@@ -752,19 +753,25 @@ export class ShellToolInvocation extends BaseToolInvocation<
     } = options;
     const strippedCommand = stripShellWrapper(this.params.command);
 
-    const isInteractiveGemini = isDefaultIsInteractiveGeminiCommand(
-      isInteractiveGeminiCommand,
-    )
-      ? this.hasCachedCommandParse(strippedCommand)
-        ? isInteractiveGeminiCommand(strippedCommand, this.parseCache)
-        : /g.*e.*m.*i.*n.*i/i.test(strippedCommand)
-          ? await isInteractiveGeminiCommandAsync(
-              strippedCommand,
-              this.parseCache,
-              signal,
-            )
-          : false
-      : isInteractiveGeminiCommand(strippedCommand);
+    let isInteractiveGemini: boolean;
+    if (!isDefaultIsInteractiveGeminiCommand(isInteractiveGeminiCommand)) {
+      isInteractiveGemini = isInteractiveGeminiCommand(strippedCommand);
+    } else if (this.hasCachedCommandParse(strippedCommand)) {
+      isInteractiveGemini = isInteractiveGeminiCommand(
+        strippedCommand,
+        this.parseCache,
+      );
+    } else {
+      const knownInteractive =
+        isKnownInteractiveGeminiCommandSync(strippedCommand);
+      isInteractiveGemini =
+        knownInteractive ??
+        (await isInteractiveGeminiCommandAsync(
+          strippedCommand,
+          this.parseCache,
+          signal,
+        ));
+    }
 
     if (isInteractiveGemini) {
       return {
