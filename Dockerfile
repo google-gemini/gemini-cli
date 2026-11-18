@@ -69,7 +69,7 @@ RUN apt-get update && apt-get dist-upgrade -y && apt-get install -y --no-install
   ca-certificates \
   && npm install -g npm@^11 --no-audit --no-fund \
   && mkdir -p /tmp/npm-deps \
-  && npm install --prefix /tmp/npm-deps glob@14.0.6 minimatch@11.0.9 --no-save --no-audit --no-fund \
+  && npm install --prefix /tmp/npm-deps glob@14.0.3 minimatch@11.0.2 --no-save --no-audit --no-fund \
   && rm -rf /usr/local/lib/node_modules/npm/node_modules/glob /usr/local/lib/node_modules/npm/node_modules/minimatch \
   && cp -r /tmp/npm-deps/node_modules/glob /usr/local/lib/node_modules/npm/node_modules/glob \
   && cp -r /tmp/npm-deps/node_modules/minimatch /usr/local/lib/node_modules/npm/node_modules/minimatch \
