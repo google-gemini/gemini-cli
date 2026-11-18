@@ -93,6 +93,11 @@ the arguments don't match the pattern, the rule does not apply. For a list of
 argument keys available for each tool, see the **Parameters** in the
 [Tools reference](/docs/reference/tools#available-tools).
 
+In the stable JSON string, each top-level argument is delimited by the `\x00`
+character, while nested objects and array items aren't. To match only a
+top-level argument, start the pattern with `\x00`, for example
+`'\x00"command":"git '`.
+
 Patterns use [RE2 syntax](https://github.com/google/re2/wiki/Syntax). Gemini CLI
 matches them in time proportional to the length of the arguments, so evaluation
 time stays predictable for large arguments. RE2 differs from JavaScript regular
@@ -338,7 +343,7 @@ toolAnnotations = { readOnlyHint = true }
 
 # (Optional) A regular expression in RE2 syntax to match against the tool's
 # arguments.
-argsPattern = '"command":"(git|npm)'
+argsPattern = '\x00"command":"(?:git|npm)'
 
 # (Optional) A string or array of strings that a shell command must start with.
 # This is syntactic sugar for `toolName = "run_shell_command"` and an
@@ -349,8 +354,9 @@ commandPrefix = "git"
 # shell command.
 # This is also syntactic sugar for `toolName = "run_shell_command"`.
 # Note: This pattern is tested against the JSON representation of the arguments
-# (e.g., `{"command":"<your_command>"}`). Because it prepends `"command":"`,
-# it effectively matches from the start of the command.
+# (e.g., `{"command":"<your_command>"}`). It matches only the top-level
+# `command` argument and starts at the beginning of the command, so
+# alternatives such as `ls|pwd` also apply from the start of the command.
 # Anchors like `^` or `$` apply to the full JSON string,
 # so `^` should usually be avoided here.
 # You cannot use commandPrefix and commandRegex in the same rule.
