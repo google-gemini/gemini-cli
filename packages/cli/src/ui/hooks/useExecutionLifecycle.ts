@@ -404,6 +404,12 @@ export const useExecutionLifecycle = (
           return;
         }
 
+        if (abortSignal.aborted) {
+          setPendingHistoryItem(null);
+          setShellInputFocused(false);
+          return;
+        }
+
         let cumulativeStdout: string | AnsiOutput = '';
         let isBinaryStream = false;
         let binaryBytesReceived = 0;

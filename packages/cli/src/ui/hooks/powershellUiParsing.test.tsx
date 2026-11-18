@@ -521,6 +521,55 @@ describe('Windows PowerShell CLI UI non-blocking parsing (#30249)', () => {
         expect.any(Number),
       );
 
+      // Case E: Pre-aborted signal on ambiguous recursive gemini command -> 0 extra spawns, never executes PTY
+      addItemToHistory.mockClear();
+      setPendingHistoryItem.mockClear();
+      setShellInputFocused.mockClear();
+      execPromises.length = 0;
+      const preAborted = new AbortController();
+      preAborted.abort();
+      await act(async () => {
+        lifecycleApi.handleShellCommand(
+          'Get-Item foo | ForEach-Object { gemini }',
+          preAborted.signal,
+        );
+        await Promise.all(execPromises);
+      });
+      expect(getStartedAsyncSpawnCount()).toBe(2);
+      expect(getCompletedAsyncSpawnCount()).toBe(2);
+      expect(getPowerShellSpawnSyncCount()).toBe(0);
+      expect(mockShellExecute).toHaveBeenCalledTimes(2);
+      expect(setPendingHistoryItem).toHaveBeenCalledWith(null);
+      expect(setShellInputFocused).toHaveBeenCalledWith(false);
+      expect(addItemToHistory).not.toHaveBeenCalledWith(
+        { type: 'error', text: INTERACTIVE_GEMINI_SHELL_ERROR },
+        expect.any(Number),
+      );
+
+      // Case F: Aborted mid-parse on ambiguous recursive gemini command -> parser aborted, PTY never spawned
+      addItemToHistory.mockClear();
+      setPendingHistoryItem.mockClear();
+      setShellInputFocused.mockClear();
+      execPromises.length = 0;
+      const inFlightAbort = new AbortController();
+      await act(async () => {
+        lifecycleApi.handleShellCommand(
+          'Get-Item foo | ForEach-Object { gemini }',
+          inFlightAbort.signal,
+        );
+        expect(getStartedAsyncSpawnCount()).toBe(3);
+        inFlightAbort.abort();
+        await Promise.all(execPromises);
+      });
+      expect(getPowerShellSpawnSyncCount()).toBe(0);
+      expect(mockShellExecute).toHaveBeenCalledTimes(2);
+      expect(setPendingHistoryItem).toHaveBeenCalledWith(null);
+      expect(setShellInputFocused).toHaveBeenCalledWith(false);
+      expect(addItemToHistory).not.toHaveBeenCalledWith(
+        { type: 'error', text: INTERACTIVE_GEMINI_SHELL_ERROR },
+        expect.any(Number),
+      );
+
       unmount();
     },
     REAL_POWERSHELL_TEST_TIMEOUT_MS,
