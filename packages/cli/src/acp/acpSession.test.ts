@@ -394,6 +394,8 @@ describe('Session', () => {
         token_count: {
           input_tokens: 120,
           output_tokens: 45,
+          cached_tokens: 80,
+          thought_tokens: 15,
         },
         model_usage: [
           {
@@ -401,6 +403,8 @@ describe('Session', () => {
             token_count: {
               input_tokens: 120,
               output_tokens: 45,
+              cached_tokens: 80,
+              thought_tokens: 15,
             },
           },
         ],
@@ -412,6 +416,248 @@ describe('Session', () => {
         sessionUpdate: 'usage_update',
         used: 165,
         size: expect.any(Number),
+      },
+    });
+  });
+
+  it('should return PromptResponse with stopReason cancelled and populated usage when aborted mid-stream', async () => {
+    async function* mockStreamWithUsage(): AsyncGenerator<ServerGeminiStreamEvent> {
+      yield {
+        type: GeminiEventType.Finished,
+        value: {
+          reason: FinishReason.STOP,
+          usageMetadata: {
+            promptTokenCount: 50,
+            candidatesTokenCount: 20,
+            cachedContentTokenCount: 10,
+            thoughtsTokenCount: 5,
+          },
+        },
+      };
+      await session.cancelPendingPrompt();
+      yield {
+        type: GeminiEventType.Content,
+        value: 'More text',
+      };
+    }
+    mockSendMessageStream.mockReturnValue(mockStreamWithUsage());
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(result.stopReason).toBe('cancelled');
+    expect(result.usage).toEqual({
+      inputTokens: 50,
+      outputTokens: 20,
+      cachedReadTokens: 10,
+      thoughtTokens: 5,
+      totalTokens: 70,
+    });
+    expect(result._meta).toEqual({
+      quota: {
+        token_count: {
+          input_tokens: 50,
+          output_tokens: 20,
+          cached_tokens: 10,
+          thought_tokens: 5,
+        },
+        model_usage: [
+          {
+            model: 'gemini-pro',
+            token_count: {
+              input_tokens: 50,
+              output_tokens: 20,
+              cached_tokens: 10,
+              thought_tokens: 5,
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it('should return PromptResponse with stopReason cancelled and zero usage when aborted immediately', async () => {
+    async function* mockHangingStream(): AsyncGenerator<ServerGeminiStreamEvent> {
+      await session.cancelPendingPrompt();
+      yield {
+        type: GeminiEventType.Content,
+        value: 'Never reached',
+      };
+    }
+    mockSendMessageStream.mockReturnValue(mockHangingStream());
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(result.stopReason).toBe('cancelled');
+    expect(result.usage).toEqual({
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedReadTokens: undefined,
+      thoughtTokens: undefined,
+      totalTokens: 0,
+    });
+    expect(result._meta).toEqual({
+      quota: {
+        token_count: {
+          input_tokens: 0,
+          output_tokens: 0,
+          cached_tokens: 0,
+          thought_tokens: 0,
+        },
+        model_usage: [],
+      },
+    });
+  });
+
+  it('should return PromptResponse with stopReason cancelled when stream throws AbortError', async () => {
+    mockSendMessageStream.mockImplementation(() => {
+      async function* errorGen(): AsyncGenerator<
+        ServerGeminiStreamEvent,
+        void,
+        unknown
+      > {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        yield* [] as any;
+        const abortErr = new Error('The operation was aborted');
+        abortErr.name = 'AbortError';
+        throw abortErr;
+      }
+      return errorGen();
+    });
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(result.stopReason).toBe('cancelled');
+    expect(result.usage).toEqual({
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedReadTokens: undefined,
+      thoughtTokens: undefined,
+      totalTokens: 0,
+    });
+    expect(result._meta).toEqual({
+      quota: {
+        token_count: {
+          input_tokens: 0,
+          output_tokens: 0,
+          cached_tokens: 0,
+          thought_tokens: 0,
+        },
+        model_usage: [],
+      },
+    });
+  });
+
+  it('should track token usage across multi-turn tool calls and multiple models', async () => {
+    let callCount = 0;
+    mockSendMessageStream.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        async function* stream1(): AsyncGenerator<ServerGeminiStreamEvent> {
+          yield {
+            type: GeminiEventType.ModelInfo,
+            value: 'gemini-2.5-flash',
+          };
+          yield {
+            type: GeminiEventType.ToolCallRequest,
+            value: {
+              callId: 'call-1',
+              name: 'test_tool',
+              args: { foo: 'bar' },
+              isClientInitiated: false,
+              prompt_id: 'prompt-1',
+            },
+          };
+          yield {
+            type: GeminiEventType.Finished,
+            value: {
+              reason: FinishReason.STOP,
+              usageMetadata: {
+                promptTokenCount: 100,
+                candidatesTokenCount: 25,
+                cachedContentTokenCount: 50,
+                thoughtsTokenCount: 10,
+              },
+            },
+          };
+        }
+        return stream1();
+      } else {
+        async function* stream2(): AsyncGenerator<ServerGeminiStreamEvent> {
+          yield {
+            type: GeminiEventType.ModelInfo,
+            value: 'gemini-2.5-pro',
+          };
+          yield {
+            type: GeminiEventType.Content,
+            value: 'Done with tool',
+          };
+          yield {
+            type: GeminiEventType.Finished,
+            value: {
+              reason: FinishReason.STOP,
+              usageMetadata: {
+                promptTokenCount: 200,
+                candidatesTokenCount: 75,
+                cachedContentTokenCount: 120,
+                thoughtsTokenCount: 30,
+              },
+            },
+          };
+        }
+        return stream2();
+      }
+    });
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Run tool' }],
+    });
+
+    expect(result.stopReason).toBe('end_turn');
+    expect(result.usage).toEqual({
+      inputTokens: 300,
+      outputTokens: 100,
+      cachedReadTokens: 170,
+      thoughtTokens: 40,
+      totalTokens: 400,
+    });
+    expect(result._meta).toEqual({
+      quota: {
+        token_count: {
+          input_tokens: 300,
+          output_tokens: 100,
+          cached_tokens: 170,
+          thought_tokens: 40,
+        },
+        model_usage: [
+          {
+            model: 'gemini-2.5-flash',
+            token_count: {
+              input_tokens: 100,
+              output_tokens: 25,
+              cached_tokens: 50,
+              thought_tokens: 10,
+            },
+          },
+          {
+            model: 'gemini-2.5-pro',
+            token_count: {
+              input_tokens: 200,
+              output_tokens: 75,
+              cached_tokens: 120,
+              thought_tokens: 30,
+            },
+          },
+        ],
       },
     });
   });
