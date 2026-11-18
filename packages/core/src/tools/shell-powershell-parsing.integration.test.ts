@@ -39,6 +39,7 @@ import type {
   UpdatePolicy,
 } from '../confirmation-bus/types.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
+import { SafeRegExp } from '../policy/safe-regex.js';
 import { ApprovalMode, PolicyDecision } from '../policy/types.js';
 import { buildArgsPatterns } from '../policy/utils.js';
 import { isStrictlyApproved } from '../sandbox/windows/commandSafety.js';
@@ -408,7 +409,7 @@ describe('PowerShell command parsing event-loop responsiveness (#30249)', () => 
       .map((pattern) => ({
         toolName: SHELL_TOOL_NAME,
         decision: PolicyDecision.ALLOW,
-        argsPattern: new RegExp(pattern),
+        argsPattern: SafeRegExp.compile(pattern),
         priority: 10,
       }));
 
