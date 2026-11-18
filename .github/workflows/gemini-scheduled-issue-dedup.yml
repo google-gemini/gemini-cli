@@ -25,6 +25,8 @@ jobs:
       packages: 'read'
     timeout-minutes: 20
     runs-on: 'ubuntu-latest'
+    env:
+      TRIAGE_IMAGE: 'ghcr.io/google-gemini/gemini-cli-issue-triage@sha256:e3de1523f6c83aabb3c54b76d08940a2bf42febcb789dd2da6f95169641f94d3'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -37,6 +39,15 @@ jobs:
           registry: 'ghcr.io'
           username: '${{ github.actor }}'
           password: '${{ secrets.GITHUB_TOKEN }}'
+          logout: false
+
+      - name: 'Pre-pull Triage Image and Scrub Credentials'
+        run: |
+          # Pull the MCP server image while the registry login is valid. The
+          # Docker client config is removed when this step exits, whether or
+          # not the pull succeeds.
+          trap 'rm -f ~/.docker/config.json' EXIT
+          docker pull "${TRIAGE_IMAGE}"
 
       - name: 'Run Gemini Issue Deduplication Refresh'
         uses: 'google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489' # ratchet:google-github-actions/run-gemini-cli@v0
@@ -74,7 +85,7 @@ jobs:
                     "-e", "GCP_PROJECT",
                     "-e", "GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json",
                     "-v", "${GOOGLE_APPLICATION_CREDENTIALS}:/app/gcp-credentials.json",
-                    "ghcr.io/google-gemini/gemini-cli-issue-triage@sha256:e3de1523f6c83aabb3c54b76d08940a2bf42febcb789dd2da6f95169641f94d3"
+                    "${{ env.TRIAGE_IMAGE }}"
                   ],
                   "env": {
                     "GITHUB_TOKEN": "${GITHUB_TOKEN}",
