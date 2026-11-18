@@ -107,6 +107,7 @@
     "@opentelemetry/sdk-trace-base": "2.11.0",
     "import-in-the-middle": "3.5.3",
     "es-module-lexer@^3.0.0": "3.0.3",
+    "systeminformation": "5.33.18",
     "tar": "7.5.22",
     "undici": "7.30.1",
     "ws": "8.22.0",
