@@ -66,6 +66,11 @@ const EXPANDED_ARGUMENT_COMMANDS = [
   'ls ?.md',
   'git log *',
   'sed -n 1p *',
+  'bash -lc "find . -maxdepth 0 {-delete,}"',
+  'zsh -lc "find . -maxdepth 0 {-delete,}"',
+  'find . -maxdepth 0 -ex\\\nec sh marker.sh \\;',
+  'find . -maxdepth 0 "-ex\\\nec" sh marker.sh \\;',
+  'find . -maxdepth 0 -name a# -o -exec sh marker.sh \\;',
 ];
 
 // Commands that already require confirmation for other reasons.
@@ -88,6 +93,7 @@ const LITERAL_ARGUMENT_COMMANDS = [
   "grep -E 'a{1,3}' f.txt",
   "cat 'file{1,2}.txt'",
   'echo {id}',
+  'bash -lc "ls -la"',
 ];
 
 describe('shell argument expansion handling', () => {

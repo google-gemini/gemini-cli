@@ -201,6 +201,12 @@ export function isKnownSafeCommand(
         return false;
       }
 
+      // The script is parsed again by the inner shell, so arguments that it
+      // rewrites before running can't be verified from the unexpanded text.
+      if (hasUnresolvedShellExpansion(script)) {
+        return false;
+      }
+
       const commands = splitCommands(script);
       if (commands.length === 0) return false;
 

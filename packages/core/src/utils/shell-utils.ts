@@ -904,11 +904,14 @@ function getUnquotedWordText(node: Node): string {
 }
 
 /**
- * Checks unquoted word text for glob patterns (`*`, `?`, `[...]`) and for
- * brace groups that contain a `,` or `..` at their own nesting level, such as
- * `{a,b}` or `{a..c}`. Backslash-escaped characters are literal.
+ * Checks unquoted word text for syntax that bash and the `shell-quote`
+ * tokenizer read differently: glob patterns (`*`, `?`, `[...]`), brace groups
+ * that contain a `,` or `..` at their own nesting level (such as `{a,b}` or
+ * `{a..c}`), and a `#` inside a word. Bash keeps a `#` that doesn't start a
+ * word as a literal character, but `shell-quote` starts a comment there and
+ * drops the rest of the command. Backslash-escaped characters are literal.
  */
-function hasGlobOrBraceGroup(text: string): boolean {
+function hasUnquotedWordSyntax(text: string): boolean {
   let hasOpenBracket = false;
   // One entry per open brace group: whether it contains a separator.
   const braceGroups: boolean[] = [];
@@ -916,7 +919,7 @@ function hasGlobOrBraceGroup(text: string): boolean {
     const char = text[i];
     if (char === '\\') {
       i += 1;
-    } else if (char === '*' || char === '?') {
+    } else if (char === '*' || char === '?' || (char === '#' && i > 0)) {
       return true;
     } else if (char === '[') {
       hasOpenBracket = true;
@@ -938,12 +941,72 @@ function hasGlobOrBraceGroup(text: string): boolean {
   return false;
 }
 
+const WHITESPACE = /\s/;
+
+/**
+ * Checks for a backslash-newline line continuation that changes an argument.
+ * Bash removes the pair before it splits words, so `-ex\<newline>ec` runs as
+ * `-exec`, and the pair is also removed inside double quotes. A continuation
+ * between two separate words (whitespace on either side) doesn't change any
+ * argument. Continuations inside single quotes or comments are literal.
+ */
+function hasArgumentLineContinuation(root: Node, command: string): boolean {
+  for (
+    let newline = command.indexOf('\n');
+    newline !== -1;
+    newline = command.indexOf('\n', newline + 1)
+  ) {
+    const end = command[newline - 1] === '\r' ? newline - 1 : newline;
+    let backslashes = 0;
+    while (command[end - 1 - backslashes] === '\\') {
+      backslashes += 1;
+    }
+    if (backslashes % 2 === 0) {
+      continue;
+    }
+
+    const backslash = end - 1;
+    let isQuoted = false;
+    let isLiteral = false;
+    for (
+      let node = root.descendantForIndex(backslash, backslash + 1);
+      node;
+      node = node.parent
+    ) {
+      if (node.type === 'raw_string' || node.type === 'comment') {
+        isLiteral = true;
+        break;
+      }
+      if (node.type === 'string') {
+        isQuoted = true;
+        break;
+      }
+    }
+    if (isLiteral) {
+      continue;
+    }
+
+    const before = command[backslash - 1];
+    const after = command[newline + 1];
+    const joinsWords =
+      before !== undefined &&
+      !WHITESPACE.test(before) &&
+      after !== undefined &&
+      !WHITESPACE.test(after);
+    if (isQuoted || joinsWords) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Checks whether bash would rewrite the arguments of a command before running
  * it, so the unexpanded text doesn't describe what runs. This covers brace
  * expansion, parameter and variable expansion, ANSI-C (`$'...'`) and locale
  * (`$"..."`) quoting, arithmetic expansion, command and process substitution,
- * and unquoted glob patterns. Tilde expansion isn't reported.
+ * unquoted glob patterns, line continuations inside an argument, and a `#`
+ * inside an unquoted word. Tilde expansion isn't reported.
  *
  * Returns `true` when the command can't be parsed (parser unavailable, parse
  * timeout, or syntax errors), and `false` when the configured shell isn't
@@ -964,6 +1027,10 @@ export function hasUnresolvedShellExpansion(command: string): boolean {
 
   try {
     if (tree.rootNode.hasError) {
+      return true;
+    }
+
+    if (hasArgumentLineContinuation(tree.rootNode, command)) {
       return true;
     }
 
@@ -995,7 +1062,7 @@ export function hasUnresolvedShellExpansion(command: string): boolean {
         current.type === 'concatenation' ||
         (current.type === 'word' && current.parent?.type !== 'concatenation')
       ) {
-        if (hasGlobOrBraceGroup(getUnquotedWordText(current))) {
+        if (hasUnquotedWordSyntax(getUnquotedWordText(current))) {
           return true;
         }
       }

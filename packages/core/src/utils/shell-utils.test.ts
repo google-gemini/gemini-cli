@@ -317,6 +317,11 @@ describe('hasUnresolvedShellExpansion', () => {
     'ls [ab].md',
     'find . -exe[c]',
     'ls && echo {a,b}',
+    'find . -maxdepth 0 -ex\\\nec',
+    'find . -maxdepth 0 -ex\\\r\nec',
+    'find . -maxdepth 0 "-ex\\\nec"',
+    'find . -name a#',
+    "echo 'a'#b",
   ]) {
     it(`returns true when arguments change after shell expansion: ${command}`, () => {
       expect(hasUnresolvedShellExpansion(command)).toBe(true);
@@ -338,6 +343,12 @@ describe('hasUnresolvedShellExpansion', () => {
     'ls \\*.md',
     'cat ~/notes.txt',
     "find . -name '*.md'",
+    'ls \\\n  -la',
+    'ls -la \\\n  src',
+    "echo 'a\\\nb'",
+    'echo "a\\\\\nb"',
+    'ls -la # list files',
+    'echo \'a#b\' "c#d"',
   ]) {
     it(`returns false when arguments are literal: ${command}`, () => {
       expect(hasUnresolvedShellExpansion(command)).toBe(false);
