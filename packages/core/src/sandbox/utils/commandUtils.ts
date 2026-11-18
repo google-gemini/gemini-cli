@@ -7,6 +7,7 @@
 import { type SandboxRequest } from '../../services/sandboxManager.js';
 import {
   getCommandRoots,
+  hasUnresolvedShellExpansion,
   initializeShellParsers,
   splitCommands,
   stripShellWrapper,
@@ -34,6 +35,12 @@ export async function isStrictlyApproved(
   const allRootsApproved = roots.every((root) => approvedTools.includes(root));
   if (allRootsApproved) {
     return true;
+  }
+
+  // The read-only classifier can't vouch for arguments that bash rewrites
+  // before the command runs.
+  if (hasUnresolvedShellExpansion(stripped)) {
+    return false;
   }
 
   const pipelineCommands = splitCommands(stripped);

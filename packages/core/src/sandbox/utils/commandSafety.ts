@@ -9,6 +9,7 @@ import path from 'node:path';
 import { parse as shellParse } from 'shell-quote';
 import {
   extractStringFromParseEntry,
+  hasUnresolvedShellExpansion,
   initializeShellParsers,
   splitCommands,
   stripShellWrapper,
@@ -59,6 +60,9 @@ export async function isStrictlyApproved(
 
   const fullCmd = [command, ...args].join(' ');
   const stripped = stripShellWrapper(fullCmd);
+  // The read-only classifier can't vouch for arguments that bash rewrites
+  // before the command runs, so only explicitly approved tools qualify then.
+  const hasExpansion = hasUnresolvedShellExpansion(stripped);
 
   const pipelineCommands = splitCommands(stripped);
 
@@ -68,7 +72,8 @@ export async function isStrictlyApproved(
     // If it's explicitly approved OR it's a known safe POSIX command, we allow it.
     return (
       tools.includes(command) ||
-      isKnownSafeCommand([command, ...args], cwd, workspaceRoot)
+      (!hasExpansion &&
+        isKnownSafeCommand([command, ...args], cwd, workspaceRoot))
     );
   }
 
@@ -83,7 +88,8 @@ export async function isStrictlyApproved(
     const root = parsedArgs[0];
     // The segment is approved if the root tool is in the allowlist OR if the whole segment is safe.
     return (
-      tools.includes(root) || isKnownSafeCommand(parsedArgs, cwd, workspaceRoot)
+      tools.includes(root) ||
+      (!hasExpansion && isKnownSafeCommand(parsedArgs, cwd, workspaceRoot))
     );
   });
 }
@@ -192,6 +198,12 @@ export function isKnownSafeCommand(
       // Basic check for dangerous operators that could spawn subshells or redirect output
       // We allow &&, ||, |, ; but explicitly block subshells () and redirection >, >>, <
       if (/[()<>]/g.test(script)) {
+        return false;
+      }
+
+      // The script is parsed again by the inner shell, so arguments that it
+      // rewrites before running can't be verified from the unexpanded text.
+      if (hasUnresolvedShellExpansion(script)) {
         return false;
       }
 
