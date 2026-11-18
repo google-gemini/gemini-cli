@@ -41,6 +41,7 @@ import {
   resolveAtCommandPath,
   type ResolvedAtCommandPath,
   tokenLimit,
+  formatUserHintsForModel,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import type { Part, FunctionCall } from '@google/genai';
@@ -55,6 +56,8 @@ import {
   toAcpToolKind,
   buildAvailableModes,
   RequestPermissionResponseSchema,
+  type SteeringRequest,
+  type SteeringResponse,
 } from './acpUtils.js';
 import { z } from 'zod';
 import { getAcpErrorMessage } from './acpErrors.js';
@@ -66,6 +69,7 @@ const StructuredErrorSchema = z.object({
 
 export class Session {
   private pendingPrompt: AbortController | null = null;
+  private pendingSteeringHints: string[] = [];
   private commandHandler = new CommandHandler();
   private callIdCounter = 0;
   private readonly disposeController = new AbortController();
@@ -230,6 +234,37 @@ export class Session {
     this.pendingPrompt = null;
   }
 
+  async steer(params: SteeringRequest): Promise<SteeringResponse> {
+    const textHints = (params.prompt ?? [])
+      .filter(
+        (b): b is acp.ContentBlock & { type: 'text' } => b.type === 'text',
+      )
+      .map((b) => b.text?.trim() ?? '')
+      .filter(Boolean);
+
+    if (textHints.length === 0) {
+      return { outcome: 'failed' };
+    }
+
+    if (this.pendingPrompt !== null) {
+      this.pendingSteeringHints.push(...textHints);
+      return { outcome: 'injected' };
+    }
+
+    const idleBehavior = params._meta?.steering?.idleBehavior;
+    if (idleBehavior === 'startNewTurn') {
+      void this.prompt({
+        sessionId: this.id,
+        prompt: params.prompt,
+      }).catch((err) => {
+        debugLogger.error('Failed to start new turn from steering:', err);
+      });
+      return { outcome: 'startedNewTurn' };
+    }
+
+    return { outcome: 'promptRequired' };
+  }
+
   setMode(modeId: acp.SessionModeId): acp.SetSessionModeResponse {
     const availableModes = buildAvailableModes(
       this.context.config.isPlanEnabled(),
@@ -338,6 +373,7 @@ export class Session {
     this.pendingPrompt?.abort();
     const pendingSend = new AbortController();
     this.pendingPrompt = pendingSend;
+    this.pendingSteeringHints = [];
 
     await this.context.config.waitForMcpInit();
 
@@ -373,6 +409,7 @@ export class Session {
       // It uses `parts` argument but effectively ignores it in current implementation
       const handled = await this.handleCommand(commandText, parts);
       if (handled) {
+        this.pendingPrompt = null;
         return {
           stopReason: 'end_turn',
           usage: {
@@ -398,33 +435,36 @@ export class Session {
 
     const buildPromptResponse = (
       stopReason: acp.StopReason,
-    ): acp.PromptResponse => ({
-      stopReason,
-      usage: {
-        inputTokens: totalInputTokens,
-        outputTokens: totalOutputTokens,
-        cachedReadTokens: totalCachedTokens || undefined,
-        thoughtTokens: totalThoughtTokens || undefined,
-        totalTokens: totalInputTokens + totalOutputTokens,
-      },
-      _meta: {
-        quota: {
-          token_count: {
-            input_tokens: totalInputTokens,
-            output_tokens: totalOutputTokens,
-          },
-          model_usage: Array.from(modelUsageMap.entries()).map(
-            ([modelName, counts]) => ({
-              model: modelName,
-              token_count: {
-                input_tokens: counts.input,
-                output_tokens: counts.output,
-              },
-            }),
-          ),
+    ): acp.PromptResponse => {
+      this.pendingPrompt = null;
+      return {
+        stopReason,
+        usage: {
+          inputTokens: totalInputTokens,
+          outputTokens: totalOutputTokens,
+          cachedReadTokens: totalCachedTokens || undefined,
+          thoughtTokens: totalThoughtTokens || undefined,
+          totalTokens: totalInputTokens + totalOutputTokens,
         },
-      },
-    });
+        _meta: {
+          quota: {
+            token_count: {
+              input_tokens: totalInputTokens,
+              output_tokens: totalOutputTokens,
+            },
+            model_usage: Array.from(modelUsageMap.entries()).map(
+              ([modelName, counts]) => ({
+                model: modelName,
+                token_count: {
+                  input_tokens: counts.input,
+                  output_tokens: counts.output,
+                },
+              }),
+            ),
+          },
+        },
+      };
+    };
 
     let currentParts: Part[] = parts;
     let turnCount = 0;
@@ -438,6 +478,7 @@ export class Session {
       }
 
       if (pendingSend.signal.aborted) {
+        this.pendingPrompt = null;
         return { stopReason: 'cancelled' };
       }
 
@@ -458,6 +499,7 @@ export class Session {
 
         for await (const event of responseStream) {
           if (pendingSend.signal.aborted) {
+            this.pendingPrompt = null;
             return { stopReason: 'cancelled' };
           }
 
@@ -577,10 +619,12 @@ export class Session {
           pendingSend.signal.aborted ||
           (error instanceof Error && error.name === 'AbortError')
         ) {
+          this.pendingPrompt = null;
           return { stopReason: 'cancelled' };
         }
 
         if (error instanceof acp.RequestError) {
+          this.pendingPrompt = null;
           throw error;
         }
 
@@ -604,6 +648,7 @@ export class Session {
           return buildPromptResponse('end_turn');
         }
 
+        this.pendingPrompt = null;
         throw new acp.RequestError(
           getErrorStatus(error) || 500,
           getAcpErrorMessage(error),
@@ -643,6 +688,15 @@ export class Session {
 
         const response = await this.runTool(pendingSend.signal, promptId, fc);
         toolResponseParts.push(...response);
+      }
+
+      if (this.pendingSteeringHints.length > 0) {
+        const hintsToInject = [...this.pendingSteeringHints];
+        this.pendingSteeringHints = [];
+        const formattedHints = formatUserHintsForModel(hintsToInject);
+        if (formattedHints) {
+          toolResponseParts.unshift({ text: formattedHints });
+        }
       }
 
       currentParts = toolResponseParts;

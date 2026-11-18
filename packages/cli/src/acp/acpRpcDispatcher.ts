@@ -16,7 +16,11 @@ import { SettingScope, type LoadedSettings } from '../config/settings.js';
 import type { CliArgs } from '../config/config.js';
 import { getAcpErrorMessage } from './acpErrors.js';
 import { AcpSessionManager, type AuthDetails } from './acpSessionManager.js';
-import { hasMeta } from './acpUtils.js';
+import {
+  hasMeta,
+  type SteeringRequest,
+  type SteeringResponse,
+} from './acpUtils.js';
 
 export class GeminiAgent {
   private apiKey: string | undefined;
@@ -98,6 +102,11 @@ export class GeminiAgent {
         mcpCapabilities: {
           http: true,
           sse: true,
+        },
+      },
+      _meta: {
+        steering: {
+          supported: true,
         },
       },
     };
@@ -232,5 +241,28 @@ export class GeminiAgent {
       );
     }
     return session.setModel(params.modelId);
+  }
+
+  async ['_session/steering'](
+    params: SteeringRequest,
+  ): Promise<SteeringResponse> {
+    return this.steering(params);
+  }
+
+  async _session_steering(
+    params: SteeringRequest,
+  ): Promise<SteeringResponse> {
+    return this.steering(params);
+  }
+
+  async steering(params: SteeringRequest): Promise<SteeringResponse> {
+    const session = this.sessionManager.getSession(params.sessionId);
+    if (!session) {
+      throw new acp.RequestError(
+        -32602,
+        `Session not found: ${params.sessionId}`,
+      );
+    }
+    return session.steer(params);
   }
 }

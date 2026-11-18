@@ -409,3 +409,23 @@ export function buildAvailableModels(
     currentModelId: preferredModel,
   };
 }
+
+export interface SteeringRequest {
+  sessionId: string;
+  prompt: acp.ContentBlock[];
+  _meta?: {
+    steering?: {
+      idleBehavior?: 'promptRequired' | 'startNewTurn';
+    };
+  };
+}
+
+export type SteeringOutcome =
+  | 'injected'
+  | 'promptRequired'
+  | 'startedNewTurn'
+  | 'failed';
+
+export interface SteeringResponse {
+  outcome: SteeringOutcome;
+}

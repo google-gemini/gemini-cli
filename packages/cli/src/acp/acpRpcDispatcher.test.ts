@@ -144,6 +144,7 @@ describe('GeminiAgent - RPC Dispatcher', () => {
       },
     });
     expect(response.agentCapabilities?.loadSession).toBe(true);
+    expect(response._meta?.steering).toEqual({ supported: true });
   });
 
   it('should authenticate correctly', async () => {
@@ -347,5 +348,64 @@ describe('GeminiAgent - RPC Dispatcher', () => {
     await agent.dispose();
 
     expect(disposeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('should dispatch _session/steering to session.steer', async () => {
+    const mockSession = {
+      steer: vi.fn().mockResolvedValue({ outcome: 'injected' }),
+    };
+    (
+      agent as unknown as { sessionManager: { getSession: Mock } }
+    ).sessionManager = {
+      getSession: vi.fn().mockReturnValue(mockSession),
+    };
+
+    const result = await agent['_session/steering']({
+      sessionId: 'test-session-id',
+      prompt: [{ type: 'text', text: 'Please focus on unit tests' }],
+    });
+
+    expect(mockSession.steer).toHaveBeenCalledWith({
+      sessionId: 'test-session-id',
+      prompt: [{ type: 'text', text: 'Please focus on unit tests' }],
+    });
+    expect(result).toEqual({ outcome: 'injected' });
+  });
+
+  it('should dispatch steering canonical method to session.steer', async () => {
+    const mockSession = {
+      steer: vi.fn().mockResolvedValue({ outcome: 'injected' }),
+    };
+    (
+      agent as unknown as { sessionManager: { getSession: Mock } }
+    ).sessionManager = {
+      getSession: vi.fn().mockReturnValue(mockSession),
+    };
+
+    const result = await agent.steering({
+      sessionId: 'test-session-id',
+      prompt: [{ type: 'text', text: 'Please focus on unit tests' }],
+    });
+
+    expect(mockSession.steer).toHaveBeenCalledWith({
+      sessionId: 'test-session-id',
+      prompt: [{ type: 'text', text: 'Please focus on unit tests' }],
+    });
+    expect(result).toEqual({ outcome: 'injected' });
+  });
+
+  it('should throw error when steering non-existent session', async () => {
+    (
+      agent as unknown as { sessionManager: { getSession: Mock } }
+    ).sessionManager = {
+      getSession: vi.fn().mockReturnValue(undefined),
+    };
+
+    await expect(
+      agent.steering({
+        sessionId: 'unknown',
+        prompt: [{ type: 'text', text: 'Hello' }],
+      }),
+    ).rejects.toThrow('Session not found: unknown');
   });
 });

@@ -603,6 +603,112 @@ describe('Session', () => {
     });
   });
 
+  describe('mid-turn steering (_session/steering)', () => {
+    it('should inject steering hints at tool-call boundary into the next turn', async () => {
+      let turn1Resolve: () => void = () => {};
+      const turn1Promise = new Promise<void>((resolve) => {
+        turn1Resolve = resolve;
+      });
+
+      async function* stream1(): AsyncGenerator<ServerGeminiStreamEvent> {
+        yield {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'call-1',
+            name: 'test_tool',
+            args: { foo: 'bar' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        };
+        yield {
+          type: GeminiEventType.Finished,
+          value: {
+            reason: FinishReason.STOP,
+            usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 },
+          },
+        };
+        turn1Resolve();
+      }
+
+      const stream2 = createMockStream([
+        {
+          type: GeminiEventType.Content,
+          value: 'Steered response',
+        },
+      ]);
+
+      mockSendMessageStream
+        .mockReturnValueOnce(stream1())
+        .mockReturnValueOnce(stream2);
+
+      const promptPromise = session.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Do initial task' }],
+      });
+
+      // Wait until turn 1 is actively running
+      await turn1Promise;
+
+      // Inject mid-turn steering while prompt is running
+      const steerResult = await session.steer({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Prefer typescript solution' }],
+      });
+
+      expect(steerResult).toEqual({ outcome: 'injected' });
+
+      const promptResult = await promptPromise;
+      expect(promptResult.stopReason).toBe('end_turn');
+
+      // Verify that the second call to sendMessageStream contained the injected steering hints
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+      const secondCallParts = mockSendMessageStream.mock.calls[1][0] as Array<{ text?: string }>;
+      expect(secondCallParts[0].text).toContain('Prefer typescript solution');
+      expect(secondCallParts[0].text).toContain('User hints:');
+    });
+
+    it('should return promptRequired when steering an idle session by default', async () => {
+      const result = await session.steer({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Nudge when idle' }],
+      });
+
+      expect(result).toEqual({ outcome: 'promptRequired' });
+    });
+
+    it('should start a new turn when steering an idle session with idleBehavior startNewTurn', async () => {
+      const stream = createMockStream([
+        {
+          type: GeminiEventType.Content,
+          value: 'New turn response',
+        },
+      ]);
+      mockSendMessageStream.mockReturnValue(stream);
+
+      const result = await session.steer({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Start working' }],
+        _meta: {
+          steering: {
+            idleBehavior: 'startNewTurn',
+          },
+        },
+      });
+
+      expect(result).toEqual({ outcome: 'startedNewTurn' });
+    });
+
+    it('should return failed when steering with empty text prompt', async () => {
+      const result = await session.steer({
+        sessionId: 'session-1',
+        prompt: [],
+      });
+
+      expect(result).toEqual({ outcome: 'failed' });
+    });
+  });
+
   it('should handle tool call permission request', async () => {
     const confirmationDetails = {
       type: 'info',
