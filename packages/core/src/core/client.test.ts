@@ -830,7 +830,7 @@ describe('Gemini Client (client.ts)', () => {
       );
     });
 
-    it('includes all hardened turns from pendingApiHistory in apiHistoryOverride so requests never end on a model turn', async () => {
+    it('includes only hardened continuation turns from pendingApiHistory', async () => {
       mockConfig.getContextManagementConfig = vi
         .fn()
         .mockReturnValue({ enabled: true });
@@ -876,7 +876,6 @@ describe('Gemini Client (client.ts)', () => {
           apiHistoryOverride: [
             { role: 'user', parts: [{ text: 'Earlier prompt' }] },
             { role: 'model', parts: [{ text: 'Earlier answer' }] },
-            { role: 'user', parts: [{ text: 'Processed prompt' }] },
             { role: 'model', parts: [{ text: 'Injected model context' }] },
             { role: 'user', parts: [{ text: 'Please continue.' }] },
           ],

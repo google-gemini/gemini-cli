@@ -711,7 +711,7 @@ export class GeminiClient {
         // trailing sentinel user turn) to the managed history for the API call.
         apiHistoryOverride =
           pendingApiHistory.length > 0
-            ? [...apiHistory, ...pendingApiHistory]
+            ? [...apiHistory, ...pendingApiHistory.slice(1)]
             : [...apiHistory, finalPendingContent];
 
         this.getChat().setHistory(newHistory);
