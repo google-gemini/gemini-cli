@@ -1,4 +1,4 @@
-# Latest stable release: v0.69.0
+# Latest stable release: v0.70.0
 
 Released: November 19, 2026
 
@@ -11,123 +11,91 @@ npm install -g @google/gemini-cli
 
 ## Highlights
 
-- **Daily Token Usage Heatmap**: Added a new `/stats heatmap` subcommand to
-  visualize daily token consumption directly within the terminal interface.
-- **Standalone Custom Themes**: Supported standalone `theme.json` configuration
-  for custom CLI themes, along with robust path checks for home-directory theme
-  files.
-- **API Timeout Overrides & Network Resilience**: Added configuration support
-  for overriding the 60-second API headers timeout across all authentication
-  modes via `model.requestTimeoutMs` and `GEMINI_API_HEADERS_TIMEOUT_MS`, and
-  eliminated silent loading hangs during network failures.
-- **Multimodal Memory & Output Optimization**: Bounded multi-part tool outputs,
-  evicted older multimodal inline data, and prevented memory retention in PDF
-  inline data and telemetry buffers.
-- **Process Lifecycle & Sandbox Hardening**: Enhanced process lifecycle
-  management to cleanly terminate child processes and preserve exit codes on
-  headless abort, prevented recursive sessions in shell mode, permitted FSEvents
-  in macOS permissive sandboxes, and verified folder trust before entering
-  sandboxes.
+- **Policy Engine Hardening**: Evaluated policy regex patterns using `re2js` for
+  linear-time matching against ReDoS vulnerabilities, matched `commandPrefix`
+  and `commandRegex` rules strictly against top-level command arguments, and
+  enforced user confirmation for shell commands with unresolved variable
+  expansions.
+- **MCP & IDE Security Isolation**: Enforced security permission checks to skip
+  system MCP servers with insecure command permissions, isolated IDE companion
+  discovery using per-user directories and atomic port file writes, and
+  disclosed canonical link targets in consent prompts.
+- **Model Listing & Network Resilience**: Accurately reported output token
+  limits and initialized authentication capabilities when listing models, and
+  dynamically scaled HTTP client body timeouts when request timeouts exceed the
+  default 300 seconds.
+- **Session & Workspace State Preservation**: Preserved Unicode characters and
+  stripped ANSI escape fragments in session previews, maintained selected git
+  worktrees across authentication restarts, and safely restored workspace
+  directories only upon successful chat resumption.
 
 ## What's Changed
 
-- fix(core,cli): preserve literal `$` characters during template placeholder
-  replacement by @jesussamuel-byte in
-  [#30136](https://github.com/google-gemini/gemini-cli/pull/30136)
-- feat(cli): add /stats heatmap subcommand for daily token usage by
-  @jvargassanchez-dot in
-  [#30135](https://github.com/google-gemini/gemini-cli/pull/30135)
-- fix(core): prevent **GCLI_EXPAND_TARGET** env collision in expandEnvVars by
-  @villahernandez-coder in
-  [#30138](https://github.com/google-gemini/gemini-cli/pull/30138)
-- chore(release): bump version to 0.69.0-nightly.20261104.g89e9d25d6 by
+- Changelog for v0.69.0-preview.0 by @gemini-cli-robot in
+  [#30222](https://github.com/google-gemini/gemini-cli/pull/30222)
+- Changelog for v0.68.0 by @gemini-cli-robot in
+  [#30224](https://github.com/google-gemini/gemini-cli/pull/30224)
+- chore(release): bump version to 0.70.0-nightly.20261110.g1603e9bab by
   @gemini-cli-robot in
-  [#30140](https://github.com/google-gemini/gemini-cli/pull/30140)
-- fix(cli): serialize AnsiOutput to text content in ACP tool call updates by
-  @diegogodinezr in
-  [#30141](https://github.com/google-gemini/gemini-cli/pull/30141)
-- Changelog for v0.67.0 by @gemini-cli-robot in
-  [#30145](https://github.com/google-gemini/gemini-cli/pull/30145)
-- Changelog for v0.68.0-preview.0 by @gemini-cli-robot in
-  [#30146](https://github.com/google-gemini/gemini-cli/pull/30146)
-- fix(core): fix Windows PowerShell substitution false positives and policy
-  handling by @duvanka-prasad in
-  [#30110](https://github.com/google-gemini/gemini-cli/pull/30110)
-- fix(cli): preserve leading and trailing whitespace in
-  @tools/caretaker-agent/cloudrun/triage-worker/Dockerfile references by
-  @duvanka-prasad in
-  [#30150](https://github.com/google-gemini/gemini-cli/pull/30150)
-- fix(core): prevent thoughtSignature-only turns and preserve multimodal tool
-  responses by @tadipavan in
-  [#30153](https://github.com/google-gemini/gemini-cli/pull/30153)
-- fix(cli): wait for piped stdin EOF and avoid destroying process.stdin by
-  @villahernandez-coder in
-  [#30163](https://github.com/google-gemini/gemini-cli/pull/30163)
-- fix(cli): preserve pending tool confirmation when escaping editor selection by
-  @jvargassanchez-dot in
-  [#30147](https://github.com/google-gemini/gemini-cli/pull/30147)
-- feat(cli): support standalone theme.json configuration for custom themes by
-  @jesussamuel-byte in
-  [#30119](https://github.com/google-gemini/gemini-cli/pull/30119)
-- fix(cli): normalize error payloads in headless CLI formatting by
-  @jvargassanchez-dot in
-  [#30117](https://github.com/google-gemini/gemini-cli/pull/30117)
-- fix(core): require path-separator boundary in tildeifyPath by
-  @villahernandez-coder in
-  [#30124](https://github.com/google-gemini/gemini-cli/pull/30124)
-- fix(cli): validate model names and support direct arguments in /model command
-  by @jesussamuel-byte in
-  [#30137](https://github.com/google-gemini/gemini-cli/pull/30137)
-- fix(cli): handle file watcher errors and permit FSEvents in macOS permissive
-  sandbox by @diegogodinezr in
-  [#30143](https://github.com/google-gemini/gemini-cli/pull/30143)
-- fix(core): bound multi-part tool outputs and evict older multimodal inlineData
+  [#30223](https://github.com/google-gemini/gemini-cli/pull/30223)
+- test(cli): remove redundant lowercase restart test in
+  AdminSettingsChangedDialog by @luisfelipe-alt in
+  [#30221](https://github.com/google-gemini/gemini-cli/pull/30221)
+- fix(cli): preserve Unicode prompts and strip ANSI fragments in session
+  previews (#29915) by @urielefrenvirtusa in
+  [#30220](https://github.com/google-gemini/gemini-cli/pull/30220)
+- fix(cli): preserve selected worktree across authentication restarts (#30078)
+  by @duvanka-prasad in
+  [#30176](https://github.com/google-gemini/gemini-cli/pull/30176)
+- fix(core): preserve interrupted placeholder after empty model responses to
+  tool turns by @tadipavan in
+  [#30228](https://github.com/google-gemini/gemini-cli/pull/30228)
+- fix(cli): apply default in ${VAR:-default} when variable is set but empty by
+  @urielefrenvirtusa in
+  [#30250](https://github.com/google-gemini/gemini-cli/pull/30250)
+- fix(core): scale undici bodyTimeout when request timeout exceeds 300s default
   by @tadipavan in
-  [#30180](https://github.com/google-gemini/gemini-cli/pull/30180)
-- fix(vscode): eliminate barrel import bundle bloat and redundant setContext
-  calls by @ugorla-dev in
-  [#30181](https://github.com/google-gemini/gemini-cli/pull/30181)
-- fix(acp): handle mid-stream retries to prevent text concatenation by
+  [#30258](https://github.com/google-gemini/gemini-cli/pull/30258)
+- fix(core,cli): report accurate output token limits in models list by
+  @tadipavan in [#30253](https://github.com/google-gemini/gemini-cli/pull/30253)
+- fix(cli): restore workspace directories only after resumeChat succeeds by
   @urielefrenvirtusa in
-  [#30165](https://github.com/google-gemini/gemini-cli/pull/30165)
-- fix(core,cli): prevent silent multi-minute loading hangs on network failures
-  by @villahernandez-coder in
-  [#30182](https://github.com/google-gemini/gemini-cli/pull/30182)
-- fix(core,cli): prevent terminal model-turn 400s on resume and main-thread
-  JSONL freezes by @villahernandez-coder in
-  [#30186](https://github.com/google-gemini/gemini-cli/pull/30186)
-- fix(core): prevent multi-hour quota retries and notify ACP client on retry
-  attempts by @urielefrenvirtusa in
-  [#30187](https://github.com/google-gemini/gemini-cli/pull/30187)
-- fix(core): close orphan /dev/ptmx master FD leaked on macOS PTY spawn by
-  @ugorla-dev in
-  [#30184](https://github.com/google-gemini/gemini-cli/pull/30184)
-- fix(core,cli): allow overriding 60s API headers timeout across all auth modes
-  (`model.requestTimeoutMs` / `GEMINI_API_HEADERS_TIMEOUT_MS`) by
-  @jesussamuel-byte in
-  [#30183](https://github.com/google-gemini/gemini-cli/pull/30183)
-- fix(cli): use isSubpath for theme file home-directory check by @duvanka-prasad
-  in [#30160](https://github.com/google-gemini/gemini-cli/pull/30160)
-- fix(cli): resolve folder trust before entering the macOS Seatbelt sandbox by
+  [#30259](https://github.com/google-gemini/gemini-cli/pull/30259)
+- fix(core,cli): scope foreground retry status to active main prompt and current
+  model policy by @tadipavan in
+  [#30266](https://github.com/google-gemini/gemini-cli/pull/30266)
+- fix(cli): initialize auth capabilities and deduplicate options when listing
+  models by @tadipavan in
+  [#30271](https://github.com/google-gemini/gemini-cli/pull/30271)
+- fix(cli): skip system MCP servers with insecure command permissions by
+  @elberthc-byte in
+  [#30283](https://github.com/google-gemini/gemini-cli/pull/30283)
+- refactor(core): use re2js for linear-time policy argsPattern evaluation by
   @diegogodinezr in
-  [#30164](https://github.com/google-gemini/gemini-cli/pull/30164)
-- fix(cli,core): kill child processes, record cancelled tools, and preserve
-  signal exit code on headless abort by @duvanka-prasad in
-  [#30204](https://github.com/google-gemini/gemini-cli/pull/30204)
-- fix(cli): prevent recursive interactive gemini sessions in shell mode by
+  [#30282](https://github.com/google-gemini/gemini-cli/pull/30282)
+- chore(deps): update workspace dependencies and sandbox runtime packages by
+  @DavidAPierce in
+  [#30321](https://github.com/google-gemini/gemini-cli/pull/30321)
+- fix(cli): disclose canonical link path and default consent prompt to no by
   @jvargassanchez-dot in
-  [#30185](https://github.com/google-gemini/gemini-cli/pull/30185)
-- fix(core): reject MessageBus.request() immediately when publish fails by
+  [#30289](https://github.com/google-gemini/gemini-cli/pull/30289)
+- fix(cli): detect local git clone from CLI path instead of cwd by @tadipavan in
+  [#30315](https://github.com/google-gemini/gemini-cli/pull/30315)
+- fix(ide): use per-user discovery directory and atomic port file writes by
+  @villahernandez-coder in
+  [#30340](https://github.com/google-gemini/gemini-cli/pull/30340)
+- ci: pre-pull triage image and clear Docker login in dedup workflows by
+  @diegogodinezr in
+  [#30342](https://github.com/google-gemini/gemini-cli/pull/30342)
+- fix(core): keep ASK_USER for shell commands with unresolved expansion by
   @luisfelipe-alt in
-  [#30189](https://github.com/google-gemini/gemini-cli/pull/30189)
-- fix(core): ensure read-many-files only inlines explicitly requested binary
-  assets (#29045) by @urielefrenvirtusa in
-  [#30211](https://github.com/google-gemini/gemini-cli/pull/30211)
-- fix(core): recognize TortoiseGitPlink as PuTTY-family SSH client (#29917) by
-  @urielefrenvirtusa in
-  [#30214](https://github.com/google-gemini/gemini-cli/pull/30214)
-- fix(core): prevent PDF inlineData and telemetry buffer memory retention by
-  @tadipavan in [#30217](https://github.com/google-gemini/gemini-cli/pull/30217)
+  [#30338](https://github.com/google-gemini/gemini-cli/pull/30338)
+- fix(core): match commandPrefix and commandRegex rules against the top-level
+  command argument by @luisfelipe-alt in
+  [#30355](https://github.com/google-gemini/gemini-cli/pull/30355)
+- chore(deps): adjust workspace dependency pins and update simple-git by
+  @DavidAPierce in
+  [#30356](https://github.com/google-gemini/gemini-cli/pull/30356)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.68.0...v0.69.0
+https://github.com/google-gemini/gemini-cli/compare/v0.69.0...v0.70.0
