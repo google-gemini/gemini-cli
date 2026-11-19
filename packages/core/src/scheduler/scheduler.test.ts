@@ -849,6 +849,24 @@ describe('Scheduler (Orchestrator)', () => {
       expect(mockExecutor.execute).toHaveBeenCalled();
     });
 
+    it('awaits an asynchronous negative taint result without escalating ALLOW', async () => {
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.ALLOW,
+        rule: undefined,
+      });
+      mockConfig.isInteractive = vi.fn().mockReturnValue(false);
+      mockTool.build = vi.fn().mockReturnValue({
+        ...mockInvocation,
+        hasTaintedOrBuildFileRisk: vi.fn().mockResolvedValue(false),
+      });
+      mockExecutor.execute.mockResolvedValue({
+        status: CoreToolCallStatus.Success,
+      } as unknown as SuccessfulToolCall);
+      await scheduler.schedule(req1, signal);
+      expect(mockExecutor.execute).toHaveBeenCalled();
+      expect(resolveConfirmation).not.toHaveBeenCalled();
+    });
+
     it('should escalate ALLOW to ASK_USER when invocation detects taint risk in interactive mode', async () => {
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.ALLOW,

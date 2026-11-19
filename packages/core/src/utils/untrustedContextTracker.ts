@@ -613,7 +613,10 @@ export function findUntrustedFlags(
  * @param command The shell command string.
  * @returns True if the command is a build or test tool.
  */
-export function isBuildOrTestCommand(command: string): boolean {
+export function isBuildOrTestCommand(
+  command: string,
+  commandRoots?: string[],
+): boolean {
   if (!command) {
     return false;
   }
@@ -623,7 +626,7 @@ export function isBuildOrTestCommand(command: string): boolean {
     return base.toLowerCase().replace(/\.(exe|cmd|bat)$/, '');
   };
   try {
-    const roots = getCommandRoots(command);
+    const roots = commandRoots ?? getCommandRoots(command);
     if (roots.length > 0) {
       return roots.some((root) => {
         const base = getBaseName(root);
@@ -662,13 +665,18 @@ export function isBuildOrTestCommand(command: string): boolean {
  * @param command The shell command string.
  * @returns True if the command invokes a remote content retrieval tool.
  */
-export function isRemoteContentCommand(command: string): boolean {
+export function isRemoteContentCommand(
+  command: string,
+  commandRoots?: string[],
+): boolean {
   if (!command) {
     return false;
   }
   let roots: string[] = [];
   try {
-    roots = getCommandRoots(command).map((root) => normalizeCommand(root));
+    roots = (commandRoots ?? getCommandRoots(command)).map((root) =>
+      normalizeCommand(root),
+    );
   } catch {
     // Ignore and fall back to the words of the command.
   }

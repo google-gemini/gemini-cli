@@ -35,15 +35,12 @@ import {
 import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
-  getCommandRoots,
   initializeShellParsers,
+  ShellCommandParser,
   stripShellWrapper,
-  parseCommandDetails,
-  hasRedirection,
   detectCommandSubstitution,
   normalizeCommand,
   escapeShellArg,
-  isInteractiveGeminiCommand,
   INTERACTIVE_GEMINI_SHELL_ERROR,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
@@ -111,6 +108,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
   ShellToolParams,
   ToolResult
 > {
+  private readonly commandParser = new ShellCommandParser();
   private proactivePermissionsConfirmed?: SandboxPermissions;
   private confirmedCommand?: string;
 
@@ -300,18 +298,26 @@ export class ShellToolInvocation extends BaseToolInvocation<
     });
     let roots: string[] = [];
     try {
-      roots = getCommandRoots(command);
+      roots = this.commandParser.getCommandRoots(command);
     } catch {
       roots = [command.trim().split(/\s+/)[0] || 'shell'];
     }
     return getUnacknowledgedUntrustedFlags(untrustedFlags, roots, config);
   }
 
-  hasTaintedOrBuildFileRisk(): boolean {
+  async hasTaintedOrBuildFileRisk(): Promise<boolean> {
+    await this.commandParser.prepare(this.params.command);
+    return this.hasPreparedTaintRisk();
+  }
+
+  private hasPreparedTaintRisk(): boolean {
     const command = stripShellWrapper(this.params.command);
     const untrustedFlags = this.getUntrustedFlags(command);
     const modifiedBuildFiles = getModifiedBuildFiles(this.context.config);
-    const isBuildCmd = isBuildOrTestCommand(command);
+    const isBuildCmd = isBuildOrTestCommand(
+      command,
+      this.commandParser.getCommandRoots(command),
+    );
 
     return (
       untrustedFlags.length > 0 || (isBuildCmd && modifiedBuildFiles.length > 0)
@@ -326,11 +332,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
       outcome === ToolConfirmationOutcome.ProceedAlways
     ) {
       const command = stripShellWrapper(this.params.command);
-      if (this.hasTaintedOrBuildFileRisk()) {
+      if (this.hasPreparedTaintRisk()) {
         return undefined;
       }
-      const rootCommands = [...new Set(getCommandRoots(command))];
-      const allowRedirection = hasRedirection(command) ? true : undefined;
+      const rootCommands = [
+        ...new Set(this.commandParser.getCommandRoots(command)),
+      ];
+      const allowRedirection = this.commandParser.hasRedirection(command)
+        ? true
+        : undefined;
       const allowCommandSubstitution = detectCommandSubstitution(command)
         ? true
         : undefined;
@@ -359,7 +369,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
     abortSignal: AbortSignal,
     forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (isInteractiveGeminiCommand(stripShellWrapper(this.params.command))) {
+    await this.commandParser.prepare(this.params.command);
+    if (
+      this.commandParser.isInteractiveGeminiCommand(
+        stripShellWrapper(this.params.command),
+      )
+    ) {
       return false;
     }
 
@@ -367,7 +382,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return super.shouldConfirmExecute(abortSignal, forcedDecision);
     }
 
-    if (this.hasTaintedOrBuildFileRisk()) {
+    if (await this.hasTaintedOrBuildFileRisk()) {
       return this.getConfirmationDetails(abortSignal);
     }
 
@@ -384,7 +399,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
     if (this.context.config.getSandboxEnabled()) {
       const command = stripShellWrapper(this.params.command);
-      const rootCommands = getCommandRoots(command);
+      const rootCommands = this.commandParser.getCommandRoots(command);
       const rawRootCommand = rootCommands[0];
 
       if (rawRootCommand) {
@@ -403,7 +418,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           const missingNetwork = !!proactive.network && !hasNetwork;
 
           // Detect commands or sub-commands that definitely need network
-          const parsed = parseCommandDetails(command);
+          const parsed = this.commandParser.getCommandDetails(command);
           const subCommand = parsed?.details[0]?.args?.[0];
           const needsNetwork = isNetworkReliantCommand(rootCommand, subCommand);
 
@@ -491,14 +506,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
 
-    const parsed = parseCommandDetails(command);
+    await this.commandParser.prepare(this.params.command);
+    const parsed = this.commandParser.getCommandDetails(command);
     let rootCommandDisplay = '';
 
     if (!parsed || parsed.hasError || parsed.details.length === 0) {
       // Fallback if parser fails
       const fallback = command.trim().split(/\s+/)[0];
       rootCommandDisplay = fallback || 'shell command';
-      if (hasRedirection(command)) {
+      if (this.commandParser.hasRedirection(command)) {
         rootCommandDisplay += ', redirection';
       }
     } else {
@@ -509,7 +525,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
     let rootCommands: string[] = [];
     try {
-      rootCommands = [...new Set(getCommandRoots(command))];
+      rootCommands = [...new Set(this.commandParser.getCommandRoots(command))];
     } catch {
       rootCommands = [command.trim().split(/\s+/)[0] || 'shell'];
     }
@@ -517,7 +533,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
     const untrustedFlags = this.getUntrustedFlags(command);
     const modifiedBuildFiles = getModifiedBuildFiles(this.context.config);
-    const isBuildCmd = isBuildOrTestCommand(command);
+    const isBuildCmd = isBuildOrTestCommand(
+      command,
+      this.commandParser.getCommandRoots(command),
+    );
 
     const hasSecurityWarning =
       untrustedFlags.length > 0 ||
@@ -610,7 +629,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return true;
     }
 
-    if (this.hasTaintedOrBuildFileRisk()) {
+    if (await this.hasTaintedOrBuildFileRisk()) {
       return false;
     }
 
@@ -640,8 +659,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
       setExecutionIdCallback,
     } = options;
     const strippedCommand = stripShellWrapper(this.params.command);
+    await this.commandParser.prepare(this.params.command);
 
-    if (isInteractiveGeminiCommand(strippedCommand)) {
+    if (this.commandParser.isInteractiveGeminiCommand(strippedCommand)) {
       return {
         llmContent: INTERACTIVE_GEMINI_SHELL_ERROR,
         returnDisplay: INTERACTIVE_GEMINI_SHELL_ERROR,
@@ -1100,9 +1120,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
           this.context.config.sandboxManager.parseDenials(result);
         if (sandboxDenial) {
           const strippedCommand = stripShellWrapper(this.params.command);
-          const rootCommands = getCommandRoots(strippedCommand).filter(
-            (r) => r !== 'shopt',
-          );
+          const rootCommands = this.commandParser
+            .getCommandRoots(strippedCommand)
+            .filter((r) => r !== 'shopt');
           const rootCommandDisplay =
             rootCommands.length > 0 ? rootCommands[0] : 'shell';
 
@@ -1238,7 +1258,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       const summarizeConfig =
         this.context.config.getSummarizeToolOutputConfig();
-      const outputSource = isRemoteContentCommand(strippedCommand)
+      const outputSource = isRemoteContentCommand(
+        strippedCommand,
+        this.commandParser.getCommandRoots(strippedCommand),
+      )
         ? REMOTE_SHELL_OUTPUT_SOURCE
         : undefined;
       const executionError = result.error
