@@ -18,6 +18,29 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.70.0 - 2026-11-19
+
+- **Policy Engine Hardening & Shell Safety:** Evaluated policy regex patterns
+  with re2js for linear-time evaluation and matched prefix and regex rules
+  against top-level command arguments
+  ([#30282](https://github.com/google-gemini/gemini-cli/pull/30282) by
+  @diegogodinezr,
+  [#30355](https://github.com/google-gemini/gemini-cli/pull/30355) by
+  @luisfelipe-alt).
+- **System MCP & IDE Security Isolation:** Skipped system MCP servers with
+  insecure command permissions and isolated IDE companion discovery using
+  per-user directories with atomic port writes
+  ([#30283](https://github.com/google-gemini/gemini-cli/pull/30283) by
+  @elberthc-byte,
+  [#30340](https://github.com/google-gemini/gemini-cli/pull/30340) by
+  @villahernandez-coder).
+- **Model Token Limits & HTTP Timeout Scaling:** Reported accurate output token
+  limits in model listings and dynamically scaled HTTP client body timeouts for
+  long-running requests
+  ([#30253](https://github.com/google-gemini/gemini-cli/pull/30253) by
+  @tadipavan, [#30258](https://github.com/google-gemini/gemini-cli/pull/30258)
+  by @tadipavan).
+
 ## Announcements: v0.69.0 - 2026-11-19
 
 - **Daily Token Heatmap & Custom Themes:** Added a `/stats heatmap` subcommand
