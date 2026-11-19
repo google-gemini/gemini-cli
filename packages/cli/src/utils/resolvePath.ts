@@ -21,6 +21,6 @@ export function resolvePath(p: string): string {
   ) {
     expandedPath = homedir() + p.substring(1);
   }
-  const pathModule = process.platform === 'win32' ? path.win32 : path;
+  const pathModule = process.platform === 'win32' ? path.win32 : path.posix;
   return pathModule.normalize(expandedPath);
 }
