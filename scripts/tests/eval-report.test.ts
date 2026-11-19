@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   findReportFiles,
   getModelFromPath,
+  getRelativePath,
   summarizeReports,
   formatReportSummary,
   formatReportSummaryJson,
@@ -94,6 +95,22 @@ describe('eval-report utility', () => {
     it('falls back to unknown-model if no env var or folder match exists', () => {
       const reportPath = path.join(tmpDir, 'some-other-folder', 'report.json');
       expect(getModelFromPath(reportPath)).toBe('unknown-model');
+    });
+  });
+
+  describe('getRelativePath', () => {
+    it('correctly handles Windows drive letter paths on any platform', () => {
+      const winPath = 'C:\\coding\\gemini-cli\\evals\\my_test.eval.ts';
+      expect(getRelativePath(winPath, '/home/runner/work/repo')).toBe(
+        'evals/my_test.eval.ts',
+      );
+    });
+
+    it('extracts relative path when starts with rootDir', () => {
+      const fullPath = '/home/runner/work/repo/evals/my_test.eval.ts';
+      expect(getRelativePath(fullPath, '/home/runner/work/repo')).toBe(
+        'evals/my_test.eval.ts',
+      );
     });
   });
 
@@ -294,6 +311,197 @@ describe('eval-report utility', () => {
       expect(c2.policy).toBe('USUALLY_PASSES');
       expect(c2.passed).toBe(0);
       expect(c2.total).toBe(1);
+    });
+
+    it('ignores skipped, pending, and todo assertions in pass rate calculation', async () => {
+      const modelDir = path.join(tmpDir, 'eval-logs-gemini-2.5-flash-999');
+      fs.mkdirSync(modelDir);
+
+      const dummyReport = {
+        testResults: [
+          {
+            name: '/repo/evals/test-one.eval.ts',
+            status: 'passed',
+            assertionResults: [
+              { title: 'passed case', status: 'passed' },
+              { title: 'failed case', status: 'failed' },
+              { title: 'skipped case', status: 'skipped' },
+              { title: 'pending case', status: 'pending' },
+              { title: 'todo case', status: 'todo' },
+            ],
+          },
+        ],
+      };
+
+      fs.writeFileSync(
+        path.join(modelDir, 'report.json'),
+        JSON.stringify(dummyReport),
+      );
+
+      const mockInventory: InventoryResult = {
+        totalFiles: 1,
+        totalCases: 5,
+        repoRoot: '/repo',
+        files: [],
+        cases: [
+          {
+            filePath: '/repo/evals/test-one.eval.ts',
+            relativePath: 'evals/test-one.eval.ts',
+            helperName: 'evalTest',
+            baseHelperName: 'evalTest',
+            policy: 'ALWAYS_PASSES',
+            name: 'passed case',
+            hasFiles: false,
+            hasPrompt: true,
+            hasAssert: true,
+            toolReferences: [],
+            location: { line: 1, column: 1 },
+          },
+          {
+            filePath: '/repo/evals/test-one.eval.ts',
+            relativePath: 'evals/test-one.eval.ts',
+            helperName: 'evalTest',
+            baseHelperName: 'evalTest',
+            policy: 'ALWAYS_PASSES',
+            name: 'failed case',
+            hasFiles: false,
+            hasPrompt: true,
+            hasAssert: true,
+            toolReferences: [],
+            location: { line: 2, column: 1 },
+          },
+          {
+            filePath: '/repo/evals/test-one.eval.ts',
+            relativePath: 'evals/test-one.eval.ts',
+            helperName: 'evalTest',
+            baseHelperName: 'evalTest',
+            policy: 'ALWAYS_PASSES',
+            name: 'skipped case',
+            hasFiles: false,
+            hasPrompt: true,
+            hasAssert: true,
+            toolReferences: [],
+            location: { line: 3, column: 1 },
+          },
+          {
+            filePath: '/repo/evals/test-one.eval.ts',
+            relativePath: 'evals/test-one.eval.ts',
+            helperName: 'evalTest',
+            baseHelperName: 'evalTest',
+            policy: 'ALWAYS_PASSES',
+            name: 'pending case',
+            hasFiles: false,
+            hasPrompt: true,
+            hasAssert: true,
+            toolReferences: [],
+            location: { line: 4, column: 1 },
+          },
+          {
+            filePath: '/repo/evals/test-one.eval.ts',
+            relativePath: 'evals/test-one.eval.ts',
+            helperName: 'evalTest',
+            baseHelperName: 'evalTest',
+            policy: 'ALWAYS_PASSES',
+            name: 'todo case',
+            hasFiles: false,
+            hasPrompt: true,
+            hasAssert: true,
+            toolReferences: [],
+            location: { line: 5, column: 1 },
+          },
+        ],
+        diagnostics: [],
+      };
+
+      const result = await summarizeReports(tmpDir, mockInventory);
+
+      expect(result.models).toHaveLength(1);
+      const modelSummary = result.models[0];
+      // Only passed case and failed case should be processed.
+      // Skipped, pending, and todo assertions should be completely ignored.
+      expect(modelSummary.totalCases).toBe(2);
+      expect(modelSummary.totalRuns).toBe(2);
+      expect(modelSummary.passedRuns).toBe(1);
+      expect(modelSummary.overallPassRate).toBe(0.5);
+
+      const passedCase = modelSummary.cases.find(
+        (c) => c.name === 'passed case',
+      )!;
+      expect(passedCase.total).toBe(1);
+      expect(passedCase.passed).toBe(1);
+
+      const failedCase = modelSummary.cases.find(
+        (c) => c.name === 'failed case',
+      )!;
+      expect(failedCase.total).toBe(1);
+      expect(failedCase.passed).toBe(0);
+
+      const skippedCase = modelSummary.cases.find(
+        (c) => c.name === 'skipped case',
+      );
+      expect(skippedCase).toBeUndefined();
+    });
+
+    it('matches policy cases across different absolute checkouts and path prefixes', async () => {
+      const modelDir = path.join(tmpDir, 'eval-logs-gemini-2.5-flash-999');
+      fs.mkdirSync(modelDir);
+
+      // Report has an absolute path from a CI environment
+      const dummyReport = {
+        testResults: [
+          {
+            name: '/home/runner/work/gemini-cli/gemini-cli/evals/my-test.eval.ts',
+            status: 'passed',
+            assertionResults: [
+              { title: 'my evaluation case', status: 'passed' },
+            ],
+          },
+        ],
+      };
+
+      fs.writeFileSync(
+        path.join(modelDir, 'report.json'),
+        JSON.stringify(dummyReport),
+      );
+
+      // Inventory uses absolute paths from a local checkout
+      const mockInventory: InventoryResult = {
+        totalFiles: 1,
+        totalCases: 1,
+        repoRoot: '/Users/local/gemini-cli',
+        files: [],
+        cases: [
+          {
+            filePath: '/Users/local/gemini-cli/evals/my-test.eval.ts',
+            relativePath: 'evals/my-test.eval.ts',
+            helperName: 'evalTest',
+            baseHelperName: 'evalTest',
+            policy: 'ALWAYS_PASSES',
+            name: 'my evaluation case',
+            hasFiles: false,
+            hasPrompt: true,
+            hasAssert: true,
+            toolReferences: [],
+            location: { line: 1, column: 1 },
+          },
+        ],
+        diagnostics: [],
+      };
+
+      const result = await summarizeReports(
+        tmpDir,
+        mockInventory,
+        '/Users/local/gemini-cli',
+      );
+
+      expect(result.models).toHaveLength(1);
+      const modelSummary = result.models[0];
+      expect(modelSummary.cases).toHaveLength(1);
+
+      const caseSummary = modelSummary.cases[0];
+      expect(caseSummary.name).toBe('my evaluation case');
+      // Verify that it correctly resolved the policy as ALWAYS_PASSES instead of 'unknown'
+      expect(caseSummary.policy).toBe('ALWAYS_PASSES');
     });
   });
 
