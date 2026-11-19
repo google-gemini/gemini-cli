@@ -2949,6 +2949,52 @@ describe('ShellExecutionService environment variables', () => {
     vi.unstubAllEnvs();
   });
 
+  it.each([
+    {
+      name: 'GIT_SSH',
+      env: { GIT_SSH: 'plink', GIT_SSH_COMMAND: undefined },
+      expected: 'plink -batch',
+    },
+    {
+      name: 'a custom GIT_SSH_COMMAND without batch mode',
+      env: { GIT_SSH: undefined, GIT_SSH_COMMAND: 'ssh -i /path/to/key' },
+      expected: 'ssh -o BatchMode=yes -i /path/to/key',
+    },
+  ])(
+    'should preserve $name and enforce non-interactive SSH',
+    async ({ env, expected }) => {
+      vi.resetModules();
+      vi.stubEnv('GIT_SSH', env.GIT_SSH);
+      vi.stubEnv('GIT_SSH_COMMAND', env.GIT_SSH_COMMAND);
+
+      const { ShellExecutionService } = await import(
+        './shellExecutionService.js'
+      );
+      mockGetPty.mockResolvedValue(null);
+      await ShellExecutionService.execute(
+        'test-cp-headless-git',
+        '/',
+        vi.fn(),
+        new AbortController().signal,
+        false,
+        shellExecutionConfig,
+      );
+
+      const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+      const sshKey = Object.keys(cpEnv).find(
+        (key) =>
+          /^GIT_CONFIG_KEY_\d+$/.test(key) && cpEnv[key] === 'core.sshCommand',
+      );
+      const sshIndex = sshKey?.slice('GIT_CONFIG_KEY_'.length);
+      expect(sshIndex).toBeDefined();
+      expect(cpEnv[`GIT_CONFIG_VALUE_${sshIndex}`]).toBe(expected);
+      mockChildProcess.emit('exit', 0, null);
+      mockChildProcess.emit('close', 0, null);
+      await new Promise(process.nextTick);
+      vi.unstubAllEnvs();
+    },
+  );
+
   it('should include headless git and gh environment variables in interactive fallback mode', async () => {
     vi.resetModules();
     vi.stubEnv('GIT_TERMINAL_PROMPT', undefined);
