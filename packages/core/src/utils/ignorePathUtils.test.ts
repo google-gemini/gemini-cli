@@ -328,5 +328,27 @@ describe('ignorePathUtils', () => {
         ]),
       ).toEqual(['# a comment /**', '!foo/**', 'normal/file.txt']);
     });
+
+    it('should not expand wildcard directory patterns when hasNestedNegation returns true', () => {
+      const hasNestedNegation = (dir: string) => dir === 'logs';
+      expect(
+        expandWildcardDirectoryPatterns(
+          ['logs/**', 'build/**'],
+          undefined,
+          hasNestedNegation,
+        ),
+      ).toEqual(['logs/**', 'build/**', '/build/']);
+    });
+
+    it('should expand wildcard directory patterns when hasNestedNegation returns false', () => {
+      const hasNestedNegation = () => false;
+      expect(
+        expandWildcardDirectoryPatterns(
+          ['logs/**'],
+          undefined,
+          hasNestedNegation,
+        ),
+      ).toEqual(['logs/**', '/logs/']);
+    });
   });
 });
