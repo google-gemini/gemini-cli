@@ -1055,6 +1055,36 @@ describe('Session', () => {
     expect(result.stopReason).toBe('max_turn_requests');
   });
 
+  it('should surface a stopped agent reason to the client', async () => {
+    const stream = createMockStream([
+      {
+        type: GeminiEventType.AgentExecutionStopped,
+        value: {
+          reason: 'hook requested stop',
+          systemMessage: 'Stopped by policy',
+        },
+      },
+    ]);
+    mockSendMessageStream.mockReturnValue(stream);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Trigger hook stop' }],
+    });
+
+    expect(result.stopReason).toBe('end_turn');
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'agent_message_chunk',
+        content: {
+          type: 'text',
+          text: 'Agent execution stopped: Stopped by policy',
+        },
+      },
+    });
+  });
+
   it('should send sessionUpdate when approval mode changes', async () => {
     const { coreEvents, CoreEvent, ApprovalMode } = await import(
       '@google/gemini-cli-core'
