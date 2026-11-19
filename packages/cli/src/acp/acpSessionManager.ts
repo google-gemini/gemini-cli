@@ -49,6 +49,21 @@ export class AcpSessionManager {
     return this.sessions.get(sessionId);
   }
 
+  async closeSession(sessionId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      throw new acp.RequestError(-32602, `Session not found: ${sessionId}`);
+    }
+
+    // Remove the session before awaiting disposal so new requests cannot use it.
+    this.sessions.delete(sessionId);
+    try {
+      await session.dispose();
+    } catch (err) {
+      debugLogger.error(`Error disposing session ${sessionId}: ${err}`);
+    }
+  }
+
   async dispose(): Promise<void> {
     const disposePromises = Array.from(this.sessions.entries()).map(
       async ([sessionId, session]) => {
