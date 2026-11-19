@@ -85,7 +85,7 @@ describe('createPolicyUpdater', () => {
         priority: ALWAYS_ALLOW_PRIORITY,
         mcpName: 'test-mcp',
         argsPattern: SafeRegExp.compile(
-          escapeRegex('"command":"echo') + COMMAND_PREFIX_BOUNDARY,
+          '\\x00' + escapeRegex('"command":"echo') + COMMAND_PREFIX_BOUNDARY,
         ),
       }),
     );
@@ -96,7 +96,7 @@ describe('createPolicyUpdater', () => {
         priority: ALWAYS_ALLOW_PRIORITY,
         mcpName: 'test-mcp',
         argsPattern: SafeRegExp.compile(
-          escapeRegex('"command":"ls') + COMMAND_PREFIX_BOUNDARY,
+          '\\x00' + escapeRegex('"command":"ls') + COMMAND_PREFIX_BOUNDARY,
         ),
       }),
     );
@@ -179,7 +179,7 @@ describe('createPolicyUpdater', () => {
         toolName: 'run_shell_command',
         priority: ALWAYS_ALLOW_PRIORITY,
         argsPattern: SafeRegExp.compile(
-          escapeRegex('"command":"git') + COMMAND_PREFIX_BOUNDARY,
+          '\\x00' + escapeRegex('"command":"git') + COMMAND_PREFIX_BOUNDARY,
         ),
       }),
     );

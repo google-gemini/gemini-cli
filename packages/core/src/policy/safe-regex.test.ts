@@ -297,7 +297,9 @@ describe('SafeRegExp', () => {
         const encoded = JSON.stringify(prefix);
         const openQuotePrefix = encoded.substring(0, encoded.length - 1);
         return new RegExp(
-          legacyEscape(`"command":${openQuotePrefix}`) + '(?:[\\s"]|\\\\")',
+          '\\x00' +
+            legacyEscape(`"command":${openQuotePrefix}`) +
+            '(?:[\\s"]|\\\\")',
         );
       };
 
@@ -353,7 +355,7 @@ describe('SafeRegExp', () => {
         for (const command of commands) {
           for (const args of [
             stableStringify({ command }),
-            JSON.stringify({ command, dir_path: '/workspace' }),
+            stableStringify({ command, dir_path: '/workspace' }),
           ]) {
             const expected = native.test(args);
             if (expected) {

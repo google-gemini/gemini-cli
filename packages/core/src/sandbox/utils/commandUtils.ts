@@ -9,6 +9,7 @@ import {
   getCommandRoots,
   getCommandRootsAsync,
   isDefaultGetCommandRoots,
+  hasUnresolvedShellExpansion,
   initializeShellParsers,
   splitCommands,
   splitCommandsAsync,
@@ -44,6 +45,12 @@ export async function isStrictlyApproved(
     );
     if (allRootsApproved) {
       return true;
+    }
+
+    // The read-only classifier can't vouch for arguments that bash rewrites
+    // before the command runs.
+    if (hasUnresolvedShellExpansion(stripped)) {
+      return false;
     }
 
     const pipelineCommands = isDefaultSplitCommands(splitCommands)

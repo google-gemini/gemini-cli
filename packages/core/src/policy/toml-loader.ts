@@ -526,7 +526,10 @@ export async function loadPoliciesFromToml(
                 // Compile with the linear-time engine. A policy pattern is
                 // never turned into a native RegExp.
                 if (argsPattern) {
-                  const compiled = compileArgsPattern(argsPattern);
+                  const compiled = compileArgsPattern(
+                    argsPattern,
+                    rule.commandRegex ?? argsPattern,
+                  );
                   if (!compiled.ok && compiled.reason === 'invalid') {
                     errors.push({
                       filePath,
@@ -660,7 +663,10 @@ export async function loadPoliciesFromToml(
                 };
 
                 if (argsPattern) {
-                  const compiled = compileArgsPattern(argsPattern);
+                  const compiled = compileArgsPattern(
+                    argsPattern,
+                    checker.commandRegex ?? argsPattern,
+                  );
                   if (!compiled.ok && compiled.reason === 'invalid') {
                     errors.push({
                       filePath,

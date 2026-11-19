@@ -17,6 +17,7 @@ import {
   hasRedirection,
   hasRedirectionAsync,
   isDefaultHasRedirection,
+  hasUnresolvedShellExpansion,
   detectCommandSubstitution,
   extractStringFromParseEntry,
 } from '../utils/shell-utils.js';
@@ -487,6 +488,15 @@ export class PolicyEngine {
         if (containsGitCommand(parsedArgs) && !this.isTrustedFolder()) {
           debugLogger.debug(
             `[PolicyEngine.check] Known safe Git command evaluated in untrusted workspace. Preserving ASK_USER: ${command}`,
+          );
+          return PolicyDecision.ASK_USER;
+        }
+
+        // The classifier sees the unexpanded text, so it can't vouch for
+        // arguments that bash rewrites before the command runs.
+        if (hasUnresolvedShellExpansion(command)) {
+          debugLogger.debug(
+            `[PolicyEngine.check] Command contains unresolved shell expansion, preserving ASK_USER: ${command}`,
           );
           return PolicyDecision.ASK_USER;
         }
