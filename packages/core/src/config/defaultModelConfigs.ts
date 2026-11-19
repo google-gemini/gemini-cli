@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ThinkingLevel } from '@google/genai';
+import { Modality, ThinkingLevel } from '@google/genai';
 import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
 import {
   DEFAULT_THINKING_MODE,
@@ -112,6 +112,18 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       extends: 'chat-base-2.5',
       modelConfig: {
         model: 'gemini-2.5-flash-lite',
+      },
+    },
+    // Nano Banana: the Gemini image generation model. It does not support
+    // thinking, so it extends 'base' instead of a chat base, and requests
+    // both text and image response modalities so image generation works.
+    'gemini-2.5-flash-image': {
+      extends: 'base',
+      modelConfig: {
+        model: 'gemini-2.5-flash-image',
+        generateContentConfig: {
+          responseModalities: [Modality.TEXT, Modality.IMAGE],
+        },
       },
     },
     'gemini-3.1-flash-lite': {
@@ -419,6 +431,13 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       isVisible: true,
       features: { thinking: false, multimodalToolUse: false },
     },
+    'gemini-2.5-flash-image': {
+      tier: 'flash',
+      family: 'gemini-2.5',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: false, multimodalToolUse: false },
+    },
     'gemma-4-31b-it': {
       displayName: 'gemma-4-31b-it',
       tier: 'custom',
@@ -532,6 +551,9 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     'gemini-2.5-flash': {
       default: 'gemini-2.5-flash',
+    },
+    'gemini-2.5-flash-image': {
+      default: 'gemini-2.5-flash-image',
     },
     'gemini-3-pro-preview': {
       default: 'gemini-3-pro-preview',
