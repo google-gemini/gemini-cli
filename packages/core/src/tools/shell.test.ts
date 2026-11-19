@@ -2321,4 +2321,83 @@ EOF`;
       expect(taintedResult.returnDisplay).toContain('Blocked');
     });
   });
+
+  describe('recursive interactive gemini command guard', () => {
+    beforeEach(() => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: '1.0.0',
+          rawOutput: Buffer.from('1.0.0'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+    });
+
+    it('should reject "gemini config set default-model gemini-2.5 -y" before spawning a PTY', async () => {
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({
+        command: 'gemini config set default-model gemini-2.5 -y',
+      });
+      const confirmDetails = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmDetails).toBe(false);
+
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(mockShellExecutionService).not.toHaveBeenCalled();
+      expect(result.llmContent).toBe(
+        "Tool Error: Do not invoke interactive 'gemini' or 'gemini config' via the Shell tool. Use built-in slash commands (/model, /settings) or inform the user how to change their setting.",
+      );
+      expect(result.error?.type).toBe(ToolErrorType.SHELL_EXECUTE_ERROR);
+    });
+
+    it('should reject bare interactive "gemini" command before spawning a PTY', async () => {
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({
+        command: 'gemini',
+      });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(mockShellExecutionService).not.toHaveBeenCalled();
+      expect(result.llmContent).toContain(
+        "Tool Error: Do not invoke interactive 'gemini' or 'gemini config' via the Shell tool.",
+      );
+    });
+
+    it('should allow non-interactive "gemini --version" and "gemini --help"', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: '1.0.0',
+          rawOutput: Buffer.from('1.0.0'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({
+        command: 'gemini --version',
+      });
+      const result = await invocation.execute({
+        abortSignal: new AbortController().signal,
+      });
+      expect(mockShellExecutionService).toHaveBeenCalled();
+      expect(result.error).toBeUndefined();
+    });
+  });
 });

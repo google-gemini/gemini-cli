@@ -69,7 +69,14 @@ export function useSessionResume({
 
       setIsResuming(true);
       try {
-        // Now that we have the client, load the history into the UI and the client.
+        // Give the history to the Gemini client first.
+        const client = config.getGeminiClient();
+        if (!client) {
+          throw new Error('Gemini client is not initialized');
+        }
+        await client.resumeChat(clientHistory, resumedData);
+
+        // Now that we have successfully resumed, load the history into the UI.
         setQuittingMessages(null);
         historyManagerRef.current.clearItems();
         uiHistory.forEach((item, index) => {
@@ -87,9 +94,6 @@ export function useSessionResume({
           // but filter out ones that no longer exist
           workspaceContext.addDirectories(resumedData.conversation.directories);
         }
-
-        // Give the history to the Gemini client.
-        await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
       } catch (error) {
         coreEvents.emitFeedback(
           'error',

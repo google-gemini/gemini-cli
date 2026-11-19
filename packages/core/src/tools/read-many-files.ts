@@ -20,6 +20,8 @@ import { getErrorMessage } from '../utils/errors.js';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import { glob, escape } from 'glob';
+import picomatch from 'picomatch';
+import { LRUCache } from 'mnemonist';
 import { buildParamArgsPattern } from '../policy/utils.js';
 import {
   detectFileType,
@@ -121,6 +123,57 @@ function getDefaultExcludes(config?: Config): string[] {
 
 const DEFAULT_OUTPUT_SEPARATOR_FORMAT = '--- {filePath} ---';
 const DEFAULT_OUTPUT_TERMINATOR = `\n${REFERENCE_CONTENT_END}`;
+
+/**
+ * Determines whether a non-text asset file (image, PDF, audio) was explicitly requested
+ * by name or extension in the include patterns, rather than matched by an indiscriminate
+ * directory traversal or unrelated glob pattern.
+ */
+export function isAssetExplicitlyRequested(
+  include: string[],
+  relativePath: string,
+  filePath: string,
+  matcherCache?: LRUCache<string, (target: string) => boolean>,
+): boolean {
+  const normalizedPath = relativePath.replace(/\\/g, '/').replace(/^\.\//, '');
+  const normalizedFilePath = filePath.replace(/\\/g, '/');
+  const fileName = path.posix.basename(normalizedFilePath);
+
+  return include.some((pattern) => {
+    const normalizedPattern = pattern.replace(/\\/g, '/').replace(/^\.\//, '');
+
+    // 1. Check if this pattern matches the file path
+    let isMatchPath = matcherCache?.get(normalizedPattern);
+    if (!isMatchPath) {
+      isMatchPath = picomatch(normalizedPattern, {
+        nocase: true,
+        dot: true,
+      });
+      matcherCache?.set(normalizedPattern, isMatchPath);
+    }
+
+    let matches = isMatchPath(normalizedPath);
+    if (!matches && !normalizedPattern.includes('/')) {
+      matches = isMatchPath(fileName);
+    }
+    if (!matches) {
+      return false;
+    }
+
+    // 2. Check if the pattern terminal segment explicitly targets this asset
+    const lastSegment = normalizedPattern.split('/').pop() ?? '';
+    if (
+      !lastSegment ||
+      lastSegment === '*' ||
+      lastSegment === '**' ||
+      lastSegment === '*.*'
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+}
 
 class ReadManyFilesToolInvocation extends BaseToolInvocation<
   ReadManyFilesParams,
@@ -283,6 +336,7 @@ ${finalExclusionPatternsForDescription
     }
 
     const sortedFiles = Array.from(filesToConsider).sort();
+    const matcherCache = new LRUCache<string, (target: string) => boolean>(100);
 
     const fileProcessingPromises = sortedFiles.map(
       async (filePath): Promise<FileProcessingResult> => {
@@ -298,15 +352,11 @@ ${finalExclusionPatternsForDescription
             fileType === 'pdf' ||
             fileType === 'audio'
           ) {
-            const fileExtension = path.extname(filePath).toLowerCase();
-            const fileNameWithoutExtension = path.basename(
+            const requestedExplicitly = isAssetExplicitlyRequested(
+              include,
+              relativePathForDisplay,
               filePath,
-              fileExtension,
-            );
-            const requestedExplicitly = include.some(
-              (pattern: string) =>
-                pattern.toLowerCase().includes(fileExtension) ||
-                pattern.includes(fileNameWithoutExtension),
+              matcherCache,
             );
 
             if (!requestedExplicitly) {

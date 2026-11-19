@@ -19,6 +19,7 @@ import { IdeClient, IDEConnectionStatus } from './ide-client.js';
 import { IDE_DEFINITIONS } from './detect-ide.js';
 import { CloseDiffRequestSchema, OpenDiffRequestSchema } from './types.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { getIdeConnectionDir } from '../utils/paths.js';
 
 const platformOverride = vi.hoisted(() => ({
   value: undefined as NodeJS.Platform | undefined,
@@ -290,8 +291,8 @@ process.stdout.write(JSON.stringify({
       const authToken = 'win-fallback-test-token';
       companion = await startCompanionStandIn(authToken);
 
-      const ideDir = path.join(fakeTmpDir, 'gemini', 'ide');
-      fs.mkdirSync(ideDir, { recursive: true });
+      const ideDir = getIdeConnectionDir(fakeTmpDir);
+      fs.mkdirSync(ideDir, { recursive: true, mode: 0o700 });
       fs.writeFileSync(
         path.join(
           ideDir,
@@ -302,7 +303,7 @@ process.stdout.write(JSON.stringify({
           workspacePath: process.cwd(),
           authToken,
         }),
-        'utf8',
+        { encoding: 'utf8', mode: 0o600 },
       );
 
       vi.stubEnv('FAKE_POWERSHELL_MODE', 'snapshot-fails-single-succeeds');

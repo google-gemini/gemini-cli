@@ -13,6 +13,7 @@ export interface UseMessageQueueOptions {
   submitQuery: (query: string) => void;
   isMcpReady: boolean;
   isCompressing?: boolean;
+  shellModeActive?: boolean;
 }
 
 export interface UseMessageQueueReturn {
@@ -34,6 +35,7 @@ export function useMessageQueue({
   submitQuery,
   isMcpReady,
   isCompressing = false,
+  shellModeActive = false,
 }: UseMessageQueueOptions): UseMessageQueueReturn {
   const [messageQueue, setMessageQueue] = useState<string[]>([]);
 
@@ -72,6 +74,7 @@ export function useMessageQueue({
       isConfigInitialized &&
       streamingState === StreamingState.Idle &&
       !isCompressing &&
+      !shellModeActive &&
       isMcpReady &&
       messageQueue.length > 0
     ) {
@@ -88,6 +91,7 @@ export function useMessageQueue({
     messageQueue,
     submitQuery,
     isCompressing,
+    shellModeActive,
   ]);
 
   return {

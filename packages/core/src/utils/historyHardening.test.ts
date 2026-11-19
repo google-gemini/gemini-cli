@@ -799,4 +799,118 @@ describe('scrubHistory', () => {
       parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
     });
   });
+
+  it('replaces an empty parts: [] or thoughtSignature-only model turn following a functionResponse (including across a synthetic binary ack) with INTERRUPTED_RESPONSE_PLACEHOLDER instead of fusing user turns (issue #29574)', () => {
+    const history: HistoryTurn[] = [
+      {
+        id: 'u1',
+        content: { role: 'user', parts: [{ text: 'Describe image.png' }] },
+      },
+      {
+        id: 'm1',
+        content: {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: 'read_file_1',
+                name: 'read_file',
+                args: { file_path: 'image.png' },
+              },
+              thoughtSignature: 'sig-1',
+            },
+          ],
+        },
+      },
+      {
+        id: 'fr1',
+        content: {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'read_file_1',
+                name: 'read_file',
+                response: { output: 'Binary content provided (1 item(s)).' },
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: 'm-ack',
+        content: {
+          role: 'model',
+          parts: [
+            {
+              text: SYNTHETIC_BINARY_ACK_TEXT,
+              thought: true,
+              thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+            },
+          ],
+        },
+      },
+      {
+        id: 'u-bin',
+        content: {
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                mimeType: 'image/png',
+                data: 'base64data',
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: 'm2-empty',
+        content: {
+          role: 'model',
+          parts: [],
+        },
+      },
+      {
+        id: 'u2',
+        content: {
+          role: 'user',
+          parts: [{ text: 'What is in this image?' }],
+        },
+      },
+    ];
+
+    const hardened = hardenHistory(history);
+    expect(hardened).toHaveLength(5);
+    expect(hardened[3].content).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
+    expect(hardened[4].content).toEqual({
+      role: 'user',
+      parts: [{ text: 'What is in this image?' }],
+    });
+
+    const scrubbed = scrubHistory(history);
+    expect(scrubbed).toHaveLength(5);
+    expect(scrubbed[3].content).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
+    expect(scrubbed[4].content).toEqual({
+      role: 'user',
+      parts: [{ text: 'What is in this image?' }],
+    });
+
+    const scrubbedRaw = scrubContents(history.map((h) => h.content));
+    expect(scrubbedRaw).toHaveLength(5);
+    expect(scrubbedRaw[3]).toEqual({
+      role: 'model',
+      parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+    });
+    expect(scrubbedRaw[4]).toEqual({
+      role: 'user',
+      parts: [{ text: 'What is in this image?' }],
+    });
+  });
 });

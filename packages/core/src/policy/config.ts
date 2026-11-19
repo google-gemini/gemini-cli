@@ -21,7 +21,8 @@ import {
 } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
 import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
-import { buildArgsPatterns, isSafeRegExp } from './utils.js';
+import { buildArgsPatterns, compileArgsPattern } from './utils.js';
+import { SafeRegExp } from './safe-regex.js';
 import toml from '@iarna/toml';
 import {
   MessageBusType,
@@ -34,7 +35,7 @@ import {
   SHELL_TOOL_NAME,
   TOOLS_REQUIRING_NARROWING,
 } from '../tools/tool-names.js';
-import { isNodeError } from '../utils/errors.js';
+import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { MCP_TOOL_PREFIX } from '../tools/mcp-tool.js';
 
 import { isDirectorySecure } from '../utils/security.js';
@@ -53,6 +54,28 @@ function emitWarningOnce(message: string): void {
   if (!emittedWarnings.has(message)) {
     coreEvents.emitFeedback('warning', message);
     emittedWarnings.add(message);
+  }
+}
+
+/**
+ * Compiles an args pattern that the CLI built itself from an escaped command
+ * prefix. Such a pattern is expected to compile. If it does not, the error is
+ * reported and `undefined` is returned, so the caller skips the rule instead
+ * of failing start-up or a policy update. These are ALLOW rules, so a skipped
+ * rule means the user is asked for confirmation as usual.
+ */
+function compileGeneratedPattern(
+  pattern: string,
+  context: string,
+): SafeRegExp | undefined {
+  try {
+    return SafeRegExp.compile(pattern);
+  } catch (e) {
+    coreEvents.emitFeedback(
+      'error',
+      `Could not compile the argument pattern for ${context}: ${getErrorMessage(e)}`,
+    );
+    return undefined;
   }
 }
 
@@ -466,11 +489,15 @@ export async function createPolicyEngineConfig(
           const patterns = buildArgsPatterns(undefined, args);
           for (const pattern of patterns) {
             if (pattern) {
+              const argsPattern = compileGeneratedPattern(pattern, source);
+              if (!argsPattern) {
+                continue;
+              }
               rules.push({
                 toolName,
                 decision: PolicyDecision.ALLOW,
                 priority,
-                argsPattern: new RegExp(pattern),
+                argsPattern,
                 source,
                 modes,
               });
@@ -745,13 +772,20 @@ export function createPolicyUpdater(
 
         for (const pattern of patterns) {
           if (pattern) {
-            // Note: patterns from buildArgsPatterns are derived from escapeRegex,
-            // which is safe and won't contain ReDoS patterns.
+            // Patterns from buildArgsPatterns are escaped literals, so they
+            // are expected to compile.
+            const argsPattern = compileGeneratedPattern(
+              pattern,
+              `tool ${toolName}`,
+            );
+            if (!argsPattern) {
+              continue;
+            }
             policyEngine.addRule({
               toolName,
               decision: PolicyDecision.ALLOW,
               priority,
-              argsPattern: new RegExp(pattern),
+              argsPattern,
               mcpName: message.mcpName,
               modes: message.modes,
               source: 'Dynamic (Confirmed)',
@@ -761,7 +795,10 @@ export function createPolicyUpdater(
           }
         }
       } else {
-        if (message.argsPattern && !isSafeRegExp(message.argsPattern)) {
+        const compiled = message.argsPattern
+          ? compileArgsPattern(message.argsPattern)
+          : undefined;
+        if (compiled && !compiled.ok) {
           coreEvents.emitFeedback(
             'error',
             `Invalid or unsafe regular expression for tool ${toolName}: ${message.argsPattern}`,
@@ -769,9 +806,7 @@ export function createPolicyUpdater(
           return;
         }
 
-        const argsPattern = message.argsPattern
-          ? new RegExp(message.argsPattern)
-          : undefined;
+        const argsPattern = compiled?.regex;
 
         const tier =
           message.persistScope === 'user'

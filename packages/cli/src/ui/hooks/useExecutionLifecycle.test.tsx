@@ -1266,4 +1266,35 @@ describe('useExecutionLifecycle', () => {
       );
     });
   });
+
+  describe('recursive interactive gemini command guard in Shell Mode (!)', () => {
+    it('should block "gemini config set default-model gemini-2.5 -y" before spawning a PTY', async () => {
+      const { result } = await renderProcessorHook();
+
+      let handled = false;
+      act(() => {
+        handled = result.current.handleShellCommand(
+          'gemini config set default-model gemini-2.5 -y',
+          new AbortController().signal,
+        );
+      });
+
+      expect(handled).toBe(true);
+      expect(mockShellExecutionService).not.toHaveBeenCalled();
+      expect(addItemToHistoryMock).toHaveBeenCalledWith(
+        {
+          type: 'user_shell',
+          text: 'gemini config set default-model gemini-2.5 -y',
+        },
+        expect.any(Number),
+      );
+      expect(addItemToHistoryMock).toHaveBeenCalledWith(
+        {
+          type: 'error',
+          text: "Tool Error: Do not invoke interactive 'gemini' or 'gemini config' via the Shell tool. Use built-in slash commands (/model, /settings) or inform the user how to change their setting.",
+        },
+        expect.any(Number),
+      );
+    });
+  });
 });

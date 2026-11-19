@@ -10,6 +10,7 @@ import type { GeminiChat } from '../core/geminiChat.js';
 import { isFunctionResponse } from './messageInspectors.js';
 import { debugLogger } from './debugLogger.js';
 import { LlmRole } from '../telemetry/types.js';
+import { INTERRUPTED_RESPONSE_PLACEHOLDER } from './historyHardening.js';
 
 const CHECK_PROMPT = `Analyze *only* the content and structure of your immediately preceding response (your last turn in the conversation history). Based *strictly* on that response, determine who should logically speak next: the 'user' or the 'model' (you).
 **Decision Rules (apply in order):**
@@ -85,7 +86,10 @@ export async function checkNextSpeaker(
     lastComprehensiveMessage &&
     lastComprehensiveMessage.role === 'model' &&
     lastComprehensiveMessage.parts &&
-    lastComprehensiveMessage.parts.length === 0
+    (lastComprehensiveMessage.parts.length === 0 ||
+      (lastComprehensiveMessage.parts.length === 1 &&
+        lastComprehensiveMessage.parts[0]?.text ===
+          INTERRUPTED_RESPONSE_PLACEHOLDER))
   ) {
     return {
       reasoning:

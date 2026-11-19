@@ -13,6 +13,7 @@ import {
   parseCommandDetails,
   stripShellWrapper,
   hasRedirection,
+  hasUnresolvedShellExpansion,
   detectCommandSubstitution,
   extractStringFromParseEntry,
 } from '../utils/shell-utils.js';
@@ -29,6 +30,7 @@ import {
   ALWAYS_ALLOW_PRIORITY_FRACTION,
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
+import { SafeRegExp } from './safe-regex.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isRecord } from '../utils/markdownUtils.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
@@ -127,6 +129,25 @@ function matchesWildcard(
   return toolName === pattern;
 }
 
+/**
+ * Rejects a rule whose `argsPattern` is not a `SafeRegExp`.
+ *
+ * The type already requires `SafeRegExp`. This covers callers that are not
+ * type-checked, so that every pattern is evaluated by the linear-time engine.
+ */
+function assertSafeArgsPattern(
+  rule: PolicyRule | SafetyCheckerRule,
+  label: 'policy rule' | 'safety checker rule',
+): void {
+  const pattern: unknown = rule.argsPattern;
+  if (pattern !== undefined && !(pattern instanceof SafeRegExp)) {
+    throw new Error(
+      `Invalid ${label}: argsPattern must be created with SafeRegExp.compile(). ` +
+        `Native RegExp objects are not accepted. Source: ${rule.source || 'unknown'}`,
+    );
+  }
+}
+
 function ruleMatches(
   rule: PolicyRule | SafetyCheckerRule,
   toolCall: FunctionCall,
@@ -218,7 +239,9 @@ function ruleMatches(
     if (!toolCall.args) {
       return false;
     }
-    // Use stable JSON stringification with sorted keys to ensure consistent matching
+    // Use stable JSON stringification with sorted keys to ensure consistent matching.
+    // argsPattern is a SafeRegExp, so this runs on the linear-time engine and
+    // never on RegExp.prototype.test().
     if (
       stringifiedArgs === undefined ||
       !rule.argsPattern.test(stringifiedArgs)
@@ -280,6 +303,7 @@ export class PolicyEngine {
           `Invalid policy rule: subagent is required if specified (cannot be empty). Rule source: ${rule.source || 'unknown'}`,
         );
       }
+      assertSafeArgsPattern(rule, 'policy rule');
     }
 
     // Validate checkers
@@ -294,6 +318,7 @@ export class PolicyEngine {
           `Invalid safety checker rule: mcpName is required if specified (cannot be empty). Checker source: ${checker.source || 'unknown'}`,
         );
       }
+      assertSafeArgsPattern(checker, 'safety checker rule');
     }
 
     this.nonInteractive = config.nonInteractive ?? false;
@@ -455,6 +480,15 @@ export class PolicyEngine {
         if (containsGitCommand(parsedArgs) && !this.isTrustedFolder()) {
           debugLogger.debug(
             `[PolicyEngine.check] Known safe Git command evaluated in untrusted workspace. Preserving ASK_USER: ${command}`,
+          );
+          return PolicyDecision.ASK_USER;
+        }
+
+        // The classifier sees the unexpanded text, so it can't vouch for
+        // arguments that bash rewrites before the command runs.
+        if (hasUnresolvedShellExpansion(command)) {
+          debugLogger.debug(
+            `[PolicyEngine.check] Command contains unresolved shell expansion, preserving ASK_USER: ${command}`,
           );
           return PolicyDecision.ASK_USER;
         }
@@ -1070,12 +1104,14 @@ export class PolicyEngine {
    * Add a new rule to the policy engine.
    */
   addRule(rule: PolicyRule): void {
+    assertSafeArgsPattern(rule, 'policy rule');
     this.rules.push(rule);
     // Re-sort rules by priority
     this.rules.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
   }
 
   addChecker(checker: SafetyCheckerRule): void {
+    assertSafeArgsPattern(checker, 'safety checker rule');
     this.checkers.push(checker);
     this.checkers.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
   }

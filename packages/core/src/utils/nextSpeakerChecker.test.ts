@@ -22,6 +22,7 @@ import {
   type NextSpeakerResponse,
 } from './nextSpeakerChecker.js';
 import { GeminiChat } from '../core/geminiChat.js';
+import { INTERRUPTED_RESPONSE_PLACEHOLDER } from './historyHardening.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -292,5 +293,29 @@ describe('checkNextSpeaker', () => {
       .calls[0][0];
     expect(generateJsonCall.modelConfigKey.model).toBe('next-speaker-checker');
     expect(generateJsonCall.promptId).toBe(promptId);
+  });
+
+  it("should return { next_speaker: 'model' } without calling generateJson when the last model turn has only INTERRUPTED_RESPONSE_PLACEHOLDER", async () => {
+    vi.mocked(chatInstance.getHistory).mockReturnValue([
+      { role: 'user', parts: [{ text: 'Describe image.png' }] },
+      {
+        role: 'model',
+        parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
+      },
+    ]);
+
+    const result = await checkNextSpeaker(
+      chatInstance,
+      mockBaseLlmClient,
+      abortSignal,
+      promptId,
+    );
+
+    expect(result).toEqual({
+      reasoning:
+        'The last message was a filler model message with no content (nothing for user to act on), model should speak next.',
+      next_speaker: 'model',
+    });
+    expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
   });
 });

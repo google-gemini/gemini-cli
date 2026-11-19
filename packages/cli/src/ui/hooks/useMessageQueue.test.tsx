@@ -30,6 +30,7 @@ describe('useMessageQueue', () => {
     submitQuery: (query: string) => void;
     isMcpReady: boolean;
     isCompressing?: boolean;
+    shellModeActive?: boolean;
   }) => {
     let hookResult: ReturnType<typeof useMessageQueue>;
     function TestComponent(props: typeof initialProps) {
@@ -446,6 +447,46 @@ describe('useMessageQueue', () => {
       await waitFor(() => {
         expect(mockSubmitQuery).toHaveBeenCalledWith(
           'Pending compression message 1\n\nPending compression message 2',
+        );
+        expect(result.current.messageQueue).toEqual([]);
+      });
+    });
+  });
+
+  describe('shellModeActive isolation', () => {
+    it('should not auto-submit queued LLM prompts while shellModeActive is true', async () => {
+      const { result, rerender } = await renderMessageQueueHook({
+        isConfigInitialized: true,
+        streamingState: StreamingState.Responding,
+        submitQuery: mockSubmitQuery,
+        isMcpReady: true,
+        shellModeActive: false,
+      });
+
+      act(() => {
+        result.current.addMessage('config set default-model gemini-2.5-pro');
+      });
+
+      // User toggles ! Shell Mode while turn finishes
+      rerender({
+        streamingState: StreamingState.Idle,
+        shellModeActive: true,
+      });
+
+      expect(mockSubmitQuery).not.toHaveBeenCalled();
+      expect(result.current.messageQueue).toEqual([
+        'config set default-model gemini-2.5-pro',
+      ]);
+
+      // Once user exits Shell Mode, queued LLM prompt is dispatched normally
+      rerender({
+        streamingState: StreamingState.Idle,
+        shellModeActive: false,
+      });
+
+      await waitFor(() => {
+        expect(mockSubmitQuery).toHaveBeenCalledWith(
+          'config set default-model gemini-2.5-pro',
         );
         expect(result.current.messageQueue).toEqual([]);
       });

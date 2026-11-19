@@ -938,7 +938,10 @@ export function resolveEnvVarsInString(value: string): string {
         return match;
       }
       const envValue = process?.env?.[varName];
-      if (typeof envValue === 'string') {
+      if (
+        typeof envValue === 'string' &&
+        (envValue !== '' || defaultValue === undefined)
+      ) {
         return envValue;
       }
       if (defaultValue !== undefined) {

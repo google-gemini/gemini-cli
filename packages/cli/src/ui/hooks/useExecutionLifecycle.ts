@@ -21,6 +21,8 @@ import {
   ExecutionLifecycleService,
   CoreToolCallStatus,
   escapeShellArg,
+  isInteractiveGeminiCommand,
+  INTERACTIVE_GEMINI_SHELL_ERROR,
 } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -356,6 +358,14 @@ export const useExecutionLifecycle = (
         { type: 'user_shell', text: rawQuery },
         userMessageTimestamp,
       );
+
+      if (isInteractiveGeminiCommand(rawQuery)) {
+        addItemToHistory(
+          { type: 'error', text: INTERACTIVE_GEMINI_SHELL_ERROR },
+          userMessageTimestamp,
+        );
+        return true;
+      }
 
       const isWindows = os.platform() === 'win32';
       const targetDir = config.getTargetDir();

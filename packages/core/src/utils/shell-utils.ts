@@ -57,6 +57,16 @@ import { NoopSandboxManager } from '../services/sandboxManager.js';
 
 export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
+export const GEMINI_CLI_IN_SHELL_ENV_VAR = 'GEMINI_CLI_IN_SHELL';
+export const GEMINI_CLI_IN_SHELL_ENV_VAR_VALUE = '1';
+export const GEMINI_CLI_NESTED_SESSION_ENV_VAR = 'GEMINI_CLI_NESTED_SESSION';
+
+export const NESTED_INTERACTIVE_SESSION_ERROR =
+  'Error: Starting a nested interactive Gemini CLI session inside Gemini CLI Shell Mode is not supported. To switch models or update settings, exit Shell Mode (!) and use /model or /settings.';
+
+export const INTERACTIVE_GEMINI_SHELL_ERROR =
+  "Tool Error: Do not invoke interactive 'gemini' or 'gemini config' via the Shell tool. Use built-in slash commands (/model, /settings) or inform the user how to change their setting.";
+
 /**
  * An identifier for the shell type.
  */
@@ -852,6 +862,222 @@ export function hasRedirection(command: string): boolean {
   }
 
   return fallbackCheck();
+}
+
+/**
+ * Syntax tree node types whose value bash computes when the command runs:
+ * parameter and variable expansion, ANSI-C quoting, arithmetic expansion,
+ * command and process substitution, and brace sequence expressions.
+ */
+const SHELL_EXPANSION_NODE_TYPES = new Set([
+  'simple_expansion',
+  'expansion',
+  'ansi_c_string',
+  'arithmetic_expansion',
+  'command_substitution',
+  'process_substitution',
+  'brace_expression',
+]);
+
+/**
+ * Returns the text of a `word` or `concatenation` node with every quoted part
+ * replaced by a placeholder, because quoted text is never globbed or brace
+ * expanded.
+ */
+function getUnquotedWordText(node: Node): string {
+  if (node.type !== 'concatenation') {
+    return node.text;
+  }
+  let text = '';
+  for (let i = 0; i < node.childCount; i += 1) {
+    const child = node.child(i);
+    if (!child) {
+      continue;
+    }
+    const isQuoted =
+      child.type === 'raw_string' ||
+      child.type === 'string' ||
+      child.type === 'ansi_c_string';
+    text += isQuoted ? '_' : child.text;
+  }
+  return text;
+}
+
+/**
+ * Checks unquoted word text for syntax that bash and the `shell-quote`
+ * tokenizer read differently: glob patterns (`*`, `?`, `[...]`), brace groups
+ * that contain a `,` or `..` at their own nesting level (such as `{a,b}` or
+ * `{a..c}`), and a `#` inside a word. Bash keeps a `#` that doesn't start a
+ * word as a literal character, but `shell-quote` starts a comment there and
+ * drops the rest of the command. Backslash-escaped characters are literal.
+ */
+function hasUnquotedWordSyntax(text: string): boolean {
+  let hasOpenBracket = false;
+  // One entry per open brace group: whether it contains a separator.
+  const braceGroups: boolean[] = [];
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (char === '\\') {
+      i += 1;
+    } else if (char === '*' || char === '?' || (char === '#' && i > 0)) {
+      return true;
+    } else if (char === '[') {
+      hasOpenBracket = true;
+    } else if (char === ']' && hasOpenBracket) {
+      return true;
+    } else if (char === '{') {
+      braceGroups.push(false);
+    } else if (char === '}' && braceGroups.length > 0) {
+      if (braceGroups.pop()) {
+        return true;
+      }
+    } else if (
+      braceGroups.length > 0 &&
+      (char === ',' || (char === '.' && text[i + 1] === '.'))
+    ) {
+      braceGroups[braceGroups.length - 1] = true;
+    }
+  }
+  return false;
+}
+
+const WHITESPACE = /\s/;
+
+/**
+ * Checks for a backslash-newline line continuation that changes an argument.
+ * Bash removes the pair before it splits words, so `-ex\<newline>ec` runs as
+ * `-exec`, and the pair is also removed inside double quotes. A continuation
+ * between two separate words (whitespace on either side) doesn't change any
+ * argument. Continuations inside single quotes or comments are literal.
+ */
+function hasArgumentLineContinuation(root: Node, command: string): boolean {
+  for (
+    let newline = command.indexOf('\n');
+    newline !== -1;
+    newline = command.indexOf('\n', newline + 1)
+  ) {
+    const end = command[newline - 1] === '\r' ? newline - 1 : newline;
+    let backslashes = 0;
+    while (command[end - 1 - backslashes] === '\\') {
+      backslashes += 1;
+    }
+    if (backslashes % 2 === 0) {
+      continue;
+    }
+
+    const backslash = end - 1;
+    let isQuoted = false;
+    let isLiteral = false;
+    for (
+      let node = root.descendantForIndex(backslash, backslash + 1);
+      node;
+      node = node.parent
+    ) {
+      if (node.type === 'raw_string' || node.type === 'comment') {
+        isLiteral = true;
+        break;
+      }
+      if (node.type === 'string') {
+        isQuoted = true;
+        break;
+      }
+    }
+    if (isLiteral) {
+      continue;
+    }
+
+    const before = command[backslash - 1];
+    const after = command[newline + 1];
+    const joinsWords =
+      before !== undefined &&
+      !WHITESPACE.test(before) &&
+      after !== undefined &&
+      !WHITESPACE.test(after);
+    if (isQuoted || joinsWords) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Checks whether bash would rewrite the arguments of a command before running
+ * it, so the unexpanded text doesn't describe what runs. This covers brace
+ * expansion, parameter and variable expansion, ANSI-C (`$'...'`) and locale
+ * (`$"..."`) quoting, arithmetic expansion, command and process substitution,
+ * unquoted glob patterns, line continuations inside an argument, and a `#`
+ * inside an unquoted word. Tilde expansion isn't reported.
+ *
+ * Returns `true` when the command can't be parsed (parser unavailable, parse
+ * timeout, or syntax errors), and `false` when the configured shell isn't
+ * bash.
+ */
+export function hasUnresolvedShellExpansion(command: string): boolean {
+  if (getShellConfiguration().shell !== 'bash') {
+    return false;
+  }
+  if (!bashLanguage) {
+    return true;
+  }
+
+  const tree = parseCommandTree(command);
+  if (!tree) {
+    return true;
+  }
+
+  try {
+    if (tree.rootNode.hasError) {
+      return true;
+    }
+
+    if (hasArgumentLineContinuation(tree.rootNode, command)) {
+      return true;
+    }
+
+    const stack: Node[] = [tree.rootNode];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+
+      // Single-quoted text never expands.
+      if (current.type === 'raw_string') {
+        continue;
+      }
+
+      if (SHELL_EXPANSION_NODE_TYPES.has(current.type)) {
+        return true;
+      }
+
+      if (current.type === 'string') {
+        // tree-sitter-bash parses locale quoting (`$"..."`) as a `$` token
+        // directly followed by a `string` node. Inside double quotes, only
+        // the `$` forms above expand, and they're checked as child nodes.
+        const previous = current.previousSibling;
+        if (
+          previous?.type === '$' &&
+          previous.endIndex === current.startIndex
+        ) {
+          return true;
+        }
+      } else if (
+        current.type === 'concatenation' ||
+        (current.type === 'word' && current.parent?.type !== 'concatenation')
+      ) {
+        if (hasUnquotedWordSyntax(getUnquotedWordText(current))) {
+          return true;
+        }
+      }
+
+      for (let i = current.childCount - 1; i >= 0; i -= 1) {
+        const child = current.child(i);
+        if (child) {
+          stack.push(child);
+        }
+      }
+    }
+    return false;
+  } finally {
+    tree.delete();
+  }
 }
 
 export function splitCommands(command: string): string[] {
@@ -2212,4 +2438,378 @@ function detectPowerShellSubstitution(command: string): boolean {
     i++;
   }
   return false;
+}
+
+const VALID_NON_INTERACTIVE_GEMINI_SUBCOMMANDS = new Set([
+  'mcp',
+  'extensions',
+  'extension',
+  'skills',
+  'skill',
+  'hooks',
+  'hook',
+  'gemma',
+  'models',
+]);
+
+const INVALID_GEMINI_MANAGEMENT_SUBCOMMANDS = new Set([
+  'config',
+  'set',
+  'model',
+  'settings',
+]);
+
+const GEMINI_FLAGS_WITH_VALUE = new Set([
+  '-m',
+  '--model',
+  '-p',
+  '--prompt',
+  '-i',
+  '--prompt-interactive',
+  '-w',
+  '--worktree',
+  '--approval-mode',
+  '--policy',
+  '--admin-policy',
+  '--allowed-mcp-server-names',
+  '--allowed-tools',
+  '-e',
+  '--extensions',
+  '-r',
+  '--resume',
+  '--session-file',
+  '--session-id',
+  '--delete-session',
+  '--include-directories',
+  '-o',
+  '--output-format',
+  '--fake-responses',
+  '--fake-responses-non-strict',
+  '--record-responses',
+]);
+
+const SHELL_COMMAND_PREFIXES = new Set([
+  'env',
+  'command',
+  'exec',
+  'nohup',
+  'sudo',
+]);
+
+const PREFIX_FLAGS_WITH_VALUE: Record<string, ReadonlySet<string>> = {
+  sudo: new Set([
+    '-u',
+    '-g',
+    '-h',
+    '-p',
+    '-r',
+    '-t',
+    '-U',
+    '-C',
+    '-D',
+    '-R',
+    '-T',
+  ]),
+  env: new Set(['-u', '-C', '-S']),
+  exec: new Set(['-a']),
+};
+
+function splitShellCommandSegments(command: string): string[] {
+  const segments: string[] = [];
+  let current = '';
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i];
+    if (ch === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      current += ch;
+      continue;
+    }
+    if (ch === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      current += ch;
+      continue;
+    }
+    if (!inSingleQuote && ch === '\\' && i + 1 < command.length) {
+      current += ch + command[i + 1];
+      i++;
+      continue;
+    }
+    if (
+      !inSingleQuote &&
+      !inDoubleQuote &&
+      (ch === ';' || ch === '|' || ch === '&' || ch === '\n' || ch === '\r')
+    ) {
+      const trimmed = current.trim();
+      if (trimmed) {
+        segments.push(trimmed);
+      }
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+
+  const trimmed = current.trim();
+  if (trimmed) {
+    segments.push(trimmed);
+  }
+  return segments;
+}
+
+function tokenizeShellCommandWords(segment: string): string[] {
+  const tokens: string[] = [];
+  let current = '';
+  let hasTokenChar = false;
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+
+  for (let i = 0; i < segment.length; i++) {
+    const ch = segment[i];
+    if (ch === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      hasTokenChar = true;
+      continue;
+    }
+    if (ch === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      hasTokenChar = true;
+      continue;
+    }
+    if (!inSingleQuote && ch === '\\' && i + 1 < segment.length) {
+      const next = segment[i + 1];
+      if (inDoubleQuote) {
+        if (next === '"' || next === '\\' || next === '$') {
+          current += next;
+          hasTokenChar = true;
+          i++;
+          continue;
+        }
+      } else {
+        const isWindowsPathToken =
+          process.platform === 'win32' ||
+          /^[A-Za-z]:$/.test(current) ||
+          current === '.' ||
+          current === '..' ||
+          current.includes('\\') ||
+          (current.length > 0 && next === '.');
+        const isWhitespaceOrQuote =
+          next === ' ' ||
+          next === '\t' ||
+          next === '\n' ||
+          next === '\r' ||
+          next === '"' ||
+          next === "'";
+        current +=
+          isWindowsPathToken && !isWhitespaceOrQuote ? ch + next : next;
+        hasTokenChar = true;
+        i++;
+        continue;
+      }
+    }
+    if (
+      !inSingleQuote &&
+      !inDoubleQuote &&
+      (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r')
+    ) {
+      if (hasTokenChar) {
+        tokens.push(current);
+        current = '';
+        hasTokenChar = false;
+      }
+      continue;
+    }
+    current += ch;
+    hasTokenChar = true;
+  }
+
+  if (hasTokenChar) {
+    tokens.push(current);
+  }
+  return tokens;
+}
+
+function isEnvAssignmentToken(token: string): boolean {
+  const eqIdx = token.indexOf('=');
+  if (eqIdx <= 0) {
+    return false;
+  }
+  const name = token.slice(0, eqIdx);
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
+}
+
+function isInteractiveGeminiSegment(segment: string): boolean {
+  let unwrapped = segment.trim();
+  for (let depth = 0; depth < 3; depth++) {
+    const next = stripShellWrapper(unwrapped);
+    if (next === unwrapped) {
+      break;
+    }
+    unwrapped = next;
+  }
+
+  const tokens = tokenizeShellCommandWords(unwrapped);
+  let idx = 0;
+  while (idx < tokens.length) {
+    const token = tokens[idx];
+    if (isEnvAssignmentToken(token)) {
+      idx++;
+      continue;
+    }
+    const lowerToken = token.toLowerCase();
+    if (SHELL_COMMAND_PREFIXES.has(lowerToken)) {
+      idx++;
+      const flagsWithValue = PREFIX_FLAGS_WITH_VALUE[lowerToken];
+      while (idx < tokens.length && tokens[idx].startsWith('-')) {
+        const flag = tokens[idx];
+        idx++;
+        if (flag === '--') {
+          break;
+        }
+        if (lowerToken === 'command' && (flag === '-v' || flag === '-V')) {
+          return false;
+        }
+        if (
+          flagsWithValue?.has(flag) &&
+          idx < tokens.length &&
+          !tokens[idx].startsWith('-')
+        ) {
+          idx++;
+        }
+      }
+      continue;
+    }
+    break;
+  }
+
+  if (idx >= tokens.length) {
+    return false;
+  }
+
+  const normalizedExe = normalizeCommand(tokens[idx]).replace(
+    /\.(cmd|bat|ps1)$/,
+    '',
+  );
+  if (normalizedExe !== 'gemini') {
+    return false;
+  }
+
+  const args = tokens.slice(idx + 1);
+  if (args.length === 0) {
+    return true;
+  }
+
+  for (const arg of args) {
+    if (
+      arg === '--help' ||
+      arg === '-h' ||
+      arg === '--version' ||
+      arg === '-v'
+    ) {
+      return false;
+    }
+    if (
+      arg === '-i' ||
+      arg === '--prompt-interactive' ||
+      arg.startsWith('--prompt-interactive=')
+    ) {
+      return true;
+    }
+  }
+
+  let hasHeadlessPromptFlag = false;
+  let hasUtilityFlag = false;
+  const positionals: string[] = [];
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--') {
+      positionals.push(...args.slice(i + 1));
+      break;
+    }
+    if (arg === '-p' || arg === '--prompt' || arg.startsWith('--prompt=')) {
+      hasHeadlessPromptFlag = true;
+      if ((arg === '-p' || arg === '--prompt') && i + 1 < args.length) {
+        i++;
+      }
+      continue;
+    }
+    if (
+      arg === '--list-models' ||
+      arg === '--list-extensions' ||
+      arg === '-l' ||
+      arg === '--list-sessions' ||
+      arg === '--delete-session' ||
+      arg.startsWith('--delete-session=')
+    ) {
+      hasUtilityFlag = true;
+      if (arg === '--delete-session' && i + 1 < args.length) {
+        i++;
+      }
+      continue;
+    }
+    if (arg.startsWith('-')) {
+      if (
+        GEMINI_FLAGS_WITH_VALUE.has(arg) &&
+        i + 1 < args.length &&
+        !args[i + 1].startsWith('-')
+      ) {
+        i++;
+      }
+      continue;
+    }
+    positionals.push(arg);
+  }
+
+  const firstPositional = positionals[0]?.toLowerCase();
+  if (
+    firstPositional &&
+    INVALID_GEMINI_MANAGEMENT_SUBCOMMANDS.has(firstPositional)
+  ) {
+    return true;
+  }
+
+  if (
+    firstPositional &&
+    VALID_NON_INTERACTIVE_GEMINI_SUBCOMMANDS.has(firstPositional)
+  ) {
+    return false;
+  }
+
+  if (hasHeadlessPromptFlag || hasUtilityFlag) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Checks whether a shell command string attempts to invoke an interactive
+ * `gemini` CLI session or an invalid management subcommand such as
+ * `gemini config ...`.
+ */
+export function isInteractiveGeminiCommand(command: string): boolean {
+  if (!command || !command.trim()) {
+    return false;
+  }
+
+  let unwrapped = command.trim();
+  for (let depth = 0; depth < 3; depth++) {
+    const next = stripShellWrapper(unwrapped);
+    if (next === unwrapped) {
+      break;
+    }
+    unwrapped = next;
+  }
+
+  const parsedSegments = splitCommands(unwrapped);
+  const fallbackSegments = splitShellCommandSegments(unwrapped);
+  const allSegments =
+    parsedSegments.length > 0
+      ? [...parsedSegments, ...fallbackSegments]
+      : fallbackSegments;
+
+  return allSegments.some((segment) => isInteractiveGeminiSegment(segment));
 }

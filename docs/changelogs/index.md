@@ -18,6 +18,28 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.68.0 - 2026-11-10
+
+- **Extension Validation & Install Safety:** Added an extension validation
+  command with evaluation tests and serialized concurrent extension installs
+  with per-extension locking
+  ([#29980](https://github.com/google-gemini/gemini-cli/pull/29980) by
+  @tadipavan, [#30039](https://github.com/google-gemini/gemini-cli/pull/30039)
+  by @diegogodinezr).
+- **Rate Limit Visibility & Model State:** Surfaced 429 rate limit cool-down
+  timers in the loading indicator and preserved selected model state across
+  transient fallback, cancel, and rewind
+  ([#30012](https://github.com/google-gemini/gemini-cli/pull/30012) by
+  @urielefrenvirtusa,
+  [#30059](https://github.com/google-gemini/gemini-cli/pull/30059) by
+  @villahernandez-coder).
+- **Hooks & Container Sandboxing:** Added SubagentStop hook event mapping with
+  merged definitions and supplied `--userns=keep-id` for rootless Podman
+  sandboxes ([#30111](https://github.com/google-gemini/gemini-cli/pull/30111) by
+  @diegogodinezr,
+  [#30118](https://github.com/google-gemini/gemini-cli/pull/30118) by
+  @diegogodinezr).
+
 ## Announcements: v0.67.0 - 2026-11-04
 
 - **Model Discovery Command:** Added a new `models` command and `--list-models`

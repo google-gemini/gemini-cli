@@ -147,6 +147,85 @@ describe('gitUtils', () => {
       );
     });
 
+    it('should handle TortoiseGitPlink correctly in GIT_SSH and GIT_SSH_COMMAND', () => {
+      const safeEnv1 = getSafeGitEnv({
+        GIT_SSH: 'C:/Program Files/TortoiseGit/bin/TortoiseGitPlink.exe',
+      });
+      expect(safeEnv1['GIT_SSH_COMMAND']).toBe(
+        '"C:/Program Files/TortoiseGit/bin/TortoiseGitPlink.exe" -batch',
+      );
+
+      // Windows backslashes
+      const safeEnvWindows = getSafeGitEnv({
+        GIT_SSH: 'C:\\Program Files\\TortoiseGit\\bin\\TortoiseGitPlink.exe',
+      });
+      expect(safeEnvWindows['GIT_SSH_COMMAND']).toBe(
+        '"C:\\Program Files\\TortoiseGit\\bin\\TortoiseGitPlink.exe" -batch',
+      );
+
+      // Quoted with existing -batch flag
+      const safeEnv2 = getSafeGitEnv({
+        GIT_SSH_COMMAND:
+          '"C:/Program Files/TortoiseGit/bin/TortoiseGitPlink.exe" -batch',
+      });
+      expect(safeEnv2['GIT_SSH_COMMAND']).toBe(
+        '"C:/Program Files/TortoiseGit/bin/TortoiseGitPlink.exe" -batch',
+      );
+
+      // Existing arguments without -batch flag: inserts -batch right after executable
+      const safeEnvArgs = getSafeGitEnv({
+        GIT_SSH_COMMAND:
+          '"C:/Program Files/TortoiseGit/bin/TortoiseGitPlink.exe" -i C:/keys/id.ppk',
+      });
+      expect(safeEnvArgs['GIT_SSH_COMMAND']).toBe(
+        '"C:/Program Files/TortoiseGit/bin/TortoiseGitPlink.exe" -batch -i C:/keys/id.ppk',
+      );
+
+      // Existing arguments with -batch flag: preserves command without duplicate flags
+      const safeEnvArgsWithBatch = getSafeGitEnv({
+        GIT_SSH_COMMAND:
+          '"C:/Program Files/TortoiseGit/bin/TortoiseGitPlink.exe" -batch -i C:/keys/id.ppk',
+      });
+      expect(safeEnvArgsWithBatch['GIT_SSH_COMMAND']).toBe(
+        '"C:/Program Files/TortoiseGit/bin/TortoiseGitPlink.exe" -batch -i C:/keys/id.ppk',
+      );
+
+      // Bare executable
+      const safeEnv3 = getSafeGitEnv({
+        GIT_SSH: 'TortoiseGitPlink.exe',
+      });
+      expect(safeEnv3['GIT_SSH_COMMAND']).toBe('TortoiseGitPlink.exe -batch');
+
+      // Case insensitivity (uppercase and lowercase without .exe)
+      const safeEnvUpper = getSafeGitEnv({
+        GIT_SSH: 'TORTOISEGITPLINK.EXE',
+      });
+      expect(safeEnvUpper['GIT_SSH_COMMAND']).toBe(
+        'TORTOISEGITPLINK.EXE -batch',
+      );
+
+      const safeEnvLower = getSafeGitEnv({
+        GIT_SSH: 'tortoisegitplink',
+      });
+      expect(safeEnvLower['GIT_SSH_COMMAND']).toBe('tortoisegitplink -batch');
+
+      // Legacy TortoisePlink
+      const safeEnvLegacy = getSafeGitEnv({
+        GIT_SSH: 'C:/Program Files/TortoiseSVN/bin/TortoisePlink.exe',
+      });
+      expect(safeEnvLegacy['GIT_SSH_COMMAND']).toBe(
+        '"C:/Program Files/TortoiseSVN/bin/TortoisePlink.exe" -batch',
+      );
+
+      // Non-plink executable with plink in path
+      const safeEnvNonPlink = getSafeGitEnv({
+        GIT_SSH_COMMAND: '/usr/local/bin/not-tortoisegitplink',
+      });
+      expect(safeEnvNonPlink['GIT_SSH_COMMAND']).toBe(
+        '/usr/local/bin/not-tortoisegitplink -o BatchMode=yes',
+      );
+    });
+
     it('should not configure diff.external to an empty string', () => {
       const safeEnv = getSafeGitEnv({});
       const count = parseInt(safeEnv['GIT_CONFIG_COUNT'] || '0', 10);

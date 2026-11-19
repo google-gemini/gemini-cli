@@ -7,11 +7,16 @@
 import type { CommandModule } from 'yargs';
 import {
   type Config,
+  AuthType,
   tokenLimit,
+  outputTokenLimit,
   DEFAULT_TOKEN_LIMIT,
+  getAuthTypeFromEnv,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
+import { validateAuthMethod } from '../../config/auth.js';
 import { loadCliConfig, type CliArgs } from '../../config/config.js';
 import { buildAvailableModels } from '../../acp/acpUtils.js';
 import { exitCli } from '../utils.js';
@@ -26,7 +31,7 @@ export interface ModelListing {
   tier?: string;
   contextLimits: {
     inputTokens: number;
-    outputTokens: number;
+    outputTokens?: number;
   };
 }
 
@@ -76,7 +81,7 @@ export function getModelListings(
 
   return (availableModels ?? []).map((m) => {
     const inputTokens = tokenLimit(m.modelId) ?? DEFAULT_TOKEN_LIMIT;
-    const outputTokens = 8192;
+    const outputTokens = outputTokenLimit(m.modelId);
     return {
       modelId: m.modelId,
       id: m.modelId,
@@ -85,7 +90,7 @@ export function getModelListings(
       description: m.description ?? '',
       contextLimits: {
         inputTokens,
-        outputTokens,
+        ...(outputTokens !== undefined ? { outputTokens } : {}),
       },
     };
   });
@@ -99,6 +104,7 @@ export async function handleList(
   const argv: CliArgs = {
     ...DEFAULT_CLI_ARGS,
     ...options?.argv,
+    isCommand: true,
   };
 
   const config = await loadCliConfig(
@@ -116,6 +122,37 @@ export async function handleList(
 
   await config.storage.initialize();
 
+  const authConfig = settings.merged.security?.auth;
+  const authType = authConfig?.selectedType || getAuthTypeFromEnv();
+  const enforcedType = authConfig?.enforcedType;
+  if (enforcedType && authType !== enforcedType) {
+    const message = authType
+      ? `The enforced authentication type is '${enforcedType}', but the current type is '${authType}'. Please re-authenticate with the correct type.`
+      : `The auth type '${enforcedType}' is enforced, but no authentication is configured.`;
+    throw new Error(message);
+  }
+
+  if (authType && !authConfig?.useExternal) {
+    try {
+      if (authType !== AuthType.GATEWAY) {
+        const authError = await validateAuthMethod(authType);
+        if (authError) {
+          throw new Error(authError);
+        }
+      }
+      config.isBrowserLaunchSuppressed = () => true;
+      await config.refreshAuth(authType);
+    } catch (e) {
+      if (enforcedType) {
+        throw e;
+      }
+      debugLogger.debug(
+        'Failed to refresh auth for models list, falling back to default catalog:',
+        e,
+      );
+    }
+  }
+
   const models = getModelListings(config, settings);
 
   if (options?.outputFormat === 'json') {
@@ -129,8 +166,12 @@ export async function handleList(
     if (model.description) {
       process.stdout.write(`  Description:   ${model.description}\n`);
     }
+    const outputLimitText =
+      model.contextLimits.outputTokens !== undefined
+        ? ` / ${model.contextLimits.outputTokens.toLocaleString()} output tokens`
+        : '';
     process.stdout.write(
-      `  Context limit: ${model.contextLimits.inputTokens.toLocaleString()} input tokens / ${model.contextLimits.outputTokens.toLocaleString()} output tokens\n\n`,
+      `  Context limit: ${model.contextLimits.inputTokens.toLocaleString()} input tokens${outputLimitText}\n\n`,
     );
   }
 }
@@ -153,6 +194,7 @@ export const listCommand: CommandModule<object, ListArgs> = {
     }),
   handler: async (argv) => {
     const outputFormat = argv['output-format'] === 'json' ? 'json' : 'text';
+    let exitCode: number | undefined;
     try {
       await handleList({
         outputFormat,
@@ -168,8 +210,13 @@ export const listCommand: CommandModule<object, ListArgs> = {
           '\n',
       );
       process.exitCode = 1;
+      exitCode = 1;
     } finally {
-      await exitCli();
+      if (exitCode !== undefined) {
+        await exitCli(exitCode);
+      } else {
+        await exitCli();
+      }
     }
   },
 };

@@ -92,6 +92,18 @@ describe('SessionBrowser utils', () => {
       const matches = findTextMatches(messages, 'test');
       expect(matches.length).toBe(2);
     });
+
+    it('finds non-ASCII Unicode matches', () => {
+      const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
+        { role: 'user', content: '请帮我修复登录问题，谢谢' },
+      ];
+
+      const matches = findTextMatches(messages, '登录');
+      expect(matches.length).toBe(1);
+      expect(matches[0].match).toBe('登录');
+      expect(matches[0].before.endsWith('修复')).toBe(true);
+      expect(matches[0].after.startsWith('问题')).toBe(true);
+    });
   });
 
   describe('filterSessions', () => {

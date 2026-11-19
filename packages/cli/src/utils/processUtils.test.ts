@@ -12,6 +12,7 @@ import {
   setupSignalForwarding,
   handleChildProcessClose,
   relaunchApp,
+  isIPCAvailable,
   _resetRelaunchStateForTesting,
   isStandardSea,
   getScriptArgs,
@@ -105,6 +106,13 @@ describe('processUtils', () => {
       });
       vi.useRealTimers();
     }
+  });
+
+  it('isIPCAvailable should return false in Vitest even when GEMINI_CLI_NO_RELAUNCH is true if process.send is not mocked', () => {
+    vi.stubEnv('VITEST', 'true');
+    vi.stubEnv('GEMINI_CLI_NO_RELAUNCH', 'true');
+    expect(isIPCAvailable()).toBe(false);
+    vi.unstubAllEnvs();
   });
 });
 

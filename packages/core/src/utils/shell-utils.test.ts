@@ -23,8 +23,10 @@ import {
   stripShellWrapper,
   normalizeCommand,
   hasRedirection,
+  hasUnresolvedShellExpansion,
   detectCommandSubstitution,
   resolveExecutable,
+  isInteractiveGeminiCommand,
 } from './shell-utils.js';
 import path from 'node:path';
 
@@ -288,6 +290,117 @@ describe('hasRedirection', () => {
   it('should return false when redirection characters are inside quotes in bash', () => {
     mockPlatform.mockReturnValue('linux');
     expect(hasRedirection('echo "a > b"')).toBe(false);
+  });
+});
+
+describe('hasUnresolvedShellExpansion', () => {
+  // Test titles use template literals because `it.each` title formatting
+  // treats `$1` in a command as a placeholder.
+  for (const command of [
+    'find . {-exec,sh,marker.sh,\\;}',
+    'echo {1..3}',
+    'echo a{b,c}d',
+    'echo $HOME',
+    'echo ${HOME}',
+    'ls ${d:-/etc}',
+    'ls "$HOME"',
+    'echo $1',
+    'echo $@',
+    "echo $'x'",
+    'echo $"x"',
+    'echo $((1+2))',
+    'echo $(pwd)',
+    'echo `pwd`',
+    'cat <(ls)',
+    'ls *.md',
+    'ls ?.md',
+    'ls [ab].md',
+    'find . -exe[c]',
+    'ls && echo {a,b}',
+    'find . -maxdepth 0 -ex\\\nec',
+    'find . -maxdepth 0 -ex\\\r\nec',
+    'find . -maxdepth 0 "-ex\\\nec"',
+    'find . -name a#',
+    "echo 'a'#b",
+  ]) {
+    it(`returns true when arguments change after shell expansion: ${command}`, () => {
+      expect(hasUnresolvedShellExpansion(command)).toBe(true);
+    });
+  }
+
+  for (const command of [
+    'ls -la',
+    "echo '{a,b}'",
+    'echo "{a,b}"',
+    "grep -E 'a{1,3}' f.txt",
+    "cat 'file{1,2}.txt'",
+    'echo {}',
+    'echo {id}',
+    "awk '{print $1}' f.txt",
+    "echo '$HOME'",
+    "ls '*.md'",
+    'ls "*.md"',
+    'ls \\*.md',
+    'cat ~/notes.txt',
+    "find . -name '*.md'",
+    'ls \\\n  -la',
+    'ls -la \\\n  src',
+    "echo 'a\\\nb'",
+    'echo "a\\\\\nb"',
+    'ls -la # list files',
+    'echo \'a#b\' "c#d"',
+  ]) {
+    it(`returns false when arguments are literal: ${command}`, () => {
+      expect(hasUnresolvedShellExpansion(command)).toBe(false);
+    });
+  }
+
+  it('returns true when the command has a syntax error', () => {
+    expect(hasUnresolvedShellExpansion('echo "unterminated')).toBe(true);
+  });
+
+  it('returns true when parsing times out', () => {
+    const nowSpy = vi.spyOn(performance, 'now');
+    nowSpy.mockReturnValueOnce(0).mockReturnValue(2000);
+    try {
+      const complexCommand =
+        'ls -la && ' + Array(100).fill('echo "hello"').join(' && ');
+      expect(hasUnresolvedShellExpansion(complexCommand)).toBe(true);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('returns true when the bash parser is unavailable', async () => {
+    vi.resetModules();
+    vi.doMock('./fileUtils.js', () => ({
+      loadWasmBinary: vi.fn().mockRejectedValue(new Error('Wasm load failed')),
+    }));
+    try {
+      const shellUtils = await import('./shell-utils.js');
+      await shellUtils.initializeShellParsers();
+      expect(shellUtils.hasUnresolvedShellExpansion('ls -la')).toBe(true);
+    } finally {
+      vi.doUnmock('./fileUtils.js');
+    }
+  });
+
+  describe('when the shell is PowerShell', () => {
+    beforeEach(() => {
+      mockPlatform.mockReturnValue('win32');
+      vi.stubEnv('ComSpec', 'powershell.exe');
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it.each(['echo $HOME', 'ls *.md', 'find . {-exec,sh,marker.sh,\\;}'])(
+      'returns false for any command: %s',
+      (command) => {
+        expect(hasUnresolvedShellExpansion(command)).toBe(false);
+      },
+    );
   });
 });
 
@@ -909,5 +1022,53 @@ describe('detectCommandSubstitution (PowerShell)', () => {
       ),
     ).toContain('git status');
     expect(performance.now() - start).toBeLessThan(1000);
+  });
+});
+
+describe('isInteractiveGeminiCommand', () => {
+  it('should detect bare interactive gemini and gemini config commands', () => {
+    expect(isInteractiveGeminiCommand('gemini')).toBe(true);
+    expect(
+      isInteractiveGeminiCommand(
+        'gemini config set default-model gemini-2.5 -y',
+      ),
+    ).toBe(true);
+    expect(isInteractiveGeminiCommand('gemini -m gemini-2.5-pro')).toBe(true);
+    expect(isInteractiveGeminiCommand('gemini -i "hello"')).toBe(true);
+    expect(isInteractiveGeminiCommand('echo hi && gemini config list')).toBe(
+      true,
+    );
+    expect(isInteractiveGeminiCommand('bash -c "gemini"')).toBe(true);
+    expect(isInteractiveGeminiCommand('sudo -u root gemini')).toBe(true);
+    expect(isInteractiveGeminiCommand('sudo -E gemini')).toBe(true);
+    expect(isInteractiveGeminiCommand('env -i FOO=1 gemini')).toBe(true);
+    expect(isInteractiveGeminiCommand('env -u HOME gemini')).toBe(true);
+    expect(isInteractiveGeminiCommand('command -p gemini')).toBe(true);
+    expect(isInteractiveGeminiCommand('exec -a custom gemini')).toBe(true);
+    expect(isInteractiveGeminiCommand('\\gemini')).toBe(true);
+    expect(isInteractiveGeminiCommand('/path/with\\ space/gemini')).toBe(true);
+    expect(isInteractiveGeminiCommand('C:\\Users\\dev\\gemini.cmd')).toBe(true);
+    expect(isInteractiveGeminiCommand('node_modules\\.bin\\gemini')).toBe(true);
+  });
+
+  it('should allow non-interactive flags and subcommands', () => {
+    expect(isInteractiveGeminiCommand('gemini --version')).toBe(false);
+    expect(isInteractiveGeminiCommand('gemini -v')).toBe(false);
+    expect(isInteractiveGeminiCommand('gemini --help')).toBe(false);
+    expect(isInteractiveGeminiCommand('gemini -h')).toBe(false);
+    expect(isInteractiveGeminiCommand('gemini -p "summarize file"')).toBe(
+      false,
+    );
+    expect(isInteractiveGeminiCommand('gemini --prompt="summarize file"')).toBe(
+      false,
+    );
+    expect(isInteractiveGeminiCommand('gemini --list-models')).toBe(false);
+    expect(isInteractiveGeminiCommand('gemini skills list')).toBe(false);
+    expect(isInteractiveGeminiCommand('gemini models list')).toBe(false);
+    expect(isInteractiveGeminiCommand('gemini mcp list')).toBe(false);
+    expect(isInteractiveGeminiCommand('command -v gemini')).toBe(false);
+    expect(isInteractiveGeminiCommand('command -V gemini')).toBe(false);
+    expect(isInteractiveGeminiCommand('gemini\\ config')).toBe(false);
+    expect(isInteractiveGeminiCommand('git status')).toBe(false);
   });
 });

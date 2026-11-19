@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   SessionSelector,
   extractFirstUserMessage,
+  cleanMessage,
   formatRelativeTime,
   SessionError,
   convertSessionToHistoryFormats,
@@ -585,6 +586,40 @@ describe('SessionSelector', () => {
     expect(sessions[0].displayName).toBe('Help me fix resume history');
   });
 
+  it('should list session with non-ASCII user message for display', async () => {
+    const sessionId = randomUUID();
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const metadata = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:01:00.000Z',
+    };
+    const unicodeMessage = {
+      type: 'user',
+      content: '修复登录问题',
+      id: 'msg1',
+      timestamp: '2024-01-01T10:00:30.000Z',
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.jsonl`,
+      ),
+      `${JSON.stringify(metadata)}\n${JSON.stringify(unicodeMessage)}\n`,
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+    const sessions = await sessionSelector.listSessions();
+
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].firstUserMessage).toBe('修复登录问题');
+    expect(sessions[0].displayName).toBe('修复登录问题');
+  });
+
   it('should list session with gemini message even without user message', async () => {
     const sessionIdGeminiOnly = randomUUID();
 
@@ -1071,6 +1106,55 @@ describe('extractFirstUserMessage', () => {
     ] as MessageRecord[];
 
     expect(extractFirstUserMessage(messages)).toBe('Empty conversation');
+  });
+
+  it('preserves non-ASCII Unicode user messages in session previews', () => {
+    const messages = [
+      {
+        type: 'user',
+        content: '修复登录问题',
+        id: 'msg1',
+        timestamp: '2024-01-01T10:00:00.000Z',
+      },
+    ] as MessageRecord[];
+
+    expect(extractFirstUserMessage(messages)).toBe('修复登录问题');
+  });
+});
+
+describe('cleanMessage', () => {
+  it('preserves non-ASCII scripts (Chinese, Arabic, Spanish)', () => {
+    expect(cleanMessage('修复登录问题')).toBe('修复登录问题');
+    expect(cleanMessage('إصلاح تسجيل الدخول')).toBe('إصلاح تسجيل الدخول');
+    expect(cleanMessage('Corrige la conexión')).toBe('Corrige la conexión');
+  });
+
+  it('preserves emojis and complex emoji sequences', () => {
+    expect(cleanMessage('Fix 🐛')).toBe('Fix 🐛');
+    expect(cleanMessage('Family: 👨‍👩‍👧‍👦 Flag: 🏳️‍🌈')).toBe('Family: 👨‍👩‍👧‍👦 Flag: 🏳️‍🌈');
+  });
+
+  it('strips ANSI control sequences without leaving fragments', () => {
+    expect(cleanMessage('\x1b[31mRed text\x1b[0m')).toBe('Red text');
+    expect(cleanMessage('\x1b[1;32;40mBold Green on Black\x1b[0m')).toBe(
+      'Bold Green on Black',
+    );
+  });
+
+  it('collapses multiple whitespace, tabs, and newlines into single spaces and trims', () => {
+    expect(cleanMessage('\n\n  hello \t\t world  \n')).toBe('hello world');
+    expect(
+      cleanMessage('\n  Fix 🐛 in conexión (修复登录)\t\n and more  '),
+    ).toBe('Fix 🐛 in conexión (修复登录) and more');
+  });
+
+  it('handles empty and whitespace-only strings', () => {
+    expect(cleanMessage('')).toBe('');
+    expect(cleanMessage('   \n\t  ')).toBe('');
+  });
+
+  it('strips dangerous C0 control characters while preserving text', () => {
+    expect(cleanMessage('\x00\x01\x02Hello\x07 World\x1F')).toBe('Hello World');
   });
 });
 
