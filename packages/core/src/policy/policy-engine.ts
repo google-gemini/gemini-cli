@@ -11,12 +11,17 @@ import {
   REDIRECTION_NAMES,
   initializeShellParsers,
   parseCommandDetails,
+  parseCommandDetailsAsync,
+  isDefaultParseCommandDetails,
   stripShellWrapper,
   hasRedirection,
+  hasRedirectionAsync,
+  isDefaultHasRedirection,
   hasUnresolvedShellExpansion,
   detectCommandSubstitution,
   extractStringFromParseEntry,
 } from '../utils/shell-utils.js';
+import { runWithCommandParseCache } from '../utils/shell-parse-cache.js';
 import { parse as shellParse } from 'shell-quote';
 import { isSubpath } from '../utils/paths.js';
 import {
@@ -360,13 +365,16 @@ export class PolicyEngine {
     );
   }
 
-  private shouldDowngradeForRedirection(
+  private async shouldDowngradeForRedirection(
     command: string,
     allowRedirection?: boolean,
     rule?: PolicyRule,
-  ): boolean {
+  ): Promise<boolean> {
     if (allowRedirection) return false;
-    if (!hasRedirection(command)) return false;
+    const redirected = isDefaultHasRedirection(hasRedirection)
+      ? await hasRedirectionAsync(command)
+      : hasRedirection(command);
+    if (!redirected) return false;
 
     // Require explicit allowRedirection when matching a command-prefix rule.
     if (rule?.argsPattern && !allowRedirection) {
@@ -524,7 +532,9 @@ export class PolicyEngine {
     }
 
     await initializeShellParsers();
-    const parsed = parseCommandDetails(command);
+    const parsed = isDefaultParseCommandDetails(parseCommandDetails)
+      ? await parseCommandDetailsAsync(command)
+      : parseCommandDetails(command);
     const subCommands = parsed?.details ?? [];
 
     // Handle parser failures or syntax errors
@@ -578,11 +588,8 @@ export class PolicyEngine {
 
     // Check for redirection on the full command string.
     // Redirection always downgrades ALLOW to ASK_USER (it never upgrades).
-    const hasTopLevelRedirectionDowngrade = this.shouldDowngradeForRedirection(
-      command,
-      allowRedirection,
-      rule,
-    );
+    const hasTopLevelRedirectionDowngrade =
+      await this.shouldDowngradeForRedirection(command, allowRedirection, rule);
     if (hasTopLevelRedirectionDowngrade) {
       if (aggregateDecision === PolicyDecision.ALLOW) {
         debugLogger.debug(
@@ -681,11 +688,11 @@ export class PolicyEngine {
         // Downgrade if sub-command has redirection or disallowed substitution
         if (
           subResult.decision === PolicyDecision.ALLOW &&
-          (this.shouldDowngradeForRedirection(
+          ((await this.shouldDowngradeForRedirection(
             subCmd,
             subResult.rule?.allowRedirection ?? allowRedirection,
             subResult.rule,
-          ) ||
+          )) ||
             this.shouldDowngradeForCommandSubstitution(
               subCmd,
               subResult.rule?.allowCommandSubstitution ??
@@ -762,6 +769,24 @@ export class PolicyEngine {
    * Returns the decision and the matching rule (if any).
    */
   async check(
+    toolCall: FunctionCall,
+    serverName: string | undefined,
+    toolAnnotations?: Record<string, unknown>,
+    subagent?: string,
+    skipHeuristics = false,
+  ): Promise<CheckResult> {
+    return runWithCommandParseCache(() =>
+      this.checkInternal(
+        toolCall,
+        serverName,
+        toolAnnotations,
+        subagent,
+        skipHeuristics,
+      ),
+    );
+  }
+
+  private async checkInternal(
     toolCall: FunctionCall,
     serverName: string | undefined,
     toolAnnotations?: Record<string, unknown>,

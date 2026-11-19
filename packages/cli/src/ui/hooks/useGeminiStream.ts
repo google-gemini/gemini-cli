@@ -29,6 +29,8 @@ import {
   EDIT_TOOL_NAMES,
   SHELL_TOOL_NAME,
   hasRedirection,
+  hasRedirectionAsync,
+  isDefaultHasRedirection,
   processRestorableToolCalls,
   recordToolCallInteractions,
   ToolErrorType,
@@ -2104,19 +2106,40 @@ export const useGeminiStream = (
         // For AUTO_EDIT mode, only approve edit tools (replace, write_file)
         // or shell commands with redirection (which act as edits).
         if (newApprovalMode === ApprovalMode.AUTO_EDIT) {
-          awaitingApprovalCalls = awaitingApprovalCalls.filter((call) => {
+          const filteredCalls: TrackedWaitingToolCall[] = [];
+          for (const call of awaitingApprovalCalls) {
             if (EDIT_TOOL_NAMES.has(call.request.name)) {
-              return true;
+              filteredCalls.push(call);
+              continue;
             }
 
             if (call.request.name === SHELL_TOOL_NAME) {
-              const command = (call.request.args as { command?: string })
-                .command;
-              return command && hasRedirection(command);
-            }
+              if (
+                call.confirmationDetails?.type === 'exec' &&
+                typeof call.confirmationDetails.hasRedirection === 'boolean'
+              ) {
+                if (call.confirmationDetails.hasRedirection) {
+                  filteredCalls.push(call);
+                }
+                continue;
+              }
 
-            return false;
-          });
+              const rawCommand = call.request.args['command'];
+              const command =
+                typeof rawCommand === 'string' ? rawCommand : undefined;
+              const redirected = command
+                ? typeof isDefaultHasRedirection === 'function' &&
+                  isDefaultHasRedirection(hasRedirection) &&
+                  typeof hasRedirectionAsync === 'function'
+                  ? await hasRedirectionAsync(command)
+                  : hasRedirection(command)
+                : false;
+              if (redirected) {
+                filteredCalls.push(call);
+              }
+            }
+          }
+          awaitingApprovalCalls = filteredCalls;
         }
 
         // Process pending tool calls sequentially to reduce UI chaos
