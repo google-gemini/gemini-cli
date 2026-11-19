@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.71.0-nightly.20261118.g615d6bc8c",
+  "version": "0.72.0-nightly.20261119.g808199f5c",
   "description": "Gemini CLI Core",
   "license": "Apache-2.0",
   "repository": {
