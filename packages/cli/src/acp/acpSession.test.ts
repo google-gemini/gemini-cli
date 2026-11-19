@@ -1085,6 +1085,36 @@ describe('Session', () => {
     });
   });
 
+  it('should use a stable fallback when a stopped agent has no reason', async () => {
+    const stream = createMockStream([
+      {
+        type: GeminiEventType.AgentExecutionStopped,
+        value: {
+          reason: '   ',
+          systemMessage: '   ',
+        },
+      },
+    ]);
+    mockSendMessageStream.mockReturnValue(stream);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Trigger stop without a reason' }],
+    });
+
+    expect(result.stopReason).toBe('end_turn');
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'agent_message_chunk',
+        content: {
+          type: 'text',
+          text: 'Agent execution stopped: unknown reason',
+        },
+      },
+    });
+  });
+
   it('should send sessionUpdate when approval mode changes', async () => {
     const { coreEvents, CoreEvent, ApprovalMode } = await import(
       '@google/gemini-cli-core'

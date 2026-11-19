@@ -551,7 +551,9 @@ export class Session {
 
             case GeminiEventType.AgentExecutionStopped: {
               const reason =
-                event.value.systemMessage?.trim() || event.value.reason;
+                event.value.systemMessage?.trim() ||
+                event.value.reason.trim() ||
+                'unknown reason';
               await this.sendUpdate({
                 sessionUpdate: 'agent_message_chunk',
                 content: {
