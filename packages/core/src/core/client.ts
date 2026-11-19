@@ -707,12 +707,14 @@ export class GeminiClient {
             ? pendingApiHistory[0]
             : rawPendingRequest;
 
-        // Late-bind the prompt: Append all hardened pending turns (including any
-        // trailing sentinel user turn) to the managed history for the API call.
+        // Late-bind the prompt only when hardening leaves it in the pending
+        // segment. On the first turn, hardening can coalesce the prompt into
+        // apiHistory and leave pendingApiHistory empty; appending the raw
+        // request again would duplicate it.
         apiHistoryOverride =
           pendingApiHistory.length > 0
-            ? [...apiHistory, ...pendingApiHistory.slice(1)]
-            : [...apiHistory, finalPendingContent];
+            ? [...apiHistory, ...pendingApiHistory]
+            : [...apiHistory];
 
         this.getChat().setHistory(newHistory);
 

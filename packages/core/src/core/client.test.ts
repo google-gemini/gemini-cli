@@ -830,7 +830,7 @@ describe('Gemini Client (client.ts)', () => {
       );
     });
 
-    it('includes only hardened continuation turns from pendingApiHistory', async () => {
+    it('includes all hardened pending turns from pendingApiHistory', async () => {
       mockConfig.getContextManagementConfig = vi
         .fn()
         .mockReturnValue({ enabled: true });
@@ -876,10 +876,59 @@ describe('Gemini Client (client.ts)', () => {
           apiHistoryOverride: [
             { role: 'user', parts: [{ text: 'Earlier prompt' }] },
             { role: 'model', parts: [{ text: 'Earlier answer' }] },
+            { role: 'user', parts: [{ text: 'Processed prompt' }] },
             { role: 'model', parts: [{ text: 'Injected model context' }] },
             { role: 'user', parts: [{ text: 'Please continue.' }] },
           ],
         }),
+      );
+    });
+
+    it('does not append the raw prompt when hardening folded it into apiHistory', async () => {
+      mockConfig.getContextManagementConfig = vi
+        .fn()
+        .mockReturnValue({ enabled: true });
+
+      const apiHistory: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: '<session_context>\nEnvironment\n</session_context>\nRaw prompt',
+            },
+          ],
+        },
+      ];
+      const renderHistorySpy = vi.fn().mockResolvedValue({
+        history: [],
+        apiHistory,
+        pendingApiHistory: [],
+        baseUnits: 42,
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (client as any).contextManager = {
+        renderHistory: renderHistorySpy,
+      };
+
+      mockTurnRunFn.mockReturnValue(
+        (async function* () {
+          yield { type: 'content', value: 'Hello' };
+        })(),
+      );
+
+      const stream = client.sendMessageStream(
+        [{ text: 'Raw prompt' }],
+        new AbortController().signal,
+        'prompt-cm-coalesced-prompt',
+      );
+      await fromAsync(stream);
+
+      expect(mockTurnRunFn).toHaveBeenCalledWith(
+        expect.anything(),
+        [{ text: 'Raw prompt' }],
+        expect.any(AbortSignal),
+        expect.objectContaining({ apiHistoryOverride: apiHistory }),
       );
     });
 
