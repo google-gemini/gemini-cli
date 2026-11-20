@@ -49,6 +49,24 @@ export class AcpSessionManager {
     return this.sessions.get(sessionId);
   }
 
+  /**
+   * Closes one session the way `loadSession` replaces one and `dispose` ends
+   * them all. The id is forgotten before the disposal is awaited, so a
+   * `session/load` of the same id that follows keeps the session it creates.
+   */
+  async closeSession(sessionId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      throw new acp.RequestError(-32602, `Session not found: ${sessionId}`);
+    }
+    this.sessions.delete(sessionId);
+    try {
+      await session.dispose();
+    } catch (err) {
+      debugLogger.error(`Error disposing session ${sessionId}: ${err}`);
+    }
+  }
+
   async dispose(): Promise<void> {
     const disposePromises = Array.from(this.sessions.entries()).map(
       async ([sessionId, session]) => {
