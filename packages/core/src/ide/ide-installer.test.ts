@@ -204,7 +204,7 @@ describe('ide-installer', () => {
       });
 
       it('successfully installs on windows when path contains spaces (#30245 behavior)', async () => {
-        vi.spyOn(child_process, 'spawnSync').mockImplementation(
+        vi.spyOn(child_process, 'spawnSync').mockImplementationOnce(
           (cmd, _args, opts) => {
             // Windows cmd.exe fails if an unquoted command path contains spaces
             if (
