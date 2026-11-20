@@ -187,6 +187,14 @@ export async function getScopedEnvContents(
     if (!stat.isDirectory()) {
       const envFile = fsSync.readFileSync(envFilePath, 'utf-8');
       customEnv = dotenv.parse(envFile);
+      // Workspace scope reads the project .env; user scope has its own file.
+      if (scope === ExtensionSettingScope.WORKSPACE) {
+        for (const key of Object.keys(customEnv)) {
+          if (/^git_/i.test(key)) {
+            delete customEnv[key];
+          }
+        }
+      }
     }
   }
 

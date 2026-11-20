@@ -38,6 +38,16 @@ describe('Environment Isolation', () => {
   const mockWorkspace = path.resolve('/mock/workspace');
   const originalArgv = process.argv;
   const originalEnv = { ...process.env };
+  const gitEnvKeys = [
+    'GIT_EXEC_PATH',
+    'GIT_SSH_COMMAND',
+    'GIT_PROXY_COMMAND',
+    'GIT_CONFIG_PARAMETERS',
+    'GIT_ALLOW_PROTOCOL',
+    'GIT_PROTOCOL_FROM_USER',
+    'GIT_FUTURE_OPTION',
+    'gIt_MiXeD_OpTiOn',
+  ];
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -50,6 +60,9 @@ describe('Environment Isolation', () => {
     // Clear env vars that might leak from the host environment
     delete process.env['GEMINI_API_KEY'];
     delete process.env['OTHER_VAR'];
+    for (const key of gitEnvKeys) {
+      delete process.env[key];
+    }
   });
 
   afterEach(() => {
@@ -234,5 +247,129 @@ describe('Environment Isolation', () => {
     }));
 
     expect(process.env['GEMINI_API_KEY']).toBeUndefined();
+  });
+
+  it('rejects Git variables from a trusted workspace .env even with empty exclusions', () => {
+    const workspaceEnv = path.join(mockWorkspace, '.env');
+    vi.mocked(fs.existsSync).mockImplementation(
+      (p) => p.toString() === workspaceEnv,
+    );
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      [
+        ...gitEnvKeys.map((key) => `${key}=file-value`),
+        'OTHER_VAR=loaded',
+      ].join('\n'),
+    );
+
+    const settings = { advanced: { excludedEnvVars: [] } } as Settings;
+    loadEnvironment(settings, mockWorkspace, () => ({
+      isTrusted: true,
+      source: 'file',
+    }));
+
+    for (const key of gitEnvKeys) {
+      expect(process.env[key]).toBeUndefined();
+    }
+    expect(process.env['OTHER_VAR']).toBe('loaded');
+  });
+
+  it('rejects Git variables from workspace .gemini/.env', () => {
+    const workspaceEnv = path.join(mockWorkspace, GEMINI_DIR, '.env');
+    vi.mocked(fs.existsSync).mockImplementation(
+      (p) => p.toString() === workspaceEnv,
+    );
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      'GIT_ALLOW_PROTOCOL=file-value\ngIt_MiXeD_OpTiOn=file-value\nOTHER_VAR=loaded',
+    );
+
+    const settings = {
+      advanced: { ignoreLocalEnv: true, excludedEnvVars: [] },
+    } as Settings;
+    loadEnvironment(settings, mockWorkspace, () => ({
+      isTrusted: true,
+      source: 'file',
+    }));
+
+    expect(process.env['GIT_ALLOW_PROTOCOL']).toBeUndefined();
+    expect(process.env['gIt_MiXeD_OpTiOn']).toBeUndefined();
+    expect(process.env['OTHER_VAR']).toBe('loaded');
+  });
+
+  it('rejects Git variables from the home .env fallback', () => {
+    const homeEnv = path.join(mockHome, '.env');
+    vi.mocked(fs.existsSync).mockImplementation(
+      (p) => p.toString() === homeEnv,
+    );
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      'GIT_CONFIG_PARAMETERS=file-value\nOTHER_VAR=loaded',
+    );
+
+    const settings = { advanced: { ignoreLocalEnv: true } } as Settings;
+    loadEnvironment(settings, mockWorkspace, () => ({
+      isTrusted: true,
+      source: 'file',
+    }));
+
+    expect(process.env['GIT_CONFIG_PARAMETERS']).toBeUndefined();
+    expect(process.env['OTHER_VAR']).toBe('loaded');
+  });
+
+  it('preserves Git variables already supplied by the shell', () => {
+    const workspaceEnv = path.join(mockWorkspace, '.env');
+    vi.mocked(fs.existsSync).mockImplementation(
+      (p) => p.toString() === workspaceEnv,
+    );
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      'GIT_SSH_COMMAND=file-value\nGIT_ALLOW_PROTOCOL=file-value\nOTHER_VAR=loaded',
+    );
+    process.env['GIT_SSH_COMMAND'] = 'shell-ssh';
+    process.env['GIT_ALLOW_PROTOCOL'] = 'shell-protocol';
+
+    loadEnvironment({} as Settings, mockWorkspace, () => ({
+      isTrusted: true,
+      source: 'file',
+    }));
+
+    expect(process.env['GIT_SSH_COMMAND']).toBe('shell-ssh');
+    expect(process.env['GIT_ALLOW_PROTOCOL']).toBe('shell-protocol');
+    expect(process.env['OTHER_VAR']).toBe('loaded');
+  });
+
+  it('keeps the file boundary across repeated loads', () => {
+    const workspaceEnv = path.join(mockWorkspace, '.env');
+    vi.mocked(fs.existsSync).mockImplementation(
+      (p) => p.toString() === workspaceEnv,
+    );
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      'GIT_FUTURE_OPTION=file-value\nOTHER_VAR=loaded',
+    );
+
+    const trust = () => ({ isTrusted: true, source: 'file' }) as const;
+    loadEnvironment({} as Settings, mockWorkspace, trust);
+    loadEnvironment({} as Settings, mockWorkspace, trust);
+
+    expect(process.env['GIT_FUTURE_OPTION']).toBeUndefined();
+    expect(process.env['OTHER_VAR']).toBe('loaded');
+  });
+
+  it('still applies custom exclusions to non-Git project variables', () => {
+    const workspaceEnv = path.join(mockWorkspace, '.env');
+    vi.mocked(fs.existsSync).mockImplementation(
+      (p) => p.toString() === workspaceEnv,
+    );
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      'OTHER_VAR=excluded\nGEMINI_API_KEY=loaded',
+    );
+
+    const settings = {
+      advanced: { excludedEnvVars: ['OTHER_VAR'] },
+    } as Settings;
+    loadEnvironment(settings, mockWorkspace, () => ({
+      isTrusted: true,
+      source: 'file',
+    }));
+
+    expect(process.env['OTHER_VAR']).toBeUndefined();
+    expect(process.env['GEMINI_API_KEY']).toBe('loaded');
   });
 });
