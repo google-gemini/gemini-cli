@@ -32,17 +32,27 @@ import * as path from 'node:path';
 import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
 import { homedir as pathsHomedir } from '../utils/paths.js';
 
+const HOME_DIR = '/home/user';
+
+beforeEach(() => {
+  vi.spyOn(os, 'homedir').mockReturnValue(HOME_DIR);
+  vi.mocked(pathsHomedir).mockReturnValue(HOME_DIR);
+  vi.spyOn(child_process, 'spawnSync').mockReturnValue({
+    status: 0,
+    stdout: Buffer.from(''),
+    stderr: Buffer.from(''),
+    output: [],
+    pid: 1234,
+    signal: null,
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
+
 describe('ide-installer', () => {
-  const HOME_DIR = '/home/user';
-
-  beforeEach(() => {
-    vi.spyOn(os, 'homedir').mockReturnValue(HOME_DIR);
-    vi.mocked(pathsHomedir).mockReturnValue(HOME_DIR);
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
 
   describe('getIdeInstaller', () => {
     it.each([
@@ -194,7 +204,7 @@ describe('ide-installer', () => {
       });
 
       it('successfully installs on windows when path contains spaces (#30245 behavior)', async () => {
-        vi.mocked(child_process.spawnSync).mockImplementation(
+        vi.spyOn(child_process, 'spawnSync').mockImplementation(
           (cmd, _args, opts) => {
             // Windows cmd.exe fails if an unquoted command path contains spaces
             if (
