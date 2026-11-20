@@ -279,6 +279,202 @@ describe('SessionSelector', () => {
     expect(result.sessionData.messages[0].content).toBe('Latest session');
   });
 
+  it('should resolve most recently used session for latest even if another session started more recently', async () => {
+    const sessionIdMain = randomUUID();
+    const sessionIdSpike = randomUUID();
+
+    // Create test session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    // sessionMain was started earlier (10:00) but was active later (12:00)
+    const sessionMain = {
+      sessionId: sessionIdMain,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T12:00:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Main long-lived session',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    // sessionSpike was started later (11:00) but its activity stopped earlier (11:05)
+    const sessionSpike = {
+      sessionId: sessionIdSpike,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T11:00:00.000Z',
+      lastUpdated: '2024-01-01T11:05:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Spike session',
+          id: 'msg2',
+          timestamp: '2024-01-01T11:00:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionIdMain.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(sessionMain, null, 2),
+    );
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionIdSpike.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(sessionSpike, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+
+    // Resolving latest should pick the most recently active session (sessionMain), not the most recently started one (sessionSpike)
+    const result = await sessionSelector.resolveSession('latest');
+    expect(result.sessionData.sessionId).toBe(sessionIdMain);
+    expect(result.sessionData.messages[0].content).toBe(
+      'Main long-lived session',
+    );
+
+    // Verify that numeric indexes remain stably sorted by startTime (session 1 = sessionMain, session 2 = sessionSpike)
+    const indexResult1 = await sessionSelector.resolveSession('1');
+    expect(indexResult1.sessionData.sessionId).toBe(sessionIdMain);
+
+    const indexResult2 = await sessionSelector.resolveSession('2');
+    expect(indexResult2.sessionData.sessionId).toBe(sessionIdSpike);
+  });
+
+  it('should fall back to startTime when resolving latest if lastUpdated timestamps are identical', async () => {
+    const sessionIdA = randomUUID();
+    const sessionIdB = randomUUID();
+
+    // Create test session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const sharedLastUpdated = '2024-01-01T12:00:00.000Z';
+
+    const sessionA = {
+      sessionId: sessionIdA,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: sharedLastUpdated,
+      messages: [
+        {
+          type: 'user',
+          content: 'Session A',
+          id: 'msgA',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    const sessionB = {
+      sessionId: sessionIdB,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:30:00.000Z',
+      lastUpdated: sharedLastUpdated,
+      messages: [
+        {
+          type: 'user',
+          content: 'Session B',
+          id: 'msgB',
+          timestamp: '2024-01-01T10:30:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionIdA.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(sessionA, null, 2),
+    );
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-30-${sessionIdB.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(sessionB, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+
+    const result = await sessionSelector.resolveSession('latest');
+    expect(result.sessionData.sessionId).toBe(sessionIdB);
+    expect(result.sessionData.messages[0].content).toBe('Session B');
+  });
+
+  it('should handle corrupted or invalid date strings when resolving latest without throwing', async () => {
+    const sessionIdCorrupted = randomUUID();
+    const sessionIdValid = randomUUID();
+
+    // Create test session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const sessionCorrupted = {
+      sessionId: sessionIdCorrupted,
+      projectHash: 'test-hash',
+      startTime: 'not-a-valid-date',
+      lastUpdated: 'invalid-date',
+      messages: [
+        {
+          type: 'user',
+          content: 'Corrupted session',
+          id: 'msg1',
+          timestamp: 'invalid',
+        },
+      ],
+    };
+
+    const sessionValid = {
+      sessionId: sessionIdValid,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T12:00:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Valid session',
+          id: 'msg2',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T09-00-${sessionIdCorrupted.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(sessionCorrupted, null, 2),
+    );
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionIdValid.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(sessionValid, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+
+    const result = await sessionSelector.resolveSession('latest');
+    expect(result.sessionData.sessionId).toBe(sessionIdValid);
+  });
+
   it('should resolve session by UUID with whitespace (trimming)', async () => {
     const sessionId = randomUUID();
 
