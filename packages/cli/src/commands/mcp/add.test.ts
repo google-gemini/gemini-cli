@@ -107,6 +107,40 @@ describe('mcp add command', () => {
     );
   });
 
+  it('should preserve env values containing = and empty values', async () => {
+    await parser.parseAsync(
+      'add -e TOKEN=abc=def== -e EMPTY= my-server /path/to/server',
+    );
+
+    expect(mockSetValue).toHaveBeenCalledWith(
+      SettingScope.Workspace,
+      'mcpServers',
+      {
+        'my-server': {
+          command: '/path/to/server',
+          args: [],
+          env: { TOKEN: 'abc=def==', EMPTY: '' },
+        },
+      },
+    );
+  });
+
+  it('should ignore env entries without a key or separator', async () => {
+    await parser.parseAsync('add -e NOVALUE -e =bar my-server /path/to/server');
+
+    expect(mockSetValue).toHaveBeenCalledWith(
+      SettingScope.Workspace,
+      'mcpServers',
+      {
+        'my-server': {
+          command: '/path/to/server',
+          args: [],
+          env: {},
+        },
+      },
+    );
+  });
+
   it('should add an sse server to user settings', async () => {
     await parser.parseAsync(
       'add --transport sse --scope user -H "X-API-Key: your-key" sse-server https://example.com/sse-endpoint',
