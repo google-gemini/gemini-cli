@@ -130,6 +130,9 @@ async function linkAction(
 
     if (context.services.agentContext?.config) {
       await context.services.agentContext.config.reloadSkills();
+      // Rebuild the slash command list so the linked skills can be run as
+      // /<skill-name> right away, the same way /skills reload does.
+      context.ui.reloadCommands();
     }
   } catch (error) {
     context.ui.addItem({

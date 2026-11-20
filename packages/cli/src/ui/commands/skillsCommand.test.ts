@@ -236,6 +236,41 @@ describe('skillsCommand', () => {
       );
     });
 
+    it('should refresh slash commands after linking so the new skill can be activated with /<skill-name>', async () => {
+      const linkCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'link',
+      )!;
+      vi.mocked(linkSkill).mockResolvedValue([
+        { name: 'test-skill', location: '/path' },
+      ]);
+      const reloadSkillsMock = vi.fn().mockResolvedValue(undefined);
+      context.services.agentContext!.config.reloadSkills = reloadSkillsMock;
+
+      await linkCmd.action!(context, '/some/path');
+
+      expect(reloadSkillsMock).toHaveBeenCalledTimes(1);
+      expect(context.ui.reloadCommands).toHaveBeenCalledTimes(1);
+      // The command list has to be rebuilt after the skills are re-discovered,
+      // otherwise the newly linked skill is missing from it.
+      expect(
+        vi.mocked(context.ui.reloadCommands).mock.invocationCallOrder[0],
+      ).toBeGreaterThan(reloadSkillsMock.mock.invocationCallOrder[0]);
+      expect(context.ui.addItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: MessageType.ERROR }),
+      );
+    });
+
+    it('should not refresh slash commands if linking fails', async () => {
+      const linkCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'link',
+      )!;
+      vi.mocked(linkSkill).mockRejectedValue(new Error('Link failed'));
+
+      await linkCmd.action!(context, '/some/path');
+
+      expect(context.ui.reloadCommands).not.toHaveBeenCalled();
+    });
+
     it('should link a skill with workspace scope', async () => {
       const linkCmd = skillsCommand.subCommands!.find(
         (s) => s.name === 'link',
