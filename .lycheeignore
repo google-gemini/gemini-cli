@@ -4,3 +4,6 @@ https://github.com/google-gemini/maintainers-gemini-cli/blob/main/npm.md
 https://github.com/settings/personal-access-tokens/new
 https://github.com/settings/tokens/new
 https://www.npmjs.com/package/@google/gemini-cli
+• Project: nb-gemini-495506
+• Required Role: Storage Viewer (roles/storage.viewer)
+• Missing Permission: storage.buckets.list

@@ -24,7 +24,7 @@ Learn about how you can use Gemini 3 Pro and Gemini 3 Flash on Gemini CLI.
 Get started by upgrading Gemini CLI to the latest version:
 
 ```bash
-npm install -g @google/gemini-cli@latest
+
 ```
 
 If your version is 0.21.1 or later:
