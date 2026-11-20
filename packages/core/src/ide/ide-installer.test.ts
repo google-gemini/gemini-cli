@@ -137,14 +137,36 @@ describe('ide-installer', () => {
         );
       });
 
-      it('installs the extension using code cli on windows', async () => {
+      it('does not quote code cli on macos even when path contains spaces', async () => {
+        const macPath =
+          '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code';
+        const { installer } = setup({
+          platform: 'darwin',
+          execSync: () => {
+            throw new Error('Command not found');
+          },
+          existsResult: true,
+        });
+        await installer.install();
+        expect(child_process.spawnSync).toHaveBeenCalledWith(
+          macPath,
+          [
+            '--install-extension',
+            'google.gemini-cli-vscode-ide-companion',
+            '--force',
+          ],
+          { stdio: 'pipe', shell: false },
+        );
+      });
+
+      it('installs the extension using code cli on windows and quotes path with spaces', async () => {
         const { installer } = setup({
           platform: 'win32',
           execSync: () => 'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd',
         });
         await installer.install();
         expect(child_process.spawnSync).toHaveBeenCalledWith(
-          'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd',
+          '"C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd"',
           [
             '--install-extension',
             'google.gemini-cli-vscode-ide-companion',
@@ -152,6 +174,61 @@ describe('ide-installer', () => {
           ],
           { stdio: 'pipe', shell: true },
         );
+      });
+
+      it('does not quote code.cmd on windows when path has no spaces', async () => {
+        const { installer } = setup({
+          platform: 'win32',
+          execSync: () => 'C:\\bin\\code.cmd',
+        });
+        await installer.install();
+        expect(child_process.spawnSync).toHaveBeenCalledWith(
+          'C:\\bin\\code.cmd',
+          [
+            '--install-extension',
+            'google.gemini-cli-vscode-ide-companion',
+            '--force',
+          ],
+          { stdio: 'pipe', shell: true },
+        );
+      });
+
+      it('successfully installs on windows when path contains spaces (#30245 behavior)', async () => {
+        vi.mocked(child_process.spawnSync).mockImplementation((cmd, _args, opts) => {
+          // Windows cmd.exe fails if an unquoted command path contains spaces
+          if (
+            opts?.shell &&
+            typeof cmd === 'string' &&
+            cmd.includes(' ') &&
+            !cmd.startsWith('"')
+          ) {
+            return {
+              status: 1,
+              stdout: Buffer.from(''),
+              stderr: Buffer.from(
+                `'${cmd.split(' ')[0]}' is not recognized as an internal or external command`,
+              ),
+              output: [],
+              pid: 1234,
+              signal: null,
+            };
+          }
+          return {
+            status: 0,
+            stdout: Buffer.from(''),
+            stderr: Buffer.from(''),
+            output: [],
+            pid: 1234,
+            signal: null,
+          };
+        });
+
+        const { installer } = setup({
+          platform: 'win32',
+          execSync: () => 'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd',
+        });
+        const result = await installer.install();
+        expect(result.success).toBe(true);
       });
 
       it.each([
@@ -233,6 +310,46 @@ describe('ide-installer', () => {
           '--force',
         ],
         { stdio: 'pipe', shell: false },
+      );
+    });
+
+    it('installs the extension on windows and quotes path with spaces', async () => {
+      vi.stubEnv('POSITRON', '1');
+      const { installer } = setup({
+        platform: 'win32',
+        execSync: () => 'C:\\Program Files\\Positron\\bin\\positron.cmd',
+      });
+      const result = await installer.install();
+
+      expect(result.success).toBe(true);
+      expect(child_process.spawnSync).toHaveBeenCalledWith(
+        '"C:\\Program Files\\Positron\\bin\\positron.cmd"',
+        [
+          '--install-extension',
+          'google.gemini-cli-vscode-ide-companion',
+          '--force',
+        ],
+        { stdio: 'pipe', shell: true },
+      );
+    });
+
+    it('installs the extension on windows with unquoted path when path has no spaces', async () => {
+      vi.stubEnv('POSITRON', '1');
+      const { installer } = setup({
+        platform: 'win32',
+        execSync: () => 'C:\\bin\\positron.cmd',
+      });
+      const result = await installer.install();
+
+      expect(result.success).toBe(true);
+      expect(child_process.spawnSync).toHaveBeenCalledWith(
+        'C:\\bin\\positron.cmd',
+        [
+          '--install-extension',
+          'google.gemini-cli-vscode-ide-companion',
+          '--force',
+        ],
+        { stdio: 'pipe', shell: true },
       );
     });
 
@@ -364,7 +481,27 @@ describe('AntigravityInstaller', () => {
       'where.exe antigravity.cmd',
     );
     expect(child_process.spawnSync).toHaveBeenCalledWith(
-      'C:\\Program Files\\Antigravity\\bin\\antigravity.cmd',
+      '"C:\\Program Files\\Antigravity\\bin\\antigravity.cmd"',
+      [
+        '--install-extension',
+        'google.gemini-cli-vscode-ide-companion',
+        '--force',
+      ],
+      { stdio: 'pipe', shell: true },
+    );
+  });
+
+  it('installs the extension on windows with unquoted path when path has no spaces', async () => {
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy.cmd');
+    const { installer } = setup({
+      platform: 'win32',
+      execSync: () => 'C:\\tools\\agy.cmd',
+    });
+    const result = await installer.install();
+
+    expect(result.success).toBe(true);
+    expect(child_process.spawnSync).toHaveBeenCalledWith(
+      'C:\\tools\\agy.cmd',
       [
         '--install-extension',
         'google.gemini-cli-vscode-ide-companion',
