@@ -14,6 +14,7 @@ import {
   escapePath,
   Storage,
 } from '@google/gemini-cli-core';
+import { convertBmpToPng } from './bmpToPng.js';
 
 /**
  * Supported image file extensions based on Gemini API.
@@ -41,7 +42,17 @@ function getUserLinuxClipboardTool(): typeof linuxClipboardTool {
   }
 
   let toolName: 'wl-paste' | 'xclip' | null = null;
-  const displayServer = process.env['XDG_SESSION_TYPE'];
+
+  // XDG_SESSION_TYPE is not always set. WSLg and some minimal setups leave
+  // it empty but still export WAYLAND_DISPLAY / DISPLAY, so fall back to
+  // those before giving up.
+  const displayServer =
+    process.env['XDG_SESSION_TYPE'] ||
+    (process.env['WAYLAND_DISPLAY']
+      ? 'wayland'
+      : process.env['DISPLAY']
+        ? 'x11'
+        : undefined);
 
   if (displayServer === 'wayland') toolName = 'wl-paste';
   else if (displayServer === 'x11') toolName = 'xclip';
@@ -203,6 +214,36 @@ export async function clipboardHasImage(): Promise<boolean> {
 }
 
 /**
+ * Fetches the clipboard image as BMP and converts it to PNG at
+ * tempFilePath. Some sources (WSLg notably) offer image/bmp but no
+ * image/png, and the model APIs don't accept BMP, so a plain copy
+ * isn't enough for those.
+ */
+async function saveBmpConvertedToPng(
+  saveBmpTo: (bmpPath: string) => Promise<boolean>,
+  tempFilePath: string,
+): Promise<boolean> {
+  const bmpPath = tempFilePath.replace(/\.png$/, '.bmp');
+  try {
+    if (!(await saveBmpTo(bmpPath))) {
+      return false;
+    }
+    const png = convertBmpToPng(await fs.readFile(bmpPath));
+    await fs.writeFile(tempFilePath, png);
+    return true;
+  } catch (e) {
+    debugLogger.debug('Failed to save clipboard BMP as PNG:', e);
+    return false;
+  } finally {
+    try {
+      await fs.unlink(bmpPath);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/**
  * Saves clipboard content to a file using wl-paste (Wayland).
  */
 async function saveFileWithWlPaste(tempFilePath: string) {
@@ -219,6 +260,24 @@ async function saveFileWithWlPaste(tempFilePath: string) {
     await fs.unlink(tempFilePath);
   } catch {
     /* ignore */
+  }
+
+  // No PNG on offer? WSLg clipboards often only expose image/bmp.
+  try {
+    const { stdout } = await spawnAsync('wl-paste', ['--list-types']);
+    if (stdout.includes('image/bmp')) {
+      return await saveBmpConvertedToPng(
+        (bmpPath) =>
+          saveFromCommand(
+            'wl-paste',
+            ['--no-newline', '--type', 'image/bmp'],
+            bmpPath,
+          ),
+        tempFilePath,
+      );
+    }
+  } catch (e) {
+    debugLogger.debug('Failed to list wl-paste types:', e);
   }
   return false;
 }
@@ -240,6 +299,30 @@ const saveFileWithXclip = async (tempFilePath: string) => {
     await fs.unlink(tempFilePath);
   } catch {
     /* ignore */
+  }
+
+  // Same BMP-only case as wl-paste above, via xclip's TARGETS list.
+  try {
+    const { stdout } = await spawnAsync('xclip', [
+      '-selection',
+      'clipboard',
+      '-t',
+      'TARGETS',
+      '-o',
+    ]);
+    if (stdout.includes('image/bmp')) {
+      return await saveBmpConvertedToPng(
+        (bmpPath) =>
+          saveFromCommand(
+            'xclip',
+            ['-selection', 'clipboard', '-t', 'image/bmp', '-o'],
+            bmpPath,
+          ),
+        tempFilePath,
+      );
+    }
+  } catch (e) {
+    debugLogger.debug('Failed to list xclip targets:', e);
   }
   return false;
 };

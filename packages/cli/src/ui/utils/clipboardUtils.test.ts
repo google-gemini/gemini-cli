@@ -188,6 +188,58 @@ describe('clipboardUtils', () => {
 
       expect(result).toBe(false);
     });
+
+    it('falls back to WAYLAND_DISPLAY when XDG_SESSION_TYPE is unset (WSLg)', async () => {
+      mockPlatform('linux');
+      delete process.env['XDG_SESSION_TYPE'];
+      process.env['WAYLAND_DISPLAY'] = 'wayland-0';
+      delete process.env['DISPLAY'];
+      vi.mocked(execSync).mockReturnValue(Buffer.from(''));
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'image/png\ntext/plain',
+        stderr: '',
+      });
+
+      const result = await clipboardUtils.clipboardHasImage();
+
+      expect(result).toBe(true);
+      expect(execSync).toHaveBeenCalledWith(
+        expect.stringContaining('wl-paste'),
+        expect.anything(),
+      );
+    });
+
+    it('falls back to DISPLAY when only an X11 display is available', async () => {
+      mockPlatform('linux');
+      delete process.env['XDG_SESSION_TYPE'];
+      delete process.env['WAYLAND_DISPLAY'];
+      process.env['DISPLAY'] = ':0';
+      vi.mocked(execSync).mockReturnValue(Buffer.from(''));
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'image/png\nTARGETS',
+        stderr: '',
+      });
+
+      const result = await clipboardUtils.clipboardHasImage();
+
+      expect(result).toBe(true);
+      expect(execSync).toHaveBeenCalledWith(
+        expect.stringContaining('xclip'),
+        expect.anything(),
+      );
+    });
+
+    it('returns false when no display variables are set at all', async () => {
+      mockPlatform('linux');
+      delete process.env['XDG_SESSION_TYPE'];
+      delete process.env['WAYLAND_DISPLAY'];
+      delete process.env['DISPLAY'];
+
+      const result = await clipboardUtils.clipboardHasImage();
+
+      expect(result).toBe(false);
+      expect(execSync).not.toHaveBeenCalled();
+    });
   });
 
   describe('saveClipboardImage (Linux)', () => {
@@ -272,6 +324,64 @@ describe('clipboardUtils', () => {
       expect(result).toMatch(/clipboard-\d+\.png$/);
       expect(spawn).toHaveBeenCalledWith('wl-paste', expect.any(Array));
       expect(fs.mkdir).toHaveBeenCalledWith(mockTempDir, { recursive: true });
+    });
+
+    // A 1x1 red-pixel 24-bit BMP, the kind of payload a WSLg clipboard
+    // hands over when it doesn't offer image/png.
+    const tinyBmp = () => {
+      const bmp = Buffer.alloc(58);
+      bmp.write('BM', 0, 'ascii');
+      bmp.writeUInt32LE(58, 2);
+      bmp.writeUInt32LE(54, 10);
+      bmp.writeUInt32LE(40, 14);
+      bmp.writeInt32LE(1, 18);
+      bmp.writeInt32LE(1, 22);
+      bmp.writeUInt16LE(1, 26);
+      bmp.writeUInt16LE(24, 28);
+      bmp.writeUInt32LE(4, 34);
+      bmp[54] = 0; // B
+      bmp[55] = 0; // G
+      bmp[56] = 255; // R
+      return bmp;
+    };
+
+    it('converts to PNG when wl-paste only offers image/bmp', async () => {
+      await primeClipboardTool('wayland');
+      vi.mocked(fs.stat).mockResolvedValue(MOCK_FILE_STATS);
+      vi.mocked(fs.readFile).mockResolvedValue(tinyBmp() as never);
+      vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+
+      // First spawn (image/png) fails, second (image/bmp) succeeds.
+      const pngChild = createMockChildProcess(true, 1);
+      const bmpChild = createMockChildProcess(true, 0);
+      vi.mocked(spawn)
+        .mockReturnValueOnce(pngChild as unknown as ChildProcess)
+        .mockReturnValueOnce(bmpChild as unknown as ChildProcess);
+      const mockStream = new EventEmitter() as EventEmitter & {
+        writableFinished: boolean;
+      };
+      mockStream.writableFinished = true;
+      vi.mocked(createWriteStream).mockReturnValue(
+        mockStream as unknown as WriteStream,
+      );
+      // The --list-types call in the BMP fallback.
+      vi.mocked(spawnAsync).mockResolvedValueOnce({
+        stdout: 'image/bmp\ntext/plain',
+        stderr: '',
+      });
+
+      const result = await clipboardUtils.saveClipboardImage(mockTargetDir);
+
+      expect(result).toMatch(/clipboard-\d+\.png$/);
+      expect(spawn).toHaveBeenCalledWith(
+        'wl-paste',
+        expect.arrayContaining(['image/bmp']),
+      );
+      // What lands in the .png file really is PNG data.
+      const written = vi.mocked(fs.writeFile).mock.calls[0][1] as Buffer;
+      expect(written.subarray(0, 4)).toEqual(
+        Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+      );
     });
 
     it('should return null if wl-paste fails', async () => {
