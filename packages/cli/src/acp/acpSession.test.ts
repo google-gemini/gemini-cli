@@ -603,6 +603,62 @@ describe('Session', () => {
     });
   });
 
+  it('should run consecutive parallelizable tool calls together like the CLI scheduler', async () => {
+    const events: string[] = [];
+    mockTool.build.mockImplementation((args: { id: string }) => ({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: vi.fn().mockImplementation(async () => {
+        events.push(`start ${args.id}`);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        events.push(`end ${args.id}`);
+        return { llmContent: `done ${args.id}` };
+      }),
+    }));
+    const call = (id: string, name: string) => ({
+      type: GeminiEventType.ToolCallRequest as const,
+      value: {
+        callId: `call-${id}`,
+        name,
+        args: { id },
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+    });
+    mockSendMessageStream
+      .mockReturnValueOnce(
+        createMockStream([
+          call('a', 'test_tool'),
+          call('b', 'test_tool'),
+          call('c', 'replace'),
+        ]),
+      )
+      .mockReturnValueOnce(
+        createMockStream([{ type: GeminiEventType.Content, value: 'Done' }]),
+      );
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tools' }],
+    });
+
+    expect(events).toEqual([
+      'start a',
+      'start b',
+      'end a',
+      'end b',
+      'start c',
+      'end c',
+    ]);
+    const sent = mockSendMessageStream.mock.calls[1][0];
+    expect(sent.map((part) => part.functionResponse?.id)).toEqual([
+      'call-a',
+      'call-b',
+      'call-c',
+    ]);
+  });
+
   it('should handle tool call permission request', async () => {
     const confirmationDetails = {
       type: 'info',

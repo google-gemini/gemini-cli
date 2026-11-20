@@ -18,6 +18,7 @@ import {
   getErrorStatus,
   DiscoveredMCPTool,
   ToolCallEvent,
+  isParallelizable,
   debugLogger,
   ReadManyFilesTool,
   partListUnionToString,
@@ -633,16 +634,38 @@ export class Session {
         break;
       }
 
+      // Start each run of consecutive parallelizable calls together, as the
+      // CLI's scheduler batches them; edits, topic updates and calls marked
+      // wait_for_previous still run alone and in order. Responses keep the
+      // model's call order.
       const toolResponseParts: Part[] = [];
-      for (const tReq of toolCallRequests) {
-        const fc: FunctionCall = {
-          id: tReq.callId,
-          name: tReq.name,
-          args: tReq.args,
-        };
-
-        const response = await this.runTool(pendingSend.signal, promptId, fc);
-        toolResponseParts.push(...response);
+      for (let start = 0; start < toolCallRequests.length; ) {
+        let end = start + 1;
+        if (isParallelizable(toolCallRequests[start])) {
+          while (
+            end < toolCallRequests.length &&
+            isParallelizable(toolCallRequests[end])
+          ) {
+            end++;
+          }
+        }
+        const results = await Promise.allSettled(
+          toolCallRequests.slice(start, end).map((tReq) => {
+            const fc: FunctionCall = {
+              id: tReq.callId,
+              name: tReq.name,
+              args: tReq.args,
+            };
+            return this.runTool(pendingSend.signal, promptId, fc);
+          }),
+        );
+        for (const result of results) {
+          if (result.status === 'rejected') {
+            throw result.reason;
+          }
+          toolResponseParts.push(...result.value);
+        }
+        start = end;
       }
 
       currentParts = toolResponseParts;
