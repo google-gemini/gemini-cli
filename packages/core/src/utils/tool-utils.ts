@@ -21,6 +21,7 @@ import type {
 } from '../scheduler/types.js';
 import type { Part } from '@google/genai';
 import { MAX_STORED_TOOL_OUTPUT_BYTES } from './constants.js';
+import { BINARY_INJECTION_KEY } from './generateContentResponseUtilities.js';
 
 /**
  * Determines whether a tool call request can be executed in parallel with
@@ -274,7 +275,11 @@ export function truncateFunctionResponsePart(
         let objModified = false;
         const copy: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(val)) {
-          const truncated = truncateValue(v);
+          // Binary injections carry base64 media that GeminiChat moves into
+          // its own turn; cutting it yields an undecodable request. Older
+          // copies are evicted by collapseOlderFunctionResponses instead.
+          const truncated: unknown =
+            k === BINARY_INJECTION_KEY ? v : truncateValue(v);
           if (truncated !== v) {
             objModified = true;
           }

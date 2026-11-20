@@ -14,6 +14,7 @@ import {
 } from './tool-utils.js';
 import type { Part } from '@google/genai';
 import { MAX_STORED_TOOL_OUTPUT_BYTES } from './constants.js';
+import { BINARY_INJECTION_KEY } from './generateContentResponseUtilities.js';
 import {
   ReadFileTool,
   UPDATE_TOPIC_TOOL_NAME,
@@ -205,6 +206,28 @@ describe('truncateToolOutput', () => {
 });
 
 describe('truncateFunctionResponsePart', () => {
+  it('keeps injected binary data intact while truncating text fields', () => {
+    const base64 = 'A'.repeat(200_000);
+    const injected = [{ inlineData: { mimeType: 'audio/wav', data: base64 } }];
+    const part: Part = {
+      functionResponse: {
+        name: 'read_file',
+        response: {
+          output: 'B'.repeat(100_000),
+          [BINARY_INJECTION_KEY]: injected,
+        },
+      },
+    };
+
+    const res = truncateFunctionResponsePart(part, MAX_STORED_TOOL_OUTPUT_BYTES)
+      .functionResponse?.response as Record<string, unknown>;
+
+    expect(res[BINARY_INJECTION_KEY]).toBe(injected);
+    expect(
+      Buffer.byteLength(res['output'] as string, 'utf8'),
+    ).toBeLessThanOrEqual(MAX_STORED_TOOL_OUTPUT_BYTES);
+  });
+
   it('recursively deep-truncates nested objects and arrays while leaving small values untouched', () => {
     const largeA = 'A'.repeat(100_000);
     const largeB = 'B'.repeat(100_000);
