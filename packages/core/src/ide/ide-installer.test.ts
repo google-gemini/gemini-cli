@@ -194,34 +194,36 @@ describe('ide-installer', () => {
       });
 
       it('successfully installs on windows when path contains spaces (#30245 behavior)', async () => {
-        vi.mocked(child_process.spawnSync).mockImplementation((cmd, _args, opts) => {
-          // Windows cmd.exe fails if an unquoted command path contains spaces
-          if (
-            opts?.shell &&
-            typeof cmd === 'string' &&
-            cmd.includes(' ') &&
-            !cmd.startsWith('"')
-          ) {
+        vi.mocked(child_process.spawnSync).mockImplementation(
+          (cmd, _args, opts) => {
+            // Windows cmd.exe fails if an unquoted command path contains spaces
+            if (
+              opts?.shell &&
+              typeof cmd === 'string' &&
+              cmd.includes(' ') &&
+              !cmd.startsWith('"')
+            ) {
+              return {
+                status: 1,
+                stdout: Buffer.from(''),
+                stderr: Buffer.from(
+                  `'${cmd.split(' ')[0]}' is not recognized as an internal or external command`,
+                ),
+                output: [],
+                pid: 1234,
+                signal: null,
+              };
+            }
             return {
-              status: 1,
+              status: 0,
               stdout: Buffer.from(''),
-              stderr: Buffer.from(
-                `'${cmd.split(' ')[0]}' is not recognized as an internal or external command`,
-              ),
+              stderr: Buffer.from(''),
               output: [],
               pid: 1234,
               signal: null,
             };
-          }
-          return {
-            status: 0,
-            stdout: Buffer.from(''),
-            stderr: Buffer.from(''),
-            output: [],
-            pid: 1234,
-            signal: null,
-          };
-        });
+          },
+        );
 
         const { installer } = setup({
           platform: 'win32',
