@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { AgentTool } from './agent-tool.js';
+import { AgentTool, MAX_AGENT_DEPTH } from './agent-tool.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import type { Config } from '../config/config.js';
@@ -144,6 +145,102 @@ describe('AgentTool', () => {
       'invoke_agent',
       'Invoke Browser Agent',
     );
+  });
+
+  describe('allowedAgentNames', () => {
+    it('should advertise only the allowed agents in its schema', () => {
+      const scoped = new AgentTool(mockConfig, mockMessageBus, undefined, {
+        allowedAgentNames: ['TestLocalAgent'],
+      });
+
+      const schema = scoped.parameterSchema as {
+        properties: { agent_name: { enum?: string[]; description: string } };
+      };
+      expect(schema.properties.agent_name.enum).toEqual(['TestLocalAgent']);
+      expect(schema.properties.agent_name.description).toContain(
+        'TestLocalAgent',
+      );
+    });
+
+    it('should leave the schema unconstrained when unrestricted', () => {
+      const schema = tool.parameterSchema as {
+        properties: { agent_name: { enum?: string[] } };
+      };
+      expect(schema.properties.agent_name.enum).toBeUndefined();
+    });
+
+    it('should invoke an agent that is on the allowlist', async () => {
+      const scoped = new AgentTool(mockConfig, mockMessageBus, undefined, {
+        allowedAgentNames: ['TestLocalAgent'],
+      });
+
+      const invocation = scoped['createInvocation'](
+        { agent_name: 'TestLocalAgent', prompt: 'Do something' },
+        mockMessageBus,
+      );
+      await invocation.shouldConfirmExecute(new AbortController().signal);
+
+      expect(LocalSubagentInvocation).toHaveBeenCalled();
+    });
+
+    it('should reject an agent that exists but is not on the allowlist', () => {
+      const scoped = new AgentTool(mockConfig, mockMessageBus, undefined, {
+        allowedAgentNames: ['TestLocalAgent'],
+      });
+
+      expect(() =>
+        scoped['createInvocation'](
+          { agent_name: 'TestRemoteAgent', prompt: 'Hello' },
+          mockMessageBus,
+        ),
+      ).toThrow(
+        "Subagent 'TestRemoteAgent' is not available to this agent. Available subagents: TestLocalAgent.",
+      );
+    });
+  });
+
+  describe('recursion depth', () => {
+    const contextAtDepth = (agentDepth: number): AgentLoopContext =>
+      ({ config: mockConfig, agentDepth }) as unknown as AgentLoopContext;
+
+    it('should allow invocation below the maximum depth', async () => {
+      const nested = new AgentTool(
+        contextAtDepth(MAX_AGENT_DEPTH - 1),
+        mockMessageBus,
+      );
+
+      const invocation = nested['createInvocation'](
+        { agent_name: 'TestLocalAgent', prompt: 'Do something' },
+        mockMessageBus,
+      );
+      await invocation.shouldConfirmExecute(new AbortController().signal);
+
+      expect(LocalSubagentInvocation).toHaveBeenCalled();
+    });
+
+    it('should refuse to nest past the maximum depth', () => {
+      const nested = new AgentTool(
+        contextAtDepth(MAX_AGENT_DEPTH),
+        mockMessageBus,
+      );
+
+      expect(() =>
+        nested['createInvocation'](
+          { agent_name: 'TestLocalAgent', prompt: 'Do something' },
+          mockMessageBus,
+        ),
+      ).toThrow(`Maximum agent nesting depth (${MAX_AGENT_DEPTH}) reached`);
+    });
+
+    it('should treat a missing depth as the top level', async () => {
+      const invocation = tool['createInvocation'](
+        { agent_name: 'TestLocalAgent', prompt: 'Do something' },
+        mockMessageBus,
+      );
+      await invocation.shouldConfirmExecute(new AbortController().signal);
+
+      expect(LocalSubagentInvocation).toHaveBeenCalled();
+    });
   });
 
   describe('agentSessionSubagentEnabled feature flag', () => {

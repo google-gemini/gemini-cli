@@ -84,6 +84,63 @@ System prompt content.`);
       });
     });
 
+    it('should accept agent names and the agent wildcard in tools', async () => {
+      const filePath = await writeAgentMarkdown(`---
+name: orchestrator
+description: An agent that delegates to other agents
+tools:
+  - run_shell_command
+  - code-reviewer
+  - codebase_investigator
+  - invoke_agent
+  - agent_*
+---
+System prompt content.`);
+
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        name: 'orchestrator',
+        tools: [
+          'run_shell_command',
+          'code-reviewer',
+          'codebase_investigator',
+          'invoke_agent',
+          'agent_*',
+        ],
+      });
+    });
+
+    it('should still reject tool entries that are not valid tool or agent names', async () => {
+      const filePath = await writeAgentMarkdown(`---
+name: bad-tools-agent
+description: An agent with a bogus tool entry
+tools:
+  - Not A Valid Name
+---
+System prompt content.`);
+
+      const error = await parseAgentMarkdown(filePath).catch((e) => e);
+      expect(error).toBeInstanceOf(AgentLoadError);
+      expect(error.message).toContain('Invalid tool or agent name');
+    });
+
+    it('should convert agent references in tools into the agent definition', async () => {
+      const filePath = await writeAgentMarkdown(`---
+name: orchestrator-2
+description: An agent that delegates to other agents
+tools:
+  - code-reviewer
+---
+System prompt content.`);
+
+      const [markdown] = await parseAgentMarkdown(filePath);
+      const definition = markdownToAgentDefinition(
+        markdown,
+      ) as LocalAgentDefinition;
+      expect(definition.toolConfig?.tools).toEqual(['code-reviewer']);
+    });
+
     it('should parse frontmatter with mcp_servers', async () => {
       const filePath = await writeAgentMarkdown(`---
 name: mcp-agent
