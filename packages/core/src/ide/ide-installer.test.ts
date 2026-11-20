@@ -42,6 +42,7 @@ describe('ide-installer', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   describe('getIdeInstaller', () => {
@@ -137,20 +138,86 @@ describe('ide-installer', () => {
         );
       });
 
-      it('installs the extension using code cli on windows', async () => {
+      it.each([
+        {
+          foundPath: 'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd',
+          expectedCommand:
+            '"C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd"',
+        },
+        {
+          foundPath:
+            'C:\\Users\\Test User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\code.cmd',
+          expectedCommand:
+            '"C:\\Users\\Test User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\code.cmd"',
+        },
+        {
+          foundPath: 'C:\\scoop\\apps\\vscode\\current\\bin\\code.cmd',
+          expectedCommand: 'C:\\scoop\\apps\\vscode\\current\\bin\\code.cmd',
+        },
+      ])(
+        'quotes the code cli path for cmd.exe on windows: $foundPath',
+        async ({ foundPath, expectedCommand }) => {
+          const { installer } = setup({
+            platform: 'win32',
+            execSync: () => foundPath,
+          });
+          await installer.install();
+          expect(child_process.spawnSync).toHaveBeenCalledWith(
+            expectedCommand,
+            [
+              '--install-extension',
+              'google.gemini-cli-vscode-ide-companion',
+              '--force',
+            ],
+            { stdio: 'pipe', shell: true },
+          );
+        },
+      );
+
+      it('quotes the default install location on windows when code is not in PATH', async () => {
+        vi.stubEnv('ProgramFiles', 'C:\\Program Files');
+        const expectedPath = path.join(
+          'C:\\Program Files',
+          'Microsoft VS Code',
+          'bin',
+          'code.cmd',
+        );
         const { installer } = setup({
           platform: 'win32',
-          execSync: () => 'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd',
+          existsResult: true,
+          execSync: () => {
+            throw new Error('Command not found');
+          },
         });
         await installer.install();
         expect(child_process.spawnSync).toHaveBeenCalledWith(
-          'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd',
+          `"${expectedPath}"`,
           [
             '--install-extension',
             'google.gemini-cli-vscode-ide-companion',
             '--force',
           ],
           { stdio: 'pipe', shell: true },
+        );
+      });
+
+      it('does not quote the cli path on macOS, where no shell is used', async () => {
+        const { installer } = setup({
+          platform: 'darwin',
+          existsResult: true,
+          execSync: () => {
+            throw new Error('Command not found');
+          },
+        });
+        await installer.install();
+        expect(child_process.spawnSync).toHaveBeenCalledWith(
+          '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
+          [
+            '--install-extension',
+            'google.gemini-cli-vscode-ide-companion',
+            '--force',
+          ],
+          { stdio: 'pipe', shell: false },
         );
       });
 
@@ -233,6 +300,25 @@ describe('ide-installer', () => {
           '--force',
         ],
         { stdio: 'pipe', shell: false },
+      );
+    });
+
+    it('quotes the positron cli path for cmd.exe on windows', async () => {
+      const { installer } = setup({
+        platform: 'win32',
+        execSync: () => 'C:\\Program Files\\Positron\\bin\\positron.cmd',
+      });
+      const result = await installer.install();
+
+      expect(result.success).toBe(true);
+      expect(child_process.spawnSync).toHaveBeenCalledWith(
+        '"C:\\Program Files\\Positron\\bin\\positron.cmd"',
+        [
+          '--install-extension',
+          'google.gemini-cli-vscode-ide-companion',
+          '--force',
+        ],
+        { stdio: 'pipe', shell: true },
       );
     });
 
@@ -364,7 +450,7 @@ describe('AntigravityInstaller', () => {
       'where.exe antigravity.cmd',
     );
     expect(child_process.spawnSync).toHaveBeenCalledWith(
-      'C:\\Program Files\\Antigravity\\bin\\antigravity.cmd',
+      '"C:\\Program Files\\Antigravity\\bin\\antigravity.cmd"',
       [
         '--install-extension',
         'google.gemini-cli-vscode-ide-companion',
