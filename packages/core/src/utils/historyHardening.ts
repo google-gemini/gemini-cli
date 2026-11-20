@@ -126,20 +126,72 @@ export function isSyntheticBinaryAckTurn(content: Content): boolean {
   );
 }
 
-function hasTrailingToolResponseUserTurn(
-  turns: readonly HistoryTurn[],
+/**
+ * The synthetic binary acknowledgment as plain model text. Thought stripping
+ * would otherwise drop the ack and coalesce the injected audio/video into the
+ * functionResponse turn, a shape the Code Assist API rejects with 400
+ * "Requests ending with a model turn are not supported".
+ */
+export function plainBinaryAckContent(): Content {
+  return { role: 'model', parts: [{ text: SYNTHETIC_BINARY_ACK_TEXT }] };
+}
+
+export function isBinaryAckTurn(content: Content): boolean {
+  return (
+    content.role === 'model' &&
+    content.parts?.length === 1 &&
+    content.parts[0]?.text === SYNTHETIC_BINARY_ACK_TEXT
+  );
+}
+
+function hasTrailingToolResponseContent(
+  contents: readonly Content[],
+  idx = contents.length - 1,
 ): boolean {
-  if (turns.at(-1)?.content?.role !== 'user') {
+  if (contents[idx]?.role !== 'user') {
     return false;
   }
-  for (
-    let i = turns.length - 1;
-    i >= 0 && turns[i]?.content?.role === 'user';
-    i--
-  ) {
-    if ((turns[i]?.content?.parts ?? []).some((p) => !!p?.functionResponse)) {
-      return true;
+  for (let i = idx; i >= 0; i--) {
+    const content = contents[i];
+    if (!content) {
+      return false;
     }
+    if (content.role === 'user') {
+      if ((content.parts ?? []).some((p) => !!p?.functionResponse)) {
+        return true;
+      }
+      continue;
+    }
+    if (isBinaryAckTurn(content)) {
+      continue;
+    }
+    return false;
+  }
+  return false;
+}
+
+function hasTrailingToolResponseUserTurn(
+  turns: readonly HistoryTurn[],
+  idx = turns.length - 1,
+): boolean {
+  if (turns[idx]?.content?.role !== 'user') {
+    return false;
+  }
+  for (let i = idx; i >= 0; i--) {
+    const content = turns[i]?.content;
+    if (!content) {
+      return false;
+    }
+    if (content.role === 'user') {
+      if ((content.parts ?? []).some((p) => !!p?.functionResponse)) {
+        return true;
+      }
+      continue;
+    }
+    if (isBinaryAckTurn(content)) {
+      continue;
+    }
+    return false;
   }
   return false;
 }
@@ -152,6 +204,10 @@ function hasTrailingToolResponseUserTurn(
 function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
   const result: HistoryTurn[] = [];
   for (const turn of history) {
+    if (isSyntheticBinaryAckTurn(turn.content)) {
+      result.push({ id: turn.id, content: plainBinaryAckContent() });
+      continue;
+    }
     if (!turn.content.parts) {
       result.push(turn);
       continue;
@@ -172,7 +228,6 @@ function stripThoughts(history: HistoryTurn[]): HistoryTurn[] {
     if (nonThoughtParts.length === 0) {
       if (
         turn.content.role === 'model' &&
-        !isSyntheticBinaryAckTurn(turn.content) &&
         hasTrailingToolResponseUserTurn(result)
       ) {
         result.push({
@@ -484,16 +539,17 @@ function enforceRoleConstraints(
 export function scrubHistory(history: HistoryTurn[]): HistoryTurn[] {
   const result: HistoryTurn[] = [];
   for (const turn of history) {
+    if (isSyntheticBinaryAckTurn(turn.content)) {
+      result.push({ id: turn.id, content: plainBinaryAckContent() });
+      continue;
+    }
     const nonThoughtParts = (turn.content.parts ?? []).filter(
       (p) => p && !isInternalThought(p) && !isEmptyTextOnlyPart(p),
     );
     if (nonThoughtParts.length === 0) {
-      const prev = result.at(-1);
       if (
         turn.content.role === 'model' &&
-        prev?.content.role === 'user' &&
-        (prev.content.parts ?? []).some((p) => !!p?.functionResponse) &&
-        !isSyntheticBinaryAckTurn(turn.content)
+        hasTrailingToolResponseUserTurn(result)
       ) {
         result.push({
           id: turn.id,
@@ -539,16 +595,17 @@ export function scrubHistory(history: HistoryTurn[]): HistoryTurn[] {
 export function scrubContents(contents: Content[]): Content[] {
   const result: Content[] = [];
   for (const content of contents) {
+    if (isSyntheticBinaryAckTurn(content)) {
+      result.push(plainBinaryAckContent());
+      continue;
+    }
     const nonThoughtParts = (content.parts ?? []).filter(
       (p) => p && !isInternalThought(p) && !isEmptyTextOnlyPart(p),
     );
     if (nonThoughtParts.length === 0) {
-      const prev = result.at(-1);
       if (
         content.role === 'model' &&
-        prev?.role === 'user' &&
-        (prev.parts ?? []).some((p) => !!p?.functionResponse) &&
-        !isSyntheticBinaryAckTurn(content)
+        hasTrailingToolResponseContent(result)
       ) {
         result.push({
           role: 'model',

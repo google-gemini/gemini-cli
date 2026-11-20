@@ -4661,6 +4661,66 @@ describe('GeminiChat', () => {
       );
     });
 
+    it('should keep injected binary data in its own user turn for modern models', async () => {
+      vi.mocked(mockConfig.isContextManagementEnabled).mockReturnValue(false);
+      vi.mocked(mockConfig.getModel).mockReturnValue('gemini-3.1-pro-preview');
+      let capturedContents: Content[] = [];
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async (req) => {
+          capturedContents = req.contents as Content[];
+          return (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Analysis done' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })();
+        },
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-3.1-pro-preview' },
+        [
+          {
+            functionResponse: {
+              id: 'call-123',
+              name: 'read_file',
+              response: {
+                output: 'Success',
+                [BINARY_INJECTION_KEY]: [
+                  { inlineData: { mimeType: 'audio/wav', data: 'base64' } },
+                ],
+              },
+            },
+          },
+        ],
+        'test-id',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // No-op
+      }
+
+      // Without the ack turn, the audio would coalesce into the
+      // functionResponse turn, which the Code Assist API rejects with 400.
+      expect(capturedContents.map((c) => c.role)).toEqual([
+        'user',
+        'model',
+        'user',
+      ]);
+      expect(capturedContents[0].parts).toHaveLength(1);
+      expect(capturedContents[1].parts).toEqual([
+        { text: 'Binary content received. Proceeding with analysis.' },
+      ]);
+      expect(capturedContents[2].parts![0].inlineData!.mimeType).toBe(
+        'audio/wav',
+      );
+    });
+
     it('should handle multiple parallel binary injections', async () => {
       const parallelParts = [
         {
@@ -7320,7 +7380,7 @@ describe('GeminiChat', () => {
       }
 
       expect(capturedContents).toBeDefined();
-      expect(capturedContents).toHaveLength(5);
+      expect(capturedContents).toHaveLength(7);
       expect(capturedContents![2]).toEqual({
         role: 'user',
         parts: [
@@ -7331,6 +7391,15 @@ describe('GeminiChat', () => {
               response: { output: 'Binary content provided (1 item(s)).' },
             },
           },
+        ],
+      });
+      expect(capturedContents![3]).toEqual({
+        role: 'model',
+        parts: [{ text: 'Binary content received. Proceeding with analysis.' }],
+      });
+      expect(capturedContents![4]).toEqual({
+        role: 'user',
+        parts: [
           {
             inlineData: {
               mimeType: 'image/png',
@@ -7339,11 +7408,11 @@ describe('GeminiChat', () => {
           },
         ],
       });
-      expect(capturedContents![3]).toEqual({
+      expect(capturedContents![5]).toEqual({
         role: 'model',
         parts: [{ text: INTERRUPTED_RESPONSE_PLACEHOLDER }],
       });
-      expect(capturedContents![4]).toEqual({
+      expect(capturedContents![6]).toEqual({
         role: 'user',
         parts: [{ text: 'Tell me more about it' }],
       });
