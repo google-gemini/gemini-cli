@@ -285,6 +285,30 @@ export function selectModelForAvailability(
 }
 
 /**
+ * Resolves the primary concrete model target for a given model alias or tier.
+ */
+function resolveTargetModel(config: Config, model?: string): string {
+  if (!model) return '';
+  const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
+  const useCustomToolModel = config.getUseCustomToolModelSync?.() ?? false;
+  const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? false;
+  const useLatestFlash = config.hasLatestFlashGAAccess?.() ?? false;
+  const useLatestFlashLite = config.hasLatestFlashLiteGAAccess?.() ?? false;
+
+  return normalizeModelId(
+    resolveModel(
+      model,
+      useGemini31,
+      useCustomToolModel,
+      hasAccessToPreview,
+      config,
+      useLatestFlash,
+      useLatestFlashLite,
+    ),
+  );
+}
+
+/**
  * Applies the model availability selection logic, including side effects
  * (setting active model, consuming sticky attempts) and config updates.
  */
@@ -304,7 +328,17 @@ export function applyModelSelection(
   const finalModel = selection.selectedModel ?? model;
   let generateContentConfig = resolved.generateContentConfig;
 
-  if (finalModel !== model) {
+  const normalizedFinalModel = finalModel ? normalizeModelId(finalModel) : '';
+  const normalizedModel = model ? normalizeModelId(model) : '';
+  const normalizedTargetModel = model ? resolveTargetModel(config, model) : '';
+
+  const isFallback =
+    Boolean(model) &&
+    Boolean(normalizedFinalModel) &&
+    normalizedFinalModel !== normalizedModel &&
+    normalizedFinalModel !== normalizedTargetModel;
+
+  if (isFallback) {
     const fallbackResolved = config.modelConfigService.getResolvedConfig({
       ...modelConfigKey,
       model: finalModel,
