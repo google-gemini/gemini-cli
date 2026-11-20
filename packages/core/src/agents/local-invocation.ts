@@ -24,6 +24,8 @@ import {
   SUBAGENT_CANCELLED_ERROR_MESSAGE,
   isToolActivityError,
   SubagentState,
+  isSuccessfulTermination,
+  getSubagentStateFromTermination,
 } from './types.js';
 import { randomUUID } from 'node:crypto';
 import type { z } from 'zod';
@@ -298,11 +300,15 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
         throw cancelError;
       }
 
+      const progressState = getSubagentStateFromTermination(
+        output.terminate_reason,
+      );
+
       const progress: SubagentProgress = {
         isSubagentProgress: true,
         agentName: this.definition.name,
         recentActivity: [...recentActivity],
-        state: SubagentState.COMPLETED,
+        state: progressState,
         result: output.result,
         terminateReason: output.terminate_reason,
       };
@@ -311,7 +317,13 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
         updateOutput(progress);
       }
 
-      const resultContent = `Subagent '${this.definition.name}' finished.
+      // Build the LLM-facing content.  When the subagent did not
+      // complete via GOAL, the parent must be told explicitly so it
+      // can decide whether to retry, narrow scope, or report failure.
+      const wasSuccessful = isSuccessfulTermination(output.terminate_reason);
+      const statusLabel = wasSuccessful ? 'finished' : 'did not complete';
+
+      const resultContent = `Subagent '${this.definition.name}' ${statusLabel}.
 Termination Reason: ${output.terminate_reason}
 Result:
 ${output.result}`;
