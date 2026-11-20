@@ -178,6 +178,7 @@ describe('Scheduler (Orchestrator)', () => {
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      isYoloModeDisabled: vi.fn().mockReturnValue(false),
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
       getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
@@ -905,6 +906,61 @@ describe('Scheduler (Orchestrator)', () => {
       await scheduler.schedule(req1, signal);
 
       expect(resolveConfirmation).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        CoreToolCallStatus.Error,
+        expect.objectContaining({
+          errorType: ToolErrorType.POLICY_VIOLATION,
+        }),
+      );
+    });
+
+    it('should not escalate ALLOW on taint risk when active YOLO mode is enabled', async () => {
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.ALLOW,
+        rule: undefined,
+      });
+
+      mockConfig.getApprovalMode = vi.fn().mockReturnValue(ApprovalMode.YOLO);
+      mockConfig.isYoloModeDisabled = vi.fn().mockReturnValue(false);
+      mockConfig.isInteractive = vi.fn().mockReturnValue(false);
+
+      const taintInvocation = {
+        ...mockInvocation,
+        hasTaintedOrBuildFileRisk: vi.fn().mockReturnValue(true),
+      };
+      mockTool.build = vi.fn().mockReturnValue(taintInvocation);
+
+      mockExecutor.execute.mockResolvedValue({
+        status: CoreToolCallStatus.Success,
+      } as unknown as SuccessfulToolCall);
+
+      await scheduler.schedule(req1, signal);
+
+      expect(taintInvocation.hasTaintedOrBuildFileRisk).not.toHaveBeenCalled();
+      expect(resolveConfirmation).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).toHaveBeenCalled();
+    });
+
+    it('should still escalate ALLOW on taint risk when YOLO mode is disabled', async () => {
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.ALLOW,
+        rule: undefined,
+      });
+
+      mockConfig.getApprovalMode = vi.fn().mockReturnValue(ApprovalMode.YOLO);
+      mockConfig.isYoloModeDisabled = vi.fn().mockReturnValue(true);
+      mockConfig.isInteractive = vi.fn().mockReturnValue(false);
+
+      const taintInvocation = {
+        ...mockInvocation,
+        hasTaintedOrBuildFileRisk: vi.fn().mockReturnValue(true),
+      };
+      mockTool.build = vi.fn().mockReturnValue(taintInvocation);
+
+      await scheduler.schedule(req1, signal);
+
       expect(mockExecutor.execute).not.toHaveBeenCalled();
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
@@ -1715,6 +1771,7 @@ describe('Scheduler MCP Progress', () => {
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      isYoloModeDisabled: vi.fn().mockReturnValue(false),
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
       getTelemetryTracesEnabled: vi.fn().mockReturnValue(false),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
