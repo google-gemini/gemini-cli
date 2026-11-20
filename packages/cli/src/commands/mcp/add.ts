@@ -12,6 +12,7 @@ import {
   UNTRUSTED_WORKSPACE_SETTINGS_ERROR,
 } from '../../config/settings.js';
 import { debugLogger, type MCPServerConfig } from '@google/gemini-cli-core';
+import { coerceCommaSeparated } from '../../utils/commaSeparated.js';
 import { exitCli } from '../utils.js';
 
 async function addMcpServer(
@@ -218,11 +219,13 @@ export const addCommand: CommandModule = {
         describe: 'A comma-separated list of tools to include',
         type: 'array',
         string: true,
+        coerce: coerceCommaSeparated,
       })
       .option('exclude-tools', {
         describe: 'A comma-separated list of tools to exclude',
         type: 'array',
         string: true,
+        coerce: coerceCommaSeparated,
       })
       .middleware((argv) => {
         // Handle -- separator args as server args if present
