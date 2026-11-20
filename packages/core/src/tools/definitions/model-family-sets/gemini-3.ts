@@ -22,6 +22,8 @@ import {
   WEB_FETCH_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
   GET_INTERNAL_DOCS_TOOL_NAME,
+  GET_CLI_REFERENCE_TOOL_NAME,
+  CLI_REFERENCE_PARAM_CATEGORY,
   ASK_USER_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   READ_MCP_RESOURCE_TOOL_NAME,
@@ -610,6 +612,23 @@ The agent did not use the todo list because this task could be completed by a ti
           description:
             "The relative path to the documentation file (e.g., 'cli/commands.md'). If omitted, lists all available documentation.",
           type: 'string',
+        },
+      },
+    },
+  },
+
+  get_cli_reference: {
+    name: GET_CLI_REFERENCE_TOOL_NAME,
+    description:
+      'Returns authoritative, structured reference data about Gemini CLI itself, its command-line flags, keyboard shortcuts, and slash commands. This tool returns data derived directly from the runtime source of truth. Use this tool FIRST when answering questions about how to invoke Gemini, which flags or hotkeys exist, or what slash commands are available.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [CLI_REFERENCE_PARAM_CATEGORY]: {
+          description:
+            "The category of reference data to retrieve. One of: 'flags' (CLI command-line flags and their aliases), 'hotkeys' (keyboard shortcuts grouped by context), 'commands' (slash commands available in the interactive prompt), 'all' (everything). Defaults to 'all'.",
+          type: 'string',
+          enum: ['flags', 'hotkeys', 'commands', 'all'],
         },
       },
     },
