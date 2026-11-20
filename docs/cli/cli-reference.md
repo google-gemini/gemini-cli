@@ -41,6 +41,10 @@ These commands are available within the interactive REPL.
 | `/help`              | Show help for all commands                      |
 | `/quit`              | Exit the interactive session                    |
 
+After you change an extension's skills, run
+`/extensions reload <extension-name>` to refresh its skill slash commands in the
+current session.
+
 ## CLI Options
 
 | Option                           | Alias | Type    | Default   | Description                                                                                                                                                            |
