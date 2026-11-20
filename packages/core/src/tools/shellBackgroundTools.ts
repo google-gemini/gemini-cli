@@ -18,6 +18,7 @@ import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { isNodeError } from '../utils/errors.js';
+import { createAbortError, delay } from '../utils/delay.js';
 
 const MAX_BUFFER_LOAD_CAP_BYTES = 64 * 1024; // Safe 64KB buffer load Cap
 const DEFAULT_TAIL_LINES_COUNT = 100;
@@ -130,11 +131,15 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
     return `Reading output for background process ${this.params.pid}`;
   }
 
-  async execute({ abortSignal: _signal }: ExecuteOptions): Promise<ToolResult> {
+  async execute({ abortSignal: signal }: ExecuteOptions): Promise<ToolResult> {
     const pid = this.params.pid;
 
+    if (signal.aborted) {
+      throw createAbortError();
+    }
+
     if (this.params.delay_ms && this.params.delay_ms > 0) {
-      await new Promise((resolve) => setTimeout(resolve, this.params.delay_ms));
+      await delay(this.params.delay_ms, signal);
     }
 
     // Verify process belongs to this session to prevent reading logs of processes from other sessions/users
