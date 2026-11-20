@@ -415,6 +415,66 @@ describe('SessionSelector', () => {
     expect(result.sessionData.messages[0].content).toBe('Session B');
   });
 
+  it('should handle corrupted or invalid date strings when resolving latest without throwing', async () => {
+    const sessionIdCorrupted = randomUUID();
+    const sessionIdValid = randomUUID();
+
+    // Create test session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const sessionCorrupted = {
+      sessionId: sessionIdCorrupted,
+      projectHash: 'test-hash',
+      startTime: 'not-a-valid-date',
+      lastUpdated: 'invalid-date',
+      messages: [
+        {
+          type: 'user',
+          content: 'Corrupted session',
+          id: 'msg1',
+          timestamp: 'invalid',
+        },
+      ],
+    };
+
+    const sessionValid = {
+      sessionId: sessionIdValid,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T12:00:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Valid session',
+          id: 'msg2',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T09-00-${sessionIdCorrupted.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(sessionCorrupted, null, 2),
+    );
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionIdValid.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(sessionValid, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+
+    const result = await sessionSelector.resolveSession('latest');
+    expect(result.sessionData.sessionId).toBe(sessionIdValid);
+  });
+
   it('should resolve session by UUID with whitespace (trimming)', async () => {
     const sessionId = randomUUID();
 
