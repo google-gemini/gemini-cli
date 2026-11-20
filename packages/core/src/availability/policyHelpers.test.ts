@@ -305,6 +305,45 @@ describe('policyHelpers', () => {
     });
   });
 
+  describe('applyModelSelection with a tier alias', () => {
+    it("keeps a custom alias's config when its tier resolves to the tier's first model", () => {
+      const config = createMockConfig({
+        modelConfigService: new ModelConfigService({
+          ...DEFAULT_MODEL_CONFIGS,
+          customAliases: {
+            'my-lite': {
+              modelConfig: {
+                model: 'flash-lite',
+                generateContentConfig: {
+                  temperature: 0.2,
+                  maxOutputTokens: 256,
+                },
+              },
+            },
+          },
+        }),
+        getModelAvailabilityService: () =>
+          ({
+            selectFirstAvailable: (models: string[]) => ({
+              selectedModel: models[0],
+              skipped: [],
+            }),
+            consumeStickyAttempt: vi.fn(),
+          }) as unknown as ReturnType<Config['getModelAvailabilityService']>,
+        setActiveModel: vi.fn(),
+      });
+
+      const result = applyModelSelection(config, { model: 'my-lite' });
+
+      expect(result.model).not.toBe('flash-lite');
+      expect(result.model).toBe(
+        resolvePolicyChain(config, 'flash-lite')[0].model,
+      );
+      expect(result.config.temperature).toBe(0.2);
+      expect(result.config.maxOutputTokens).toBe(256);
+    });
+  });
+
   describe('applyModelSelection', () => {
     const mockModelConfigService = {
       getResolvedConfig: vi.fn(),
