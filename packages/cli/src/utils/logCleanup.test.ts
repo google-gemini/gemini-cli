@@ -12,12 +12,13 @@ import {
   type Stats,
 } from 'node:fs';
 import * as path from 'node:path';
-import { cleanupBackgroundLogs } from './logCleanup.js';
+import { cleanupBackgroundLogs, cleanupErrorReports } from './logCleanup.js';
 
 vi.mock('@google/gemini-cli-core', () => ({
   ShellExecutionService: {
     getLogDir: vi.fn().mockReturnValue('/tmp/gemini/tmp/background-processes'),
   },
+  getErrorReportsDir: vi.fn().mockReturnValue('/tmp/gemini/tmp/error-reports'),
   debugLogger: {
     debug: vi.fn(),
     warn: vi.fn(),
@@ -112,5 +113,44 @@ describe('logCleanup', () => {
 
     await expect(cleanupBackgroundLogs()).resolves.not.toThrow();
     expect(fs.unlink).toHaveBeenCalled();
+  });
+
+  it('should delete error reports older than 7 days', async () => {
+    const reportsDir = '/tmp/gemini/tmp/error-reports';
+    const now = Date.now();
+    const oldTime = now - 8 * 24 * 60 * 60 * 1000;
+    const newTime = now - 1 * 24 * 60 * 60 * 1000;
+
+    const entries = [
+      { name: 'gemini-client-error-old.json', isFile: () => true },
+      { name: 'gemini-client-error-new.json', isFile: () => true },
+      { name: 'unrelated.json', isFile: () => true },
+    ] as Dirent[];
+
+    vi.mocked(fs.access).mockResolvedValue(undefined);
+    vi.mocked(
+      fs.readdir as (
+        path: PathLike,
+        options: { withFileTypes: true },
+      ) => Promise<Dirent[]>,
+    ).mockResolvedValue(entries);
+    vi.mocked(fs.stat).mockImplementation((filePath: PathLike) =>
+      Promise.resolve({
+        mtime: new Date(
+          filePath.toString().endsWith('new.json') ? newTime : oldTime,
+        ),
+      } as Stats),
+    );
+    vi.mocked(fs.unlink).mockResolvedValue(undefined);
+
+    await cleanupErrorReports();
+
+    expect(fs.readdir).toHaveBeenCalledWith(reportsDir, {
+      withFileTypes: true,
+    });
+    expect(fs.unlink).toHaveBeenCalledTimes(1);
+    expect(fs.unlink).toHaveBeenCalledWith(
+      path.join(reportsDir, 'gemini-client-error-old.json'),
+    );
   });
 });
