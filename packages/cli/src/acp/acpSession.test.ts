@@ -21,6 +21,7 @@ import {
   ReadManyFilesTool,
   type GeminiChat,
   type Config,
+  type Storage,
   type MessageBus,
   type GitService,
   InvalidStreamError,
@@ -1823,6 +1824,157 @@ describe('Session', () => {
       );
     },
   );
+
+  describe('tool output truncation', () => {
+    it('truncates large shell output and records truncated response parts', async () => {
+      mockConfig.getTruncateToolOutputThreshold = vi.fn().mockReturnValue(20);
+      mockConfig.storage = {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp'),
+      } as unknown as Storage;
+      mockConfig.isContextManagementEnabled = vi.fn().mockReturnValue(false);
+
+      const longOutput = 'echo: ' + 'A'.repeat(50);
+      mockTool.build.mockReturnValue({
+        getDescription: () => 'run_shell_command',
+        toolLocations: () => [],
+        shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+        execute: vi.fn().mockResolvedValue({
+          llmContent: longOutput,
+          returnDisplay: longOutput,
+        }),
+      });
+
+      const stream1 = createMockStream([
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'call-shell-trunc',
+            name: 'run_shell_command',
+            args: { command: 'echo test' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        },
+      ]);
+      const stream2 = createMockStream([
+        {
+          type: GeminiEventType.Content,
+          value: '',
+        },
+      ]);
+
+      mockSendMessageStream
+        .mockReturnValueOnce(stream1)
+        .mockReturnValueOnce(stream2);
+
+      await session.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Run shell' }],
+      });
+
+      // Verify that chat.recordCompletedToolCalls received truncated response with outputFile
+      expect(mockChat.recordCompletedToolCalls).toHaveBeenCalledWith(
+        'gemini-pro',
+        expect.arrayContaining([
+          expect.objectContaining({
+            request: expect.objectContaining({
+              callId: 'call-shell-trunc',
+              name: 'run_shell_command',
+            }),
+            response: expect.objectContaining({
+              outputFile: expect.any(String),
+              responseParts: expect.arrayContaining([
+                expect.objectContaining({
+                  functionResponse: expect.objectContaining({
+                    response: expect.objectContaining({
+                      output: expect.stringContaining('Output too large'),
+                    }),
+                  }),
+                }),
+              ]),
+            }),
+          }),
+        ]),
+      );
+
+      // Verify that tool_call_update sent formatted truncated content
+      const updates = (mockConnection.sessionUpdate as Mock).mock.calls.map(
+        (call) => call[0].update,
+      );
+      const toolUpdate = updates.find(
+        (u) =>
+          u.sessionUpdate === 'tool_call_update' &&
+          u.toolCallId === 'call-shell-trunc',
+      );
+      expect(toolUpdate).toBeDefined();
+      expect(toolUpdate.content[0].content.text).toContain('Output too large');
+    });
+
+    it('does not truncate output when within threshold', async () => {
+      mockConfig.getTruncateToolOutputThreshold = vi.fn().mockReturnValue(100);
+      mockConfig.storage = {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp'),
+      } as unknown as Storage;
+      mockConfig.isContextManagementEnabled = vi.fn().mockReturnValue(false);
+
+      const shortOutput = 'small output';
+      mockTool.build.mockReturnValue({
+        getDescription: () => 'run_shell_command',
+        toolLocations: () => [],
+        shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+        execute: vi.fn().mockResolvedValue({
+          llmContent: shortOutput,
+          returnDisplay: shortOutput,
+        }),
+      });
+
+      const stream1 = createMockStream([
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'call-shell-short',
+            name: 'run_shell_command',
+            args: { command: 'echo short' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        },
+      ]);
+      const stream2 = createMockStream([
+        {
+          type: GeminiEventType.Content,
+          value: '',
+        },
+      ]);
+
+      mockSendMessageStream
+        .mockReturnValueOnce(stream1)
+        .mockReturnValueOnce(stream2);
+
+      await session.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Run shell' }],
+      });
+
+      expect(mockChat.recordCompletedToolCalls).toHaveBeenCalledWith(
+        'gemini-pro',
+        expect.arrayContaining([
+          expect.objectContaining({
+            response: expect.objectContaining({
+              outputFile: undefined,
+              responseParts: expect.arrayContaining([
+                expect.objectContaining({
+                  functionResponse: expect.objectContaining({
+                    response: { output: shortOutput },
+                  }),
+                }),
+              ]),
+            }),
+          }),
+        ]),
+      );
+    });
+  });
 
   describe('dispose', () => {
     it('should safely dispose without throwing when config.dispose is undefined', async () => {
