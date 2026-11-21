@@ -62,11 +62,9 @@ Gemini will run the command (for example, `npm run dev`) and detach it.
 
 ### Scenario: Viewing active shells
 
-To see what's running in the background, use the `/shells` command.
-
-**Command:** `/shells`
-
-This opens a dashboard where you can view logs or kill runaway processes.
+To see what's running in the background, press `Ctrl+B` to toggle the background
+shell view, or `Ctrl+L` to toggle the background shell process list, where you
+can view logs or kill runaway processes.
 
 ## How to handle interactive commands
 
