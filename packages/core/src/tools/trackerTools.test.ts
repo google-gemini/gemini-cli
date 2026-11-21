@@ -14,6 +14,7 @@ import {
   TrackerUpdateTaskTool,
   TrackerVisualizeTool,
   TrackerAddDependencyTool,
+  TrackerDeleteTaskTool,
   buildTodosReturnDisplay,
 } from './trackerTools.js';
 import * as fs from 'node:fs/promises';
@@ -152,6 +153,83 @@ describe('Tracker Tools Integration', () => {
     expect(vizResult.llmContent).toContain('Parent Task');
     expect(vizResult.llmContent).toContain('Child Task');
     expect(vizResult.llmContent).toContain(childId);
+  });
+
+  it('deletes a task successfully', async () => {
+    const createTool = new TrackerCreateTaskTool(config, messageBus);
+    await createTool.buildAndExecute(
+      {
+        title: 'Delete Me',
+        description: 'Task to be deleted',
+        type: TaskType.TASK,
+      },
+      getSignal(),
+    );
+
+    const tasks = await config.getTrackerService().listTasks();
+    expect(tasks.length).toBe(1);
+    const taskId = tasks[0].id;
+
+    const deleteTool = new TrackerDeleteTaskTool(config, messageBus);
+    const result = await deleteTool.buildAndExecute(
+      { id: taskId },
+      getSignal(),
+    );
+
+    expect(result.llmContent).toContain('Deleted task');
+    expect(result.llmContent).toContain('Delete Me');
+
+    const afterDelete = await config.getTrackerService().listTasks();
+    expect(afterDelete.length).toBe(0);
+  });
+
+  it('returns error when deleting non-existent task', async () => {
+    const deleteTool = new TrackerDeleteTaskTool(config, messageBus);
+    const result = await deleteTool.buildAndExecute(
+      { id: 'abcdef' },
+      getSignal(),
+    );
+    expect(result.llmContent).toContain('not found');
+    expect(result.error).toBeDefined();
+  });
+
+  it('blocks deletion of task with children', async () => {
+    const createTool = new TrackerCreateTaskTool(config, messageBus);
+    await createTool.buildAndExecute(
+      {
+        title: 'Parent',
+        description: 'Has children',
+        type: TaskType.EPIC,
+      },
+      getSignal(),
+    );
+
+    const tasks = await config.getTrackerService().listTasks();
+    const parentId = tasks[0].id;
+
+    await createTool.buildAndExecute(
+      {
+        title: 'Child',
+        description: 'Belongs to parent',
+        type: TaskType.TASK,
+        parentId,
+      },
+      getSignal(),
+    );
+
+    const deleteTool = new TrackerDeleteTaskTool(config, messageBus);
+    const result = await deleteTool.buildAndExecute(
+      { id: parentId },
+      getSignal(),
+    );
+
+    expect(result.llmContent).toContain('Cannot delete');
+    expect(result.llmContent).toContain('child task(s)');
+    expect(result.error).toBeDefined();
+
+    // Parent should still exist
+    const still = await config.getTrackerService().getTask(parentId);
+    expect(still).not.toBeNull();
   });
 
   describe('buildTodosReturnDisplay', () => {
