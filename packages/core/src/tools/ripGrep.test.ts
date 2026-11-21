@@ -1770,6 +1770,37 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain('... [truncated]');
       expect(result.llmContent).not.toContain(longString);
     });
+
+    it('should bound the output of a broad search over long lines', async () => {
+      // A broad pattern hitting thousands of long lines in logs and build
+      // output, as in issue #17448.
+      const rgLines: string[] = [];
+      for (let i = 0; i < 5006; i++) {
+        rgLines.push(
+          JSON.stringify({
+            type: 'match',
+            data: {
+              path: { text: `build/out-${i % 60}.txt` },
+              line_number: i + 1,
+              lines: { text: `Gmail ${'x'.repeat(1500)}\n` },
+            },
+          }),
+        );
+      }
+      mockSpawn.mockImplementation(
+        createMockSpawn({ outputData: rgLines.join('\n') + '\n', exitCode: 0 }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'Gmail', context: 0 };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute({ abortSignal });
+
+      // MAX_GREP_OUTPUT_CHARS is 40000.
+      expect(String(result.llmContent).length).toBeLessThanOrEqual(40000);
+      expect(result.llmContent).toContain('Found 100 matches');
+      expect(result.llmContent).toMatch(/showing \d+ of 100 matches/);
+      expect(result.llmContent).toContain('Narrow the search');
+    });
   });
 });
 
