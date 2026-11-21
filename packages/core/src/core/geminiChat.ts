@@ -1655,6 +1655,7 @@ export class GeminiChat {
             if (fnCall.id && !fnCall.id.startsWith(`${name}__`)) {
               fnCall.id = `${name}__${fnCall.id}`;
             }
+            fnCall.name = name;
             finalFunctionCallsMap.set(fnCall.id, fnCall);
           }
           runningFunctionCallCounter += chunk.functionCalls.length;
@@ -1664,6 +1665,7 @@ export class GeminiChat {
             if (fnCall.id && !fnCall.id.startsWith(`${name}__`)) {
               fnCall.id = `${name}__${fnCall.id}`;
             }
+            fnCall.name = name;
           }
           legacyFunctionCalls.push(...chunk.functionCalls);
         }
@@ -1791,6 +1793,13 @@ export class GeminiChat {
         } else {
           consolidatedParts.push(part);
         }
+      }
+    }
+
+    for (const part of consolidatedParts) {
+      if (part.functionCall) {
+        part.functionCall.name =
+          part.functionCall.name?.trim() || 'generic_tool';
       }
     }
 
