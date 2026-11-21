@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import os from 'node:os';
+import path from 'node:path';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
 import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 import {
@@ -31,6 +33,77 @@ describe('Background Tools', () => {
     // Clear history to avoid state leakage from previous runs
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (ShellExecutionService as any).backgroundProcessHistory.clear();
+  });
+
+  describe('large log tails', () => {
+    let fixtureDir: string;
+    let logPath: string;
+    const pid = 987654;
+
+    beforeEach(() => {
+      fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'background-tail-'));
+      logPath = path.join(fixtureDir, 'output.log');
+      vi.spyOn(ShellExecutionService, 'getLogFilePath').mockReturnValue(
+        logPath,
+      );
+      vi.spyOn(
+        ShellExecutionService,
+        'listBackgroundProcesses',
+      ).mockReturnValue([{ pid, command: 'fixture', status: 'running' }]);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+    });
+
+    it.each(['', '\n'])(
+      'preserves an oversized single line ending in %j',
+      async (ending) => {
+        fs.writeFileSync(logPath, 'x'.repeat(70_000) + ending);
+        const result = await readTool
+          .build({ pid })
+          .execute({ abortSignal: new AbortController().signal });
+        expect(result.llmContent).toContain('x'.repeat(100));
+        expect(result.llmContent).toContain('Truncated log tail');
+        expect(result.llmContent).toContain('first line is partial');
+        expect(result.llmContent).not.toContain('Full Log Output');
+      },
+    );
+
+    it('keeps the first complete line when the read starts on a line boundary', async () => {
+      const firstLine = 'first-complete-line\n';
+      const tail =
+        firstLine +
+        'x'.repeat(65_536 - Buffer.byteLength(firstLine) - 1) +
+        '\n';
+      fs.writeFileSync(logPath, 'old\n' + tail);
+      const result = await readTool
+        .build({ pid })
+        .execute({ abortSignal: new AbortController().signal });
+      expect(result.llmContent).toContain(firstLine);
+      expect(result.llmContent).toContain('Truncated log tail');
+      expect(result.llmContent).not.toContain('first line is partial');
+    });
+
+    it('discards a partial prefix when complete trailing lines are available', async () => {
+      fs.writeFileSync(logPath, 'x'.repeat(70_000) + '\nlast-line\n');
+      const result = await readTool
+        .build({ pid })
+        .execute({ abortSignal: new AbortController().signal });
+      expect(result.llmContent).toContain('last-line');
+      expect(result.llmContent).not.toContain('xxx');
+      expect(result.llmContent).toContain('Truncated log tail');
+    });
+
+    it('does not corrupt UTF-8 when retaining a partial single line', async () => {
+      fs.writeFileSync(logPath, '\u20ac'.repeat(30_000));
+      const result = await readTool
+        .build({ pid })
+        .execute({ abortSignal: new AbortController().signal });
+      expect(result.llmContent).toContain('\u20ac');
+      expect(result.llmContent).not.toContain('\ufffd');
+    });
   });
 
   it('list_background_processes should return empty message when no processes', async () => {
