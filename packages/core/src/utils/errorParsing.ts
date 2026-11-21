@@ -13,6 +13,9 @@ const RATE_LIMIT_ERROR_MESSAGE_USE_GEMINI =
   '\nPlease wait and try again later. To increase your limits, request a quota increase through AI Studio, or switch to another /auth method';
 const RATE_LIMIT_ERROR_MESSAGE_VERTEX =
   '\nPlease wait and try again later. To increase your limits, request a quota increase through Vertex, or switch to another /auth method';
+const FETCH_FAILURE_HINT =
+  '\nNo response was received from the Gemini API. Check your internet connection, VPN or firewall, and HTTP_PROXY/HTTPS_PROXY settings, then try again.';
+const FETCH_FAILED_PATTERN = /\b(fetch failed|failed to fetch)\b/i;
 const getRateLimitErrorMessageDefault = (
   fallbackModel: string = DEFAULT_GEMINI_FLASH_MODEL,
 ) =>
@@ -43,6 +46,11 @@ export function parseAndFormatApiError(
     let text = `[API Error: ${error.message}]`;
     if (error.status === 429) {
       text += getRateLimitMessage(authType, fallbackModel);
+    } else if (
+      error.status === undefined &&
+      FETCH_FAILED_PATTERN.test(error.message)
+    ) {
+      text += FETCH_FAILURE_HINT;
     }
     return text;
   }
@@ -51,7 +59,7 @@ export function parseAndFormatApiError(
   if (typeof error === 'string') {
     const jsonStart = error.indexOf('{');
     if (jsonStart === -1) {
-      return `[API Error: ${error}]`; // Not a JSON error, return as is.
+      return formatPlainApiError(error); // Not a JSON error, return as is.
     }
 
     const jsonString = error.substring(jsonStart);
@@ -78,8 +86,13 @@ export function parseAndFormatApiError(
     } catch {
       // Not a valid JSON, fall through and return the original message.
     }
-    return `[API Error: ${error}]`;
+    return formatPlainApiError(error);
   }
 
   return '[API Error: An unknown error occurred.]';
+}
+
+function formatPlainApiError(message: string): string {
+  const text = `[API Error: ${message}]`;
+  return FETCH_FAILED_PATTERN.test(message) ? text + FETCH_FAILURE_HINT : text;
 }
