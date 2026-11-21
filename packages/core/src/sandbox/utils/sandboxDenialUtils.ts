@@ -91,6 +91,10 @@ export function parsePosixSandboxDenials(
     'fs.permissiondenied',
     'forbidden',
     'system.unauthorizedaccessexception',
+    'cannot create directory',
+    'cannot touch',
+    'changing permissions of',
+    'errno 13',
   ].some((keyword) => combined.includes(keyword));
 
   const isNetworkDenial = [
@@ -138,6 +142,18 @@ export function parsePosixSandboxDenials(
     /filenotfounderror[\s:,'"[\]]*(?:[^'"]*)['"]((?:\/|~)[\w.\-/:~]*[\w.\-/~])?['"]/gi,
     // format: Error: EACCES: permission denied, open '/path'
     /error[\s:,'"[\]]*eacces[\s:,'"[\]]*permission denied[\s:,'"[\]]*(?:[^'"]*)['"]((?:\/|~)[\w.\-/:~]*[\w.\-/~])?['"]/gi,
+    // format: mkdir: cannot create directory '/path': Permission denied
+    /mkdir[\s:,'"[\]]*cannot create directory[\s:,'"[\]]*['"]?((?:\/|~)[\w.\-/:~]*[\w.\-/~])['"]?/gi,
+    // format: touch: cannot touch '/path': Permission denied
+    /touch[\s:,'"[\]]*cannot touch[\s:,'"[\]]*['"]?((?:\/|~)[\w.\-/:~]*[\w.\-/~])['"]?/gi,
+    // format: chmod: changing permissions of '/path': Operation not permitted
+    /chmod[\s:,'"[\]]*changing permissions of[\s:,'"[\]]*['"]?((?:\/|~)[\w.\-/:~]*[\w.\-/~])['"]?/gi,
+    // format: EACCES: permission denied, scandir '/path' or access '/path'
+    /eacces[\s:,'"[\]]*permission denied[\s:,'"[\]]*(?:scandir|access|open|mkdir)[\s:,'"[\]]*['"]?((?:\/|~)[\w.\-/:~]*[\w.\-/~])['"]?/gi,
+    // format: OSError: [Errno 13] Permission denied: '/path'
+    /(?:oserror|permissionerror)[\s:,'"[\]]*\[errno 13\][\s:,'"[\]]*permission denied[\s:,'"[\]]*(?:[^'"]*)['"]((?:\/|~)[\w.\-/:~]*[\w.\-/~])['"]/gi,
+    // format: sh: /path: Permission denied or bash: /path: Permission denied
+    /(?:^|\s)(?:sh|bash|zsh)[\s:,'"[\]]+['"]?((?:\/|~)[\w.\-/:~]*[\w.\-/~])['"]?[\s:,'"[\]]+permission denied/gi,
   ];
 
   for (const regex of regexes) {
