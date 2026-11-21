@@ -9,6 +9,7 @@ import {
   doesToolInvocationMatch,
   getToolSuggestion,
   isParallelizable,
+  partitionToolCallRequestsIntoWaves,
   truncateToolOutput,
   truncateFunctionResponsePart,
 } from './tool-utils.js';
@@ -399,5 +400,76 @@ describe('isParallelizable', () => {
 
   it('defaults to true for non-edit tools when wait_for_previous is omitted', () => {
     expect(isParallelizable(makeRequest('read_file'))).toBe(true);
+  });
+});
+
+describe('partitionToolCallRequestsIntoWaves', () => {
+  const makeRequest = (
+    callId: string,
+    name: string,
+    args: Record<string, unknown> = {},
+  ): ToolCallRequestInfo => ({
+    callId,
+    name,
+    args,
+    isClientInitiated: false,
+    prompt_id: 'prompt-1',
+  });
+
+  it('returns empty array when given no requests', () => {
+    expect(partitionToolCallRequestsIntoWaves([])).toEqual([]);
+  });
+
+  it('batches contiguous parallelizable requests into a single wave', () => {
+    const requests = [
+      makeRequest('call-1', 'read_file'),
+      makeRequest('call-2', 'grep'),
+      makeRequest('call-3', 'glob'),
+    ];
+
+    const waves = partitionToolCallRequestsIntoWaves(requests);
+    expect(waves).toHaveLength(1);
+    expect(waves[0].map((r) => r.callId)).toEqual(['call-1', 'call-2', 'call-3']);
+  });
+
+  it('isolates non-parallelizable edit tools into individual sequential waves', () => {
+    const requests = [
+      makeRequest('call-1', 'read_file'),
+      makeRequest('call-2', 'write_file'),
+      makeRequest('call-3', 'read_file'),
+    ];
+
+    const waves = partitionToolCallRequestsIntoWaves(requests);
+    expect(waves).toHaveLength(3);
+    expect(waves[0].map((r) => r.callId)).toEqual(['call-1']);
+    expect(waves[1].map((r) => r.callId)).toEqual(['call-2']);
+    expect(waves[2].map((r) => r.callId)).toEqual(['call-3']);
+  });
+
+  it('sorts update_topic to the front and isolates it', () => {
+    const requests = [
+      makeRequest('call-1', 'read_file'),
+      makeRequest('call-2', UPDATE_TOPIC_TOOL_NAME),
+      makeRequest('call-3', 'grep'),
+    ];
+
+    const waves = partitionToolCallRequestsIntoWaves(requests);
+    expect(waves).toHaveLength(2);
+    expect(waves[0].map((r) => r.callId)).toEqual(['call-2']);
+    expect(waves[1].map((r) => r.callId)).toEqual(['call-1', 'call-3']);
+  });
+
+  it('isolates tools with wait_for_previous: true into sequential waves', () => {
+    const requests = [
+      makeRequest('call-1', 'read_file'),
+      makeRequest('call-2', 'read_file', { wait_for_previous: true }),
+      makeRequest('call-3', 'read_file'),
+    ];
+
+    const waves = partitionToolCallRequestsIntoWaves(requests);
+    expect(waves).toHaveLength(3);
+    expect(waves[0].map((r) => r.callId)).toEqual(['call-1']);
+    expect(waves[1].map((r) => r.callId)).toEqual(['call-2']);
+    expect(waves[2].map((r) => r.callId)).toEqual(['call-3']);
   });
 });
