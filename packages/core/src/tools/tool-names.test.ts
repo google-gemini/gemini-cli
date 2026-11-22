@@ -96,6 +96,24 @@ describe('tool-names', () => {
         isValidToolName('mcp_server_tool*', { allowWildcards: true }),
       ).toBe(false);
     });
+
+    it('should accept agent names only when allowed', () => {
+      expect(isValidToolName('my-helper')).toBe(false);
+      expect(isValidToolName('my-helper', { allowAgentNames: true })).toBe(
+        true,
+      );
+      expect(
+        isValidToolName('codebase_investigator', { allowAgentNames: true }),
+      ).toBe(true);
+
+      // Not a valid agent name, and malformed MCP names stay rejected.
+      expect(isValidToolName('My Helper', { allowAgentNames: true })).toBe(
+        false,
+      );
+      expect(isValidToolName('mcp__tool', { allowAgentNames: true })).toBe(
+        false,
+      );
+    });
   });
 
   describe('getToolAliases', () => {

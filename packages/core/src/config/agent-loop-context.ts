@@ -26,6 +26,12 @@ export interface AgentLoopContext {
   /** The unique ID for the parent session if this is a subagent. */
   readonly parentSessionId?: string;
 
+  /**
+   * How many subagents deep this context runs. Undefined for the main agent,
+   * 1 for a subagent it invokes, and so on. Bounds agents invoking agents.
+   */
+  readonly agentDepth?: number;
+
   /** The registry of tools available to the agent in this context. */
   readonly toolRegistry: ToolRegistry;
 

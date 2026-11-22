@@ -10,6 +10,7 @@ import { makeFakeConfig } from '../test-utils/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { AgentRegistry } from './registry.js';
+import { AGENT_TOOL_NAME } from '../tools/tool-names.js';
 
 describe('GeneralistAgent', () => {
   beforeEach(() => {
@@ -24,7 +25,7 @@ describe('GeneralistAgent', () => {
   it('should create a valid generalist agent definition', () => {
     const config = makeFakeConfig();
     const mockToolRegistry = {
-      getAllToolNames: () => ['tool1', 'tool2', 'agent-tool'],
+      getAllToolNames: () => ['tool1', 'tool2', 'agent-tool', AGENT_TOOL_NAME],
     } as unknown as ToolRegistry;
     vi.spyOn(config, 'getToolRegistry').mockReturnValue(mockToolRegistry);
     Object.defineProperty(config, 'toolRegistry', {
@@ -51,6 +52,8 @@ describe('GeneralistAgent', () => {
     expect(agent.toolConfig?.tools).toBeDefined();
     expect(agent.toolConfig?.tools).toContain('agent-tool');
     expect(agent.toolConfig?.tools).toContain('tool1');
+    // Listing the agent tool would let the generalist invoke every agent.
+    expect(agent.toolConfig?.tools).not.toContain(AGENT_TOOL_NAME);
     expect(agent.promptConfig.systemPrompt).toContain('CLI agent');
     // Ensure it's non-interactive
     expect(agent.promptConfig.systemPrompt).toContain('non-interactive');

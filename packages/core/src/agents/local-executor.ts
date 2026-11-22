@@ -97,6 +97,9 @@ import {
   runWithScopedWorkspaceContext,
 } from '../config/scoped-config.js';
 import { CompleteTaskTool } from '../tools/complete-task.js';
+import { AGENT_TOOL_NAME, isValidToolName } from '../tools/tool-names.js';
+import { AgentTool } from './agent-tool.js';
+import { coreEvents } from '../utils/events.js';
 import {
   COMPLETE_TASK_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
@@ -107,6 +110,12 @@ import {
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
 
 const GRACE_PERIOD_MS = 60 * 1000; // 1 min
+
+/**
+ * Deepest subagent level that may still invoke agents. A subagent at this
+ * depth does not get the agent tool, which bounds agents invoking themselves.
+ */
+export const MAX_AGENT_DEPTH = 3;
 
 /** The possible outcomes of a single agent turn. */
 type AgentTurnResult =
@@ -149,6 +158,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       config: this.context.config,
       promptId: this.agentId,
       parentSessionId: this.context.parentSessionId || this.context.promptId, // Always preserve the main agent session ID
+      agentDepth: (this.context.agentDepth ?? 0) + 1,
       geminiClient: this.context.geminiClient,
       sandboxManager: this.context.sandboxManager,
       toolRegistry: this.toolRegistry,
@@ -203,8 +213,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     const parentToolRegistry = context.toolRegistry;
 
     const registerToolInstance = (tool: AnyDeclarativeTool) => {
-      // Check if the tool is an agent tool to prevent recursion.
-      // We do not allow agents to call other agents.
+      // Agent tools are never inherited, including through `*` or the
+      // default tool set. Agents are granted explicitly by name (or all of
+      // them via `invoke_agent`) and get a scoped agent tool below.
       if (tool.kind === Kind.Agent) {
         return;
       }
@@ -257,10 +268,29 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     };
 
+    const agentRegistry = context.config.getAgentRegistry();
+    const allowedAgents = new Set<string>();
+
     if (definition.toolConfig) {
       for (const toolRef of definition.toolConfig.tools) {
         if (typeof toolRef === 'string') {
-          registerToolByName(toolRef);
+          if (toolRef === AGENT_TOOL_NAME) {
+            for (const name of agentRegistry.getAllAgentNames()) {
+              allowedAgents.add(name);
+            }
+          } else if (
+            parentToolRegistry.getTool(toolRef) ||
+            isValidToolName(toolRef, { allowWildcards: true })
+          ) {
+            registerToolByName(toolRef);
+          } else if (agentRegistry.getDefinition(toolRef)) {
+            allowedAgents.add(toolRef);
+          } else {
+            coreEvents.emitFeedback(
+              'warning',
+              `Agent '${definition.name}' lists '${toolRef}', which is not a known tool or agent.`,
+            );
+          }
         } else if (
           typeof toolRef === 'object' &&
           'name' in toolRef &&
@@ -293,7 +323,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     const toolContext = getToolCallContext();
     const parentCallId = toolContext?.callId;
 
-    return new LocalAgentExecutor(
+    const executor = new LocalAgentExecutor(
       definition,
       context,
       agentToolRegistry,
@@ -302,6 +332,25 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       onActivity,
       parentCallId,
     );
+
+    const nestedContext = executor.executionContext;
+    if (
+      allowedAgents.size > 0 &&
+      (nestedContext.agentDepth ?? 0) < MAX_AGENT_DEPTH
+    ) {
+      agentToolRegistry.registerTool(
+        new AgentTool(
+          // Invoked agents resolve their own tools from the registry this
+          // agent resolved from, as they would if the user invoked them.
+          { ...nestedContext, toolRegistry: parentToolRegistry },
+          subagentMessageBus,
+          undefined,
+          [...allowedAgents],
+        ),
+      );
+    }
+
+    return executor;
   }
 
   /**

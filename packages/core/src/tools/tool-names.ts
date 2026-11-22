@@ -236,6 +236,9 @@ export function getToolAliases(name: string): string[] {
 /** Prefix used for tools discovered via the tool DiscoveryCommand. */
 export const DISCOVERED_TOOL_PREFIX = 'discovered_tool_';
 
+/** Valid agent names: lowercase slugs such as `codebase_investigator`. */
+export const AGENT_NAME_PATTERN = /^[a-z0-9-_]+$/;
+
 /**
  * List of all built-in tool names.
  */
@@ -299,10 +302,12 @@ export const PLAN_MODE_TOOLS = [
 /**
  * Validates if a tool name is syntactically valid.
  * Checks against built-in tools, discovered tools, and MCP naming conventions.
+ * With `allowAgentNames`, any valid agent name is also accepted; agents are
+ * resolved later, once every agent is registered.
  */
 export function isValidToolName(
   name: string,
-  options: { allowWildcards?: boolean } = {},
+  options: { allowWildcards?: boolean; allowAgentNames?: boolean } = {},
 ): boolean {
   // Built-in tools
   if ((ALL_BUILTIN_TOOL_NAMES as readonly string[]).includes(name)) {
@@ -362,6 +367,10 @@ export function isValidToolName(
     }
 
     return false;
+  }
+
+  if (options.allowAgentNames && AGENT_NAME_PATTERN.test(name)) {
+    return true;
   }
 
   return false;

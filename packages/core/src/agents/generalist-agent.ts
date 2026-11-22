@@ -8,6 +8,7 @@ import { z } from 'zod';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { getCoreSystemPrompt } from '../core/prompts.js';
 import type { LocalAgentDefinition } from './types.js';
+import { AGENT_TOOL_NAME } from '../tools/tool-names.js';
 
 import { ApprovalMode } from '../policy/types.js';
 
@@ -54,7 +55,11 @@ export const GeneralistAgent = (
     model: 'inherit',
   },
   get toolConfig() {
-    const tools = context.toolRegistry.getAllToolNames();
+    // Exclude the agent tool: listing it would let the generalist invoke
+    // every agent, including itself.
+    const tools = context.toolRegistry
+      .getAllToolNames()
+      .filter((name) => name !== AGENT_TOOL_NAME);
     return {
       tools,
     };

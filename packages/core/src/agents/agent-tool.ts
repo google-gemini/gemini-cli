@@ -46,15 +46,21 @@ export class AgentTool extends BaseDeclarativeTool<
 > {
   static readonly Name = AGENT_TOOL_NAME;
 
+  /**
+   * @param allowedAgents Restricts the tool to these agents and lists them in
+   * the tool description. Used when a subagent delegates to other agents,
+   * since its system prompt does not list the available agents.
+   */
   constructor(
     private readonly context: AgentLoopContext,
     messageBus: MessageBus,
     private readonly onAgentEvent?: (event: AgentEvent) => void,
+    private readonly allowedAgents?: readonly string[],
   ) {
     super(
       AGENT_TOOL_NAME,
       'Invoke Subagent',
-      'Invoke a subagent to perform a specific task or investigation.',
+      describeAgentTool(context, allowedAgents),
       Kind.Agent,
       {
         type: 'object',
@@ -62,6 +68,7 @@ export class AgentTool extends BaseDeclarativeTool<
           agent_name: {
             type: 'string',
             description: 'Name of the subagent to invoke',
+            ...(allowedAgents && { enum: [...allowedAgents] }),
           },
           prompt: {
             type: 'string',
@@ -83,6 +90,12 @@ export class AgentTool extends BaseDeclarativeTool<
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<{ agent_name: string; prompt: string }, ToolResult> {
+    if (this.allowedAgents && !this.allowedAgents.includes(params.agent_name)) {
+      throw new Error(
+        `Subagent '${params.agent_name}' is not available to this agent.`,
+      );
+    }
+
     const registry = this.context.config.getAgentRegistry();
     const definition = registry.getDefinition(params.agent_name);
 
@@ -122,6 +135,21 @@ export class AgentTool extends BaseDeclarativeTool<
     }
     return { prompt };
   }
+}
+
+function describeAgentTool(
+  context: AgentLoopContext,
+  allowedAgents: readonly string[] | undefined,
+): string {
+  const base = 'Invoke a subagent to perform a specific task or investigation.';
+  if (!allowedAgents) {
+    return base;
+  }
+  const registry = context.config.getAgentRegistry();
+  const agentList = allowedAgents
+    .map((name) => `- ${name}: ${registry.getDefinition(name)?.description}`)
+    .join('\n');
+  return `${base}\n\nAvailable subagents:\n${agentList}`;
 }
 
 class DelegateInvocation extends BaseToolInvocation<

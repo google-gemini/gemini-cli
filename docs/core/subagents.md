@@ -359,17 +359,17 @@ it yourself; just report it.
 
 ### Configuration schema
 
-| Field          | Type   | Required | Description                                                                                                                                                                                                   |
-| :------------- | :----- | :------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `name`         | string | Yes      | Unique identifier (slug) used as the tool name for the agent. Only lowercase letters, numbers, hyphens, and underscores.                                                                                      |
-| `description`  | string | Yes      | Short description of what the agent does. This is visible to the main agent to help it decide when to call this subagent.                                                                                     |
-| `kind`         | string | No       | `local` (default) or `remote`.                                                                                                                                                                                |
-| `tools`        | array  | No       | List of tool names this agent can use. Supports wildcards: `*` (all tools), `mcp_*` (all MCP tools), `mcp_server_*` (all tools from a server). **If omitted, it inherits all tools from the parent session.** |
-| `mcpServers`   | object | No       | Configuration for inline Model Context Protocol (MCP) servers isolated to this specific agent.                                                                                                                |
-| `model`        | string | No       | Specific model to use (for example, `gemini-3-preview`). Defaults to `inherit` (uses the main session model).                                                                                                 |
-| `temperature`  | number | No       | Model temperature (0.0 - 2.0). Defaults to `1`.                                                                                                                                                               |
-| `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return. Defaults to `30`.                                                                                                          |
-| `timeout_mins` | number | No       | Maximum execution time in minutes. Defaults to `10`.                                                                                                                                                          |
+| Field          | Type   | Required | Description                                                                                                                                                                                                                                                                            |
+| :------------- | :----- | :------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`         | string | Yes      | Unique identifier (slug) used as the tool name for the agent. Only lowercase letters, numbers, hyphens, and underscores.                                                                                                                                                               |
+| `description`  | string | Yes      | Short description of what the agent does. This is visible to the main agent to help it decide when to call this subagent.                                                                                                                                                              |
+| `kind`         | string | No       | `local` (default) or `remote`.                                                                                                                                                                                                                                                         |
+| `tools`        | array  | No       | List of tool names this agent can use. Supports wildcards: `*` (all tools), `mcp_*` (all MCP tools), `mcp_server_*` (all tools from a server). Can also list agents; see [Calling other agents](#calling-other-agents). **If omitted, it inherits all tools from the parent session.** |
+| `mcpServers`   | object | No       | Configuration for inline Model Context Protocol (MCP) servers isolated to this specific agent.                                                                                                                                                                                         |
+| `model`        | string | No       | Specific model to use (for example, `gemini-3-preview`). Defaults to `inherit` (uses the main session model).                                                                                                                                                                          |
+| `temperature`  | number | No       | Model temperature (0.0 - 2.0). Defaults to `1`.                                                                                                                                                                                                                                        |
+| `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return. Defaults to `30`.                                                                                                                                                                                   |
+| `timeout_mins` | number | No       | Maximum execution time in minutes. Defaults to `10`.                                                                                                                                                                                                                                   |
 
 ### Tool wildcards
 
@@ -381,6 +381,32 @@ access to groups of tools:
 - `mcp_my-server_*`: Grant access to all tools from a specific MCP server named
   `my-server`.
 
+### Calling other agents
+
+A subagent can delegate to other agents, or to itself, when you list them in
+`tools`:
+
+- An agent's name, such as `codebase_investigator`, lets the subagent call that
+  agent.
+- `invoke_agent` lets the subagent call every registered agent.
+
+```yaml
+---
+name: coordinator
+description: Splits a large task across specialized agents.
+tools:
+  - read_file
+  - codebase_investigator
+  - coordinator
+---
+```
+
+The `*` wildcard and an omitted `tools` list do not grant access to agents.
+
+An agent that you call from a subagent uses its own `tools` list, the same as
+when the main agent calls it. The calling subagent's `tools` list does not limit
+the tools of the agents it calls.
+
 ### Isolation and recursion protection
 
 Each subagent runs in its own isolated context loop. This means:
@@ -389,9 +415,10 @@ Each subagent runs in its own isolated context loop. This means:
   the main agent's context.
 - **Isolated tools:** The subagent only has access to the tools you explicitly
   grant it.
-- **Recursion protection:** To prevent infinite loops and excessive token usage,
-  subagents **cannot** call other subagents. If a subagent is granted the `*`
-  tool wildcard, it will still be unable to see or invoke other agents.
+- **Recursion protection:** Subagents can call other agents only when you list
+  them in `tools`. To prevent infinite loops and excessive token usage, agents
+  can be nested at most three levels below the main agent. A subagent at the
+  third level cannot call other agents.
 
 ## Subagent tool isolation
 

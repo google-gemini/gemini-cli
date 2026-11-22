@@ -130,6 +130,44 @@ describe('AgentTool', () => {
     }).toThrow("Subagent 'UnknownAgent' not found.");
   });
 
+  describe('with allowed agents', () => {
+    let scopedTool: AgentTool;
+
+    beforeEach(() => {
+      scopedTool = new AgentTool(mockConfig, mockMessageBus, undefined, [
+        'TestLocalAgent',
+      ]);
+    });
+
+    it('should limit agent_name to the allowed agents and list them', () => {
+      const schema = scopedTool.schema.parametersJsonSchema as {
+        properties: { agent_name: { enum?: string[] } };
+      };
+      expect(schema.properties.agent_name.enum).toEqual(['TestLocalAgent']);
+      expect(scopedTool.schema.description).toContain(
+        'TestLocalAgent: A local test agent.',
+      );
+    });
+
+    it('should reject agents that are not allowed', () => {
+      expect(() =>
+        scopedTool['createInvocation'](
+          { agent_name: 'TestRemoteAgent', prompt: 'Hello' },
+          mockMessageBus,
+        ),
+      ).toThrow("Subagent 'TestRemoteAgent' is not available to this agent.");
+    });
+
+    it('should invoke allowed agents', async () => {
+      const invocation = scopedTool['createInvocation'](
+        { agent_name: 'TestLocalAgent', prompt: 'Do something' },
+        mockMessageBus,
+      );
+      await invocation.shouldConfirmExecute(new AbortController().signal);
+      expect(LocalSubagentInvocation).toHaveBeenCalled();
+    });
+  });
+
   it('should map prompt to task and use BrowserAgentInvocation for browser agent', async () => {
     const params = { agent_name: BROWSER_AGENT_NAME, prompt: 'Open page' };
     const invocation = tool['createInvocation'](params, mockMessageBus);

@@ -50,7 +50,13 @@ vi.mock('../tools/mcp-client-manager.js', () => ({
 
 import { debugLogger } from '../utils/debugLogger.js';
 import { runWithToolCallContext } from '../utils/toolCallContext.js';
-import { LocalAgentExecutor, type ActivityCallback } from './local-executor.js';
+import {
+  LocalAgentExecutor,
+  MAX_AGENT_DEPTH,
+  type ActivityCallback,
+} from './local-executor.js';
+import { AgentTool } from './agent-tool.js';
+import { coreEvents } from '../utils/events.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
@@ -58,6 +64,7 @@ import { ResourceRegistry } from '../resources/resource-registry.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { LSTool } from '../tools/ls.js';
 import {
+  AGENT_TOOL_NAME,
   COMPLETE_TASK_TOOL_NAME,
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
@@ -498,6 +505,7 @@ describe('LocalAgentExecutor', () => {
     );
     vi.spyOn(mockConfig, 'getAgentRegistry').mockReturnValue({
       getAllAgentNames: () => [],
+      getDefinition: () => undefined,
     } as unknown as AgentRegistry);
 
     mockedGetDirectoryContextString.mockResolvedValue(
@@ -845,6 +853,115 @@ describe('LocalAgentExecutor', () => {
 
       // Should exclude subagent
       expect(agentRegistry.getTool(subAgentName)).toBeUndefined();
+    });
+
+    describe('agent delegation', () => {
+      const agentDefinitions: Record<string, LocalAgentDefinition> = {
+        helper: { ...createTestDefinition(), name: 'helper' },
+        reviewer: { ...createTestDefinition(), name: 'reviewer' },
+      };
+
+      const createContext = (agentDepth?: number): AgentLoopContext => ({
+        config: mockConfig,
+        promptId: mockConfig.promptId,
+        agentDepth,
+        toolRegistry: parentToolRegistry,
+        promptRegistry: mockConfig.promptRegistry,
+        resourceRegistry: mockConfig.resourceRegistry,
+        messageBus: mockConfig.messageBus,
+        geminiClient: mockConfig.geminiClient,
+        sandboxManager: mockConfig.sandboxManager,
+      });
+
+      const getAgentTool = <T extends z.ZodTypeAny>(
+        executor: LocalAgentExecutor<T>,
+      ) =>
+        executor['toolRegistry'].getTool(AGENT_TOOL_NAME) as
+          | AgentTool
+          | undefined;
+
+      const getAllowedAgents = <T extends z.ZodTypeAny>(
+        executor: LocalAgentExecutor<T>,
+      ) => getAgentTool(executor)?.['allowedAgents'];
+
+      beforeEach(() => {
+        vi.spyOn(mockConfig, 'getAgentRegistry').mockReturnValue({
+          getAllAgentNames: () => Object.keys(agentDefinitions),
+          getDefinition: (name: string) => agentDefinitions[name],
+        } as unknown as AgentRegistry);
+      });
+
+      it('should grant only the agents listed by name', async () => {
+        const executor = await LocalAgentExecutor.create(
+          createTestDefinition([LS_TOOL_NAME, 'helper']),
+          createContext(),
+        );
+
+        expect(executor['toolRegistry'].getTool(LS_TOOL_NAME)).toBeDefined();
+        expect(getAllowedAgents(executor)).toEqual(['helper']);
+      });
+
+      it('should grant every agent when invoke_agent is listed', async () => {
+        const executor = await LocalAgentExecutor.create(
+          createTestDefinition([AGENT_TOOL_NAME]),
+          createContext(),
+        );
+
+        expect(getAllowedAgents(executor)).toEqual(['helper', 'reviewer']);
+      });
+
+      it('should not grant agents through the * wildcard', async () => {
+        parentToolRegistry.registerTool(
+          new AgentTool(mockConfig, mockConfig.messageBus),
+        );
+
+        const executor = await LocalAgentExecutor.create(
+          createTestDefinition(['*']),
+          createContext(),
+        );
+
+        expect(getAgentTool(executor)).toBeUndefined();
+      });
+
+      it('should warn about names that are neither tools nor agents', async () => {
+        const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+        const executor = await LocalAgentExecutor.create(
+          createTestDefinition([LS_TOOL_NAME, 'no-such-agent']),
+          createContext(),
+        );
+
+        expect(getAgentTool(executor)).toBeUndefined();
+        expect(feedbackSpy).toHaveBeenCalledWith(
+          'warning',
+          expect.stringContaining("'no-such-agent'"),
+        );
+      });
+
+      it('should run invoked agents one level deeper with the same tool registry', async () => {
+        const executor = await LocalAgentExecutor.create(
+          createTestDefinition(['helper']),
+          createContext(),
+        );
+
+        const nestedContext = getAgentTool(executor)?.['context'];
+        expect(nestedContext?.agentDepth).toBe(1);
+        expect(nestedContext?.toolRegistry).toBe(parentToolRegistry);
+      });
+
+      it('should not grant agents at the maximum depth', async () => {
+        const belowMax = await LocalAgentExecutor.create(
+          createTestDefinition(['helper']),
+          createContext(MAX_AGENT_DEPTH - 2),
+        );
+        const atMax = await LocalAgentExecutor.create(
+          createTestDefinition(['helper']),
+          createContext(MAX_AGENT_DEPTH - 1),
+        );
+
+        expect(getAgentTool(belowMax)).toBeDefined();
+        expect(getAgentTool(atMax)).toBeUndefined();
+      });
     });
 
     it('should automatically qualify MCP tools in agent definitions', async () => {

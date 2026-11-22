@@ -22,7 +22,7 @@ import {
   AuthProviderType,
   type MCPOAuthConfig,
 } from '../config/config.js';
-import { isValidToolName } from '../tools/tool-names.js';
+import { AGENT_NAME_PATTERN, isValidToolName } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
 import { getErrorMessage } from '../utils/errors.js';
 
@@ -49,7 +49,7 @@ export interface AgentLoadResult {
 
 const nameSchema = z
   .string()
-  .regex(/^[a-z0-9-_]+$/, 'Name must be a valid slug');
+  .regex(AGENT_NAME_PATTERN, 'Name must be a valid slug');
 
 const mcpServerSchema = z.object({
   command: z.string().optional(),
@@ -97,14 +97,16 @@ const localAgentSchema = z
     display_name: z.string().optional(),
     tools: z
       .array(
-        z
-          .string()
-          .refine(
-            (val: string) => isValidToolName(val, { allowWildcards: true }),
-            {
-              message: 'Invalid tool name',
-            },
-          ),
+        z.string().refine(
+          (val: string) =>
+            isValidToolName(val, {
+              allowWildcards: true,
+              allowAgentNames: true,
+            }),
+          {
+            message: 'Invalid tool or agent name',
+          },
+        ),
       )
       .optional(),
     mcp_servers: z.record(mcpServerSchema).optional(),

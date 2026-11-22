@@ -84,6 +84,23 @@ System prompt content.`);
       });
     });
 
+    it('should accept agent names in tools', async () => {
+      const filePath = await writeAgentMarkdown(`---
+name: coordinator
+description: Delegates to other agents
+tools:
+  - read_file
+  - codebase_investigator
+  - my-helper
+---
+System prompt content.`);
+
+      const result = await parseAgentMarkdown(filePath);
+      expect(result[0]).toMatchObject({
+        tools: ['read_file', 'codebase_investigator', 'my-helper'],
+      });
+    });
+
     it('should parse frontmatter with mcp_servers', async () => {
       const filePath = await writeAgentMarkdown(`---
 name: mcp-agent
