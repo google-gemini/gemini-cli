@@ -723,7 +723,11 @@ export async function main() {
         process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
       }
       let stdinData = '';
-      if (!process.stdin.isTTY) {
+      // In ACP mode stdin is the client's JSON-RPC stream and stays open for
+      // the whole session, so readStdin() would swallow the `initialize`
+      // request and never see EOF. Leave stdin to the sandboxed child, which
+      // inherits it.
+      if (!process.stdin.isTTY && !partialConfig.getAcpMode()) {
         stdinData = await readStdin();
       }
 
