@@ -1428,7 +1428,7 @@ describe('mcp-client', () => {
       expect(toolUpdateCall).toBeDefined();
     });
 
-    it('should refresh tools and notify manager when notification is received', async () => {
+    it('should refresh tools with the configured timeout and notify manager', async () => {
       // Setup mocks
       const mockedClient = {
         connect: vi.fn(),
@@ -1471,7 +1471,7 @@ describe('mcp-client', () => {
       // Initialize client with onContextUpdated callback
       const client = new McpClient(
         'test-server',
-        { command: 'test-command' },
+        { command: 'test-command', timeout: 120000 },
         workspaceContext,
         MOCK_CONTEXT,
         false,
@@ -1507,8 +1507,14 @@ describe('mcp-client', () => {
         'test-server',
       );
 
-      // It should fetch new tools (listTools called inside discoverTools)
-      expect(mockedClient.listTools).toHaveBeenCalled();
+      expect(mockedClient.listTools).toHaveBeenCalledWith(
+        {},
+        expect.objectContaining({
+          timeout: 120000,
+          signal: expect.any(AbortSignal),
+          progressReporter: client,
+        }),
+      );
 
       // It should register the new tool
       expect(mockedToolRegistry.registerTool).toHaveBeenCalled();
@@ -1793,7 +1799,7 @@ describe('mcp-client', () => {
       expect(mockedToolRegistry.registerTool).not.toHaveBeenCalled();
     });
 
-    it('should pass abort signal to onToolsUpdated callback', async () => {
+    it('should preserve the default timeout and abort signal when refreshing tools', async () => {
       const mockedClient = {
         connect: vi.fn(),
         getServerCapabilities: vi
@@ -1867,6 +1873,18 @@ describe('mcp-client', () => {
       // Verify the signal passed was not aborted (happy path)
       const signal = onContextUpdatedSpy.mock.calls[0][0];
       expect(signal.aborted).toBe(false);
+
+      // Both the initial refresh and verification retry keep the default timeout.
+      expect(mockedClient.listTools).toHaveBeenCalledTimes(2);
+      for (const [, options] of mockedClient.listTools.mock.calls) {
+        expect(options).toEqual(
+          expect.objectContaining({
+            timeout: 600000,
+            signal,
+            progressReporter: client,
+          }),
+        );
+      }
     });
   });
 
