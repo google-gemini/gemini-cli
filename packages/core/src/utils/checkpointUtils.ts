@@ -142,7 +142,8 @@ export async function processRestorableToolCalls<HistoryType>(
       checkpointsToWrite.set(fileName, JSON.stringify(checkpointData, null, 2));
       toolCallToCheckpointMap.set(
         toolCall.callId,
-        fileName.replace('.json', ''),
+        // Only strip the extension; the name may itself contain ".json".
+        fileName.replace(/\.json$/, ''),
       );
     } catch (error) {
       errors.push(
@@ -176,7 +177,7 @@ export function getCheckpointInfoList(
       if (result.success) {
         checkpointInfoList.push({
           messageId: result.data.messageId,
-          checkpoint: file.replace('.json', ''),
+          checkpoint: file.replace(/\.json$/, ''),
         });
       }
     } catch {
