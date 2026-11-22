@@ -103,6 +103,44 @@ describe('GitIgnoreParser', () => {
         parser.isIgnored('ignored-at-root/should-not-work.txt', false),
       ).toBe(true);
     });
+
+    it('should not ignore files re-included by nested .gitignore under dir/** pattern (#29826)', async () => {
+      await createTestFile('.gitignore', 'logs/**');
+      await createTestFile('logs/.gitignore', '!keep.txt');
+      await createTestFile('logs/keep.txt', 'content');
+      await createTestFile('logs/a.txt', 'content');
+      await createTestFile('logs/sub/keep.txt', 'content');
+      parser.clearCache();
+
+      expect(parser.isIgnored('logs', true)).toBe(false);
+      expect(parser.isIgnored('logs/keep.txt', false)).toBe(false);
+      expect(parser.isIgnored('logs/a.txt', false)).toBe(true);
+      // Subdirectories without negations remain ignored
+      expect(parser.isIgnored('logs/sub', true)).toBe(true);
+      expect(parser.isIgnored('logs/sub/keep.txt', false)).toBe(true);
+    });
+
+    it('should continue pruning wildcard directory when nested .gitignore has no negations (#29826)', async () => {
+      await createTestFile('.gitignore', 'build/**');
+      await createTestFile('build/.gitignore', '# only comments\n*.tmp\n');
+      await createTestFile('build/out.js', 'content');
+      parser.clearCache();
+
+      expect(parser.isIgnored('build', true)).toBe(true);
+      expect(parser.isIgnored('build/out.js', false)).toBe(true);
+    });
+
+    it('should handle nested directory wildcard patterns with nested negations (#29826)', async () => {
+      await createTestFile('packages/.gitignore', 'dist/**');
+      await createTestFile('packages/dist/.gitignore', '!bundle.js');
+      await createTestFile('packages/dist/bundle.js', 'content');
+      await createTestFile('packages/dist/other.js', 'content');
+      parser.clearCache();
+
+      expect(parser.isIgnored('packages/dist', true)).toBe(false);
+      expect(parser.isIgnored('packages/dist/bundle.js', false)).toBe(false);
+      expect(parser.isIgnored('packages/dist/other.js', false)).toBe(true);
+    });
   });
 
   describe('Advanced Pattern Matching', () => {

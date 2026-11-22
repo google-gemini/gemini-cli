@@ -282,6 +282,31 @@ describe('FileDiscoveryService', () => {
       ).toBe(false);
     });
 
+    it('should not ignore directory and file re-included by nested .gitignore under dir/** pattern (#29826)', async () => {
+      await createTestFile('.gitignore', 'logs/**');
+      await createTestFile('logs/.gitignore', '!keep.txt');
+      await createTestFile('logs/keep.txt', 'important');
+      await createTestFile('logs/a.txt', 'discard');
+
+      const service = new FileDiscoveryService(projectRoot);
+
+      expect(
+        service.shouldIgnoreDirectory(path.join(projectRoot, 'logs')),
+      ).toBe(false);
+      expect(
+        service.shouldIgnoreFile(path.join(projectRoot, 'logs/keep.txt')),
+      ).toBe(false);
+      expect(
+        service.shouldIgnoreFile(path.join(projectRoot, 'logs/a.txt')),
+      ).toBe(true);
+
+      const filtered = service.filterFiles([
+        path.join(projectRoot, 'logs/keep.txt'),
+        path.join(projectRoot, 'logs/a.txt'),
+      ]);
+      expect(filtered).toEqual([path.join(projectRoot, 'logs/keep.txt')]);
+    });
+
     it('should return false for non-git-ignored files', () => {
       const service = new FileDiscoveryService(projectRoot);
 

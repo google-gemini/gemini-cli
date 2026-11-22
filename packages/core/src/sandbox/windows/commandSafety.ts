@@ -11,6 +11,8 @@ import {
   extractStringFromParseEntry,
   initializeShellParsers,
   splitCommands,
+  splitCommandsAsync,
+  isDefaultSplitCommands,
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
 import { isSubpath, resolveToRealPath } from '../../utils/paths.js';
@@ -41,7 +43,9 @@ export async function isStrictlyApproved(
   const fullCmd = [command, ...args].join(' ');
   const stripped = stripShellWrapper(fullCmd);
 
-  const pipelineCommands = splitCommands(stripped);
+  const pipelineCommands = isDefaultSplitCommands(splitCommands)
+    ? await splitCommandsAsync(stripped)
+    : splitCommands(stripped);
 
   // Fallback for simple commands or parsing failures
   if (pipelineCommands.length === 0) {
