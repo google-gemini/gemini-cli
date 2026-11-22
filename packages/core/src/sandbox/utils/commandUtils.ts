@@ -7,10 +7,16 @@
 import { type SandboxRequest } from '../../services/sandboxManager.js';
 import {
   getCommandRoots,
+  getCommandRootsAsync,
+  isDefaultGetCommandRoots,
+  hasUnresolvedShellExpansion,
   initializeShellParsers,
   splitCommands,
+  splitCommandsAsync,
+  isDefaultSplitCommands,
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
+import { runWithCommandParseCache } from '../../utils/shell-parse-cache.js';
 import { isKnownSafeCommand } from './commandSafety.js';
 import { parse as shellParse } from 'shell-quote';
 import path from 'node:path';
@@ -23,39 +29,54 @@ export async function isStrictlyApproved(
     return false;
   }
 
-  await initializeShellParsers();
+  return runWithCommandParseCache(async () => {
+    await initializeShellParsers();
 
-  const fullCmd = [req.command, ...req.args].join(' ');
-  const stripped = stripShellWrapper(fullCmd);
+    const fullCmd = [req.command, ...req.args].join(' ');
+    const stripped = stripShellWrapper(fullCmd);
 
-  const roots = getCommandRoots(stripped);
-  if (roots.length === 0) return false;
+    const roots = isDefaultGetCommandRoots(getCommandRoots)
+      ? await getCommandRootsAsync(stripped)
+      : getCommandRoots(stripped);
+    if (roots.length === 0) return false;
 
-  const allRootsApproved = roots.every((root) => approvedTools.includes(root));
-  if (allRootsApproved) {
-    return true;
-  }
+    const allRootsApproved = roots.every((root) =>
+      approvedTools.includes(root),
+    );
+    if (allRootsApproved) {
+      return true;
+    }
 
-  const pipelineCommands = splitCommands(stripped);
-  if (pipelineCommands.length === 0) return false;
-
-  for (const cmdString of pipelineCommands) {
-    const parsedArgs = shellParse(cmdString).map(String);
-    if (!isKnownSafeCommand(parsedArgs)) {
+    // The read-only classifier can't vouch for arguments that bash rewrites
+    // before the command runs.
+    if (hasUnresolvedShellExpansion(stripped)) {
       return false;
     }
-  }
 
-  return true;
+    const pipelineCommands = isDefaultSplitCommands(splitCommands)
+      ? await splitCommandsAsync(stripped)
+      : splitCommands(stripped);
+    if (pipelineCommands.length === 0) return false;
+
+    for (const cmdString of pipelineCommands) {
+      const parsedArgs = shellParse(cmdString).map(String);
+      if (!isKnownSafeCommand(parsedArgs)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 }
 
 export async function getCommandName(req: SandboxRequest): Promise<string> {
   await initializeShellParsers();
   const fullCmd = [req.command, ...req.args].join(' ');
   const stripped = stripShellWrapper(fullCmd);
-  const roots = getCommandRoots(stripped).filter(
-    (r) => r !== 'shopt' && r !== 'set',
-  );
+  const computedRoots = isDefaultGetCommandRoots(getCommandRoots)
+    ? await getCommandRootsAsync(stripped)
+    : getCommandRoots(stripped);
+  const roots = computedRoots.filter((r) => r !== 'shopt' && r !== 'set');
   if (roots.length > 0) {
     return roots[0];
   }

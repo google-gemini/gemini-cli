@@ -23,7 +23,9 @@ import {
   createCache,
   isFileAndDirectorySecureSync,
   createPathSecurityCache,
+  type PathSecurityCache,
 } from '@google/gemini-cli-core';
+import { parse } from 'shell-quote';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
 import { DefaultDark } from '../ui/themes/builtin/dark/default-dark.js';
@@ -331,12 +333,14 @@ export class LoadedSettings {
     workspace: SettingsFile,
     isTrusted: boolean,
     errors: SettingsError[] = [],
+    blockedMcpServers: ReadonlySet<string> = new Set(),
   ) {
     this.system = system;
     this.systemDefaults = systemDefaults;
     this.user = user;
     this._workspaceFile = workspace;
     this.isTrusted = isTrusted;
+    this._blockedMcpServers = blockedMcpServers;
     this.workspace = isTrusted
       ? workspace
       : this.createEmptyWorkspace(workspace);
@@ -353,6 +357,7 @@ export class LoadedSettings {
   readonly errors: SettingsError[];
 
   private _workspaceFile: SettingsFile;
+  private readonly _blockedMcpServers: ReadonlySet<string>;
   private _merged: MergedSettings;
   private _snapshot: LoadedSettingsSnapshot;
   private _remoteAdminSettings: Partial<Settings> | undefined;
@@ -386,6 +391,10 @@ export class LoadedSettings {
         this.errors,
       );
       normalizeLegacyTheme(resolvedWorkspaceSettings);
+      stripBlockedMcpServers(
+        resolvedWorkspaceSettings,
+        this._blockedMcpServers,
+      );
       this._workspaceFile = {
         ...this._workspaceFile,
         settings: resolvedWorkspaceSettings,
@@ -422,6 +431,7 @@ export class LoadedSettings {
       workspaceSettings,
       isTrusted,
     );
+    stripBlockedMcpServers(merged, this._blockedMcpServers);
 
     // Remote admin settings always take precedence and file-based admin settings
     // are ignored.
@@ -932,6 +942,698 @@ function resolveSettings(
   return (validationResult.data as Settings) ?? expandedSettings;
 }
 
+const SCRIPT_INTERPRETERS = new Set([
+  'sh',
+  'bash',
+  'zsh',
+  'dash',
+  'ksh',
+  'fish',
+  'csh',
+  'tcsh',
+  'node',
+  'nodejs',
+  'python',
+  'python2',
+  'python3',
+  'py',
+  'ruby',
+  'perl',
+  'php',
+  'lua',
+  'rscript',
+  'pwsh',
+  'powershell',
+  'deno',
+  'bun',
+  'tsx',
+  'ts-node',
+  'ts-node-esm',
+  'cmd',
+  'osascript',
+  'cscript',
+  'wscript',
+]);
+
+const WINDOWS_SLASH_FLAG_INTERPRETERS = new Set(['cmd', 'cscript', 'wscript']);
+
+const INLINE_EVAL_FLAGS = new Set([
+  '-c',
+  '-e',
+  '-E',
+  '--eval',
+  '-p',
+  '--print',
+  '-command',
+  '-encodedcommand',
+]);
+
+const PRELOAD_FLAGS = new Set([
+  '-r',
+  '--require',
+  '--import',
+  '--loader',
+  '--experimental-loader',
+  '--preload',
+  '--env-file',
+  '--env-file-if-exists',
+  '-f',
+  '-file',
+]);
+
+const SCRIPT_EXTENSIONS = new Set([
+  '.js',
+  '.mjs',
+  '.cjs',
+  '.jsx',
+  '.node',
+  '.ts',
+  '.mts',
+  '.cts',
+  '.tsx',
+  '.py',
+  '.pyw',
+  '.py3',
+  '.pyz',
+  '.sh',
+  '.bash',
+  '.zsh',
+  '.ksh',
+  '.fish',
+  '.csh',
+  '.pl',
+  '.pm',
+  '.rb',
+  '.php',
+  '.phar',
+  '.lua',
+  '.r',
+  '.ps1',
+  '.psm1',
+  '.cmd',
+  '.bat',
+  '.vbs',
+  '.vbe',
+  '.jse',
+  '.wsf',
+  '.wsh',
+  '.scpt',
+  '.scptd',
+  '.applescript',
+]);
+
+const NON_SCRIPT_VALUE_FLAGS = new Set([
+  '-W',
+  '-m',
+  '-I',
+  '-M',
+  '-K',
+  '-F',
+  '-C',
+  '-P',
+  '--project',
+  '--config',
+  '--log-file',
+  '--max-old-space-size',
+  '--inspect-port',
+  '--debug-port',
+  '--conditions',
+  '--input-type',
+  '--title',
+  '-executionpolicy',
+]);
+
+const KNOWN_BOOLEAN_FLAGS = new Set([
+  '-x',
+  '-v',
+  '-n',
+  '-u',
+  '-w',
+  '-d',
+  '-O',
+  '-B',
+  '-s',
+  '-S',
+  '-i',
+  '-t',
+  '--watch',
+  '--no-warnings',
+  '--trace-warnings',
+  '--inspect',
+  '--inspect-brk',
+  '--enable-source-maps',
+  '--preserve-symlinks',
+  '--no-deprecation',
+  '--throw-deprecation',
+  '-noprofile',
+  '-noninteractive',
+  '-sta',
+  '-mta',
+]);
+
+const SUBCOMMAND_INTERPRETERS = new Set(['deno', 'bun']);
+const INTERPRETER_SUBCOMMANDS = new Set(['run', 'x', 'serve', 'test', 'bench']);
+
+const IMPLICIT_SCRIPT_EXTENSIONS = [
+  '.js',
+  '.mjs',
+  '.cjs',
+  '.ts',
+  '.mts',
+  '.cts',
+  '.py',
+  '.ps1',
+];
+
+interface SystemMcpCommandCheckContext {
+  workspaceDir: string;
+  settingsFilePath: string;
+  fileLabel: string;
+  securityCache: PathSecurityCache;
+  settingsErrors: SettingsError[];
+}
+
+function getCommandBaseName(command: string): string | undefined {
+  return command
+    .split(/[\\/]/)
+    .pop()
+    ?.toLowerCase()
+    .replace(/\.(exe|cmd|bat)$/, '');
+}
+
+function isExplicitCommandPath(command: string): boolean {
+  return (
+    path.isAbsolute(command) || command.includes('/') || command.includes('\\')
+  );
+}
+
+function resolveMcpCommandPath(
+  command: string,
+  cwd: string | undefined,
+  workspaceDir: string,
+): string {
+  if (path.isAbsolute(command) || /^[a-zA-Z]:[\\/]/.test(command)) {
+    return command;
+  }
+  const baseDir = cwd ? path.resolve(workspaceDir, cwd) : workspaceDir;
+  return path.resolve(baseDir, command);
+}
+
+function hasExistingScriptOnDisk(resolvedPath: string): boolean {
+  try {
+    if (fs.existsSync(resolvedPath)) {
+      return true;
+    }
+    for (const ext of IMPLICIT_SCRIPT_EXTENSIONS) {
+      if (fs.existsSync(`${resolvedPath}${ext}`)) {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+function isScriptPathCandidate(
+  token: string,
+  cwd: string | undefined,
+  workspaceDir: string,
+): boolean {
+  if (/^\d+$/.test(token)) {
+    return false;
+  }
+  const ext = path.extname(token).toLowerCase();
+  if (ext !== '') {
+    return SCRIPT_EXTENSIONS.has(ext);
+  }
+  if (isExplicitCommandPath(token)) {
+    return true;
+  }
+  return hasExistingScriptOnDisk(
+    resolveMcpCommandPath(token, cwd, workspaceDir),
+  );
+}
+
+function isPreloadTargetCandidate(
+  token: string,
+  cwd: string | undefined,
+  workspaceDir: string,
+): boolean {
+  return (
+    isExplicitCommandPath(token) ||
+    isScriptPathCandidate(token, cwd, workspaceDir)
+  );
+}
+
+function expandCandidatePaths(resolvedPath: string): string[] {
+  const paths = [resolvedPath];
+  if (path.extname(resolvedPath) !== '') {
+    return paths;
+  }
+  for (const ext of IMPLICIT_SCRIPT_EXTENSIONS) {
+    const withExt = `${resolvedPath}${ext}`;
+    try {
+      if (fs.existsSync(withExt)) {
+        paths.push(withExt);
+      }
+    } catch {
+      paths.push(withExt);
+    }
+  }
+  return paths;
+}
+
+function unwrapEnvInvocation(
+  command: string,
+  args: string[] | undefined,
+  cwd: string | undefined,
+  workspaceDir: string,
+): {
+  command: string;
+  args: string[];
+  cwd: string | undefined;
+  wrapperPaths: string[];
+  unsafeSplitString?: string;
+} {
+  let currentCmd = command.trim();
+  let currentArgs = [...(args ?? [])];
+  let effectiveCwd = cwd;
+  const wrapperPaths: string[] = [];
+
+  while (currentCmd && getCommandBaseName(currentCmd) === 'env') {
+    if (isExplicitCommandPath(currentCmd)) {
+      wrapperPaths.push(currentCmd);
+    }
+    let idx = 0;
+    let stopEnvOptions = false;
+    while (idx < currentArgs.length) {
+      const token = currentArgs[idx]?.trim() ?? '';
+      if (!token) {
+        idx++;
+        continue;
+      }
+      if (!stopEnvOptions && token === '--') {
+        stopEnvOptions = true;
+        idx++;
+        continue;
+      }
+      if (!stopEnvOptions && token.startsWith('-') && token !== '-') {
+        if (token === '-u' || token === '--unset') {
+          idx += 2;
+          continue;
+        }
+        if (token === '-C' || token === '--chdir') {
+          const dirArg = currentArgs[idx + 1]?.trim();
+          if (dirArg) {
+            effectiveCwd = effectiveCwd
+              ? path.resolve(workspaceDir, effectiveCwd, dirArg)
+              : dirArg;
+          }
+          idx += 2;
+          continue;
+        }
+        if (token.startsWith('--chdir=')) {
+          const dirArg = token.slice('--chdir='.length).trim();
+          if (dirArg) {
+            effectiveCwd = effectiveCwd
+              ? path.resolve(workspaceDir, effectiveCwd, dirArg)
+              : dirArg;
+          }
+          idx++;
+          continue;
+        }
+        if (
+          token === '-S' ||
+          token === '--split-string' ||
+          token.startsWith('-S') ||
+          token.startsWith('--split-string=')
+        ) {
+          const splitRaw =
+            token === '-S' || token === '--split-string'
+              ? (currentArgs[idx + 1] ?? '')
+              : token.startsWith('--split-string=')
+                ? token.slice('--split-string='.length)
+                : token.slice(2);
+          const consumed = token === '-S' || token === '--split-string' ? 2 : 1;
+          try {
+            const parsed = parse(splitRaw);
+            const strTokens = parsed.filter(
+              (t): t is string => typeof t === 'string',
+            );
+            if (strTokens.length !== parsed.length) {
+              return {
+                command: '',
+                args: [],
+                cwd: effectiveCwd,
+                wrapperPaths,
+                unsafeSplitString: splitRaw,
+              };
+            }
+            currentArgs = [...strTokens, ...currentArgs.slice(idx + consumed)];
+            idx = 0;
+            continue;
+          } catch {
+            return {
+              command: '',
+              args: [],
+              cwd: effectiveCwd,
+              wrapperPaths,
+              unsafeSplitString: splitRaw,
+            };
+          }
+        }
+        idx++;
+        continue;
+      }
+      if (token.includes('=') && !token.startsWith('=')) {
+        idx++;
+        continue;
+      }
+      break;
+    }
+    if (idx < currentArgs.length) {
+      currentCmd = currentArgs[idx]?.trim() ?? '';
+      currentArgs = currentArgs.slice(idx + 1);
+    } else {
+      currentCmd = '';
+      currentArgs = [];
+    }
+  }
+
+  return {
+    command: currentCmd,
+    args: currentArgs,
+    cwd: effectiveCwd,
+    wrapperPaths,
+  };
+}
+
+function extractInterpreterScriptArgs(
+  command: string,
+  args: string[] | undefined,
+  cwd: string | undefined,
+  workspaceDir: string,
+): string[] {
+  if (!args || args.length === 0) {
+    return [];
+  }
+  const baseName = getCommandBaseName(command);
+  if (!baseName || !SCRIPT_INTERPRETERS.has(baseName)) {
+    return [];
+  }
+  const candidates: string[] = [];
+  let expectPreloadValue = false;
+  let skipNextValue = false;
+  let prevWasUnknownFlag = false;
+  let sawSubcommand = false;
+  let afterDoubleDash = false;
+
+  for (const arg of args) {
+    const trimmed = arg.trim();
+    if (!trimmed) continue;
+
+    if (afterDoubleDash) {
+      if (isPreloadTargetCandidate(trimmed, cwd, workspaceDir)) {
+        candidates.push(trimmed);
+      }
+      break;
+    }
+
+    if (expectPreloadValue) {
+      if (isPreloadTargetCandidate(trimmed, cwd, workspaceDir)) {
+        candidates.push(trimmed);
+      }
+      expectPreloadValue = false;
+      prevWasUnknownFlag = false;
+      continue;
+    }
+
+    if (skipNextValue) {
+      skipNextValue = false;
+      prevWasUnknownFlag = false;
+      continue;
+    }
+
+    if (trimmed === '--') {
+      afterDoubleDash = true;
+      prevWasUnknownFlag = false;
+      continue;
+    }
+
+    if (
+      WINDOWS_SLASH_FLAG_INTERPRETERS.has(baseName) &&
+      /^\/(\/)?[a-zA-Z?][a-zA-Z0-9:_-]*$/.test(trimmed)
+    ) {
+      prevWasUnknownFlag = false;
+      continue;
+    }
+
+    if (trimmed.startsWith('-') && trimmed !== '-') {
+      const eqIndex = trimmed.indexOf('=');
+      const rawFlag = eqIndex >= 0 ? trimmed.slice(0, eqIndex) : trimmed;
+      const flagName = rawFlag.length === 2 ? rawFlag : rawFlag.toLowerCase();
+      if (INLINE_EVAL_FLAGS.has(flagName)) {
+        break;
+      }
+      if (PRELOAD_FLAGS.has(flagName)) {
+        if (eqIndex >= 0) {
+          const inlineValue = trimmed.slice(eqIndex + 1).trim();
+          if (
+            inlineValue &&
+            isPreloadTargetCandidate(inlineValue, cwd, workspaceDir)
+          ) {
+            candidates.push(inlineValue);
+          }
+          prevWasUnknownFlag = false;
+        } else {
+          expectPreloadValue = true;
+          prevWasUnknownFlag = false;
+        }
+      } else if (eqIndex < 0 && NON_SCRIPT_VALUE_FLAGS.has(flagName)) {
+        skipNextValue = true;
+        prevWasUnknownFlag = false;
+      } else {
+        prevWasUnknownFlag = eqIndex < 0 && !KNOWN_BOOLEAN_FLAGS.has(flagName);
+      }
+      continue;
+    }
+
+    if (
+      !sawSubcommand &&
+      candidates.length === 0 &&
+      SUBCOMMAND_INTERPRETERS.has(baseName) &&
+      INTERPRETER_SUBCOMMANDS.has(trimmed.toLowerCase())
+    ) {
+      sawSubcommand = true;
+      prevWasUnknownFlag = false;
+      continue;
+    }
+
+    if (isScriptPathCandidate(trimmed, cwd, workspaceDir)) {
+      candidates.push(trimmed);
+      if (!prevWasUnknownFlag) {
+        break;
+      }
+    }
+    prevWasUnknownFlag = false;
+  }
+
+  return candidates;
+}
+
+function findInsecureMcpTarget(
+  command: string | undefined,
+  args: string[] | undefined,
+  cwd: string | undefined,
+  ctx: SystemMcpCommandCheckContext,
+): { target: string; reason: string } | undefined {
+  const initialCmd = command?.trim();
+  if (!initialCmd) {
+    return undefined;
+  }
+  const unwrapped = unwrapEnvInvocation(
+    initialCmd,
+    args,
+    cwd,
+    ctx.workspaceDir,
+  );
+  if (unwrapped.unsafeSplitString !== undefined) {
+    return {
+      target: unwrapped.unsafeSplitString,
+      reason: 'Unsupported shell operators or malformed env -S string.',
+    };
+  }
+  for (const wrapperPath of unwrapped.wrapperPaths) {
+    const resolvedWrapper = resolveMcpCommandPath(
+      wrapperPath,
+      cwd,
+      ctx.workspaceDir,
+    );
+    const wrapperCheck = isFileAndDirectorySecureSync(
+      resolvedWrapper,
+      ctx.securityCache,
+    );
+    if (!wrapperCheck.secure) {
+      return {
+        target: wrapperPath,
+        reason: wrapperCheck.reason ?? 'Insecure file or directory.',
+      };
+    }
+  }
+  if (!unwrapped.command) {
+    return undefined;
+  }
+  const effectiveCwd = unwrapped.cwd;
+  const candidates: string[] = [];
+  if (
+    isExplicitCommandPath(unwrapped.command) ||
+    (path.extname(unwrapped.command) !== '' &&
+      isScriptPathCandidate(unwrapped.command, effectiveCwd, ctx.workspaceDir))
+  ) {
+    candidates.push(unwrapped.command);
+  }
+  candidates.push(
+    ...extractInterpreterScriptArgs(
+      unwrapped.command,
+      unwrapped.args,
+      effectiveCwd,
+      ctx.workspaceDir,
+    ),
+  );
+  for (const target of candidates) {
+    const resolved = resolveMcpCommandPath(
+      target,
+      effectiveCwd,
+      ctx.workspaceDir,
+    );
+    for (const candidatePath of expandCandidatePaths(resolved)) {
+      const check = isFileAndDirectorySecureSync(
+        candidatePath,
+        ctx.securityCache,
+      );
+      if (!check.secure) {
+        return {
+          target,
+          reason: check.reason ?? 'Insecure file or directory.',
+        };
+      }
+    }
+  }
+  return undefined;
+}
+
+function sanitizeSystemMcpServerMap(
+  settings: Settings,
+  ctx: SystemMcpCommandCheckContext,
+): string[] {
+  const skipped: string[] = [];
+  for (const [serverName, serverConfig] of Object.entries(
+    settings.mcpServers ?? {},
+  )) {
+    const insecure = findInsecureMcpTarget(
+      serverConfig.command,
+      serverConfig.args,
+      serverConfig.cwd,
+      ctx,
+    );
+    if (!insecure) continue;
+    ctx.settingsErrors.push({
+      message: `Security Warning: Skipping MCP server '${serverName}' in ${ctx.fileLabel} file '${ctx.settingsFilePath}' due to insecure command path '${insecure.target}': ${insecure.reason}`,
+      path: ctx.settingsFilePath,
+      severity: 'warning',
+    });
+    delete settings.mcpServers?.[serverName];
+    skipped.push(serverName);
+  }
+  return skipped;
+}
+
+function sanitizeSystemMcpServerCommand(
+  settings: Settings,
+  ctx: SystemMcpCommandCheckContext,
+): void {
+  if (!settings.mcp?.serverCommand) {
+    return;
+  }
+  let tokens: string[];
+  try {
+    const parsedTokens = parse(settings.mcp.serverCommand);
+    const stringTokens = parsedTokens.filter(
+      (token): token is string => typeof token === 'string',
+    );
+    if (stringTokens.length !== parsedTokens.length) {
+      ctx.settingsErrors.push({
+        message: `Security Warning: Skipping mcp.serverCommand in ${ctx.fileLabel} file '${ctx.settingsFilePath}' due to presence of shell operators.`,
+        path: ctx.settingsFilePath,
+        severity: 'warning',
+      });
+      delete settings.mcp.serverCommand;
+      return;
+    }
+    tokens = stringTokens;
+  } catch (err) {
+    ctx.settingsErrors.push({
+      message: `Security Warning: Skipping mcp.serverCommand in ${ctx.fileLabel} file '${ctx.settingsFilePath}' due to parse failure: ${getErrorMessage(err)}`,
+      path: ctx.settingsFilePath,
+      severity: 'warning',
+    });
+    delete settings.mcp.serverCommand;
+    return;
+  }
+  const insecure = findInsecureMcpTarget(
+    tokens[0],
+    tokens.slice(1),
+    undefined,
+    ctx,
+  );
+  if (!insecure) {
+    return;
+  }
+  ctx.settingsErrors.push({
+    message: `Security Warning: Skipping mcp.serverCommand in ${ctx.fileLabel} file '${ctx.settingsFilePath}' due to insecure command path '${insecure.target}': ${insecure.reason}`,
+    path: ctx.settingsFilePath,
+    severity: 'warning',
+  });
+  delete settings.mcp.serverCommand;
+}
+
+function stripBlockedMcpServers(
+  settings: Settings,
+  blockedIds: ReadonlySet<string>,
+): void {
+  if (blockedIds.size === 0 || !settings.mcpServers) {
+    return;
+  }
+  for (const key of Object.keys(settings.mcpServers)) {
+    if (blockedIds.has(key.toLowerCase().trim())) {
+      delete settings.mcpServers[key];
+    }
+  }
+}
+
+function blockSkippedSystemMcpServers(
+  skippedServers: string[],
+  allScopes: Settings[],
+  systemSettings: Settings,
+): Set<string> {
+  const blockedIds = new Set(
+    skippedServers.map((name) => name.toLowerCase().trim()),
+  );
+  if (blockedIds.size === 0) {
+    return blockedIds;
+  }
+  for (const scopeSettings of allScopes) {
+    stripBlockedMcpServers(scopeSettings, blockedIds);
+  }
+  const existingExcluded = systemSettings.mcp?.excluded ?? [];
+  systemSettings.mcp = {
+    ...systemSettings.mcp,
+    excluded: [...new Set([...existingExcluded, ...skippedServers])],
+  };
+  return blockedIds;
+}
+
 /**
  * Internal implementation of the settings loading logic.
  */
@@ -1126,6 +1828,32 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
       )
     : {};
 
+  const systemCheckCtx: SystemMcpCommandCheckContext = {
+    workspaceDir,
+    settingsFilePath: systemSettingsPath,
+    fileLabel: 'system settings',
+    securityCache,
+    settingsErrors,
+  };
+  const defaultsCheckCtx: SystemMcpCommandCheckContext = {
+    workspaceDir,
+    settingsFilePath: systemDefaultsPath,
+    fileLabel: 'system defaults',
+    securityCache,
+    settingsErrors,
+  };
+  const skippedSystemServers = [
+    ...sanitizeSystemMcpServerMap(systemSettings, systemCheckCtx),
+    ...sanitizeSystemMcpServerMap(systemDefaultSettings, defaultsCheckCtx),
+  ];
+  sanitizeSystemMcpServerCommand(systemSettings, systemCheckCtx);
+  sanitizeSystemMcpServerCommand(systemDefaultSettings, defaultsCheckCtx);
+  const blockedSystemMcpServerIds = blockSkippedSystemMcpServers(
+    skippedSystemServers,
+    [systemSettings, systemDefaultSettings, userSettings, workspaceSettings],
+    systemSettings,
+  );
+
   // Support legacy theme names
   normalizeLegacyTheme(userSettings);
   normalizeLegacyTheme(workspaceSettings);
@@ -1172,6 +1900,7 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
     },
     isTrusted,
     settingsErrors,
+    blockedSystemMcpServerIds,
   );
 
   // Automatically migrate deprecated settings when loading.

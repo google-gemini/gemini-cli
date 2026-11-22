@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type MockInstance,
+} from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -126,6 +134,75 @@ describe('commandSafety', () => {
 
       expect(await isStrictlyApproved('/tmp/malicious/rg', ['pattern'])).toBe(
         false,
+      );
+    });
+
+    describe('when the configured shell is bash', () => {
+      // Report a POSIX platform on every host (including Windows CI) so that
+      // the shell configuration resolves to bash for these cases.
+      let platformSpy: MockInstance<typeof os.platform>;
+
+      beforeEach(() => {
+        platformSpy = vi.spyOn(os, 'platform').mockReturnValue('linux');
+      });
+
+      afterEach(() => {
+        platformSpy.mockRestore();
+      });
+
+      it('approves known read-only commands with literal arguments', async () => {
+        expect(await isStrictlyApproved('ls', ['-la'], ['cat'])).toBe(true);
+      });
+
+      it('approves commands whose root tools are all explicitly approved', async () => {
+        expect(
+          await isStrictlyApproved(
+            'bash',
+            ['-c', 'find . {-delete,}'],
+            ['find'],
+          ),
+        ).toBe(true);
+      });
+
+      it('does not approve unlisted tools whose arguments change after shell expansion', async () => {
+        expect(
+          await isStrictlyApproved(
+            'bash',
+            ['-c', 'find . {-delete,}'],
+            ['cat'],
+          ),
+        ).toBe(false);
+      });
+    });
+  });
+
+  describe('shell wrapper scripts in isKnownSafeCommand', () => {
+    // Report a POSIX platform on every host (including Windows CI) so that
+    // the shell configuration resolves to bash for these cases.
+    let platformSpy: MockInstance<typeof os.platform>;
+
+    beforeEach(() => {
+      platformSpy = vi.spyOn(os, 'platform').mockReturnValue('linux');
+    });
+
+    afterEach(() => {
+      platformSpy.mockRestore();
+    });
+
+    it('rejects wrapped scripts whose arguments change after shell expansion', () => {
+      for (const shell of ['bash', 'zsh']) {
+        for (const flag of ['-c', '-lc']) {
+          expect(
+            isKnownSafeCommand([shell, flag, 'find . -maxdepth 0 {-delete,}']),
+          ).toBe(false);
+        }
+      }
+    });
+
+    it('accepts wrapped read-only scripts with literal arguments', () => {
+      expect(isKnownSafeCommand(['bash', '-lc', 'ls -la'])).toBe(true);
+      expect(isKnownSafeCommand(['zsh', '-c', "grep -E 'a{1,3}' f.txt"])).toBe(
+        true,
       );
     });
   });

@@ -13,6 +13,21 @@ import {
   spawnSync,
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
+import {
+  CommandParseCache,
+  getActiveCommandParseCache,
+  runWithCommandParseCache,
+  type CommandParseResult,
+  type ParsedCommandDetail,
+} from './shell-parse-cache.js';
+
+export {
+  CommandParseCache,
+  getActiveCommandParseCache,
+  runWithCommandParseCache,
+  type CommandParseResult,
+  type ParsedCommandDetail,
+};
 
 /**
  * Extracts the primary command name from a potentially wrapped shell command.
@@ -29,7 +44,7 @@ export async function getCommandName(
   await initializeShellParsers();
   const fullCmd = [command, ...args].join(' ');
   const stripped = stripShellWrapper(fullCmd);
-  const roots = getCommandRoots(stripped).filter(
+  const roots = (await getCommandRootsAsync(stripped)).filter(
     (r) => r !== 'shopt' && r !== 'set',
   );
   if (roots.length > 0) {
@@ -184,20 +199,6 @@ export async function initializeShellParsers(): Promise<void> {
   }
 
   await treeSitterInitialization;
-}
-
-export interface ParsedCommandDetail {
-  name: string;
-  text: string;
-  startIndex: number;
-  args?: string[];
-}
-
-interface CommandParseResult {
-  details: ParsedCommandDetail[];
-  hasError: boolean;
-  hasRedirection?: boolean;
-  hasCommandSubstitution?: boolean;
 }
 
 const POWERSHELL_COMMAND_ENV = '__GCLI_POWERSHELL_COMMAND__';
@@ -566,9 +567,117 @@ export function parseBashCommandDetails(
   };
 }
 
+interface RawPowerShellCommand {
+  name?: unknown;
+  text?: unknown;
+  startIndex?: unknown;
+  args?: unknown;
+}
+
+interface RawPowerShellParsePayload {
+  success?: unknown;
+  commands?: unknown;
+  hasRedirection?: unknown;
+  hasCommandSubstitution?: unknown;
+}
+
+function isRawPowerShellCommand(value: unknown): value is RawPowerShellCommand {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isRawPowerShellParsePayload(
+  value: unknown,
+): value is RawPowerShellParsePayload {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parsePowerShellParserOutput(
+  rawStdout: string,
+  originalCommand: string,
+): CommandParseResult {
+  const output = rawStdout.trim();
+  if (!output) {
+    return { details: [], hasError: true };
+  }
+
+  let parsedUnknown: unknown;
+  try {
+    parsedUnknown = JSON.parse(output);
+  } catch {
+    return { details: [], hasError: true };
+  }
+
+  if (
+    !isRawPowerShellParsePayload(parsedUnknown) ||
+    parsedUnknown.success !== true
+  ) {
+    return { details: [], hasError: true };
+  }
+
+  const rawCommandsField = parsedUnknown.commands;
+  const rawCommands: unknown[] = Array.isArray(rawCommandsField)
+    ? rawCommandsField
+    : isRawPowerShellCommand(rawCommandsField)
+      ? [rawCommandsField]
+      : [];
+
+  const details = rawCommands
+    .map((commandDetail): ParsedCommandDetail | null => {
+      if (
+        !isRawPowerShellCommand(commandDetail) ||
+        typeof commandDetail.name !== 'string'
+      ) {
+        return null;
+      }
+
+      const name = normalizeCommandName(commandDetail.name);
+      const text =
+        typeof commandDetail.text === 'string'
+          ? commandDetail.text.trim()
+          : originalCommand;
+      const rawArgs = commandDetail.args;
+
+      return {
+        name,
+        text,
+        startIndex:
+          typeof commandDetail.startIndex === 'number'
+            ? commandDetail.startIndex
+            : 0,
+        args: Array.isArray(rawArgs)
+          ? rawArgs.filter((arg): arg is string => typeof arg === 'string')
+          : undefined,
+      };
+    })
+    .filter((detail): detail is ParsedCommandDetail => detail !== null)
+    .sort((a, b) => a.startIndex - b.startIndex);
+
+  return {
+    details,
+    hasError: details.length === 0,
+    hasRedirection:
+      typeof parsedUnknown.hasRedirection === 'boolean'
+        ? parsedUnknown.hasRedirection
+        : undefined,
+    hasCommandSubstitution:
+      typeof parsedUnknown.hasCommandSubstitution === 'boolean'
+        ? parsedUnknown.hasCommandSubstitution
+        : false,
+  };
+}
+
+// Coalesces strictly concurrent in-flight async PowerShell AST parses across
+// callers (e.g. Scheduler validation and UI turn-activity hooks) and removes
+// entries immediately on completion so no process-wide parse state is retained.
+const globalInFlightPowerShellParses = new Map<
+  string,
+  Promise<CommandParseResult | null>
+>();
+
 function parsePowerShellCommandDetails(
   command: string,
   executable: string,
+  cache?: CommandParseCache,
 ): CommandParseResult | null {
   const trimmed = command.trim();
   if (!trimmed) {
@@ -576,6 +685,11 @@ function parsePowerShellCommandDetails(
       details: [],
       hasError: true,
     };
+  }
+
+  const activeCache = cache ?? getActiveCommandParseCache();
+  if (activeCache?.hasCompleted(executable, command)) {
+    return activeCache.getCompleted(executable, command) ?? null;
   }
 
   try {
@@ -598,84 +712,151 @@ function parsePowerShellCommandDetails(
     );
 
     if (result.error || result.status !== 0) {
+      activeCache?.setCompleted(executable, command, null);
       return null;
     }
 
-    const output = (result.stdout ?? '').toString().trim();
-    if (!output) {
-      return { details: [], hasError: true };
-    }
-
-    interface RawPowerShellCommand {
-      name?: string;
-      text?: string;
-      startIndex?: number;
-      args?: string[];
-    }
-
-    let parsed: {
-      success?: boolean;
-      commands?: RawPowerShellCommand[] | RawPowerShellCommand;
-      hasRedirection?: boolean;
-      hasCommandSubstitution?: boolean;
-    } | null = null;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      parsed = JSON.parse(output);
-    } catch {
-      return { details: [], hasError: true };
-    }
-
-    if (!parsed?.success) {
-      return { details: [], hasError: true };
-    }
-
-    const rawCommands = Array.isArray(parsed.commands)
-      ? parsed.commands
-      : parsed.commands
-        ? [parsed.commands]
-        : [];
-
-    const details = rawCommands
-      .map((commandDetail): ParsedCommandDetail | null => {
-        if (!commandDetail || typeof commandDetail.name !== 'string') {
-          return null;
-        }
-
-        const name = normalizeCommandName(commandDetail.name);
-        const text =
-          typeof commandDetail.text === 'string'
-            ? commandDetail.text.trim()
-            : command;
-
-        return {
-          name,
-          text,
-          startIndex:
-            typeof commandDetail.startIndex === 'number'
-              ? commandDetail.startIndex
-              : 0,
-          args: Array.isArray(commandDetail.args)
-            ? commandDetail.args
-            : undefined,
-        };
-      })
-      .filter((detail): detail is ParsedCommandDetail => detail !== null)
-      .sort((a, b) => a.startIndex - b.startIndex);
-
-    return {
-      details,
-      hasError: details.length === 0,
-      hasRedirection: parsed.hasRedirection,
-      hasCommandSubstitution: parsed.hasCommandSubstitution ?? false,
-    };
+    const parsed = parsePowerShellParserOutput(
+      (result.stdout ?? '').toString(),
+      command,
+    );
+    activeCache?.setCompleted(executable, command, parsed);
+    return parsed;
   } catch {
+    activeCache?.setCompleted(executable, command, null);
     return null;
   }
 }
 
+async function parsePowerShellCommandDetailsAsync(
+  command: string,
+  executable: string,
+  cache?: CommandParseCache,
+  signal?: AbortSignal,
+): Promise<CommandParseResult | null> {
+  const trimmed = command.trim();
+  if (!trimmed) {
+    return {
+      details: [],
+      hasError: true,
+    };
+  }
+
+  if (signal?.aborted) {
+    return null;
+  }
+
+  const activeCache = cache ?? getActiveCommandParseCache();
+  if (activeCache?.hasCompleted(executable, command)) {
+    return activeCache.getCompleted(executable, command) ?? null;
+  }
+
+  const existingInFlight = activeCache?.getInFlight(executable, command);
+  if (existingInFlight) {
+    return existingInFlight;
+  }
+
+  const globalKey = `${executable}\0${command}`;
+  if (!signal) {
+    const existingGlobalInFlight =
+      globalInFlightPowerShellParses.get(globalKey);
+    if (existingGlobalInFlight) {
+      const joinedPromise = existingGlobalInFlight.then((result) => {
+        activeCache?.setCompleted(executable, command, result);
+        return result;
+      });
+      if (activeCache) {
+        return activeCache.trackInFlight(executable, command, joinedPromise);
+      }
+      return joinedPromise;
+    }
+  }
+
+  const parsePromise = new Promise<CommandParseResult | null>((resolve) => {
+    let settled = false;
+    const finish = (value: CommandParseResult | null, cacheResult = true) => {
+      if (!settled) {
+        settled = true;
+        if (cacheResult && !signal?.aborted) {
+          activeCache?.setCompleted(executable, command, value);
+        }
+        resolve(value);
+      }
+    };
+
+    let child;
+    try {
+      child = spawn(
+        executable,
+        [
+          '-NoLogo',
+          '-NoProfile',
+          '-NonInteractive',
+          '-EncodedCommand',
+          POWERSHELL_PARSER_SCRIPT,
+        ],
+        {
+          env: {
+            ...process.env,
+            [POWERSHELL_COMMAND_ENV]: command,
+          },
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: true,
+          ...(signal ? { signal } : {}),
+        },
+      );
+    } catch {
+      finish(null, !signal?.aborted);
+      return;
+    }
+
+    let stdout = '';
+    child.stdout?.setEncoding('utf-8');
+    child.stdout?.on('data', (chunk: string | Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.stderr?.on('data', () => {
+      // Drain stderr to avoid blocking child exit if diagnostics are written.
+    });
+    child.on('error', (err) => {
+      if (err.name === 'AbortError' || signal?.aborted) {
+        finish(null, false);
+        return;
+      }
+      finish(null);
+    });
+    child.on('close', (code) => {
+      if (signal?.aborted) {
+        finish(null, false);
+        return;
+      }
+      if (code !== 0) {
+        finish(null);
+        return;
+      }
+      const parsed = parsePowerShellParserOutput(stdout, command);
+      finish(parsed);
+    });
+  });
+
+  if (!signal) {
+    globalInFlightPowerShellParses.set(globalKey, parsePromise);
+    void parsePromise.finally(() => {
+      if (globalInFlightPowerShellParses.get(globalKey) === parsePromise) {
+        globalInFlightPowerShellParses.delete(globalKey);
+      }
+    });
+  }
+
+  if (activeCache) {
+    return activeCache.trackInFlight(executable, command, parsePromise);
+  }
+  return parsePromise;
+}
+
 export function parseCommandDetails(
   command: string,
+  cache?: CommandParseCache,
 ): CommandParseResult | null {
   const configuration = getShellConfiguration();
 
@@ -683,6 +864,7 @@ export function parseCommandDetails(
     const result = parsePowerShellCommandDetails(
       command,
       configuration.executable,
+      cache,
     );
     if (!result || result.hasError) {
       // Never fall back to the Bash parser when PowerShell command substitution
@@ -707,6 +889,54 @@ export function parseCommandDetails(
   }
 
   return null;
+}
+
+export async function parseCommandDetailsAsync(
+  command: string,
+  cache?: CommandParseCache,
+  signal?: AbortSignal,
+): Promise<CommandParseResult | null> {
+  if (signal?.aborted) {
+    return null;
+  }
+
+  const configuration = getShellConfiguration();
+
+  if (configuration.shell === 'powershell') {
+    const result = await parsePowerShellCommandDetailsAsync(
+      command,
+      configuration.executable,
+      cache,
+      signal,
+    );
+    if (signal?.aborted) {
+      return null;
+    }
+    if (!result || result.hasError) {
+      if (detectPowerShellSubstitution(command)) {
+        return result ?? { details: [], hasError: true };
+      }
+      await initializeShellParsers();
+      const bashResult = parseBashCommandDetails(command);
+      if (bashResult && !bashResult.hasError) {
+        return bashResult;
+      }
+    }
+    return result;
+  }
+
+  if (configuration.shell === 'bash') {
+    await initializeShellParsers();
+    return parseBashCommandDetails(command);
+  }
+
+  return null;
+}
+
+const defaultParseCommandDetailsRef = parseCommandDetails;
+
+export function isDefaultParseCommandDetails(fn: unknown): boolean {
+  return fn === defaultParseCommandDetailsRef;
 }
 
 /**
@@ -818,7 +1048,36 @@ export function escapeShellArg(arg: string, shell: ShellType): string {
  * Checks if a command contains redirection operators.
  * Uses shell-specific parsers where possible, falling back to a broad regex check.
  */
-export function hasRedirection(command: string): boolean {
+function hasBashTreeRedirection(
+  command: string,
+  fallbackCheck: () => boolean,
+): boolean {
+  const tree = parseCommandTree(command);
+  if (!tree) return fallbackCheck();
+
+  const stack: Node[] = [tree.rootNode];
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    if (
+      current.type === 'redirected_statement' ||
+      current.type === 'file_redirect' ||
+      current.type === 'heredoc_redirect' ||
+      current.type === 'herestring_redirect'
+    ) {
+      return true;
+    }
+    for (let i = current.childCount - 1; i >= 0; i -= 1) {
+      const child = current.child(i);
+      if (child) stack.push(child);
+    }
+  }
+  return false;
+}
+
+export function hasRedirection(
+  command: string,
+  cache?: CommandParseCache,
+): boolean {
   const fallbackCheck = () => /[><]/.test(command);
 
   // If there are no redirection characters at all, we can skip parsing.
@@ -832,6 +1091,7 @@ export function hasRedirection(command: string): boolean {
     const parsed = parsePowerShellCommandDetails(
       command,
       configuration.executable,
+      cache,
     );
     return parsed && !parsed.hasError
       ? !!parsed.hasRedirection
@@ -839,33 +1099,291 @@ export function hasRedirection(command: string): boolean {
   }
 
   if (configuration.shell === 'bash' && bashLanguage) {
-    const tree = parseCommandTree(command);
-    if (!tree) return fallbackCheck();
-
-    const stack: Node[] = [tree.rootNode];
-    while (stack.length > 0) {
-      const current = stack.pop()!;
-      if (
-        current.type === 'redirected_statement' ||
-        current.type === 'file_redirect' ||
-        current.type === 'heredoc_redirect' ||
-        current.type === 'herestring_redirect'
-      ) {
-        return true;
-      }
-      for (let i = current.childCount - 1; i >= 0; i -= 1) {
-        const child = current.child(i);
-        if (child) stack.push(child);
-      }
-    }
-    return false;
+    return hasBashTreeRedirection(command, fallbackCheck);
   }
 
   return fallbackCheck();
 }
 
-export function splitCommands(command: string): string[] {
-  const parsed = parseCommandDetails(command);
+export async function hasRedirectionAsync(
+  command: string,
+  cache?: CommandParseCache,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  if (signal?.aborted) {
+    return false;
+  }
+
+  const fallbackCheck = () => /[><]/.test(command);
+
+  if (!fallbackCheck()) {
+    return false;
+  }
+
+  const configuration = getShellConfiguration();
+
+  if (configuration.shell === 'powershell') {
+    const parsed = await parsePowerShellCommandDetailsAsync(
+      command,
+      configuration.executable,
+      cache,
+      signal,
+    );
+    if (signal?.aborted) {
+      return false;
+    }
+    return parsed && !parsed.hasError
+      ? !!parsed.hasRedirection
+      : fallbackCheck();
+  }
+
+  if (configuration.shell === 'bash') {
+    await initializeShellParsers();
+    if (bashLanguage) {
+      return hasBashTreeRedirection(command, fallbackCheck);
+    }
+  }
+
+  return fallbackCheck();
+}
+
+/**
+ * Syntax tree node types whose value bash computes when the command runs:
+ * parameter and variable expansion, ANSI-C quoting, arithmetic expansion,
+ * command and process substitution, and brace sequence expressions.
+ */
+const SHELL_EXPANSION_NODE_TYPES = new Set([
+  'simple_expansion',
+  'expansion',
+  'ansi_c_string',
+  'arithmetic_expansion',
+  'command_substitution',
+  'process_substitution',
+  'brace_expression',
+]);
+
+/**
+ * Returns the text of a `word` or `concatenation` node with every quoted part
+ * replaced by a placeholder, because quoted text is never globbed or brace
+ * expanded.
+ */
+function getUnquotedWordText(node: Node): string {
+  if (node.type !== 'concatenation') {
+    return node.text;
+  }
+  let text = '';
+  for (let i = 0; i < node.childCount; i += 1) {
+    const child = node.child(i);
+    if (!child) {
+      continue;
+    }
+    const isQuoted =
+      child.type === 'raw_string' ||
+      child.type === 'string' ||
+      child.type === 'ansi_c_string';
+    text += isQuoted ? '_' : child.text;
+  }
+  return text;
+}
+
+/**
+ * Checks unquoted word text for syntax that bash and the `shell-quote`
+ * tokenizer read differently: glob patterns (`*`, `?`, `[...]`), brace groups
+ * that contain a `,` or `..` at their own nesting level (such as `{a,b}` or
+ * `{a..c}`), and a `#` inside a word. Bash keeps a `#` that doesn't start a
+ * word as a literal character, but `shell-quote` starts a comment there and
+ * drops the rest of the command. Backslash-escaped characters are literal.
+ */
+function hasUnquotedWordSyntax(text: string): boolean {
+  let hasOpenBracket = false;
+  // One entry per open brace group: whether it contains a separator.
+  const braceGroups: boolean[] = [];
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (char === '\\') {
+      i += 1;
+    } else if (char === '*' || char === '?' || (char === '#' && i > 0)) {
+      return true;
+    } else if (char === '[') {
+      hasOpenBracket = true;
+    } else if (char === ']' && hasOpenBracket) {
+      return true;
+    } else if (char === '{') {
+      braceGroups.push(false);
+    } else if (char === '}' && braceGroups.length > 0) {
+      if (braceGroups.pop()) {
+        return true;
+      }
+    } else if (
+      braceGroups.length > 0 &&
+      (char === ',' || (char === '.' && text[i + 1] === '.'))
+    ) {
+      braceGroups[braceGroups.length - 1] = true;
+    }
+  }
+  return false;
+}
+
+const WHITESPACE = /\s/;
+
+/**
+ * Checks for a backslash-newline line continuation that changes an argument.
+ * Bash removes the pair before it splits words, so `-ex\<newline>ec` runs as
+ * `-exec`, and the pair is also removed inside double quotes. A continuation
+ * between two separate words (whitespace on either side) doesn't change any
+ * argument. Continuations inside single quotes or comments are literal.
+ */
+function hasArgumentLineContinuation(root: Node, command: string): boolean {
+  for (
+    let newline = command.indexOf('\n');
+    newline !== -1;
+    newline = command.indexOf('\n', newline + 1)
+  ) {
+    const end = command[newline - 1] === '\r' ? newline - 1 : newline;
+    let backslashes = 0;
+    while (command[end - 1 - backslashes] === '\\') {
+      backslashes += 1;
+    }
+    if (backslashes % 2 === 0) {
+      continue;
+    }
+
+    const backslash = end - 1;
+    let isQuoted = false;
+    let isLiteral = false;
+    for (
+      let node = root.descendantForIndex(backslash, backslash + 1);
+      node;
+      node = node.parent
+    ) {
+      if (node.type === 'raw_string' || node.type === 'comment') {
+        isLiteral = true;
+        break;
+      }
+      if (node.type === 'string') {
+        isQuoted = true;
+        break;
+      }
+    }
+    if (isLiteral) {
+      continue;
+    }
+
+    const before = command[backslash - 1];
+    const after = command[newline + 1];
+    const joinsWords =
+      before !== undefined &&
+      !WHITESPACE.test(before) &&
+      after !== undefined &&
+      !WHITESPACE.test(after);
+    if (isQuoted || joinsWords) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Checks whether bash would rewrite the arguments of a command before running
+ * it, so the unexpanded text doesn't describe what runs. This covers brace
+ * expansion, parameter and variable expansion, ANSI-C (`$'...'`) and locale
+ * (`$"..."`) quoting, arithmetic expansion, command and process substitution,
+ * unquoted glob patterns, line continuations inside an argument, and a `#`
+ * inside an unquoted word. Tilde expansion isn't reported.
+ *
+ * Returns `true` when the command can't be parsed (parser unavailable, parse
+ * timeout, or syntax errors), and `false` when the configured shell isn't
+ * bash.
+ */
+export function hasUnresolvedShellExpansion(command: string): boolean {
+  if (getShellConfiguration().shell !== 'bash') {
+    return false;
+  }
+  if (!bashLanguage) {
+    return true;
+  }
+
+  const tree = parseCommandTree(command);
+  if (!tree) {
+    return true;
+  }
+
+  try {
+    if (tree.rootNode.hasError) {
+      return true;
+    }
+
+    if (hasArgumentLineContinuation(tree.rootNode, command)) {
+      return true;
+    }
+
+    const stack: Node[] = [tree.rootNode];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+
+      // Single-quoted text never expands.
+      if (current.type === 'raw_string') {
+        continue;
+      }
+
+      if (SHELL_EXPANSION_NODE_TYPES.has(current.type)) {
+        return true;
+      }
+
+      if (current.type === 'string') {
+        // tree-sitter-bash parses locale quoting (`$"..."`) as a `$` token
+        // directly followed by a `string` node. Inside double quotes, only
+        // the `$` forms above expand, and they're checked as child nodes.
+        const previous = current.previousSibling;
+        if (
+          previous?.type === '$' &&
+          previous.endIndex === current.startIndex
+        ) {
+          return true;
+        }
+      } else if (
+        current.type === 'concatenation' ||
+        (current.type === 'word' && current.parent?.type !== 'concatenation')
+      ) {
+        if (hasUnquotedWordSyntax(getUnquotedWordText(current))) {
+          return true;
+        }
+      }
+
+      for (let i = current.childCount - 1; i >= 0; i -= 1) {
+        const child = current.child(i);
+        if (child) {
+          stack.push(child);
+        }
+      }
+    }
+    return false;
+  } finally {
+    tree.delete();
+  }
+}
+
+export function splitCommands(
+  command: string,
+  cache?: CommandParseCache,
+): string[] {
+  const parsed = parseCommandDetails(command, cache);
+  if (!parsed || parsed.hasError) {
+    return [];
+  }
+
+  return parsed.details
+    .filter((detail) => !REDIRECTION_NAMES.has(detail.name))
+    .map((detail) => detail.text)
+    .filter(Boolean);
+}
+
+export async function splitCommandsAsync(
+  command: string,
+  cache?: CommandParseCache,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  const parsed = await parseCommandDetailsAsync(command, cache, signal);
   if (!parsed || parsed.hasError) {
     return [];
   }
@@ -884,8 +1402,11 @@ export function splitCommands(command: string): string[] {
  * @example getCommandRoot("ls -la /tmp") returns "ls"
  * @example getCommandRoot("git status && npm test") returns "git"
  */
-export function getCommandRoot(command: string): string | undefined {
-  const parsed = parseCommandDetails(command);
+export function getCommandRoot(
+  command: string,
+  cache?: CommandParseCache,
+): string | undefined {
+  const parsed = parseCommandDetails(command, cache);
   if (!parsed || parsed.hasError || parsed.details.length === 0) {
     return undefined;
   }
@@ -893,12 +1414,28 @@ export function getCommandRoot(command: string): string | undefined {
   return parsed.details[0]?.name;
 }
 
-export function getCommandRoots(command: string): string[] {
+export async function getCommandRootAsync(
+  command: string,
+  cache?: CommandParseCache,
+  signal?: AbortSignal,
+): Promise<string | undefined> {
+  const parsed = await parseCommandDetailsAsync(command, cache, signal);
+  if (!parsed || parsed.hasError || parsed.details.length === 0) {
+    return undefined;
+  }
+
+  return parsed.details[0]?.name;
+}
+
+export function getCommandRoots(
+  command: string,
+  cache?: CommandParseCache,
+): string[] {
   if (!command) {
     return [];
   }
 
-  const parsed = parseCommandDetails(command);
+  const parsed = parseCommandDetails(command, cache);
   if (!parsed || parsed.hasError) {
     return [];
   }
@@ -907,6 +1444,42 @@ export function getCommandRoots(command: string): string[] {
     .map((detail) => detail.name)
     .filter((name) => !REDIRECTION_NAMES.has(name))
     .filter(Boolean);
+}
+
+export async function getCommandRootsAsync(
+  command: string,
+  cache?: CommandParseCache,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  if (!command) {
+    return [];
+  }
+
+  const parsed = await parseCommandDetailsAsync(command, cache, signal);
+  if (!parsed || parsed.hasError) {
+    return [];
+  }
+
+  return parsed.details
+    .map((detail) => detail.name)
+    .filter((name) => !REDIRECTION_NAMES.has(name))
+    .filter(Boolean);
+}
+
+const defaultHasRedirectionRef = hasRedirection;
+const defaultSplitCommandsRef = splitCommands;
+const defaultGetCommandRootsRef = getCommandRoots;
+
+export function isDefaultHasRedirection(fn: unknown): boolean {
+  return fn === defaultHasRedirectionRef;
+}
+
+export function isDefaultSplitCommands(fn: unknown): boolean {
+  return fn === defaultSplitCommandsRef;
+}
+
+export function isDefaultGetCommandRoots(fn: unknown): boolean {
+  return fn === defaultGetCommandRootsRef;
 }
 
 const PS_WRAPPER_FLAGS = new Set([
@@ -2569,16 +3142,7 @@ function isInteractiveGeminiSegment(segment: string): boolean {
   return true;
 }
 
-/**
- * Checks whether a shell command string attempts to invoke an interactive
- * `gemini` CLI session or an invalid management subcommand such as
- * `gemini config ...`.
- */
-export function isInteractiveGeminiCommand(command: string): boolean {
-  if (!command || !command.trim()) {
-    return false;
-  }
-
+function unwrapCommandForGeminiCheck(command: string): string {
   let unwrapped = command.trim();
   for (let depth = 0; depth < 3; depth++) {
     const next = stripShellWrapper(unwrapped);
@@ -2587,13 +3151,96 @@ export function isInteractiveGeminiCommand(command: string): boolean {
     }
     unwrapped = next;
   }
+  return unwrapped;
+}
 
-  const parsedSegments = splitCommands(unwrapped);
+const GEMINI_SUBSEQUENCE = 'gemini';
+
+/**
+ * Checks in O(n) time whether `input` contains the characters `g`, `e`, `m`,
+ * `i`, `n`, `i` in order (case-insensitively, including across newlines)
+ * without regex backtracking.
+ */
+function containsGeminiSubsequence(input: string): boolean {
+  const lower = input.toLowerCase();
+  let pos = 0;
+  for (const ch of GEMINI_SUBSEQUENCE) {
+    const found = lower.indexOf(ch, pos);
+    if (found === -1) {
+      return false;
+    }
+    pos = found + 1;
+  }
+  return true;
+}
+
+/**
+ * Performs purely in-process checks for interactive `gemini` commands without
+ * spawning any external shell parser. Returns `false` when the command cannot
+ * invoke `gemini`, `true` when synchronous segment tokenization already detects
+ * an interactive `gemini` invocation, or `undefined` when AST command splitting
+ * is still required to disambiguate.
+ */
+export function isKnownInteractiveGeminiCommandSync(
+  command: string,
+): boolean | undefined {
+  if (!command || !command.trim()) {
+    return false;
+  }
+
+  const unwrapped = unwrapCommandForGeminiCheck(command);
+  if (!containsGeminiSubsequence(unwrapped)) {
+    return false;
+  }
+
   const fallbackSegments = splitShellCommandSegments(unwrapped);
-  const allSegments =
-    parsedSegments.length > 0
-      ? [...parsedSegments, ...fallbackSegments]
-      : fallbackSegments;
+  if (fallbackSegments.some((segment) => isInteractiveGeminiSegment(segment))) {
+    return true;
+  }
 
-  return allSegments.some((segment) => isInteractiveGeminiSegment(segment));
+  return undefined;
+}
+
+/**
+ * Checks whether a shell command string attempts to invoke an interactive
+ * `gemini` CLI session or an invalid management subcommand such as
+ * `gemini config ...`.
+ */
+export function isInteractiveGeminiCommand(
+  command: string,
+  cache?: CommandParseCache,
+): boolean {
+  const fastResult = isKnownInteractiveGeminiCommandSync(command);
+  if (fastResult !== undefined) {
+    return fastResult;
+  }
+
+  const unwrapped = unwrapCommandForGeminiCheck(command);
+  const parsedSegments = splitCommands(unwrapped, cache);
+  return parsedSegments.some((segment) => isInteractiveGeminiSegment(segment));
+}
+
+export async function isInteractiveGeminiCommandAsync(
+  command: string,
+  cache?: CommandParseCache,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  if (signal?.aborted) {
+    return false;
+  }
+
+  const fastResult = isKnownInteractiveGeminiCommandSync(command);
+  if (fastResult !== undefined) {
+    return fastResult;
+  }
+
+  const unwrapped = unwrapCommandForGeminiCheck(command);
+  const parsedSegments = await splitCommandsAsync(unwrapped, cache, signal);
+  return parsedSegments.some((segment) => isInteractiveGeminiSegment(segment));
+}
+
+const defaultIsInteractiveGeminiCommandRef = isInteractiveGeminiCommand;
+
+export function isDefaultIsInteractiveGeminiCommand(fn: unknown): boolean {
+  return fn === defaultIsInteractiveGeminiCommandRef;
 }
