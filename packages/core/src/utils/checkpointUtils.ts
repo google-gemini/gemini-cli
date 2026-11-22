@@ -140,11 +140,7 @@ export async function processRestorableToolCalls<HistoryType>(
 
       const fileName = `${checkpointFileName}.json`;
       checkpointsToWrite.set(fileName, JSON.stringify(checkpointData, null, 2));
-      toolCallToCheckpointMap.set(
-        toolCall.callId,
-        // Only strip the extension; the name may itself contain ".json".
-        fileName.replace(/\.json$/, ''),
-      );
+      toolCallToCheckpointMap.set(toolCall.callId, checkpointFileName);
     } catch (error) {
       errors.push(
         `Failed to create checkpoint for ${toolCall.name}: ${getErrorMessage(
