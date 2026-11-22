@@ -35,6 +35,20 @@ export function tmpdir(): string {
 }
 
 /**
+ * Returns the per-user directory used for IDE companion discovery files.
+ *
+ * On POSIX systems where `process.getuid` is available, returns a per-user
+ * directory directly under the temporary directory (`${baseTmpDir}/gemini-ide-${uid}`).
+ * On Windows, returns `${baseTmpDir}\gemini\ide`.
+ */
+export function getIdeConnectionDir(baseTmpDir: string = tmpdir()): string {
+  if (process.getuid) {
+    return path.join(baseTmpDir, `gemini-ide-${process.getuid()}`);
+  }
+  return path.join(baseTmpDir, 'gemini', 'ide');
+}
+
+/**
  * Replaces the home directory prefix with a tilde when it matches on a path-segment boundary.
  * @param filePath - The path to tildeify.
  * @returns The tildeified path.

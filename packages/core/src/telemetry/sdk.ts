@@ -385,7 +385,7 @@ export async function initializeTelemetry(
 
   // Store processor references for manual flushing
   spanProcessor = new BatchSpanProcessor(spanExporter);
-  logRecordProcessor = new BatchLogRecordProcessor(logExporter);
+  logRecordProcessor = new BatchLogRecordProcessor({ exporter: logExporter });
 
   sdk = new NodeSDK({
     resource,

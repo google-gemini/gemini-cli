@@ -118,6 +118,7 @@ export type SerializableConfirmationDetails =
       rootCommand: string;
       rootCommands: string[];
       commands?: string[];
+      hasRedirection?: boolean;
       untrustedFlags?: string[];
       modifiedBuildFiles?: string[];
     }
