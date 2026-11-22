@@ -602,11 +602,19 @@ export class SessionSelector {
         throw SessionError.noSessionsFound();
       }
 
-      // Sort by startTime (oldest first, so newest sessions get highest numbers)
-      sessions.sort(
-        (a, b) =>
-          new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-      );
+      // Sort by lastUpdated (oldest first, so most recently active session is last).
+      // Fall back to startTime if lastUpdated timestamps are identical.
+      // Defensively fall back to 0 if getTime() returns NaN to prevent unstable sort behavior.
+      sessions.sort((a, b) => {
+        const timeA = new Date(a.lastUpdated).getTime() || 0;
+        const timeB = new Date(b.lastUpdated).getTime() || 0;
+        if (timeA !== timeB) {
+          return timeA - timeB;
+        }
+        const startA = new Date(a.startTime).getTime() || 0;
+        const startB = new Date(b.startTime).getTime() || 0;
+        return startA - startB;
+      });
 
       selectedSession = sessions[sessions.length - 1];
     } else {

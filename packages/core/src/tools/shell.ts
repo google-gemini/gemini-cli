@@ -36,16 +36,30 @@ import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
+  getCommandRootsAsync,
+  isDefaultGetCommandRoots,
+  getShellConfiguration,
   initializeShellParsers,
   stripShellWrapper,
   parseCommandDetails,
+  parseCommandDetailsAsync,
+  isDefaultParseCommandDetails,
   hasRedirection,
+  hasRedirectionAsync,
+  isDefaultHasRedirection,
   detectCommandSubstitution,
   normalizeCommand,
   escapeShellArg,
   isInteractiveGeminiCommand,
+  isInteractiveGeminiCommandAsync,
+  isKnownInteractiveGeminiCommandSync,
+  isDefaultIsInteractiveGeminiCommand,
   INTERACTIVE_GEMINI_SHELL_ERROR,
 } from '../utils/shell-utils.js';
+import {
+  CommandParseCache,
+  runWithCommandParseCache,
+} from '../utils/shell-parse-cache.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
 import { ApprovalMode, PolicyDecision } from '../policy/types.js';
@@ -57,7 +71,7 @@ import {
   findUntrustedFlags,
   getUnacknowledgedUntrustedFlags,
   isBuildOrTestCommand,
-  isRemoteContentCommand,
+  isRemoteContentCommandAsync,
   getModifiedBuildFiles,
   resetModifiedBuildFiles,
   REMOTE_SHELL_OUTPUT_SOURCE,
@@ -113,6 +127,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 > {
   private proactivePermissionsConfirmed?: SandboxPermissions;
   private confirmedCommand?: string;
+  private readonly parseCache = new CommandParseCache();
 
   constructor(
     private readonly context: AgentLoopContext,
@@ -122,6 +137,56 @@ export class ShellToolInvocation extends BaseToolInvocation<
     _toolDisplayName?: string,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
+  }
+
+  runInCommandParseCache<T>(fn: () => T): T {
+    return runWithCommandParseCache(fn, this.parseCache);
+  }
+
+  async prepareCommandParseCache(signal?: AbortSignal): Promise<void> {
+    if (
+      signal?.aborted ||
+      typeof stripShellWrapper !== 'function' ||
+      !isDefaultParseCommandDetails(parseCommandDetails)
+    ) {
+      return;
+    }
+    const rawCommand = this.params.command;
+    const stripped = stripShellWrapper(rawCommand);
+    let unwrapped = stripped;
+    for (let depth = 0; depth < 3; depth++) {
+      const next = stripShellWrapper(unwrapped);
+      if (next === unwrapped) {
+        break;
+      }
+      unwrapped = next;
+    }
+    await parseCommandDetailsAsync(stripped, this.parseCache, signal);
+    if (unwrapped !== stripped && !signal?.aborted) {
+      await parseCommandDetailsAsync(unwrapped, this.parseCache, signal);
+    }
+  }
+
+  private hasCachedCommandParse(command: string): boolean {
+    if (typeof getShellConfiguration !== 'function') {
+      return false;
+    }
+    const configuration = getShellConfiguration();
+    if (configuration.shell !== 'powershell') {
+      return true;
+    }
+    let unwrapped = command.trim();
+    for (let depth = 0; depth < 3; depth++) {
+      const next = stripShellWrapper(unwrapped);
+      if (next === unwrapped) {
+        break;
+      }
+      unwrapped = next;
+    }
+    return (
+      this.parseCache.hasCompleted(configuration.executable, command) &&
+      this.parseCache.hasCompleted(configuration.executable, unwrapped)
+    );
   }
 
   /**
@@ -308,295 +373,337 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   hasTaintedOrBuildFileRisk(): boolean {
-    const command = stripShellWrapper(this.params.command);
-    const untrustedFlags = this.getUntrustedFlags(command);
-    const modifiedBuildFiles = getModifiedBuildFiles(this.context.config);
-    const isBuildCmd = isBuildOrTestCommand(command);
+    return this.runInCommandParseCache(() => {
+      const command = stripShellWrapper(this.params.command);
+      const untrustedFlags = this.getUntrustedFlags(command);
+      const modifiedBuildFiles = getModifiedBuildFiles(this.context.config);
+      const isBuildCmd = isBuildOrTestCommand(command);
 
-    return (
-      untrustedFlags.length > 0 || (isBuildCmd && modifiedBuildFiles.length > 0)
-    );
+      return (
+        untrustedFlags.length > 0 ||
+        (isBuildCmd && modifiedBuildFiles.length > 0)
+      );
+    });
   }
 
   override getPolicyUpdateOptions(
     outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
-    if (
-      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave ||
-      outcome === ToolConfirmationOutcome.ProceedAlways
-    ) {
-      const command = stripShellWrapper(this.params.command);
-      if (this.hasTaintedOrBuildFileRisk()) {
-        return undefined;
-      }
-      const rootCommands = [...new Set(getCommandRoots(command))];
-      const allowRedirection = hasRedirection(command) ? true : undefined;
-      const allowCommandSubstitution = detectCommandSubstitution(command)
-        ? true
-        : undefined;
+    return this.runInCommandParseCache(() => {
+      if (
+        outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave ||
+        outcome === ToolConfirmationOutcome.ProceedAlways
+      ) {
+        const command = stripShellWrapper(this.params.command);
+        if (this.hasTaintedOrBuildFileRisk()) {
+          return undefined;
+        }
+        const rootCommands = [...new Set(getCommandRoots(command))];
+        const allowRedirection = hasRedirection(command) ? true : undefined;
+        const allowCommandSubstitution = detectCommandSubstitution(command)
+          ? true
+          : undefined;
 
-      if (rootCommands.length > 0) {
+        if (rootCommands.length > 0) {
+          return {
+            commandPrefix: rootCommands,
+            allowRedirection,
+            ...(allowCommandSubstitution !== undefined
+              ? { allowCommandSubstitution }
+              : {}),
+          };
+        }
         return {
-          commandPrefix: rootCommands,
+          commandPrefix: this.params.command,
           allowRedirection,
           ...(allowCommandSubstitution !== undefined
             ? { allowCommandSubstitution }
             : {}),
         };
       }
-      return {
-        commandPrefix: this.params.command,
-        allowRedirection,
-        ...(allowCommandSubstitution !== undefined
-          ? { allowCommandSubstitution }
-          : {}),
-      };
-    }
-    return undefined;
+      return undefined;
+    });
   }
 
   override async shouldConfirmExecute(
     abortSignal: AbortSignal,
     forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (isInteractiveGeminiCommand(stripShellWrapper(this.params.command))) {
-      return false;
-    }
+    return this.runInCommandParseCache(async () => {
+      await this.prepareCommandParseCache(abortSignal);
+      const strippedForInteractiveCheck = stripShellWrapper(
+        this.params.command,
+      );
+      const isInteractive = isDefaultIsInteractiveGeminiCommand(
+        isInteractiveGeminiCommand,
+      )
+        ? await isInteractiveGeminiCommandAsync(
+            strippedForInteractiveCheck,
+            this.parseCache,
+            abortSignal,
+          )
+        : isInteractiveGeminiCommand(strippedForInteractiveCheck);
+      if (isInteractive) {
+        return false;
+      }
 
-    if (forcedDecision === 'deny') {
-      return super.shouldConfirmExecute(abortSignal, forcedDecision);
-    }
+      if (forcedDecision === 'deny') {
+        return super.shouldConfirmExecute(abortSignal, forcedDecision);
+      }
 
-    if (this.hasTaintedOrBuildFileRisk()) {
-      return this.getConfirmationDetails(abortSignal);
-    }
+      if (this.hasTaintedOrBuildFileRisk()) {
+        return this.getConfirmationDetails(abortSignal);
+      }
 
-    if (
-      this.context.config.getApprovalMode() === ApprovalMode.YOLO &&
-      forcedDecision !== 'ask_user'
-    ) {
-      return super.shouldConfirmExecute(abortSignal, forcedDecision);
-    }
+      if (
+        this.context.config.getApprovalMode() === ApprovalMode.YOLO &&
+        forcedDecision !== 'ask_user'
+      ) {
+        return super.shouldConfirmExecute(abortSignal, forcedDecision);
+      }
 
-    if (this.params[PARAM_ADDITIONAL_PERMISSIONS]) {
-      return this.getConfirmationDetails(abortSignal);
-    }
+      if (this.params[PARAM_ADDITIONAL_PERMISSIONS]) {
+        return this.getConfirmationDetails(abortSignal);
+      }
 
-    if (this.context.config.getSandboxEnabled()) {
-      const command = stripShellWrapper(this.params.command);
-      const rootCommands = getCommandRoots(command);
-      const rawRootCommand = rootCommands[0];
+      if (this.context.config.getSandboxEnabled()) {
+        const command = stripShellWrapper(this.params.command);
+        const rootCommands = isDefaultGetCommandRoots(getCommandRoots)
+          ? await getCommandRootsAsync(command, this.parseCache, abortSignal)
+          : getCommandRoots(command);
+        const rawRootCommand = rootCommands[0];
 
-      if (rawRootCommand) {
-        const rootCommand = normalizeCommand(rawRootCommand);
-        const proactive = await getProactiveToolSuggestions(rootCommand);
-        if (proactive) {
-          const mode = this.context.config.getApprovalMode();
-          const modeConfig =
-            this.context.config.sandboxPolicyManager.getModeConfig(mode);
-          const approved =
-            this.context.config.sandboxPolicyManager.getCommandPermissions(
+        if (rawRootCommand) {
+          const rootCommand = normalizeCommand(rawRootCommand);
+          const proactive = await getProactiveToolSuggestions(rootCommand);
+          if (proactive) {
+            const mode = this.context.config.getApprovalMode();
+            const modeConfig =
+              this.context.config.sandboxPolicyManager.getModeConfig(mode);
+            const approved =
+              this.context.config.sandboxPolicyManager.getCommandPermissions(
+                rootCommand,
+              );
+
+            const hasNetwork = modeConfig.network || approved.network;
+            const missingNetwork = !!proactive.network && !hasNetwork;
+
+            // Detect commands or sub-commands that definitely need network
+            const parsed = isDefaultParseCommandDetails(parseCommandDetails)
+              ? await parseCommandDetailsAsync(
+                  command,
+                  this.parseCache,
+                  abortSignal,
+                )
+              : parseCommandDetails(command);
+            const subCommand = parsed?.details[0]?.args?.[0];
+            const needsNetwork = isNetworkReliantCommand(
               rootCommand,
+              subCommand,
             );
 
-          const hasNetwork = modeConfig.network || approved.network;
-          const missingNetwork = !!proactive.network && !hasNetwork;
+            if (needsNetwork) {
+              // Add write permission to the current directory if we are in readonly mode
+              const isReadonlyMode = modeConfig.readonly ?? false;
 
-          // Detect commands or sub-commands that definitely need network
-          const parsed = parseCommandDetails(command);
-          const subCommand = parsed?.details[0]?.args?.[0];
-          const needsNetwork = isNetworkReliantCommand(rootCommand, subCommand);
-
-          if (needsNetwork) {
-            // Add write permission to the current directory if we are in readonly mode
-            const isReadonlyMode = modeConfig.readonly ?? false;
-
-            if (isReadonlyMode) {
-              const cwd =
-                this.params.dir_path || this.context.config.getTargetDir();
-              proactive.fileSystem = proactive.fileSystem || {
-                read: [],
-                write: [],
-              };
-              proactive.fileSystem.write = proactive.fileSystem.write || [];
-              if (!proactive.fileSystem.write.includes(cwd)) {
-                proactive.fileSystem.write.push(cwd);
-                proactive.fileSystem.read = proactive.fileSystem.read || [];
-                if (!proactive.fileSystem.read.includes(cwd)) {
-                  proactive.fileSystem.read.push(cwd);
+              if (isReadonlyMode) {
+                const cwd =
+                  this.params.dir_path || this.context.config.getTargetDir();
+                proactive.fileSystem = proactive.fileSystem || {
+                  read: [],
+                  write: [],
+                };
+                proactive.fileSystem.write = proactive.fileSystem.write || [];
+                if (!proactive.fileSystem.write.includes(cwd)) {
+                  proactive.fileSystem.write.push(cwd);
+                  proactive.fileSystem.read = proactive.fileSystem.read || [];
+                  if (!proactive.fileSystem.read.includes(cwd)) {
+                    proactive.fileSystem.read.push(cwd);
+                  }
                 }
               }
-            }
 
-            const isApproved = (
-              requestedPath: string,
-              approvedPaths?: string[],
-            ): boolean => {
-              if (!approvedPaths || approvedPaths.length === 0) return false;
-              const requestedRealIdentity = toPathKey(
-                resolveToRealPath(requestedPath),
-              );
-
-              // Identity check is fast, subpath check is slower
-              return approvedPaths.some((p) => {
-                const approvedRealIdentity = toPathKey(resolveToRealPath(p));
-                return (
-                  requestedRealIdentity === approvedRealIdentity ||
-                  isSubpath(approvedRealIdentity, requestedRealIdentity)
+              const isApproved = (
+                requestedPath: string,
+                approvedPaths?: string[],
+              ): boolean => {
+                if (!approvedPaths || approvedPaths.length === 0) return false;
+                const requestedRealIdentity = toPathKey(
+                  resolveToRealPath(requestedPath),
                 );
-              });
-            };
 
-            const missingRead = (proactive.fileSystem?.read || []).filter(
-              (p) => !isApproved(p, approved.fileSystem?.read),
-            );
-            const missingWrite = (proactive.fileSystem?.write || []).filter(
-              (p) => !isApproved(p, approved.fileSystem?.write),
-            );
+                // Identity check is fast, subpath check is slower
+                return approvedPaths.some((p) => {
+                  const approvedRealIdentity = toPathKey(resolveToRealPath(p));
+                  return (
+                    requestedRealIdentity === approvedRealIdentity ||
+                    isSubpath(approvedRealIdentity, requestedRealIdentity)
+                  );
+                });
+              };
 
-            const needsExpansion =
-              missingRead.length > 0 ||
-              missingWrite.length > 0 ||
-              missingNetwork;
-
-            if (needsExpansion) {
-              const details = await this.getConfirmationDetails(
-                abortSignal,
-                proactive,
+              const missingRead = (proactive.fileSystem?.read || []).filter(
+                (p) => !isApproved(p, approved.fileSystem?.read),
               );
-              if (details && details.type === 'sandbox_expansion') {
-                const originalOnConfirm = details.onConfirm;
-                details.onConfirm = async (
-                  outcome: ToolConfirmationOutcome,
-                ) => {
-                  await originalOnConfirm(outcome);
-                  if (outcome !== ToolConfirmationOutcome.Cancel) {
-                    this.proactivePermissionsConfirmed = proactive;
-                  }
-                };
+              const missingWrite = (proactive.fileSystem?.write || []).filter(
+                (p) => !isApproved(p, approved.fileSystem?.write),
+              );
+
+              const needsExpansion =
+                missingRead.length > 0 ||
+                missingWrite.length > 0 ||
+                missingNetwork;
+
+              if (needsExpansion) {
+                const details = await this.getConfirmationDetails(
+                  abortSignal,
+                  proactive,
+                );
+                if (details && details.type === 'sandbox_expansion') {
+                  const originalOnConfirm = details.onConfirm;
+                  details.onConfirm = async (
+                    outcome: ToolConfirmationOutcome,
+                  ) => {
+                    await originalOnConfirm(outcome);
+                    if (outcome !== ToolConfirmationOutcome.Cancel) {
+                      this.proactivePermissionsConfirmed = proactive;
+                    }
+                  };
+                }
+                return details;
               }
-              return details;
             }
           }
         }
       }
-    }
 
-    return super.shouldConfirmExecute(abortSignal, forcedDecision);
+      return super.shouldConfirmExecute(abortSignal, forcedDecision);
+    });
   }
 
   protected override async getConfirmationDetails(
-    _abortSignal: AbortSignal,
+    abortSignal: AbortSignal,
     proactivePermissions?: SandboxPermissions,
   ): Promise<ToolCallConfirmationDetails | false> {
-    const command = stripShellWrapper(this.params.command);
+    return this.runInCommandParseCache(async () => {
+      const command = stripShellWrapper(this.params.command);
 
-    const parsed = parseCommandDetails(command);
-    let rootCommandDisplay = '';
+      const parsed = isDefaultParseCommandDetails(parseCommandDetails)
+        ? await parseCommandDetailsAsync(command, this.parseCache, abortSignal)
+        : parseCommandDetails(command);
+      const commandHasRedirection = isDefaultHasRedirection(hasRedirection)
+        ? await hasRedirectionAsync(command, this.parseCache, abortSignal)
+        : hasRedirection(command);
+      let rootCommandDisplay = '';
 
-    if (!parsed || parsed.hasError || parsed.details.length === 0) {
-      // Fallback if parser fails
-      const fallback = command.trim().split(/\s+/)[0];
-      rootCommandDisplay = fallback || 'shell command';
-      if (hasRedirection(command)) {
-        rootCommandDisplay += ', redirection';
+      if (!parsed || parsed.hasError || parsed.details.length === 0) {
+        // Fallback if parser fails
+        const fallback = command.trim().split(/\s+/)[0];
+        rootCommandDisplay = fallback || 'shell command';
+        if (commandHasRedirection) {
+          rootCommandDisplay += ', redirection';
+        }
+      } else {
+        rootCommandDisplay = parsed.details
+          .map((detail) => detail.name)
+          .join(', ');
       }
-    } else {
-      rootCommandDisplay = parsed.details
-        .map((detail) => detail.name)
-        .join(', ');
-    }
 
-    let rootCommands: string[] = [];
-    try {
-      rootCommands = [...new Set(getCommandRoots(command))];
-    } catch {
-      rootCommands = [command.trim().split(/\s+/)[0] || 'shell'];
-    }
-    const rootCommand = rootCommands[0] || 'shell';
+      let rootCommands: string[] = [];
+      try {
+        const computedRoots = isDefaultGetCommandRoots(getCommandRoots)
+          ? await getCommandRootsAsync(command, this.parseCache, abortSignal)
+          : getCommandRoots(command);
+        rootCommands = [...new Set(computedRoots)];
+      } catch {
+        rootCommands = [command.trim().split(/\s+/)[0] || 'shell'];
+      }
+      const rootCommand = rootCommands[0] || 'shell';
 
-    const untrustedFlags = this.getUntrustedFlags(command);
-    const modifiedBuildFiles = getModifiedBuildFiles(this.context.config);
-    const isBuildCmd = isBuildOrTestCommand(command);
+      const untrustedFlags = this.getUntrustedFlags(command);
+      const modifiedBuildFiles = getModifiedBuildFiles(this.context.config);
+      const isBuildCmd = isBuildOrTestCommand(command);
 
-    const hasSecurityWarning =
-      untrustedFlags.length > 0 ||
-      (isBuildCmd && modifiedBuildFiles.length > 0);
+      const hasSecurityWarning =
+        untrustedFlags.length > 0 ||
+        (isBuildCmd && modifiedBuildFiles.length > 0);
 
-    // Proactively suggest expansion for known network-heavy tools (npm install, etc.)
-    // to avoid hangs when network is restricted by default.
-    const effectiveAdditionalPermissions =
-      this.params[PARAM_ADDITIONAL_PERMISSIONS] || proactivePermissions;
+      // Proactively suggest expansion for known network-heavy tools (npm install, etc.)
+      // to avoid hangs when network is restricted by default.
+      const effectiveAdditionalPermissions =
+        this.params[PARAM_ADDITIONAL_PERMISSIONS] || proactivePermissions;
 
-    // Rely entirely on PolicyEngine for interactive confirmation.
-    // If we are here, it means PolicyEngine returned ASK_USER (or no message bus),
-    // so we must provide confirmation details.
-    // If additional_permissions are provided, and no security warnings are present,
-    // it's an expansion request
-    if (effectiveAdditionalPermissions && !hasSecurityWarning) {
-      return {
-        type: 'sandbox_expansion',
-        title: proactivePermissions
-          ? 'Sandbox Expansion Request (Recommended)'
-          : 'Sandbox Expansion Request',
+      // Rely entirely on PolicyEngine for interactive confirmation.
+      // If we are here, it means PolicyEngine returned ASK_USER (or no message bus),
+      // so we must provide confirmation details.
+      // If additional_permissions are provided, and no security warnings are present,
+      // it's an expansion request
+      if (effectiveAdditionalPermissions && !hasSecurityWarning) {
+        return {
+          type: 'sandbox_expansion',
+          title: proactivePermissions
+            ? 'Sandbox Expansion Request (Recommended)'
+            : 'Sandbox Expansion Request',
+          command: this.params.command,
+          rootCommand: rootCommandDisplay,
+          additionalPermissions: effectiveAdditionalPermissions,
+          onConfirm: async (outcome: ToolConfirmationOutcome) => {
+            if (
+              outcome !== ToolConfirmationOutcome.Cancel &&
+              outcome !== ToolConfirmationOutcome.ModifyWithEditor
+            ) {
+              this.confirmedCommand = this.params.command;
+            }
+            if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
+              this.context.config.sandboxPolicyManager.addPersistentApproval(
+                rootCommand,
+                effectiveAdditionalPermissions,
+              );
+            } else if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+              this.context.config.sandboxPolicyManager.addSessionApproval(
+                rootCommand,
+                effectiveAdditionalPermissions,
+              );
+            }
+          },
+        };
+      }
+
+      const confirmationDetails: ToolExecuteConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Shell Command',
         command: this.params.command,
         rootCommand: rootCommandDisplay,
-        additionalPermissions: effectiveAdditionalPermissions,
+        rootCommands,
+        hasRedirection: commandHasRedirection,
+        untrustedFlags: untrustedFlags.length > 0 ? untrustedFlags : undefined,
+        modifiedBuildFiles:
+          isBuildCmd && modifiedBuildFiles.length > 0
+            ? modifiedBuildFiles
+            : undefined,
         onConfirm: async (outcome: ToolConfirmationOutcome) => {
+          // Policy updates are now handled centrally by the scheduler
           if (
-            outcome !== ToolConfirmationOutcome.Cancel &&
-            outcome !== ToolConfirmationOutcome.ModifyWithEditor
+            outcome === ToolConfirmationOutcome.Cancel ||
+            outcome === ToolConfirmationOutcome.ModifyWithEditor
           ) {
-            this.confirmedCommand = this.params.command;
+            return;
           }
-          if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
-            this.context.config.sandboxPolicyManager.addPersistentApproval(
-              rootCommand,
-              effectiveAdditionalPermissions,
-            );
-          } else if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-            this.context.config.sandboxPolicyManager.addSessionApproval(
-              rootCommand,
-              effectiveAdditionalPermissions,
-            );
+          this.confirmedCommand = this.params.command;
+          // Remember approved flags and the reviewed build file state for the
+          // rest of the session so identical follow-up commands do not prompt.
+          acknowledgeUntrustedFlags(
+            untrustedFlags,
+            rootCommands,
+            this.context.config,
+          );
+          if (isBuildCmd && modifiedBuildFiles.length > 0) {
+            resetModifiedBuildFiles(this.context.config);
           }
         },
       };
-    }
-
-    const confirmationDetails: ToolExecuteConfirmationDetails = {
-      type: 'exec',
-      title: 'Confirm Shell Command',
-      command: this.params.command,
-      rootCommand: rootCommandDisplay,
-      rootCommands,
-      untrustedFlags: untrustedFlags.length > 0 ? untrustedFlags : undefined,
-      modifiedBuildFiles:
-        isBuildCmd && modifiedBuildFiles.length > 0
-          ? modifiedBuildFiles
-          : undefined,
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        // Policy updates are now handled centrally by the scheduler
-        if (
-          outcome === ToolConfirmationOutcome.Cancel ||
-          outcome === ToolConfirmationOutcome.ModifyWithEditor
-        ) {
-          return;
-        }
-        this.confirmedCommand = this.params.command;
-        // Remember approved flags and the reviewed build file state for the
-        // rest of the session so identical follow-up commands do not prompt.
-        acknowledgeUntrustedFlags(
-          untrustedFlags,
-          rootCommands,
-          this.context.config,
-        );
-        if (isBuildCmd && modifiedBuildFiles.length > 0) {
-          resetModifiedBuildFiles(this.context.config);
-        }
-      },
-    };
-    return confirmationDetails;
+      return confirmationDetails;
+    });
   }
 
   private async isCommandSubstitutionAllowed(
@@ -610,6 +717,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return true;
     }
 
+    await this.prepareCommandParseCache(options.abortSignal);
     if (this.hasTaintedOrBuildFileRisk()) {
       return false;
     }
@@ -633,6 +741,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   async execute(options: ExecuteOptions): Promise<ToolResult> {
+    return this.runInCommandParseCache(() => this.executeInternal(options));
+  }
+
+  private async executeInternal(options: ExecuteOptions): Promise<ToolResult> {
     const {
       abortSignal: signal,
       updateOutput,
@@ -641,7 +753,27 @@ export class ShellToolInvocation extends BaseToolInvocation<
     } = options;
     const strippedCommand = stripShellWrapper(this.params.command);
 
-    if (isInteractiveGeminiCommand(strippedCommand)) {
+    let isInteractiveGemini: boolean;
+    if (!isDefaultIsInteractiveGeminiCommand(isInteractiveGeminiCommand)) {
+      isInteractiveGemini = isInteractiveGeminiCommand(strippedCommand);
+    } else if (this.hasCachedCommandParse(strippedCommand)) {
+      isInteractiveGemini = isInteractiveGeminiCommand(
+        strippedCommand,
+        this.parseCache,
+      );
+    } else {
+      const knownInteractive =
+        isKnownInteractiveGeminiCommandSync(strippedCommand);
+      isInteractiveGemini =
+        knownInteractive ??
+        (await isInteractiveGeminiCommandAsync(
+          strippedCommand,
+          this.parseCache,
+          signal,
+        ));
+    }
+
+    if (isInteractiveGemini) {
       return {
         llmContent: INTERACTIVE_GEMINI_SHELL_ERROR,
         returnDisplay: INTERACTIVE_GEMINI_SHELL_ERROR,
@@ -1100,7 +1232,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
           this.context.config.sandboxManager.parseDenials(result);
         if (sandboxDenial) {
           const strippedCommand = stripShellWrapper(this.params.command);
-          const rootCommands = getCommandRoots(strippedCommand).filter(
+          const computedRootCommands = isDefaultGetCommandRoots(getCommandRoots)
+            ? await getCommandRootsAsync(strippedCommand, this.parseCache)
+            : getCommandRoots(strippedCommand);
+          const rootCommands = computedRootCommands.filter(
             (r) => r !== 'shopt',
           );
           const rootCommandDisplay =
@@ -1238,7 +1373,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       const summarizeConfig =
         this.context.config.getSummarizeToolOutputConfig();
-      const outputSource = isRemoteContentCommand(strippedCommand)
+      const outputSource = (await isRemoteContentCommandAsync(strippedCommand))
         ? REMOTE_SHELL_OUTPUT_SOURCE
         : undefined;
       const executionError = result.error
