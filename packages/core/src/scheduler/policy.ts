@@ -218,6 +218,14 @@ async function handleStandardPolicyUpdate(
     outcome === ToolConfirmationOutcome.ProceedAlways ||
     outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
   ) {
+    if (
+      typeof toolInvocation === 'object' &&
+      toolInvocation !== null &&
+      'prepareCommandParseCache' in toolInvocation &&
+      typeof toolInvocation.prepareCommandParseCache === 'function'
+    ) {
+      await toolInvocation.prepareCommandParseCache();
+    }
     const options: PolicyUpdateOptions =
       toolInvocation?.getPolicyUpdateOptions?.(outcome) || {};
 

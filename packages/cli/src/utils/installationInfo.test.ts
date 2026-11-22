@@ -99,11 +99,288 @@ describe('getInstallationInfo', () => {
 
     const info = getInstallationInfo(projectRoot, true);
 
+    expect(mockedIsGitRepository).toHaveBeenCalledWith(
+      `${projectRoot}/packages/cli/dist`,
+    );
     expect(info.packageManager).toBe(PackageManager.UNKNOWN);
     expect(info.isGlobal).toBe(false);
+    expect(info.updateCommand).toBeUndefined();
     expect(info.updateMessage).toBe(
       'Running from a local git clone. Please update with "git pull".',
     );
+  });
+
+  it('should detect running from a local git clone when invoked from a non-git directory outside the clone', () => {
+    const cloneRoot = '/path/to/gemini-cli';
+    const outsideDir = '/tmp/plain-folder';
+    vi.spyOn(process, 'cwd').mockReturnValue(outsideDir);
+    process.argv[1] = `${cloneRoot}/bundle/gemini.js`;
+    mockedRealPathSync.mockReturnValue(`${cloneRoot}/bundle/gemini.js`);
+    mockedIsGitRepository.mockImplementation((dir) =>
+      dir.replace(/\\/g, '/').startsWith(cloneRoot),
+    );
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('Command failed');
+    });
+
+    const info = getInstallationInfo(outsideDir, true);
+
+    expect(mockedIsGitRepository).toHaveBeenCalledWith(`${cloneRoot}/bundle`);
+    expect(info.packageManager).toBe(PackageManager.UNKNOWN);
+    expect(info.isGlobal).toBe(false);
+    expect(info.updateCommand).toBeUndefined();
+    expect(info.updateMessage).toBe(
+      'Running from a local git clone. Please update with "git pull".',
+    );
+  });
+
+  it('should detect running from a local git clone when invoked from a different git repository', () => {
+    const cloneRoot = '/path/to/gemini-cli';
+    const otherGitRepo = '/path/to/other-repo';
+    vi.spyOn(process, 'cwd').mockReturnValue(otherGitRepo);
+    process.argv[1] = `${cloneRoot}/bundle/gemini.js`;
+    mockedRealPathSync.mockReturnValue(`${cloneRoot}/bundle/gemini.js`);
+    mockedIsGitRepository.mockReturnValue(true);
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('Command failed');
+    });
+
+    const info = getInstallationInfo(otherGitRepo, true);
+
+    expect(mockedIsGitRepository).toHaveBeenCalledWith(`${cloneRoot}/bundle`);
+    expect(info.packageManager).toBe(PackageManager.UNKNOWN);
+    expect(info.isGlobal).toBe(false);
+    expect(info.updateCommand).toBeUndefined();
+    expect(info.updateMessage).toBe(
+      'Running from a local git clone. Please update with "git pull".',
+    );
+  });
+
+  it('should detect running from a local git clone when invoked via npm link from outside the clone', () => {
+    const cloneRoot = '/path/to/gemini-cli';
+    const outsideDir = '/tmp/plain-folder';
+    vi.spyOn(process, 'cwd').mockReturnValue(outsideDir);
+    process.argv[1] = '/usr/local/bin/gemini';
+    mockedRealPathSync.mockReturnValue(
+      `${cloneRoot}/packages/cli/dist/index.js`,
+    );
+    mockedIsGitRepository.mockImplementation((dir) =>
+      dir.replace(/\\/g, '/').startsWith(cloneRoot),
+    );
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('Command failed');
+    });
+
+    const info = getInstallationInfo(outsideDir, true);
+
+    expect(mockedIsGitRepository).toHaveBeenCalledWith(
+      `${cloneRoot}/packages/cli/dist`,
+    );
+    expect(info.packageManager).toBe(PackageManager.UNKNOWN);
+    expect(info.isGlobal).toBe(false);
+    expect(info.updateCommand).toBeUndefined();
+    expect(info.updateMessage).toBe(
+      'Running from a local git clone. Please update with "git pull".',
+    );
+  });
+
+  it('should detect running from a local git clone when invoked via packages/cli directory entrypoint from outside the clone', () => {
+    const cloneRoot = '/path/to/gemini-cli';
+    const outsideDir = '/tmp/plain-folder';
+    vi.spyOn(process, 'cwd').mockReturnValue(outsideDir);
+    process.argv[1] = `${cloneRoot}/packages/cli`;
+    mockedRealPathSync.mockReturnValue(`${cloneRoot}/packages/cli`);
+    mockedIsGitRepository.mockImplementation((dir) =>
+      dir.replace(/\\/g, '/').startsWith(cloneRoot),
+    );
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('Command failed');
+    });
+
+    const info = getInstallationInfo(outsideDir, true);
+
+    expect(mockedIsGitRepository).toHaveBeenCalledWith(`${cloneRoot}/packages`);
+    expect(info.packageManager).toBe(PackageManager.UNKNOWN);
+    expect(info.isGlobal).toBe(false);
+    expect(info.updateCommand).toBeUndefined();
+    expect(info.updateMessage).toBe(
+      'Running from a local git clone. Please update with "git pull".',
+    );
+  });
+
+  it('should detect running from a local git clone when invoked from a subdirectory inside the clone', () => {
+    const cloneRoot = '/path/to/gemini-cli';
+    const subDir = `${cloneRoot}/packages/core`;
+    vi.spyOn(process, 'cwd').mockReturnValue(subDir);
+    process.argv[1] = `${cloneRoot}/bundle/gemini.js`;
+    mockedRealPathSync.mockReturnValue(`${cloneRoot}/bundle/gemini.js`);
+    mockedIsGitRepository.mockImplementation((dir) =>
+      dir.replace(/\\/g, '/').startsWith(cloneRoot),
+    );
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('Command failed');
+    });
+
+    const info = getInstallationInfo(subDir, true);
+
+    expect(mockedIsGitRepository).toHaveBeenCalledWith(`${cloneRoot}/bundle`);
+    expect(info.packageManager).toBe(PackageManager.UNKNOWN);
+    expect(info.isGlobal).toBe(false);
+    expect(info.updateCommand).toBeUndefined();
+    expect(info.updateMessage).toBe(
+      'Running from a local git clone. Please update with "git pull".',
+    );
+  });
+
+  it('should detect running from a Windows-style local git clone when invoked from another directory', () => {
+    const outsideDir = 'C:\\Users\\dev\\other-project';
+    vi.spyOn(process, 'cwd').mockReturnValue(outsideDir);
+    process.argv[1] = 'C:\\Users\\dev\\gemini-cli\\bundle\\gemini.js';
+    mockedRealPathSync.mockReturnValue(
+      'C:\\Users\\dev\\gemini-cli\\bundle\\gemini.js',
+    );
+    mockedIsGitRepository.mockImplementation((dir) =>
+      dir.replace(/\\/g, '/').startsWith('C:/Users/dev/gemini-cli'),
+    );
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('Command failed');
+    });
+
+    const info = getInstallationInfo(outsideDir, true);
+
+    expect(mockedIsGitRepository).toHaveBeenCalledWith(
+      'C:/Users/dev/gemini-cli/bundle',
+    );
+    expect(info.packageManager).toBe(PackageManager.UNKNOWN);
+    expect(info.isGlobal).toBe(false);
+    expect(info.updateCommand).toBeUndefined();
+    expect(info.updateMessage).toBe(
+      'Running from a local git clone. Please update with "git pull".',
+    );
+  });
+
+  it('should NOT classify a global npm node_modules install as a local git clone even inside an ancestor git repo', () => {
+    const globalBundlePath =
+      '/Users/test/.nvm/versions/node/v20.19.0/lib/node_modules/@google/gemini-cli/bundle/gemini.js';
+    process.argv[1] = globalBundlePath;
+    mockedRealPathSync.mockReturnValue(globalBundlePath);
+    mockedIsGitRepository.mockReturnValue(true);
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('Command failed');
+    });
+
+    const info = getInstallationInfo(projectRoot, true);
+
+    expect(mockedIsGitRepository).not.toHaveBeenCalled();
+    expect(info.packageManager).toBe(PackageManager.NPM);
+    expect(info.isGlobal).toBe(true);
+    expect(info.updateCommand).toBe('npm install -g @google/gemini-cli@latest');
+  });
+
+  it('should NOT classify a local node_modules install inside a git repo as a local git clone', () => {
+    const localBundlePath = `${projectRoot}/node_modules/@google/gemini-cli/bundle/gemini.js`;
+    process.argv[1] = localBundlePath;
+    mockedRealPathSync.mockReturnValue(localBundlePath);
+    mockedIsGitRepository.mockReturnValue(true);
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('Command failed');
+    });
+    mockedExistsSync.mockReturnValue(false);
+
+    const info = getInstallationInfo(projectRoot, true);
+
+    expect(mockedIsGitRepository).not.toHaveBeenCalled();
+    expect(info.packageManager).toBe(PackageManager.NPM);
+    expect(info.isGlobal).toBe(false);
+    expect(info.updateMessage).toContain('Locally installed');
+  });
+
+  it('should NOT classify a Homebrew install as a local git clone even when Homebrew prefix is a git repo', () => {
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, 'platform', {
+      value: 'darwin',
+      configurable: true,
+    });
+    try {
+      const cliPath = '/opt/homebrew/Cellar/gemini-cli/1.0.0/bin/gemini';
+      process.argv[1] = cliPath;
+      mockedIsGitRepository.mockReturnValue(true);
+      mockedExecSync.mockImplementation((cmd) => {
+        if (
+          typeof cmd === 'string' &&
+          cmd.includes('brew --prefix gemini-cli')
+        ) {
+          return '/opt/homebrew/opt/gemini-cli';
+        }
+        throw new Error(`Command failed: ${cmd}`);
+      });
+      mockedRealPathSync.mockImplementation((p) => {
+        if (p === cliPath) return cliPath;
+        if (p === '/opt/homebrew/opt/gemini-cli') {
+          return '/opt/homebrew/Cellar/gemini-cli/1.0.0';
+        }
+        return String(p);
+      });
+
+      const info = getInstallationInfo(projectRoot, true);
+
+      expect(info.packageManager).toBe(PackageManager.HOMEBREW);
+      expect(info.isGlobal).toBe(true);
+    } finally {
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+        configurable: true,
+      });
+    }
+  });
+
+  it('should NOT classify a non-git bundle directory as a local git clone', () => {
+    const nonGitBundle = '/opt/tools/gemini-cli/bundle/gemini.js';
+    process.argv[1] = nonGitBundle;
+    mockedRealPathSync.mockReturnValue(nonGitBundle);
+    mockedIsGitRepository.mockReturnValue(false);
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('Command failed');
+    });
+
+    const info = getInstallationInfo(projectRoot, true);
+
+    expect(mockedIsGitRepository).toHaveBeenCalledWith(
+      '/opt/tools/gemini-cli/bundle',
+    );
+    expect(info.packageManager).toBe(PackageManager.NPM);
+    expect(info.isGlobal).toBe(true);
+  });
+
+  it('should NOT classify bunx cache bundle as a local git clone even inside an ancestor git repo', () => {
+    const bunxBundlePath =
+      '/Users/test/.bun/install/cache/@google/gemini-cli@0.70.0@@@1/bundle/gemini.js';
+    process.argv[1] = bunxBundlePath;
+    mockedRealPathSync.mockReturnValue(bunxBundlePath);
+    mockedIsGitRepository.mockReturnValue(true);
+
+    const info = getInstallationInfo(projectRoot, true);
+
+    expect(mockedIsGitRepository).not.toHaveBeenCalled();
+    expect(info.packageManager).toBe(PackageManager.BUNX);
+    expect(info.isGlobal).toBe(false);
+    expect(info.updateMessage).toBe('Running via bunx, update not applicable.');
+  });
+
+  it('should NOT classify a path with an ancestor directory named bundle as a local git clone', () => {
+    const unrelatedPath = '/home/user/bundle/projects/my-app/index.js';
+    process.argv[1] = unrelatedPath;
+    mockedRealPathSync.mockReturnValue(unrelatedPath);
+    mockedIsGitRepository.mockReturnValue(true);
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('Command failed');
+    });
+
+    const info = getInstallationInfo(projectRoot, true);
+
+    expect(mockedIsGitRepository).not.toHaveBeenCalled();
+    expect(info.packageManager).toBe(PackageManager.NPM);
+    expect(info.isGlobal).toBe(true);
   });
 
   it('should detect running via npx', () => {

@@ -9,7 +9,11 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { EnvHttpProxyAgent, fetch as undiciFetch } from 'undici';
 import { debugLogger } from '../utils/debugLogger.js';
-import { isSubpath, resolveToRealPath } from '../utils/paths.js';
+import {
+  getIdeConnectionDir,
+  isSubpath,
+  resolveToRealPath,
+} from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import { type IdeInfo } from './detect-ide.js';
 
@@ -128,14 +132,65 @@ export function getStdioConfigFromEnv(): StdioConfig | undefined {
 
 const IDE_SERVER_FILE_REGEX = /^gemini-ide-server-(\d+)-\d+\.json$/;
 
+type DiscoveredConnectionConfig = ConnectionConfig & {
+  workspacePath?: string;
+  ideInfo?: IdeInfo;
+};
+
+async function verifyDirectory(
+  dirPath: string,
+  requireStrictPermissions: boolean,
+): Promise<boolean> {
+  try {
+    const stat = await fs.promises.lstat(dirPath);
+    if (
+      (typeof stat.isSymbolicLink === 'function' && stat.isSymbolicLink()) ||
+      (typeof stat.isDirectory === 'function' && !stat.isDirectory())
+    ) {
+      return false;
+    }
+    if (requireStrictPermissions) {
+      if (process.getuid && stat.uid !== process.getuid()) {
+        return false;
+      }
+      if (
+        os.platform() !== 'win32' &&
+        typeof stat.mode === 'number' &&
+        (stat.mode & 0o077) !== 0
+      ) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function verifyAndReadFile(
   filePath: string,
 ): Promise<string | undefined> {
   let handle: fs.promises.FileHandle | undefined;
   try {
-    handle = await fs.promises.open(filePath, 'r');
+    const openFlags =
+      os.platform() === 'win32'
+        ? 'r'
+        : fs.constants.O_RDONLY |
+          (fs.constants.O_NOFOLLOW ?? 0) |
+          (fs.constants.O_NONBLOCK ?? 0);
+    handle = await fs.promises.open(filePath, openFlags);
     const stat = await handle.stat();
+    if (typeof stat.isFile === 'function' && !stat.isFile()) {
+      return undefined;
+    }
     if (process.getuid && stat.uid !== process.getuid()) {
+      return undefined;
+    }
+    if (
+      os.platform() !== 'win32' &&
+      typeof stat.mode === 'number' &&
+      (stat.mode & 0o077) !== 0
+    ) {
       return undefined;
     }
     return await handle.readFile('utf8');
@@ -148,29 +203,24 @@ async function verifyAndReadFile(
   }
 }
 
-export async function getConnectionConfigFromFile(
+async function readConnectionConfigFromDirectory(
+  portFileDir: string,
   pid: number,
-): Promise<
-  (ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo }) | undefined
-> {
-  // For backwards compatibility
+  requireStrictPermissions: boolean,
+): Promise<DiscoveredConnectionConfig | undefined> {
+  if (!(await verifyDirectory(portFileDir, requireStrictPermissions))) {
+    return undefined;
+  }
+
+  // For backwards compatibility with single-file naming scheme
   try {
-    const portFile = path.join(
-      os.tmpdir(),
-      'gemini',
-      'ide',
-      `gemini-ide-server-${pid}.json`,
-    );
+    const portFile = path.join(portFileDir, `gemini-ide-server-${pid}.json`);
     const portFileContents = await verifyAndReadFile(portFile);
     if (!portFileContents) {
       throw new Error('Verification failed or file not found');
     }
     const parsed: unknown = JSON.parse(portFileContents);
-    type ConfigType = ConnectionConfig & {
-      workspacePath?: string;
-      ideInfo?: IdeInfo;
-    };
-    const isConfig = (val: unknown): val is ConfigType =>
+    const isConfig = (val: unknown): val is DiscoveredConnectionConfig =>
       typeof val === 'object' && val !== null;
     if (isConfig(parsed)) {
       return parsed;
@@ -183,7 +233,6 @@ export async function getConnectionConfigFromFile(
     // exist.
   }
 
-  const portFileDir = path.join(os.tmpdir(), 'gemini', 'ide');
   let portFiles;
   try {
     portFiles = await fs.promises.readdir(portFileDir);
@@ -213,21 +262,13 @@ export async function getConnectionConfigFromFile(
   );
 
   const parsedContents = fileContents.map(
-    (
-      content,
-    ):
-      | (ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo })
-      | undefined => {
+    (content): DiscoveredConnectionConfig | undefined => {
       if (!content) {
         return undefined;
       }
       try {
         const parsed: unknown = JSON.parse(content);
-        type ConfigType = ConnectionConfig & {
-          workspacePath?: string;
-          ideInfo?: IdeInfo;
-        };
-        const isConfig = (val: unknown): val is ConfigType =>
+        const isConfig = (val: unknown): val is DiscoveredConnectionConfig =>
           typeof val === 'object' && val !== null;
         if (isConfig(parsed)) {
           return parsed;
@@ -241,12 +282,7 @@ export async function getConnectionConfigFromFile(
   );
 
   const validWorkspaces = parsedContents.filter(
-    (
-      content,
-    ): content is ConnectionConfig & {
-      workspacePath?: string;
-      ideInfo?: IdeInfo;
-    } => {
+    (content): content is DiscoveredConnectionConfig => {
       if (!content) {
         return false;
       }
@@ -322,6 +358,27 @@ export async function getConnectionConfigFromFile(
     );
   }
   return selected;
+}
+
+export async function getConnectionConfigFromFile(
+  pid: number,
+): Promise<DiscoveredConnectionConfig | undefined> {
+  const baseTmpDir = os.tmpdir();
+  const primaryDir = getIdeConnectionDir(baseTmpDir);
+  const primaryConfig = await readConnectionConfigFromDirectory(
+    primaryDir,
+    pid,
+    Boolean(process.getuid),
+  );
+  if (primaryConfig) {
+    return primaryConfig;
+  }
+
+  const legacyDir = path.join(baseTmpDir, 'gemini', 'ide');
+  if (legacyDir !== primaryDir) {
+    return readConnectionConfigFromDirectory(legacyDir, pid, false);
+  }
+  return undefined;
 }
 
 // Sort files to prioritize the one matching the target pid,

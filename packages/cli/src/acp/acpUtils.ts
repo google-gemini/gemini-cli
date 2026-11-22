@@ -311,7 +311,9 @@ export function buildAvailableModels(
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
   const useLatestFlash = config.hasLatestFlashGAAccess?.() ?? false;
   const useLatestFlashLite = config.hasLatestFlashLiteGAAccess?.() ?? false;
-  const selectedAuthType = settings.merged.security.auth.selectedType;
+  const selectedAuthType =
+    settings.merged.security?.auth?.selectedType ??
+    config.getContentGeneratorConfig?.()?.authType;
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
 
@@ -392,6 +394,15 @@ export function buildAvailableModels(
     manualOptions.unshift(...previewOptions);
   }
 
+  const seen = new Set<string>();
+  const uniqueManualOptions = manualOptions.filter((option) => {
+    if (seen.has(option.value)) {
+      return false;
+    }
+    seen.add(option.value);
+    return true;
+  });
+
   const scaleOptions = (
     options: Array<{ value: string; title: string; description?: string }>,
   ) =>
@@ -404,7 +415,7 @@ export function buildAvailableModels(
   return {
     availableModels: [
       ...scaleOptions(mainOptions),
-      ...scaleOptions(manualOptions),
+      ...scaleOptions(uniqueManualOptions),
     ],
     currentModelId: preferredModel,
   };
