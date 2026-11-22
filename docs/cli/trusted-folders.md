@@ -7,10 +7,11 @@ the CLI loads any project-specific configurations from it.
 
 ## Enabling the feature
 
-The Trusted Folders feature is **disabled by default**. To use it, you must
-first enable it in your settings.
+The Trusted Folders feature is **enabled by default**. You don't need to change
+your settings to use it.
 
-Add the following to your user `settings.json` file:
+If you previously disabled it, add the following to your user `settings.json`
+file to re-enable it:
 
 ```json
 {
