@@ -7,7 +7,12 @@
 import * as path from 'node:path';
 import type { Content } from '@google/genai';
 import { parse as shellParse } from 'shell-quote';
-import { getCommandRoots, normalizeCommand } from './shell-utils.js';
+import {
+  getCommandRoots,
+  getCommandRootsAsync,
+  isDefaultGetCommandRoots,
+  normalizeCommand,
+} from './shell-utils.js';
 import { SHELL_TOOL_NAME } from '../tools/definitions/base-declarations.js';
 
 export interface UntrustedContextData {
@@ -613,29 +618,26 @@ export function findUntrustedFlags(
  * @param command The shell command string.
  * @returns True if the command is a build or test tool.
  */
-export function isBuildOrTestCommand(command: string): boolean {
-  if (!command) {
-    return false;
-  }
+function evaluateBuildOrTestCommandFromRoots(
+  command: string,
+  roots: string[],
+): boolean {
   const getBaseName = (cmd: string) => {
     const base = cmd.replace(/\\/g, '/').split('/').pop();
     if (!base) return cmd.toLowerCase();
     return base.toLowerCase().replace(/\.(exe|cmd|bat)$/, '');
   };
-  try {
-    const roots = getCommandRoots(command);
-    if (roots.length > 0) {
-      return roots.some((root) => {
-        const base = getBaseName(root);
-        return (
-          BUILD_TEST_COMMAND_ROOTS.has(base) ||
-          BUILD_TEST_COMMAND_ROOTS.has(root.toLowerCase())
-        );
-      });
-    }
-  } catch {
-    // Ignore and fallback
+
+  if (roots.length > 0) {
+    return roots.some((root) => {
+      const base = getBaseName(root);
+      return (
+        BUILD_TEST_COMMAND_ROOTS.has(base) ||
+        BUILD_TEST_COMMAND_ROOTS.has(root.toLowerCase())
+      );
+    });
   }
+
   // Fallback if parsing fails or returns empty roots (e.g. parser not initialized yet in fast unit tests)
   const parts = command.trim().split(/\s+/);
   let rootIndex = 0;
@@ -655,23 +657,41 @@ export function isBuildOrTestCommand(command: string): boolean {
   );
 }
 
-/**
- * Checks whether a shell command retrieves content from remote hosts, in which
- * case its output keeps external provenance for untrusted flag detection.
- *
- * @param command The shell command string.
- * @returns True if the command invokes a remote content retrieval tool.
- */
-export function isRemoteContentCommand(command: string): boolean {
+export function isBuildOrTestCommand(command: string): boolean {
   if (!command) {
     return false;
   }
   let roots: string[] = [];
   try {
-    roots = getCommandRoots(command).map((root) => normalizeCommand(root));
+    roots = getCommandRoots(command);
   } catch {
-    // Ignore and fall back to the words of the command.
+    // Ignore and fallback
   }
+  return evaluateBuildOrTestCommandFromRoots(command, roots);
+}
+
+export async function isBuildOrTestCommandAsync(
+  command: string,
+): Promise<boolean> {
+  if (!command) {
+    return false;
+  }
+  let roots: string[] = [];
+  try {
+    roots = isDefaultGetCommandRoots(getCommandRoots)
+      ? await getCommandRootsAsync(command)
+      : getCommandRoots(command);
+  } catch {
+    // Ignore and fallback
+  }
+  return evaluateBuildOrTestCommandFromRoots(command, roots);
+}
+
+function evaluateRemoteContentCommandFromRoots(
+  command: string,
+  rawRoots: string[],
+): boolean {
+  const roots = rawRoots.map((root) => normalizeCommand(root));
   // Check every word when the parser is unavailable or when a root runs another
   // command (for example, `sudo curl`). Treating a command as remote by mistake
   // only makes the check stricter.
@@ -683,6 +703,43 @@ export function isRemoteContentCommand(command: string): boolean {
           .map((word) => normalizeCommand(word))
       : roots;
   return candidates.some((name) => REMOTE_CONTENT_COMMAND_ROOTS.has(name));
+}
+
+/**
+ * Checks whether a shell command retrieves content from remote hosts, in which
+ * case its output keeps external provenance for untrusted flag detection.
+ *
+ * @param command The shell command string.
+ * @returns True if the command invokes a remote content retrieval tool.
+ */
+export function isRemoteContentCommand(command: string): boolean {
+  if (!command) {
+    return false;
+  }
+  let rawRoots: string[] = [];
+  try {
+    rawRoots = getCommandRoots(command);
+  } catch {
+    // Ignore and fall back to the words of the command.
+  }
+  return evaluateRemoteContentCommandFromRoots(command, rawRoots);
+}
+
+export async function isRemoteContentCommandAsync(
+  command: string,
+): Promise<boolean> {
+  if (!command) {
+    return false;
+  }
+  let rawRoots: string[] = [];
+  try {
+    rawRoots = isDefaultGetCommandRoots(getCommandRoots)
+      ? await getCommandRootsAsync(command)
+      : getCommandRoots(command);
+  } catch {
+    // Ignore and fall back to the words of the command.
+  }
+  return evaluateRemoteContentCommandFromRoots(command, rawRoots);
 }
 
 const MODIFIED_BUILD_FILES_SYMBOL = Symbol('sessionModifiedBuildFiles');

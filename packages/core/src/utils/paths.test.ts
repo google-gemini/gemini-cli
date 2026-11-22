@@ -24,6 +24,7 @@ import {
   resolveDefensiveToolPath,
   hasBlockedPathSegment,
   stripExtendedLengthPrefix,
+  getIdeConnectionDir,
 } from './paths.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -1253,6 +1254,46 @@ describe('normalizePath', () => {
       expect(hasBlockedPathSegment('gh1a2b~1.json')).toBe(true);
       expect(hasBlockedPathSegment('gha-cr~1.jso')).toBe(true);
       expect(hasBlockedPathSegment('gh1a2b~1.jso')).toBe(true);
+    });
+  });
+
+  describe('getIdeConnectionDir', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('should return a per-UID single-level directory under tmpdir when process.getuid is available', () => {
+      vi.stubGlobal(
+        'process',
+        Object.create(process, {
+          getuid: { value: () => 6001 },
+        }),
+      );
+      expect(getIdeConnectionDir('/tmp')).toBe(
+        path.join('/tmp', 'gemini-ide-6001'),
+      );
+    });
+
+    it('should handle root UID 0 without falling back to shared directory', () => {
+      vi.stubGlobal(
+        'process',
+        Object.create(process, {
+          getuid: { value: () => 0 },
+        }),
+      );
+      expect(getIdeConnectionDir('/tmp')).toBe(
+        path.join('/tmp', 'gemini-ide-0'),
+      );
+    });
+
+    it('should fall back to gemini/ide under tmpdir when process.getuid is undefined (Windows)', () => {
+      vi.stubGlobal(
+        'process',
+        Object.create(process, {
+          getuid: { value: undefined },
+        }),
+      );
+      expect(getIdeConnectionDir('C:\\Temp')).toBe(
+        path.join('C:\\Temp', 'gemini', 'ide'),
+      );
     });
   });
 });

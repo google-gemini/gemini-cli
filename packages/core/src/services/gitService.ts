@@ -172,7 +172,10 @@ export class GitService {
 
     const shadowRepoEnv = this.getShadowRepoEnv(repoDir);
     await fs.writeFile(shadowRepoEnv.GIT_CONFIG_SYSTEM, '');
-    const repo = simpleGit(repoDir, SHADOW_REPO_GIT_OPTIONS).env(shadowRepoEnv);
+    const repo = simpleGit(repoDir, {
+      ...SHADOW_REPO_GIT_OPTIONS,
+      allowEnvironment: Object.keys(shadowRepoEnv),
+    }).env(shadowRepoEnv);
     let isRepoDefined = false;
     try {
       isRepoDefined = await repo.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
@@ -362,11 +365,15 @@ export class GitService {
 
   private get shadowGitRepository(): SimpleGit {
     const repoDir = this.getHistoryDir();
-    return simpleGit(this.projectRoot, SHADOW_REPO_GIT_OPTIONS).env({
+    const env = {
       ...this.getShadowRepoEnv(repoDir),
       GIT_DIR: path.join(repoDir, '.git'),
       GIT_WORK_TREE: this.projectRoot,
-    });
+    };
+    return simpleGit(this.projectRoot, {
+      ...SHADOW_REPO_GIT_OPTIONS,
+      allowEnvironment: Object.keys(env),
+    }).env(env);
   }
 
   async getCurrentCommitHash(): Promise<string> {
