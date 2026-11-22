@@ -851,8 +851,26 @@ export class Task {
       }
     }
 
-    // Fire and forget so we don't block the executor loop before waitForPendingTools can be called
-    void this.scheduler.schedule(updatedRequests, abortSignal);
+    // Fire and forget so we don't block the executor loop before waitForPendingTools can be called.
+    // schedule() legitimately rejects (e.g. when the signal aborts while the
+    // batch is queued), and an unhandled rejection would terminate the whole
+    // server, so the rejection must be handled here.
+    this.scheduler.schedule(updatedRequests, abortSignal).catch((error) => {
+      if (abortSignal.aborted) {
+        // Expected: the task was cancelled, and its own cancellation flow
+        // handles cleanup.
+        logger.info(
+          `[Task] Tool scheduling cancelled: ${getErrorMessage(error)}`,
+        );
+        return;
+      }
+      logger.error('[Task] Failed to schedule tool calls:', error);
+      // Don't leave the pre-registered calls pending, or waitForPendingTools
+      // would wait forever for tools that will never run.
+      this.cancelPendingTools(
+        `Failed to schedule tool calls: ${getErrorMessage(error)}`,
+      );
+    });
   }
 
   async acceptAgentMessage(event: ServerGeminiStreamEvent): Promise<void> {
