@@ -14,6 +14,7 @@ import {
   getNormalizedRelativePath,
   expandWildcardDirectoryPatterns,
 } from './ignorePathUtils.js';
+import { isWithinRoot } from './fileUtils.js';
 
 export interface GitIgnoreFilter {
   isIgnored(filePath: string, isDirectory: boolean): boolean;
@@ -84,9 +85,46 @@ export class GitIgnoreParser implements GitIgnoreFilter {
     rawPatterns: string[],
     relativeBaseDir: string,
   ): string[] {
+    const checkedDirs = new Map<string, boolean>();
+    const hasNestedNegation = (dir: string): boolean => {
+      let result = checkedDirs.get(dir);
+      if (result !== undefined) {
+        return result;
+      }
+      const targetRelDir =
+        relativeBaseDir && relativeBaseDir !== '.'
+          ? path.posix.join(relativeBaseDir, dir)
+          : dir;
+      const gitignorePath = path.resolve(
+        this.projectRoot,
+        targetRelDir,
+        '.gitignore',
+      );
+      if (!isWithinRoot(gitignorePath, this.projectRoot)) {
+        checkedDirs.set(dir, false);
+        return false;
+      }
+      try {
+        const content = fs.readFileSync(gitignorePath, 'utf-8');
+        result = false;
+        for (const line of content.split(/\r\n|\n|\r/)) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('!') && trimmed.slice(1).trim() !== '') {
+            result = true;
+            break;
+          }
+        }
+      } catch {
+        result = false;
+      }
+      checkedDirs.set(dir, result);
+      return result;
+    };
+
     const expandedPatterns = expandWildcardDirectoryPatterns(
       rawPatterns,
       this.extraPatterns,
+      hasNestedNegation,
     );
     return expandedPatterns
       .map((p) => p.trimStart())

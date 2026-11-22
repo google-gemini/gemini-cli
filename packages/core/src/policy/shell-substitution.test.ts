@@ -7,6 +7,7 @@
 import { expect, describe, it, beforeAll, vi } from 'vitest';
 import { PolicyEngine } from './policy-engine.js';
 import { PolicyDecision } from './types.js';
+import { SafeRegExp } from './safe-regex.js';
 import { initializeShellParsers } from '../utils/shell-utils.js';
 
 // Mock node:os to ensure shell-utils logic always thinks it's on a POSIX-like system.
@@ -50,7 +51,7 @@ describe('PolicyEngine Command Substitution Validation', () => {
       rules: [
         {
           toolName: 'run_shell_command',
-          argsPattern: new RegExp(`"command":"${blockedCmd}"`),
+          argsPattern: SafeRegExp.compile(`"command":"${blockedCmd}"`),
           decision: PolicyDecision.DENY,
         },
       ],
