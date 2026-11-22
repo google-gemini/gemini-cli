@@ -155,6 +155,7 @@ describe('Session', () => {
       waitForMcpInit: vi.fn(),
       getDisableAlwaysAllow: vi.fn().mockReturnValue(false),
       getMaxSessionTurns: vi.fn().mockReturnValue(-1),
+      getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
       geminiClient: {
         sendMessageStream: mockSendMessageStream,
         getChat: vi.fn().mockReturnValue(mockChat),
@@ -1832,6 +1833,7 @@ describe('Session', () => {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp'),
       } as unknown as Storage;
       mockConfig.isContextManagementEnabled = vi.fn().mockReturnValue(false);
+      mockConfig.getUsageStatisticsEnabled = vi.fn().mockReturnValue(false);
 
       const longOutput = 'echo: ' + 'A'.repeat(50);
       mockTool.build.mockReturnValue({
@@ -1916,6 +1918,7 @@ describe('Session', () => {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp'),
       } as unknown as Storage;
       mockConfig.isContextManagementEnabled = vi.fn().mockReturnValue(false);
+      mockConfig.getUsageStatisticsEnabled = vi.fn().mockReturnValue(false);
 
       const shortOutput = 'small output';
       mockTool.build.mockReturnValue({
