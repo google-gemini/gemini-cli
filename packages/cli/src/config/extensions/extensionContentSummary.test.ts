@@ -444,4 +444,147 @@ describe('extensionContentSummary', () => {
       );
     });
   });
+
+  describe('sub-agents', () => {
+    const localAgent = [
+      '---',
+      'name: release-helper',
+      'description: Helps with releases',
+      'mcp_servers:',
+      '  tracker:',
+      '    command: node',
+      '    args:',
+      '      - ${extensionPath}/servers/tracker.js',
+      '    trust: true',
+      '---',
+      'You help with releases.',
+    ].join('\n');
+    const remoteAgent = [
+      '---',
+      'kind: remote',
+      'name: remote-helper',
+      'agent_card_url: https://example.com/card.json',
+      '---',
+    ].join('\n');
+
+    it('lists the agents that the loader reads, with their MCP servers and the files they use', async () => {
+      writeFile('agents/release-helper.md', localAgent);
+      writeFile('agents/remote.md', remoteAgent);
+      writeFile('agents/broken.md', 'no front matter');
+      writeFile('agents/_draft.md', 'skipped');
+      writeFile('agents/notes.txt', 'skipped');
+      writeFile('agents/nested/deep.md', 'skipped');
+      writeFile('servers/tracker.js', 'server');
+
+      const summary = await buildExtensionContentSummary(rootDir);
+
+      const files = [
+        fileEntry('agents/broken.md', 'no front matter'),
+        fileEntry('agents/release-helper.md', localAgent),
+        fileEntry('agents/remote.md', remoteAgent),
+      ];
+      const trackerEntries = [fileEntry('servers/tracker.js', 'server')];
+      expect(summary.agents?.files).toEqual(files);
+      expect(
+        summary.agents?.agents.map((agent) => ({
+          path: agent.path,
+          name: agent.name,
+          agentCardUrl: agent.agentCardUrl,
+          servers: agent.mcpServers.map(([name, server]) => [
+            name,
+            server.command,
+            server.args,
+            server.trust,
+          ]),
+        })),
+      ).toEqual([
+        { path: 'agents/broken.md', servers: [] },
+        {
+          path: 'agents/release-helper.md',
+          name: 'release-helper',
+          servers: [
+            ['tracker', 'node', ['${extensionPath}/servers/tracker.js'], true],
+          ],
+        },
+        {
+          path: 'agents/remote.md',
+          name: 'remote-helper',
+          agentCardUrl: 'https://example.com/card.json',
+          servers: [],
+        },
+      ]);
+      expect(summary.agents?.referencedPaths).toEqual([
+        {
+          path: 'servers/tracker.js',
+          signature: computeContentSignature(trackerEntries),
+        },
+      ]);
+      expect(summary.agents?.signature).toBe(
+        computeContentSignature([...files, ...trackerEntries]),
+      );
+    });
+
+    it('is absent when agents/ has no file that the loader reads', async () => {
+      writeFile('agents/_draft.md', 'skipped');
+      writeFile('agents/README.txt', 'skipped');
+
+      expect(await buildExtensionContentSummary(rootDir)).toEqual({});
+    });
+
+    it.skipIf(isWindows)(
+      'does not load agents through a folder link that leaves the extension folder',
+      async () => {
+        const outsideDir = path.join(tempDir, 'outside-agents');
+        writeFile('helper.md', localAgent, outsideDir);
+        fs.symlinkSync(outsideDir, path.join(rootDir, 'agents'));
+
+        const summary = await buildExtensionContentSummary(rootDir);
+
+        const files: ContentEntry[] = [
+          { path: 'agents', type: 'link', value: ContentMarker.Outside },
+        ];
+        expect(summary.agents).toEqual({
+          agents: [],
+          referencedPaths: [],
+          files,
+          signature: computeContentSignature(files),
+        });
+      },
+    );
+  });
+
+  describe('custom commands and policies', () => {
+    it('lists the commands that the loader finds, including nested and hidden folders', async () => {
+      writeFile('commands/deploy.toml', 'a');
+      writeFile('commands/release/notes.toml', 'b');
+      writeFile('commands/.internal/sync.toml', 'c');
+      writeFile('commands/README.md', 'skipped');
+
+      const summary = await buildExtensionContentSummary(rootDir);
+
+      const files = [
+        fileEntry('commands/.internal/sync.toml', 'c'),
+        fileEntry('commands/deploy.toml', 'a'),
+        fileEntry('commands/release/notes.toml', 'b'),
+      ];
+      expect(summary.commands).toEqual({
+        files,
+        signature: computeContentSignature(files),
+      });
+    });
+
+    it('lists the policy files directly in policies/', async () => {
+      writeFile('policies/release.toml', 'a');
+      writeFile('policies/nested/skipped.toml', 'b');
+      writeFile('policies/notes.md', 'c');
+
+      const summary = await buildExtensionContentSummary(rootDir);
+
+      const files = [fileEntry('policies/release.toml', 'a')];
+      expect(summary.policies).toEqual({
+        files,
+        signature: computeContentSignature(files),
+      });
+    });
+  });
 });

@@ -970,6 +970,133 @@ describe('consent', () => {
           /Changes since the installed version:\n {2}\* Skills: `skills\/demo` changed$/,
         );
       });
+
+      it('lists sub-agents with their MCP servers, the files they use, and a signature', async () => {
+        const text = await consentTextFor({
+          agents: {
+            agents: [
+              { path: 'agents/broken.md', mcpServers: [] },
+              {
+                path: 'agents/release-helper.md',
+                name: 'release-helper',
+                mcpServers: [
+                  [
+                    'tracker',
+                    {
+                      command: 'node',
+                      args: ['${extensionPath}/servers/tracker.js'],
+                      env: { API_TOKEN: 'abc', LOG_LEVEL: 'debug' },
+                      trust: true,
+                    },
+                  ],
+                ],
+              },
+              {
+                path: 'agents/remote.md',
+                name: 'remote-helper',
+                agentCardUrl: 'https://example.com/card.json',
+                mcpServers: [],
+              },
+            ],
+            referencedPaths: [{ path: 'servers/tracker.js', signature }],
+            files: [],
+            signature,
+          },
+        });
+
+        expect(text).toContain(
+          [
+            'This extension will add the following sub-agents:',
+            "  * `agents/broken.md` isn't a valid sub-agent file.",
+            '  * `release-helper` (`agents/release-helper.md`)',
+            '      MCP server `tracker` (local): `node ${extensionPath}/servers/tracker.js`',
+            '      Environment variables:',
+            '        - API_TOKEN: ********',
+            '        - LOG_LEVEL: `debug`',
+            '      Trust: true',
+            '  * `remote-helper` (`agents/remote.md`)',
+            '      Agent card URL: `https://example.com/card.json`',
+            '  Files used by MCP servers: `servers/tracker.js`',
+            `  Agents signature: ${signature}`,
+          ].join('\n'),
+        );
+      });
+
+      it('lists custom commands and policy files with a signature each', async () => {
+        const text = await consentTextFor({
+          commands: {
+            files: [
+              {
+                path: 'commands/release/notes.toml',
+                type: 'file',
+                value: signature,
+              },
+              {
+                path: 'commands/shared',
+                type: 'link',
+                value: ContentMarker.Outside,
+              },
+            ],
+            signature,
+          },
+          policies: {
+            files: [
+              { path: 'policies/release.toml', type: 'file', value: signature },
+            ],
+            signature: otherSignature,
+          },
+        });
+
+        expect(text).toContain(
+          [
+            'This extension will add the following custom commands:',
+            '  * `commands/release/notes.toml`',
+            '  * `commands/shared` (outside the extension folder)',
+            `  Commands signature: ${signature}`,
+            'This extension will add the following policy files:',
+            '  * `policies/release.toml`',
+            `  Policies signature: ${otherSignature}`,
+          ].join('\n'),
+        );
+      });
+
+      it('names the sub-agents, custom commands, and policy files that changed', async () => {
+        const agents = { agents: [], referencedPaths: [] };
+
+        const text = await consentTextFor(
+          {
+            agents: {
+              ...agents,
+              files: [{ path: 'agents/triage.md', type: 'file', value: 'v2' }],
+              signature: otherSignature,
+            },
+            commands: {
+              files: [{ path: 'commands/tag.toml', type: 'file', value: 'v1' }],
+              signature,
+            },
+          },
+          {
+            agents: {
+              ...agents,
+              files: [{ path: 'agents/triage.md', type: 'file', value: 'v1' }],
+              signature,
+            },
+            policies: {
+              files: [{ path: 'policies/old.toml', type: 'file', value: 'v1' }],
+              signature,
+            },
+          },
+        );
+
+        expect(text).toContain(
+          [
+            'Changes since the installed version:',
+            '  * Sub-agents: `agents/triage.md` changed',
+            '  * Custom commands: `commands/tag.toml` added',
+            '  * Policies: `policies/old.toml` removed',
+          ].join('\n'),
+        );
+      });
     });
   });
 

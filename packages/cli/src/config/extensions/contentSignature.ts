@@ -50,6 +50,11 @@ export interface ContentEntry {
   value: string;
 }
 
+/** Returns `value` as a {@link ContentMarker}, or `undefined` for a hash. */
+export function asContentMarker(value: string): ContentMarker | undefined {
+  return Object.values(ContentMarker).find((marker) => marker === value);
+}
+
 /**
  * Compares two strings by UTF-16 code units, so the order doesn't depend on
  * the locale.

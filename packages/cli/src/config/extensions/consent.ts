@@ -18,6 +18,7 @@ import type { ConfirmationRequest } from '../../ui/types.js';
 import { escapeAnsiCtrlCodes } from '../../ui/utils/textUtils.js';
 import type { ExtensionConfig } from '../extension.js';
 import {
+  asContentMarker,
   compareCodeUnits,
   ContentMarker,
   escapeForDisplay,
@@ -25,8 +26,10 @@ import {
   type ContentEntry,
 } from './contentSignature.js';
 import type {
+  AgentsSummary,
   ContextFilesSummary,
   ExtensionContentSummary,
+  FilesSummary,
   HookSummary,
   HooksSummary,
   ReferencedPath,
@@ -219,6 +222,12 @@ function getMcpServerConfigHash(mcpServer: MCPServerConfig): string {
 const SENSITIVE_ENV_NAME =
   /token|secret|password|passwd|key|auth|credential|creds|private|cert/i;
 
+/** Header names whose values the consent text masks. */
+const SENSITIVE_HEADER_NAME = /authorization|key|cookie|token|secret/i;
+
+/** OAuth setting names whose values the consent text masks. */
+const SENSITIVE_OAUTH_NAME = /secret|token|password/i;
+
 const HOOKS_HEADING =
   '⚠️  This extension contains Hooks which can automatically execute commands';
 
@@ -230,10 +239,13 @@ function formatEnvValue(name: string, value: string): string {
     : formatValueForDisplay(value);
 }
 
-function formatReferencedPath(reference: ReferencedPath): string {
-  const label = formatValueForDisplay(reference.path);
-  switch (reference.marker) {
+function formatPathNote(
+  label: string,
+  marker: ContentMarker | undefined,
+): string {
+  switch (marker) {
     case undefined:
+    case ContentMarker.Directory:
       return label;
     case ContentMarker.Root:
       return `${label} (the extension folder)`;
@@ -243,9 +255,25 @@ function formatReferencedPath(reference: ReferencedPath): string {
       return `${label} (not found)`;
     case ContentMarker.Dangling:
       return `${label} (broken link)`;
+    case ContentMarker.Unsupported:
+      return `${label} (not a regular file)`;
     default:
       return `${label} (unreadable)`;
   }
+}
+
+function formatReferencedPath(reference: ReferencedPath): string {
+  return formatPathNote(
+    formatValueForDisplay(reference.path),
+    reference.marker,
+  );
+}
+
+function formatEntryPath(entry: ContentEntry): string {
+  return formatPathNote(
+    formatValueForDisplay(entry.path),
+    asContentMarker(entry.value),
+  );
 }
 
 function formatHook(hook: HookSummary): string {
@@ -300,6 +328,155 @@ function renderContextFilesDetails(summary: ContextFilesSummary): string[] {
   }
   output.push(`  Context files signature: ${summary.signature}`);
   return output;
+}
+
+function sortedEntries<T>(
+  record: Record<string, T> | undefined,
+): Array<[string, T]> {
+  return Object.entries(record ?? {}).sort(([a], [b]) =>
+    compareCodeUnits(a, b),
+  );
+}
+
+/**
+ * Lists the MCP server of a sub-agent like a manifest MCP server, with values
+ * as written, escaped, and in code spans.
+ */
+function renderAgentMcpServer(name: string, server: MCPServerConfig): string[] {
+  const indent = '      ';
+  const isLocal = !!server.command;
+  const source =
+    server.httpUrl ??
+    `${server.command || ''}${server.args ? ' ' + server.args.join(' ') : ''}`;
+  const output = [
+    `${indent}MCP server ${formatValueForDisplay(name)} (${isLocal ? 'local' : 'remote'}): ${formatValueForDisplay(source)}`,
+  ];
+  if (server.cwd) {
+    output.push(
+      `${indent}Working directory: ${formatValueForDisplay(server.cwd)}`,
+    );
+  }
+  const env = sortedEntries(server.env);
+  if (env.length > 0) {
+    output.push(`${indent}Environment variables:`);
+    for (const [envName, value] of env) {
+      output.push(
+        `${indent}  - ${escapeForDisplay(envName)}: ${formatEnvValue(envName, value ?? '')}`,
+      );
+    }
+  }
+  const headers = sortedEntries(server.headers);
+  if (headers.length > 0) {
+    output.push(`${indent}Headers:`);
+    for (const [headerName, value] of headers) {
+      const displayValue =
+        SENSITIVE_HEADER_NAME.test(headerName) && value
+          ? '********'
+          : formatValueForDisplay(value ?? '');
+      output.push(
+        `${indent}  - ${escapeForDisplay(headerName)}: ${displayValue}`,
+      );
+    }
+  }
+  if (server.url) {
+    output.push(`${indent}URL: ${formatValueForDisplay(server.url)}`);
+  }
+  if (server.tcp) {
+    output.push(`${indent}TCP: ${formatValueForDisplay(server.tcp)}`);
+  }
+  if (server.type) {
+    output.push(`${indent}Type: ${formatValueForDisplay(server.type)}`);
+  }
+  if (server.timeout !== undefined) {
+    output.push(`${indent}Timeout: ${server.timeout}`);
+  }
+  if (server.trust !== undefined) {
+    output.push(`${indent}Trust: ${server.trust}`);
+  }
+  if (server.description) {
+    output.push(
+      `${indent}Description: ${formatValueForDisplay(server.description)}`,
+    );
+  }
+  for (const [label, tools] of [
+    ['Include tools', server.includeTools],
+    ['Exclude tools', server.excludeTools],
+  ] as const) {
+    if (tools && tools.length > 0) {
+      output.push(
+        `${indent}${label}: ${tools.map((tool) => formatValueForDisplay(tool)).join(', ')}`,
+      );
+    }
+  }
+  if (server.authProviderType) {
+    output.push(
+      `${indent}Auth Provider Type: ${formatValueForDisplay(server.authProviderType)}`,
+    );
+  }
+  if (server.oauth) {
+    output.push(`${indent}OAuth Configuration:`);
+    for (const [key, value] of sortedEntries<unknown>({ ...server.oauth })) {
+      const text = Array.isArray(value)
+        ? value.join(', ')
+        : String(value ?? '');
+      const displayValue =
+        SENSITIVE_OAUTH_NAME.test(key) && text
+          ? '********'
+          : formatValueForDisplay(text);
+      output.push(`${indent}  - ${escapeForDisplay(key)}: ${displayValue}`);
+    }
+  }
+  return output;
+}
+
+function renderAgentsSection(summary: AgentsSummary): string[] {
+  const output = ['This extension will add the following sub-agents:'];
+  for (const agent of summary.agents) {
+    if (agent.name === undefined) {
+      output.push(
+        `  * ${formatValueForDisplay(agent.path)} isn't a valid sub-agent file.`,
+      );
+      continue;
+    }
+    output.push(
+      `  * ${formatValueForDisplay(agent.name)} (${formatValueForDisplay(agent.path)})`,
+    );
+    if (agent.agentCardUrl !== undefined) {
+      output.push(
+        `      Agent card URL: ${formatValueForDisplay(agent.agentCardUrl)}`,
+      );
+    }
+    for (const [name, server] of agent.mcpServers) {
+      output.push(...renderAgentMcpServer(name, server));
+    }
+  }
+  for (const entry of summary.files) {
+    // The agents folder itself, when it's a link that can't be followed.
+    if (entry.path === 'agents' && entry.value !== ContentMarker.Directory) {
+      output.push(`  * ${formatEntryPath(entry)}`);
+    }
+  }
+  if (summary.referencedPaths.length > 0) {
+    output.push(
+      `  Files used by MCP servers: ${summary.referencedPaths.map(formatReferencedPath).join(', ')}`,
+    );
+  }
+  output.push(`  Agents signature: ${summary.signature}`);
+  return output;
+}
+
+function renderFilesSection(
+  heading: string,
+  signatureLabel: string,
+  summary: FilesSummary,
+): string[] {
+  return [
+    heading,
+    ...summary.files
+      .filter((entry) => entry.value !== ContentMarker.Directory)
+      .map((entry) => `  * ${formatEntryPath(entry)}`),
+    `  ${signatureLabel}: ${summary.signature}`,
+  ];
 }
 
 /**
@@ -459,6 +636,26 @@ function describeContentChanges(
         skillHashes(previous.skills),
         skillHashes(current.skills),
       ),
+      ...describeItemChanges(
+        'Sub-agents',
+        fileHashes(previous.agents?.files ?? []),
+        fileHashes(current.agents?.files ?? []),
+      ),
+      ...describeItemChanges(
+        'Sub-agents',
+        referenceHashes(previous.agents?.referencedPaths ?? []),
+        referenceHashes(current.agents?.referencedPaths ?? []),
+      ),
+      ...describeItemChanges(
+        'Custom commands',
+        fileHashes(previous.commands?.files ?? []),
+        fileHashes(current.commands?.files ?? []),
+      ),
+      ...describeItemChanges(
+        'Policies',
+        fileHashes(previous.policies?.files ?? []),
+        fileHashes(current.policies?.files ?? []),
+      ),
     ]),
   ];
 }
@@ -534,9 +731,7 @@ async function extensionConsentString(
           ([a], [b]) => a.localeCompare(b),
         );
         for (const [headerKey, headerValue] of sortedHeaders) {
-          const isSensitive = /authorization|key|cookie|token|secret/i.test(
-            headerKey,
-          );
+          const isSensitive = SENSITIVE_HEADER_NAME.test(headerKey);
           const displayValue =
             isSensitive && headerValue ? '********' : (headerValue ?? '');
           output.push(`      - ${headerKey}: ${displayValue}`);
@@ -583,7 +778,7 @@ async function extensionConsentString(
           a.localeCompare(b),
         );
         for (const [oKey, oValue] of sortedOauth) {
-          const isSensitive = /secret|token|password/i.test(oKey);
+          const isSensitive = SENSITIVE_OAUTH_NAME.test(oKey);
           const valStr = Array.isArray(oValue)
             ? oValue.join(', ')
             : String(oValue ?? '');
@@ -617,6 +812,27 @@ async function extensionConsentString(
     }
   } else if (hasHooks) {
     output.push(`${HOOKS_HEADING}.`);
+  }
+  if (contentSummary?.agents) {
+    output.push(...renderAgentsSection(contentSummary.agents));
+  }
+  if (contentSummary?.commands) {
+    output.push(
+      ...renderFilesSection(
+        'This extension will add the following custom commands:',
+        'Commands signature',
+        contentSummary.commands,
+      ),
+    );
+  }
+  if (contentSummary?.policies) {
+    output.push(
+      ...renderFilesSection(
+        'This extension will add the following policy files:',
+        'Policies signature',
+        contentSummary.policies,
+      ),
+    );
   }
   const hasSkills = contentSummary
     ? contentSummary.skills !== undefined

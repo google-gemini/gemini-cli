@@ -6,8 +6,14 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { loadSkillsFromDir, processImports } from '@google/gemini-cli-core';
 import {
+  loadAgentsFromDirectory,
+  loadSkillsFromDir,
+  processImports,
+  type MCPServerConfig,
+} from '@google/gemini-cli-core';
+import {
+  asContentMarker,
   collectContentEntries,
   compareCodeUnits,
   computeContentSignature,
@@ -76,6 +82,38 @@ export interface ExtensionContentSummary {
   hooks?: HooksSummary;
   contextFiles?: ContextFilesSummary;
   skills?: SkillsSummary;
+  agents?: AgentsSummary;
+  commands?: FilesSummary;
+  policies?: FilesSummary;
+}
+
+/** One sub-agent from `agents/`, with its values as written. */
+export interface AgentSummary {
+  /** The agent file, relative to the extension folder. */
+  path: string;
+  /** The agent name, or `undefined` if the file can't be loaded. */
+  name?: string;
+  /** The agent card URL of a remote agent. */
+  agentCardUrl?: string;
+  /** MCP servers of a local agent, sorted by name. */
+  mcpServers: Array<[string, MCPServerConfig]>;
+}
+
+/** The sub-agents under `agents/` and the files that they use. */
+export interface AgentsSummary {
+  /** Agents sorted by file and name. */
+  agents: AgentSummary[];
+  /** Paths that the MCP servers of the agents reference. */
+  referencedPaths: ReferencedPath[];
+  /** The files that the agent loader reads. */
+  files: ContentEntry[];
+  signature: string;
+}
+
+/** Files of one kind, such as custom commands or policy files. */
+export interface FilesSummary {
+  files: ContentEntry[];
+  signature: string;
 }
 
 /** One agent skill from the `skills/` folder. */
@@ -135,8 +173,50 @@ function asText(value: unknown): string | undefined {
   return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
-function toMarker(value: string): ContentMarker | undefined {
-  return Object.values(ContentMarker).find((marker) => marker === value);
+/** Returns true for a link that leaves the extension folder or is broken. */
+function isUnresolvedLink(entry: ContentEntry): boolean {
+  return (
+    entry.type === 'link' &&
+    (entry.value === ContentMarker.Outside ||
+      entry.value === ContentMarker.Dangling)
+  );
+}
+
+/**
+ * Keeps the regular files directly in `folder` whose names pass `accept`, like
+ * loaders that list a folder and skip links, plus the entry of the folder
+ * itself when it's a link.
+ */
+function topLevelFiles(
+  entries: readonly ContentEntry[],
+  folder: string,
+  accept: (name: string) => boolean,
+): ContentEntry[] {
+  return entries.filter((entry) => {
+    if (entry.path === folder) {
+      return entry.type === 'link';
+    }
+    const name = entry.path.slice(folder.length + 1);
+    return !name.includes('/') && entry.type === 'file' && accept(name);
+  });
+}
+
+/** Returns true if `files` has more than the link entry of a folder. */
+function hasListedFiles(files: readonly ContentEntry[]): boolean {
+  return files.some((entry) => entry.value !== ContentMarker.Directory);
+}
+
+/** Values of an MCP server that can reference files: command, args, and env. */
+export function mcpServerValues(server: {
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+}): string[] {
+  return [
+    server.command ?? '',
+    ...(server.args ?? []),
+    ...Object.values(server.env ?? {}),
+  ];
 }
 
 function toReferencedPath(suffix: string): Omit<ReferencedPath, 'signature'> {
@@ -207,7 +287,7 @@ export async function collectReferencedPaths(
       found = [{ path: reference.path, type: 'reference', value: marker }];
     } else if (found.length === 1 && found[0].path === reference.path) {
       // For example a link that leaves the folder.
-      const entryMarker = toMarker(found[0].value);
+      const entryMarker = asContentMarker(found[0].value);
       if (entryMarker && entryMarker !== ContentMarker.Directory) {
         marker = entryMarker;
       }
@@ -424,6 +504,106 @@ async function summarizeSkills(
 }
 
 /**
+ * Summarizes the sub-agents that `loadAgentsFromDirectory` reads: the `.md`
+ * files directly in `agents/` whose names don't start with `_`. The agents
+ * aren't loaded when `agents/` is a link that leaves the extension folder.
+ */
+async function summarizeAgents(
+  rootDir: string,
+): Promise<AgentsSummary | undefined> {
+  const entries = (await collectContentEntries(rootDir, 'agents')) ?? [];
+  const files = topLevelFiles(
+    entries,
+    'agents',
+    (name) => name.endsWith('.md') && !name.startsWith('_'),
+  );
+  if (!hasListedFiles(files)) {
+    return undefined;
+  }
+  const agents: AgentSummary[] = [];
+  if (!files.some(isUnresolvedLink)) {
+    const loaded = await loadAgentsFromDirectory(path.join(rootDir, 'agents'));
+    for (const agent of loaded?.agents ?? []) {
+      const filePath = agent.metadata?.filePath;
+      agents.push({
+        path: filePath ? toRelativePath(rootDir, filePath) : 'agents',
+        name: agent.name,
+        ...(agent.kind === 'remote' && agent.agentCardUrl
+          ? { agentCardUrl: agent.agentCardUrl }
+          : {}),
+        mcpServers:
+          agent.kind === 'local'
+            ? Object.entries(agent.mcpServers ?? {}).sort(([a], [b]) =>
+                compareCodeUnits(a, b),
+              )
+            : [],
+      });
+    }
+    for (const error of loaded?.errors ?? []) {
+      agents.push({
+        path: toRelativePath(rootDir, error.filePath),
+        mcpServers: [],
+      });
+    }
+  }
+  agents.sort(
+    (a, b) =>
+      compareCodeUnits(a.path, b.path) ||
+      compareCodeUnits(a.name ?? '', b.name ?? ''),
+  );
+  const { referencedPaths, entries: referencedEntries } =
+    await collectReferencedPaths(
+      rootDir,
+      findReferencedPaths(
+        agents.flatMap((agent) =>
+          agent.mcpServers.flatMap(([, server]) => mcpServerValues(server)),
+        ),
+      ),
+    );
+  return {
+    agents,
+    referencedPaths,
+    files,
+    signature: computeContentSignature([...files, ...referencedEntries]),
+  };
+}
+
+/**
+ * Summarizes the `.toml` files under `commands/`, like the `**\/*.toml` glob
+ * of the command loader, which includes hidden folders and follows links.
+ */
+async function summarizeCommands(
+  rootDir: string,
+): Promise<FilesSummary | undefined> {
+  const entries = (await collectContentEntries(rootDir, 'commands')) ?? [];
+  const files = entries.filter(
+    (entry) =>
+      entry.type !== 'dir' &&
+      entry.value !== ContentMarker.Directory &&
+      (entry.path.endsWith('.toml') || isUnresolvedLink(entry)),
+  );
+  return files.length > 0
+    ? { files, signature: computeContentSignature(files) }
+    : undefined;
+}
+
+/**
+ * Summarizes the policy files that the policy loader reads: the `.toml` files
+ * directly in `policies/`.
+ */
+async function summarizePolicies(
+  rootDir: string,
+): Promise<FilesSummary | undefined> {
+  const entries = (await collectContentEntries(rootDir, 'policies')) ?? [];
+  const files = topLevelFiles(entries, 'policies', (name) =>
+    name.endsWith('.toml'),
+  );
+  return hasListedFiles(files)
+    ? { files, signature: computeContentSignature(files) }
+    : undefined;
+}
+
+/**
  * Builds the summary of an extension folder from its raw files. Variables such
  * as `${extensionPath}` stay as written, and nothing outside the folder is
  * read.
@@ -438,9 +618,15 @@ export async function buildExtensionContentSummary(
     sources.contextFilePaths ?? [],
   );
   const skills = await summarizeSkills(extensionDir);
+  const agents = await summarizeAgents(extensionDir);
+  const commands = await summarizeCommands(extensionDir);
+  const policies = await summarizePolicies(extensionDir);
   return {
     ...(hooks ? { hooks } : {}),
     ...(contextFiles ? { contextFiles } : {}),
     ...(skills ? { skills } : {}),
+    ...(agents ? { agents } : {}),
+    ...(commands ? { commands } : {}),
+    ...(policies ? { policies } : {}),
   };
 }

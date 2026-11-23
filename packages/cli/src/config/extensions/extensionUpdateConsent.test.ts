@@ -608,6 +608,137 @@ describe('extension update consent', () => {
     });
   });
 
+  describe('sub-agents, custom commands, and policies', () => {
+    function agentFile(body: string): string {
+      return [
+        '---',
+        'name: release-helper',
+        'description: Helps with releases',
+        'mcp_servers:',
+        '  tracker:',
+        '    command: node',
+        '    args:',
+        '      - ${extensionPath}/servers/tracker.js',
+        '    trust: true',
+        '---',
+        body,
+      ].join('\n');
+    }
+
+    it('asks for consent when a sub-agent with MCP servers is added, and shows its trust setting', async () => {
+      const installed = await installVersion1({});
+      writeSource({
+        version: '1.0.1',
+        files: {
+          'agents/release-helper.md': agentFile('Help with releases.'),
+          'servers/tracker.js': 'server',
+        },
+      });
+
+      await settleUpdate(installed);
+
+      const text = consentText();
+      expect(text).toContain(
+        [
+          '  * `release-helper` (`agents/release-helper.md`)',
+          '      MCP server `tracker` (local): `node ${extensionPath}/servers/tracker.js`',
+          '      Trust: true',
+        ].join('\n'),
+      );
+      expect(text).toContain(
+        '  Files used by MCP servers: `servers/tracker.js`',
+      );
+      expect(text).toContain(
+        '  * Sub-agents: `agents/release-helper.md` added',
+      );
+    });
+
+    it('lists a remote sub-agent with its agent card URL', async () => {
+      const installed = await installVersion1({});
+      writeSource({
+        version: '1.0.1',
+        files: {
+          'agents/remote.md':
+            '---\nkind: remote\nname: remote-helper\nagent_card_url: https://example.com/card.json\n---\n',
+        },
+      });
+
+      await settleUpdate(installed);
+
+      expect(consentText()).toContain(
+        '  * `remote-helper` (`agents/remote.md`)\n      Agent card URL: `https://example.com/card.json`',
+      );
+    });
+
+    it('asks for consent again when a sub-agent file changes', async () => {
+      const installed = await installVersion1({
+        files: { 'agents/release-helper.md': agentFile('Version one.') },
+      });
+      writeSource({
+        version: '1.0.1',
+        files: { 'agents/release-helper.md': agentFile('Version two.') },
+      });
+
+      await settleUpdate(installed);
+
+      expect(consentText()).toContain(
+        '  * Sub-agents: `agents/release-helper.md` changed',
+      );
+    });
+
+    it('does not ask for consent when a file starting with _ in agents/ changes', async () => {
+      const files = { 'agents/release-helper.md': agentFile('Help.') };
+      const installed = await installVersion1({
+        files: { ...files, 'agents/_notes.md': 'notes v1' },
+      });
+      writeSource({
+        version: '1.0.1',
+        files: { ...files, 'agents/_notes.md': 'notes v2' },
+      });
+
+      expect(await settleUpdate(installed)).toBe('applied');
+      expect(requestConsent).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a nested folder', 'commands/release/notes.toml'],
+      ['a hidden folder', 'commands/.internal/notes.toml'],
+    ])(
+      'asks for consent again when a command in %s changes',
+      async (_name, commandPath) => {
+        const installed = await installVersion1({
+          files: { [commandPath]: 'prompt = "v1"' },
+        });
+        writeSource({
+          version: '1.0.1',
+          files: { [commandPath]: 'prompt = "v2"' },
+        });
+
+        await settleUpdate(installed);
+
+        expect(consentText()).toContain(
+          `  * Custom commands: \`${commandPath}\` changed`,
+        );
+      },
+    );
+
+    it('asks for consent again when a policy file changes', async () => {
+      const installed = await installVersion1({
+        files: { 'policies/release.toml': '# release policy v1' },
+      });
+      writeSource({
+        version: '1.0.1',
+        files: { 'policies/release.toml': '# release policy v2' },
+      });
+
+      await settleUpdate(installed);
+
+      expect(consentText()).toContain(
+        '  * Policies: `policies/release.toml` changed',
+      );
+    });
+  });
+
   describe('manifest changes', () => {
     it('asks for consent and keeps the installed version when an MCP server is added', async () => {
       const installed = await installVersion1({ hookCommand: HOOK_V1 });
