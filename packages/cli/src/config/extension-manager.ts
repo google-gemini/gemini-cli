@@ -347,10 +347,21 @@ Would you like to attempt to install via "git clone" instead?`,
         // Both sides are read from the raw files, so they compare the same way
         // whatever the settings (hooks, for example, load only when enabled).
         const contentSummaries = {
-          current: await buildExtensionContentSummary(localSourcePath),
-          previous: previous
-            ? await buildExtensionContentSummary(previous.path)
-            : undefined,
+          current: await buildExtensionContentSummary(localSourcePath, {
+            contextFilePaths: resolveContextFilePaths(
+              newExtensionConfig,
+              localSourcePath,
+            ),
+          }),
+          previous:
+            previous && previousExtensionConfig
+              ? await buildExtensionContentSummary(previous.path, {
+                  contextFilePaths: resolveContextFilePaths(
+                    previousExtensionConfig,
+                    previous.path,
+                  ),
+                })
+              : undefined,
         };
         const newHasHooks = contentSummaries.current.hooks !== undefined;
         const previousHasHooks = contentSummaries.previous?.hooks !== undefined;

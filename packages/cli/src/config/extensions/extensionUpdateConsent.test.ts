@@ -72,6 +72,8 @@ interface HookOptions {
 
 interface SourceOptions {
   version: string;
+  /** Extra fields for `gemini-extension.json`. */
+  manifest?: Record<string, unknown>;
   /** Adds a `SessionStart` hook that runs this command. */
   hookCommand?: string;
   /** Adds a `SessionStart` hook with these options. */
@@ -143,6 +145,7 @@ describe('extension update consent', () => {
       JSON.stringify({
         name: EXTENSION_NAME,
         version: options.version,
+        ...options.manifest,
         ...(options.mcpServers ? { mcpServers: options.mcpServers } : {}),
       }),
     );
@@ -457,6 +460,109 @@ describe('extension update consent', () => {
 
       expect(lastFrame()).toContain(`SessionStart: ${command}`);
       unmount();
+    });
+  });
+
+  describe('context files', () => {
+    it('asks for consent again when the GEMINI.md content changes', async () => {
+      const installed = await installVersion1({ context: 'context v1' });
+      writeSource({ version: '1.0.1', context: 'context v2' });
+
+      await settleUpdate(installed);
+
+      expect(
+        requestConsent,
+        'Changed GEMINI.md content must trigger a consent request.',
+      ).toHaveBeenCalledTimes(1);
+      const text = consentText();
+      expect(text).toContain(
+        'This extension will append info to your gemini.md context using GEMINI.md\n  Context files signature: ',
+      );
+      expect(text).toContain('  * Context files: `GEMINI.md` changed');
+    });
+
+    it('asks for consent again when GEMINI.md is added or removed', async () => {
+      const installed = await installVersion1({});
+      writeSource({ version: '1.0.1', context: 'context' });
+      expect(await settleUpdate(installed)).toBe('applied');
+      expect(consentText()).toContain('  * Context files: `GEMINI.md` added');
+
+      requestConsent.mockClear();
+      const updated = extensionManager
+        .getExtensions()
+        .find((extension) => extension.name === EXTENSION_NAME);
+      if (!updated) {
+        throw new Error('The updated extension is not loaded.');
+      }
+      writeSource({ version: '1.0.2' });
+      await settleUpdate(updated);
+      expect(consentText()).toContain('  * Context files: `GEMINI.md` removed');
+    });
+
+    it('asks for consent again when a file of a contextFileName list changes', async () => {
+      const manifest = { contextFileName: ['a.md', 'b.md'] };
+      const installed = await installVersion1({
+        manifest,
+        files: { 'a.md': 'a', 'b.md': 'b v1' },
+      });
+      writeSource({
+        version: '1.0.1',
+        manifest,
+        files: { 'a.md': 'a', 'b.md': 'b v2' },
+      });
+
+      await settleUpdate(installed);
+
+      expect(consentText()).toContain('  * Context files: `b.md` changed');
+    });
+
+    it('ignores GEMINI.md when contextFileName is set', async () => {
+      const manifest = { contextFileName: 'CONTEXT.md' };
+      const installed = await installVersion1({
+        manifest,
+        context: 'ignored v1',
+        files: { 'CONTEXT.md': 'context' },
+      });
+      writeSource({
+        version: '1.0.1',
+        manifest,
+        context: 'ignored v2',
+        files: { 'CONTEXT.md': 'context' },
+      });
+
+      expect(await settleUpdate(installed)).toBe('applied');
+      expect(requestConsent).not.toHaveBeenCalled();
+    });
+
+    it('asks for consent again when a file imported by GEMINI.md changes', async () => {
+      const context = 'Follow @./docs/rules.md';
+      const installed = await installVersion1({
+        context,
+        files: { 'docs/rules.md': 'rules v1' },
+      });
+      writeSource({
+        version: '1.0.1',
+        context,
+        files: { 'docs/rules.md': 'rules v2' },
+      });
+
+      await settleUpdate(installed);
+
+      const text = consentText();
+      expect(text).toContain('  Imported files: `docs/rules.md`');
+      expect(text).toContain('  * Context files: `docs/rules.md` changed');
+    });
+
+    it('does not ask for consent when context files are unchanged', async () => {
+      const options = {
+        context: 'Follow @./docs/rules.md',
+        files: { 'docs/rules.md': 'rules' },
+      };
+      const installed = await installVersion1(options);
+      writeSource({ version: '1.0.1', ...options });
+
+      expect(await settleUpdate(installed)).toBe('applied');
+      expect(requestConsent).not.toHaveBeenCalled();
     });
   });
 

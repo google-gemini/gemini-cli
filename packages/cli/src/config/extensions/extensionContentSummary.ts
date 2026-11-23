@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { processImports } from '@google/gemini-cli-core';
 import {
   collectContentEntries,
   compareCodeUnits,
@@ -53,12 +54,33 @@ export interface HooksSummary {
 }
 
 /**
+ * The context files that an extension adds to the model context, and the
+ * files that they import.
+ */
+export interface ContextFilesSummary {
+  /** Context files that exist, relative to the extension folder. */
+  paths: string[];
+  /** Files that the context files import with `@`, relative to the folder. */
+  importedPaths: string[];
+  /** Entries of the context files and the imported files. */
+  files: ContentEntry[];
+  signature: string;
+}
+
+/**
  * What an extension folder adds to the CLI, read from the raw files on disk
  * without resolving variables, so two folders with the same files have the same
  * summary.
  */
 export interface ExtensionContentSummary {
   hooks?: HooksSummary;
+  contextFiles?: ContextFilesSummary;
+}
+
+/** Inputs that the extension manager resolves for a folder. */
+export interface ExtensionContentSources {
+  /** Context files that exist, as returned by `resolveContextFilePaths`. */
+  contextFilePaths?: readonly string[];
 }
 
 const EXTENSION_PATH_VARIABLE = '${extensionPath}';
@@ -280,15 +302,77 @@ async function summarizeHooks(
 }
 
 /**
+ * Summarizes the context files and the files they import with `@`. Imports
+ * that resolve outside the extension folder aren't read.
+ */
+async function summarizeContextFiles(
+  rootDir: string,
+  contextFilePaths: readonly string[],
+): Promise<ContextFilesSummary | undefined> {
+  if (contextFilePaths.length === 0) {
+    return undefined;
+  }
+  const toRelative = (filePath: string) =>
+    path.relative(rootDir, filePath).split(path.sep).join('/');
+  const paths = [...new Set(contextFilePaths.map(toRelative))];
+  const files: ContentEntry[] = [];
+  const imported = new Set<string>();
+  for (const relativePath of paths) {
+    const entries = (await collectContentEntries(rootDir, relativePath)) ?? [
+      { path: relativePath, type: 'reference', value: ContentMarker.Missing },
+    ];
+    files.push(...entries);
+    const content = hasReadableFile(entries, relativePath)
+      ? await readTextFile(rootDir, relativePath)
+      : undefined;
+    if (content === undefined) {
+      continue;
+    }
+    const filePath = path.join(rootDir, ...relativePath.split('/'));
+    const { importTree } = await processImports(
+      content,
+      path.dirname(filePath),
+      false,
+      undefined,
+      rootDir,
+      'tree',
+    );
+    const pending = [...(importTree.imports ?? [])];
+    for (let node = pending.pop(); node; node = pending.pop()) {
+      imported.add(toRelative(node.path));
+      pending.push(...(node.imports ?? []));
+    }
+  }
+  const importedPaths = [...imported]
+    .filter((importedPath) => !paths.includes(importedPath))
+    .sort(compareCodeUnits);
+  for (const importedPath of importedPaths) {
+    files.push(...((await collectContentEntries(rootDir, importedPath)) ?? []));
+  }
+  return {
+    paths,
+    importedPaths,
+    files,
+    signature: computeContentSignature(files),
+  };
+}
+
+/**
  * Builds the summary of an extension folder from its raw files. Variables such
  * as `${extensionPath}` stay as written, and nothing outside the folder is
  * read.
  */
 export async function buildExtensionContentSummary(
   extensionDir: string,
+  sources: ExtensionContentSources = {},
 ): Promise<ExtensionContentSummary> {
   const hooks = await summarizeHooks(extensionDir);
+  const contextFiles = await summarizeContextFiles(
+    extensionDir,
+    sources.contextFilePaths ?? [],
+  );
   return {
     ...(hooks ? { hooks } : {}),
+    ...(contextFiles ? { contextFiles } : {}),
   };
 }

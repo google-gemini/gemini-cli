@@ -303,4 +303,79 @@ describe('extensionContentSummary', () => {
       expect(after.hooks?.files).toEqual(before.hooks?.files);
     });
   });
+
+  describe('context files', () => {
+    function contextSources(...relativePaths: string[]) {
+      return {
+        contextFilePaths: relativePaths.map((relativePath) =>
+          path.join(rootDir, relativePath),
+        ),
+      };
+    }
+
+    it('is absent without context files', async () => {
+      writeFile('GEMINI.md', 'context');
+
+      expect(
+        await buildExtensionContentSummary(rootDir, contextSources()),
+      ).toEqual({});
+    });
+
+    it('signs the context files and the files they import', async () => {
+      const context = 'Read @./docs/rules.md first.';
+      const rules = 'Rules. See @./nested/more.md';
+      writeFile('GEMINI.md', context);
+      writeFile('docs/rules.md', rules);
+      writeFile('docs/nested/more.md', 'More');
+
+      const summary = await buildExtensionContentSummary(
+        rootDir,
+        contextSources('GEMINI.md'),
+      );
+
+      const files = [
+        fileEntry('GEMINI.md', context),
+        fileEntry('docs/nested/more.md', 'More'),
+        fileEntry('docs/rules.md', rules),
+      ];
+      expect(summary.contextFiles).toEqual({
+        paths: ['GEMINI.md'],
+        importedPaths: ['docs/nested/more.md', 'docs/rules.md'],
+        files,
+        signature: computeContentSignature(files),
+      });
+    });
+
+    it('signs every context file of a list', async () => {
+      writeFile('a.md', 'a');
+      writeFile('b.md', 'b');
+
+      const summary = await buildExtensionContentSummary(
+        rootDir,
+        contextSources('a.md', 'b.md'),
+      );
+
+      expect(summary.contextFiles?.paths).toEqual(['a.md', 'b.md']);
+      expect(summary.contextFiles?.files).toEqual([
+        fileEntry('a.md', 'a'),
+        fileEntry('b.md', 'b'),
+      ]);
+    });
+
+    it('does not read imports outside the extension folder', async () => {
+      const context = 'See @../outside.md';
+      writeFile('GEMINI.md', context);
+      fs.writeFileSync(path.join(tempDir, 'outside.md'), 'outside');
+
+      const summary = await buildExtensionContentSummary(
+        rootDir,
+        contextSources('GEMINI.md'),
+      );
+
+      expect(summary.contextFiles?.importedPaths).toEqual([]);
+      expect(summary.contextFiles?.files).toEqual([
+        fileEntry('GEMINI.md', context),
+      ]);
+    });
+  });
 });

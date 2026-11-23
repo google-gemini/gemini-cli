@@ -25,6 +25,7 @@ import {
   type ContentEntry,
 } from './contentSignature.js';
 import type {
+  ContextFilesSummary,
   ExtensionContentSummary,
   HookSummary,
   HooksSummary,
@@ -289,6 +290,17 @@ function renderHooksSection(summary: HooksSummary): string[] {
   return output;
 }
 
+function renderContextFilesDetails(summary: ContextFilesSummary): string[] {
+  const output: string[] = [];
+  if (summary.importedPaths.length > 0) {
+    output.push(
+      `  Imported files: ${summary.importedPaths.map((importedPath) => formatValueForDisplay(importedPath)).join(', ')}`,
+    );
+  }
+  output.push(`  Context files signature: ${summary.signature}`);
+  return output;
+}
+
 /** Lists the items that were added, changed, or removed, keyed by label. */
 function describeItemChanges(
   section: string,
@@ -388,7 +400,16 @@ function describeContentChanges(
   previous: ExtensionContentSummary,
   current: ExtensionContentSummary,
 ): string[] {
-  return [...new Set(describeHookChanges(previous.hooks, current.hooks))];
+  return [
+    ...new Set([
+      ...describeHookChanges(previous.hooks, current.hooks),
+      ...describeItemChanges(
+        'Context files',
+        fileHashes(previous.contextFiles?.files ?? []),
+        fileHashes(current.contextFiles?.files ?? []),
+      ),
+    ]),
+  ];
 }
 
 /**
@@ -526,6 +547,13 @@ async function extensionConsentString(
     output.push(
       `This extension will append info to your gemini.md context using ${sanitizedConfig.contextFileName}`,
     );
+  } else if (contentSummary?.contextFiles) {
+    output.push(
+      'This extension will append info to your gemini.md context using GEMINI.md',
+    );
+  }
+  if (contentSummary?.contextFiles) {
+    output.push(...renderContextFilesDetails(contentSummary.contextFiles));
   }
   if (sanitizedConfig.excludeTools) {
     output.push(

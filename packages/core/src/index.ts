@@ -72,6 +72,7 @@ export * from './core/apiKeyCredentialStorage.js';
 export * from './utils/fetch.js';
 export { homedir, tmpdir } from './utils/paths.js';
 export * from './utils/paths.js';
+export { processImports } from './utils/memoryImportProcessor.js';
 export * from './utils/checks.js';
 export * from './utils/headless.js';
 export * from './utils/schemaValidator.js';

@@ -819,6 +819,76 @@ describe('consent', () => {
           ].join('\n'),
         );
       });
+
+      it('adds the imported files and a signature to the context file line', async () => {
+        const text = await consentTextFor({
+          contextFiles: {
+            paths: ['GEMINI.md'],
+            importedPaths: ['docs/rules.md'],
+            files: [],
+            signature,
+          },
+        });
+
+        expect(text).toContain(
+          [
+            'This extension will append info to your gemini.md context using GEMINI.md',
+            '  Imported files: `docs/rules.md`',
+            `  Context files signature: ${signature}`,
+          ].join('\n'),
+        );
+      });
+
+      it('keeps the context file line without a signature when the declared file is missing', async () => {
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          { ...baseConfig, contextFileName: 'CONTEXT.md' },
+          requestConsent,
+          false,
+          undefined,
+          false,
+          [],
+          [],
+          false,
+          undefined,
+          undefined,
+          { current: {} },
+        );
+
+        const text = requestConsent.mock.calls[0][0] as string;
+        expect(text).toContain(
+          'This extension will append info to your gemini.md context using CONTEXT.md\n',
+        );
+        expect(text).not.toContain('Context files signature');
+      });
+
+      it('names the context files that changed', async () => {
+        const contextFiles = {
+          paths: ['GEMINI.md'],
+          importedPaths: [],
+          signature,
+        };
+
+        const text = await consentTextFor(
+          {
+            contextFiles: {
+              ...contextFiles,
+              files: [{ path: 'GEMINI.md', type: 'file', value: 'v2' }],
+              signature: otherSignature,
+            },
+          },
+          {
+            contextFiles: {
+              ...contextFiles,
+              files: [{ path: 'GEMINI.md', type: 'file', value: 'v1' }],
+            },
+          },
+        );
+
+        expect(text).toMatch(
+          /Changes since the installed version:\n {2}\* Context files: `GEMINI\.md` changed$/,
+        );
+      });
     });
   });
 
