@@ -18,7 +18,7 @@ import { execFileSync } from 'node:child_process';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import React from 'react';
+import React, { act } from 'react';
 import {
   getErrorMessage,
   getRealPath,
@@ -935,6 +935,28 @@ describe('extension update consent', () => {
         expect.stringContaining('rolling back'),
       );
       expect(readInstalledHookCommand()).toBe(HOOK_V1);
+    });
+  });
+
+  describe('interactive dialog', () => {
+    it('declines when Enter is pressed in a dialog that selects "No" first', async () => {
+      const onConfirm = vi.fn();
+      const { stdin, waitUntilReady, unmount } = await renderWithProviders(
+        React.createElement(ConsentPrompt, {
+          prompt: 'Install this extension?',
+          onConfirm,
+          terminalWidth: 80,
+          defaultToNo: true,
+        }),
+      );
+
+      await act(async () => {
+        stdin.write('\r');
+      });
+      await waitUntilReady();
+
+      await vi.waitFor(() => expect(onConfirm).toHaveBeenCalledWith(false));
+      unmount();
     });
   });
 

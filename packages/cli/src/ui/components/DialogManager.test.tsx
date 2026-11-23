@@ -24,7 +24,9 @@ vi.mock('./FolderTrustDialog.js', () => ({
   FolderTrustDialog: () => <Text>FolderTrustDialog</Text>,
 }));
 vi.mock('./ConsentPrompt.js', () => ({
-  ConsentPrompt: () => <Text>ConsentPrompt</Text>,
+  ConsentPrompt: ({ defaultToNo }: { defaultToNo?: boolean }) => (
+    <Text>{defaultToNo ? 'ConsentPrompt (default: No)' : 'ConsentPrompt'}</Text>
+  ),
 }));
 vi.mock('./ThemeDialog.js', () => ({
   ThemeDialog: () => <Text>ThemeDialog</Text>,
@@ -201,4 +203,38 @@ describe('DialogManager', () => {
       unmount();
     },
   );
+
+  it('selects "No" first only in the extension consent dialog', async () => {
+    const extensionDialog = await renderWithProviders(
+      <DialogManager {...defaultProps} />,
+      {
+        uiState: {
+          ...baseUiState,
+          confirmUpdateExtensionRequests: [
+            { prompt: 'Install this extension?', onConfirm: vi.fn() },
+          ],
+        } as Partial<UIState> as UIState,
+      },
+    );
+    expect(extensionDialog.lastFrame()).toContain(
+      'ConsentPrompt (default: No)',
+    );
+    extensionDialog.unmount();
+
+    const commandDialog = await renderWithProviders(
+      <DialogManager {...defaultProps} />,
+      {
+        uiState: {
+          ...baseUiState,
+          commandConfirmationRequest: {
+            prompt: 'Run this command?',
+            onConfirm: vi.fn(),
+          },
+        } as Partial<UIState> as UIState,
+      },
+    );
+    expect(commandDialog.lastFrame()).toContain('ConsentPrompt');
+    expect(commandDialog.lastFrame()).not.toContain('default: No');
+    commandDialog.unmount();
+  });
 });
