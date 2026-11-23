@@ -668,6 +668,24 @@ describe('CoderAgentExecutor', () => {
     );
   });
 
+  it('should strip client-supplied isTrusted in createTask', async () => {
+    const { setIsTrusted } = await import('../config/config.js');
+    vi.mocked(setIsTrusted).mockReturnValue(false);
+
+    await executor.createTask('task-create-untrusted', 'context-1', {
+      kind: 'agent-settings',
+      workspacePath: '/tmp',
+      isTrusted: true,
+    } as never);
+
+    expect(setIsTrusted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isTrusted: undefined,
+      }),
+      expect.any(String),
+    );
+  });
+
   it('should clean up already-registered socket listeners if a subsequent listener registration throws synchronously', async () => {
     const taskId = 'test-partial-socket-registration-cleanup';
     const contextId = 'test-context';

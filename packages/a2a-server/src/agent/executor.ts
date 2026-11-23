@@ -238,10 +238,19 @@ export class CoderAgentExecutor implements AgentExecutor {
     agentSettingsInput?: AgentSettings,
     eventBus?: ExecutionEventBus,
   ): Promise<TaskWrapper> {
-    const agentSettings: AgentSettings = agentSettingsInput || {
-      kind: CoderAgentEvent.StateAgentSettingsEvent,
-      workspacePath: process.cwd(),
-    };
+    const agentSettings: AgentSettings = agentSettingsInput
+      ? {
+          ...agentSettingsInput,
+          workspacePath: validateWorkspacePath(
+            agentSettingsInput.workspacePath,
+          ),
+          // Strip client-supplied isTrusted so setIsTrusted() evaluates server-side trust.
+          isTrusted: undefined,
+        }
+      : {
+          kind: CoderAgentEvent.StateAgentSettingsEvent,
+          workspacePath: validateWorkspacePath(undefined),
+        };
     return this.runInIsolatedEnv(
       agentSettings,
       async (isTrusted, workspaceRoot) => {
