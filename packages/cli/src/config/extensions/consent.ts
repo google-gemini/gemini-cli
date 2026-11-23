@@ -30,6 +30,7 @@ import type {
   HookSummary,
   HooksSummary,
   ReferencedPath,
+  SkillsSummary,
 } from './extensionContentSummary.js';
 
 export const INSTALL_WARNING_MESSAGE = chalk.yellow(
@@ -301,6 +302,51 @@ function renderContextFilesDetails(summary: ContextFilesSummary): string[] {
   return output;
 }
 
+/**
+ * Lists skills like `renderSkillsList`, with paths relative to the extension
+ * folder, escaped values, and a signature line.
+ */
+function renderSkillSummaries(summary: SkillsSummary): string[] {
+  const output: string[] = [];
+  for (const skill of summary.skills) {
+    output.push(
+      `  * ${chalk.bold(escapeForDisplay(skill.name))}: ${escapeForDisplay(skill.description)}`,
+    );
+    const fileCountStr =
+      skill.itemCount !== undefined
+        ? ` (${skill.itemCount} items in directory)`
+        : ` ${chalk.red('⚠️ (Could not count items in directory)')}`;
+    output.push(
+      chalk.dim(
+        `    (Source: ${escapeForDisplay(skill.location)})${fileCountStr}`,
+      ),
+    );
+    output.push('');
+  }
+  output.push(`  Skills signature: ${summary.signature}`);
+  return output;
+}
+
+/** Hashes per skill folder, plus files under `skills/` outside any skill. */
+function skillHashes(summary: SkillsSummary | undefined): Map<string, string> {
+  const hashes = new Map<string, string>();
+  const folders: string[] = [];
+  for (const skill of summary?.skills ?? []) {
+    const folder = path.posix.dirname(skill.location);
+    folders.push(folder);
+    hashes.set(folder, skill.signature);
+  }
+  for (const entry of summary?.files ?? []) {
+    const inSkillFolder = folders.some(
+      (folder) => entry.path === folder || entry.path.startsWith(`${folder}/`),
+    );
+    if (!inSkillFolder) {
+      hashes.set(entry.path, `${entry.type}\0${entry.value}`);
+    }
+  }
+  return hashes;
+}
+
 /** Lists the items that were added, changed, or removed, keyed by label. */
 function describeItemChanges(
   section: string,
@@ -407,6 +453,11 @@ function describeContentChanges(
         'Context files',
         fileHashes(previous.contextFiles?.files ?? []),
         fileHashes(current.contextFiles?.files ?? []),
+      ),
+      ...describeItemChanges(
+        'Skills',
+        skillHashes(previous.skills),
+        skillHashes(current.skills),
       ),
     ]),
   ];
@@ -567,10 +618,17 @@ async function extensionConsentString(
   } else if (hasHooks) {
     output.push(`${HOOKS_HEADING}.`);
   }
-  if (skills.length > 0) {
+  const hasSkills = contentSummary
+    ? contentSummary.skills !== undefined
+    : skills.length > 0;
+  if (hasSkills) {
     output.push(`\n${chalk.bold('Agent Skills:')}`);
     output.push('\nThis extension will install the following agent skills:\n');
-    output.push(...(await renderSkillsList(skills)));
+    output.push(
+      ...(contentSummary?.skills
+        ? renderSkillSummaries(contentSummary.skills)
+        : await renderSkillsList(skills)),
+    );
   }
 
   if (sanitizedLinkedPath) {
@@ -582,7 +640,7 @@ async function extensionConsentString(
     );
   }
   output.push('\n' + INSTALL_WARNING_MESSAGE);
-  if (skills.length > 0) {
+  if (hasSkills) {
     output.push('\n' + SKILLS_WARNING_MESSAGE);
   }
 

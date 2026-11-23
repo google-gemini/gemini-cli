@@ -378,4 +378,70 @@ describe('extensionContentSummary', () => {
       ]);
     });
   });
+
+  describe('skills', () => {
+    function skillFile(name: string, description: string): string {
+      return `---\nname: ${name}\ndescription: ${description}\n---\nBody of ${name}\n`;
+    }
+
+    it('is absent without skills', async () => {
+      writeFile('skills/notes.txt', 'not a skill');
+
+      expect(await buildExtensionContentSummary(rootDir)).toEqual({});
+    });
+
+    it('lists skills by location, relative to the extension folder, with a signature per skill', async () => {
+      writeFile('skills/zeta/SKILL.md', skillFile('zeta', 'Last skill'));
+      writeFile('skills/alpha/SKILL.md', skillFile('alpha', 'First skill'));
+      writeFile('skills/alpha/reference.md', 'reference');
+      writeFile('skills/README.md', 'readme');
+
+      const summary = await buildExtensionContentSummary(rootDir);
+
+      const alphaFiles = [
+        fileEntry('skills/alpha/SKILL.md', skillFile('alpha', 'First skill')),
+        fileEntry('skills/alpha/reference.md', 'reference'),
+      ];
+      const zetaFiles = [
+        fileEntry('skills/zeta/SKILL.md', skillFile('zeta', 'Last skill')),
+      ];
+      const files = [
+        fileEntry('skills/README.md', 'readme'),
+        ...alphaFiles,
+        ...zetaFiles,
+      ];
+      expect(summary.skills).toEqual({
+        skills: [
+          {
+            name: 'alpha',
+            description: 'First skill',
+            location: 'skills/alpha/SKILL.md',
+            itemCount: 2,
+            signature: computeContentSignature(alphaFiles),
+          },
+          {
+            name: 'zeta',
+            description: 'Last skill',
+            location: 'skills/zeta/SKILL.md',
+            itemCount: 1,
+            signature: computeContentSignature(zetaFiles),
+          },
+        ],
+        files,
+        signature: computeContentSignature(files),
+      });
+    });
+
+    it('returns the same skills summary for identical folders in different places', async () => {
+      const otherRoot = path.join(tempDir, 'elsewhere', 'copy');
+      for (const root of [rootDir, otherRoot]) {
+        writeFile('skills/demo/SKILL.md', skillFile('demo', 'Demo'), root);
+        writeFile('skills/demo/notes.md', 'notes', root);
+      }
+
+      expect((await buildExtensionContentSummary(otherRoot)).skills).toEqual(
+        (await buildExtensionContentSummary(rootDir)).skills,
+      );
+    });
+  });
 });

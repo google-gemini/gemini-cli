@@ -566,6 +566,48 @@ describe('extension update consent', () => {
     });
   });
 
+  describe('skills', () => {
+    it('does not ask for consent when skills are unchanged', async () => {
+      const installed = await installVersion1({ skillBody: 'body v1' });
+      writeSource({ version: '1.0.1', skillBody: 'body v1' });
+
+      await settleUpdate(installed);
+
+      expect(
+        requestConsent,
+        'Identical skills must not trigger a consent request.',
+      ).not.toHaveBeenCalled();
+    });
+
+    it('asks for consent again when a skill file changes', async () => {
+      const installed = await installVersion1({ skillBody: 'body v1' });
+      writeSource({ version: '1.0.1', skillBody: 'body v2' });
+
+      await settleUpdate(installed);
+
+      const text = consentText();
+      expect(text).toContain('(Source: skills/demo/SKILL.md) (1 items');
+      expect(text).toContain('  Skills signature: ');
+      expect(text).toContain('  * Skills: `skills/demo` changed');
+    });
+
+    it('asks for consent again when a companion file of a skill changes', async () => {
+      const installed = await installVersion1({
+        skillBody: 'body',
+        files: { 'skills/demo/reference.md': 'reference v1' },
+      });
+      writeSource({
+        version: '1.0.1',
+        skillBody: 'body',
+        files: { 'skills/demo/reference.md': 'reference v2' },
+      });
+
+      await settleUpdate(installed);
+
+      expect(consentText()).toContain('  * Skills: `skills/demo` changed');
+    });
+  });
+
   describe('manifest changes', () => {
     it('asks for consent and keeps the installed version when an MCP server is added', async () => {
       const installed = await installVersion1({ hookCommand: HOOK_V1 });

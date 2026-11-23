@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Text } from 'ink';
+import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -887,6 +888,86 @@ describe('consent', () => {
 
         expect(text).toMatch(
           /Changes since the installed version:\n {2}\* Context files: `GEMINI\.md` changed$/,
+        );
+      });
+
+      it('lists skills with paths relative to the extension folder and a signature', async () => {
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          baseConfig,
+          requestConsent,
+          false,
+          undefined,
+          false,
+          [],
+          [],
+          false,
+          undefined,
+          undefined,
+          {
+            current: {
+              skills: {
+                skills: [
+                  {
+                    name: 'demo',
+                    description: 'Demo skill',
+                    location: 'skills/demo/SKILL.md',
+                    itemCount: 2,
+                    signature,
+                  },
+                  {
+                    name: 'other',
+                    description: 'Other\u202e skill',
+                    location: 'skills/other/SKILL.md',
+                    signature,
+                  },
+                ],
+                files: [],
+                signature: otherSignature,
+              },
+            },
+          },
+        );
+
+        const text = stripAnsi(requestConsent.mock.calls[0][0] as string);
+        expect(text).toContain(
+          [
+            'This extension will install the following agent skills:',
+            '',
+            '  * demo: Demo skill',
+            '    (Source: skills/demo/SKILL.md) (2 items in directory)',
+            '',
+            '  * other: Other\\u202e skill',
+            '    (Source: skills/other/SKILL.md) ⚠️ (Could not count items in directory)',
+            '',
+            `  Skills signature: ${otherSignature}`,
+          ].join('\n'),
+        );
+      });
+
+      it('names the skills that changed', async () => {
+        const skill = {
+          name: 'demo',
+          description: 'Demo skill',
+          location: 'skills/demo/SKILL.md',
+          itemCount: 1,
+        };
+
+        const text = await consentTextFor(
+          {
+            skills: {
+              skills: [{ ...skill, signature: otherSignature }],
+              files: [],
+              signature: otherSignature,
+            },
+          },
+          {
+            skills: { skills: [{ ...skill, signature }], files: [], signature },
+          },
+        );
+
+        expect(text).toMatch(
+          /Changes since the installed version:\n {2}\* Skills: `skills\/demo` changed$/,
         );
       });
     });

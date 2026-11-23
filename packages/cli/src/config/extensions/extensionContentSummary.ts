@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { processImports } from '@google/gemini-cli-core';
+import { loadSkillsFromDir, processImports } from '@google/gemini-cli-core';
 import {
   collectContentEntries,
   compareCodeUnits,
@@ -75,6 +75,28 @@ export interface ContextFilesSummary {
 export interface ExtensionContentSummary {
   hooks?: HooksSummary;
   contextFiles?: ContextFilesSummary;
+  skills?: SkillsSummary;
+}
+
+/** One agent skill from the `skills/` folder. */
+export interface SkillSummary {
+  name: string;
+  description: string;
+  /** The `SKILL.md` file of the skill, relative to the extension folder. */
+  location: string;
+  /** Number of items in the skill folder, or `undefined` if it can't be read. */
+  itemCount?: number;
+  /** Signature of the files in the skill folder. */
+  signature: string;
+}
+
+/** The agent skills under `skills/`. */
+export interface SkillsSummary {
+  /** Skills sorted by location. */
+  skills: SkillSummary[];
+  /** Every file under `skills/`. */
+  files: ContentEntry[];
+  signature: string;
 }
 
 /** Inputs that the extension manager resolves for a folder. */
@@ -91,6 +113,14 @@ const HOOKS_FILE = 'hooks/hooks.json';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function toRelativePath(rootDir: string, filePath: string): string {
+  return path.relative(rootDir, filePath).split(path.sep).join('/');
+}
+
+function isInFolder(entry: ContentEntry, folder: string): boolean {
+  return entry.path === folder || entry.path.startsWith(`${folder}/`);
 }
 
 function toArray(value: unknown): unknown[] {
@@ -312,8 +342,7 @@ async function summarizeContextFiles(
   if (contextFilePaths.length === 0) {
     return undefined;
   }
-  const toRelative = (filePath: string) =>
-    path.relative(rootDir, filePath).split(path.sep).join('/');
+  const toRelative = (filePath: string) => toRelativePath(rootDir, filePath);
   const paths = [...new Set(contextFilePaths.map(toRelative))];
   const files: ContentEntry[] = [];
   const imported = new Set<string>();
@@ -358,6 +387,43 @@ async function summarizeContextFiles(
 }
 
 /**
+ * Summarizes the skills that `loadSkillsFromDir` finds under `skills/`, with
+ * paths relative to the extension folder and a signature over every file of
+ * that folder.
+ */
+async function summarizeSkills(
+  rootDir: string,
+): Promise<SkillsSummary | undefined> {
+  const definitions = await loadSkillsFromDir(path.join(rootDir, 'skills'));
+  if (!Array.isArray(definitions) || definitions.length === 0) {
+    return undefined;
+  }
+  const files = (await collectContentEntries(rootDir, 'skills')) ?? [];
+  const skills: SkillSummary[] = [];
+  for (const definition of definitions) {
+    const location = toRelativePath(rootDir, definition.location);
+    const folder = path.posix.dirname(location);
+    let itemCount: number | undefined;
+    try {
+      itemCount = (await fs.readdir(path.dirname(definition.location))).length;
+    } catch {
+      // The consent text says that the items can't be counted.
+    }
+    skills.push({
+      name: definition.name,
+      description: definition.description,
+      location,
+      ...(itemCount !== undefined ? { itemCount } : {}),
+      signature: computeContentSignature(
+        files.filter((entry) => isInFolder(entry, folder)),
+      ),
+    });
+  }
+  skills.sort((a, b) => compareCodeUnits(a.location, b.location));
+  return { skills, files, signature: computeContentSignature(files) };
+}
+
+/**
  * Builds the summary of an extension folder from its raw files. Variables such
  * as `${extensionPath}` stay as written, and nothing outside the folder is
  * read.
@@ -371,8 +437,10 @@ export async function buildExtensionContentSummary(
     extensionDir,
     sources.contextFilePaths ?? [],
   );
+  const skills = await summarizeSkills(extensionDir);
   return {
     ...(hooks ? { hooks } : {}),
     ...(contextFiles ? { contextFiles } : {}),
+    ...(skills ? { skills } : {}),
   };
 }
