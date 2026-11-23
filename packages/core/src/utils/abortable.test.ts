@@ -64,8 +64,24 @@ describe('abortable', () => {
     await expect(result).rejects.toMatchObject({ name: 'AbortError' });
   });
 
-  it('should remove its abort listener once the promise settles', async () => {
+  it('should ignore a late rejection when the signal was already aborted', async () => {
     const controller = new AbortController();
+    controller.abort();
+    let rejectPromise: (reason: Error) => void = () => {};
+    const promise = new Promise<string>((_resolve, reject) => {
+      rejectPromise = reject;
+    });
+
+    const result = abortable(promise, controller.signal);
+    // Vitest fails the run if this rejection is left unhandled.
+    rejectPromise(new Error('late failure'));
+
+    await expect(result).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('should remove its abort listener once the promise resolves', async () => {
+    const controller = new AbortController();
+    const addEventListener = vi.spyOn(controller.signal, 'addEventListener');
     const removeEventListener = vi.spyOn(
       controller.signal,
       'removeEventListener',
@@ -75,7 +91,26 @@ describe('abortable', () => {
 
     expect(removeEventListener).toHaveBeenCalledWith(
       'abort',
-      expect.any(Function),
+      addEventListener.mock.calls[0][1],
+    );
+  });
+
+  it('should remove its abort listener once the promise rejects', async () => {
+    const controller = new AbortController();
+    const addEventListener = vi.spyOn(controller.signal, 'addEventListener');
+    const removeEventListener = vi.spyOn(
+      controller.signal,
+      'removeEventListener',
+    );
+    const error = new Error('operation failed');
+
+    await expect(
+      abortable(Promise.reject(error), controller.signal),
+    ).rejects.toBe(error);
+
+    expect(removeEventListener).toHaveBeenCalledWith(
+      'abort',
+      addEventListener.mock.calls[0][1],
     );
   });
 });

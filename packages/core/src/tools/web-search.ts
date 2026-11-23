@@ -19,7 +19,6 @@ import { ToolErrorType } from './tool-error.js';
 
 import { getErrorMessage, isAbortError } from '../utils/errors.js';
 import { abortable } from '../utils/abortable.js';
-import { DeadlineTimer } from '../utils/deadlineTimer.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WEB_SEARCH_DEFINITION } from './definitions/coreTools.js';
@@ -55,7 +54,7 @@ interface GroundingSupportItem {
  * request. Without it, a request that stalls or keeps being retried leaves the
  * agent waiting on this tool call until the user cancels it.
  */
-export const WEB_SEARCH_TIMEOUT_MS = 60_000;
+const WEB_SEARCH_TIMEOUT_MS = 60_000;
 
 /**
  * Parameters for the WebSearchTool.
@@ -98,30 +97,37 @@ class WebSearchToolInvocation extends BaseToolInvocation<
   async execute({
     abortSignal: signal,
   }: ExecuteOptions): Promise<WebSearchToolResult> {
+    if (signal.aborted) {
+      return {
+        llmContent: 'Web search was cancelled.',
+        returnDisplay: 'Search cancelled.',
+      };
+    }
+
     const geminiClient = this.context.geminiClient;
 
-    // One deadline covers the whole search, retries included. The combined
-    // signal cancels the request and its retry waits, and `abortable` returns
+    // One deadline covers the whole search, retries included. A local
+    // AbortController avoids AbortSignal.any (Node >= 20.3) and lets us clear
+    // the timer on success without aborting the signal. `abortable` returns
     // control at the deadline even if a lower layer ignores the signal.
-    const deadlineTimer = new DeadlineTimer(
-      WEB_SEARCH_TIMEOUT_MS,
-      'Web search timed out.',
-    );
-    /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
-    const combinedSignal = (
-      AbortSignal as unknown as { any: (signals: AbortSignal[]) => AbortSignal }
-    ).any([signal, deadlineTimer.signal]);
-    /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
+    const requestController = new AbortController();
+    let timedOut = false;
+    const onCallerAbort = () => requestController.abort();
+    signal.addEventListener('abort', onCallerAbort, { once: true });
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      requestController.abort();
+    }, WEB_SEARCH_TIMEOUT_MS);
 
     try {
       const response = await abortable(
         geminiClient.generateContent(
           { model: 'web-search' },
           [{ role: 'user', parts: [{ text: this.params.query }] }],
-          combinedSignal,
+          requestController.signal,
           LlmRole.UTILITY_TOOL,
         ),
-        combinedSignal,
+        requestController.signal,
       );
 
       const responseText = getResponseText(response);
@@ -204,23 +210,22 @@ class WebSearchToolInvocation extends BaseToolInvocation<
         sources,
       };
     } catch (error: unknown) {
-      // If the user cancelled as well, report the cancellation instead.
-      const timedOut = deadlineTimer.signal.aborted && !signal.aborted;
-      if (timedOut) {
-        const timeoutMessage = `Web search for query "${
-          this.params.query
-        }" timed out after ${WEB_SEARCH_TIMEOUT_MS / 1000} seconds.`;
-        debugLogger.warn(timeoutMessage);
-        return {
-          llmContent: `Error: ${timeoutMessage}`,
-          returnDisplay: 'Web search timed out.',
-          error: {
-            message: timeoutMessage,
-            type: ToolErrorType.WEB_SEARCH_FAILED,
-          },
-        };
-      }
       if (isAbortError(error)) {
+        // If the user cancelled as well, report the cancellation instead.
+        if (timedOut && !signal.aborted) {
+          const timeoutMessage = `Web search for query "${
+            this.params.query
+          }" timed out after ${WEB_SEARCH_TIMEOUT_MS / 1000} seconds.`;
+          debugLogger.warn(timeoutMessage);
+          return {
+            llmContent: `Error: ${timeoutMessage}`,
+            returnDisplay: 'Web search timed out.',
+            error: {
+              message: timeoutMessage,
+              type: ToolErrorType.WEB_SEARCH_FAILED,
+            },
+          };
+        }
         return {
           llmContent: 'Web search was cancelled.',
           returnDisplay: 'Search cancelled.',
@@ -239,8 +244,8 @@ class WebSearchToolInvocation extends BaseToolInvocation<
         },
       };
     } finally {
-      // Clear the pending timer, which would otherwise keep the process alive.
-      deadlineTimer.abort();
+      clearTimeout(timeoutId);
+      signal.removeEventListener('abort', onCallerAbort);
     }
   }
 }

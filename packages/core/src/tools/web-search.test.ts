@@ -13,11 +13,7 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
-import {
-  WebSearchTool,
-  WEB_SEARCH_TIMEOUT_MS,
-  type WebSearchToolParams,
-} from './web-search.js';
+import { WebSearchTool, type WebSearchToolParams } from './web-search.js';
 import type { Config } from '../config/config.js';
 import { GeminiClient } from '../core/client.js';
 import { ToolErrorType } from './tool-error.js';
@@ -279,6 +275,7 @@ Sources:
     });
 
     describe('time limit and cancellation', () => {
+      const WEB_SEARCH_TIMEOUT_MS = 60_000;
       const neverSettles = () => new Promise<never>(() => {});
 
       beforeEach(() => {
@@ -308,6 +305,7 @@ Sources:
           } seconds.`,
         );
         expect(result.returnDisplay).toBe('Web search timed out.');
+        expect(vi.getTimerCount()).toBe(0);
       });
 
       it('should abort the underlying request when the time limit is reached', async () => {
@@ -329,8 +327,17 @@ Sources:
         await resultPromise;
       });
 
-      it('should not leave a timer behind when the search completes in time', async () => {
+      it('should clean up timer and listener without aborting the request signal on success', async () => {
         const params: WebSearchToolParams = { query: 'fast query' };
+        const controller = new AbortController();
+        const addEventListener = vi.spyOn(
+          controller.signal,
+          'addEventListener',
+        );
+        const removeEventListener = vi.spyOn(
+          controller.signal,
+          'removeEventListener',
+        );
         (mockGeminiClient.generateContent as Mock).mockResolvedValue({
           candidates: [
             {
@@ -343,13 +350,54 @@ Sources:
         });
 
         const invocation = tool.build(params);
-        const result = await invocation.execute({ abortSignal });
+        const result = await invocation.execute({
+          abortSignal: controller.signal,
+        });
+        const requestSignal = vi.mocked(mockGeminiClient.generateContent).mock
+          .calls[0][2];
 
         expect(result.error).toBeUndefined();
         expect(result.returnDisplay).toBe(
           'Search results for "fast query" returned.',
         );
+        expect(requestSignal.aborted).toBe(false);
         expect(vi.getTimerCount()).toBe(0);
+        expect(removeEventListener).toHaveBeenCalledWith(
+          'abort',
+          addEventListener.mock.calls[0][1],
+        );
+      });
+
+      it('should clean up timer and listener without aborting the request signal on API error', async () => {
+        const params: WebSearchToolParams = { query: 'failing query' };
+        const controller = new AbortController();
+        const addEventListener = vi.spyOn(
+          controller.signal,
+          'addEventListener',
+        );
+        const removeEventListener = vi.spyOn(
+          controller.signal,
+          'removeEventListener',
+        );
+        (mockGeminiClient.generateContent as Mock).mockRejectedValue(
+          new Error('API failure'),
+        );
+
+        const invocation = tool.build(params);
+        const result = await invocation.execute({
+          abortSignal: controller.signal,
+        });
+        const requestSignal = vi.mocked(mockGeminiClient.generateContent).mock
+          .calls[0][2];
+
+        expect(result.error?.type).toBe(ToolErrorType.WEB_SEARCH_FAILED);
+        expect(result.returnDisplay).toBe('Error performing web search.');
+        expect(requestSignal.aborted).toBe(false);
+        expect(vi.getTimerCount()).toBe(0);
+        expect(removeEventListener).toHaveBeenCalledWith(
+          'abort',
+          addEventListener.mock.calls[0][1],
+        );
       });
 
       it('should report a cancellation, not a timeout, when the user aborts', async () => {
@@ -369,6 +417,50 @@ Sources:
         expect(result.llmContent).toBe('Web search was cancelled.');
         expect(result.returnDisplay).toBe('Search cancelled.');
         expect(result.error).toBeUndefined();
+        expect(vi.getTimerCount()).toBe(0);
+      });
+
+      it('should prefer user cancellation when both the timeout and user abort fire', async () => {
+        const params: WebSearchToolParams = { query: 'race query' };
+        const controller = new AbortController();
+        (mockGeminiClient.generateContent as Mock).mockImplementation(
+          neverSettles,
+        );
+
+        const invocation = tool.build(params);
+        const resultPromise = invocation.execute({
+          abortSignal: controller.signal,
+        });
+        const requestSignal = vi.mocked(mockGeminiClient.generateContent).mock
+          .calls[0][2];
+        // Abort the caller signal in the same turn that the timeout aborts the request.
+        requestSignal.addEventListener('abort', () => controller.abort(), {
+          once: true,
+        });
+
+        await vi.advanceTimersByTimeAsync(WEB_SEARCH_TIMEOUT_MS);
+        const result = await resultPromise;
+
+        expect(result.llmContent).toBe('Web search was cancelled.');
+        expect(result.returnDisplay).toBe('Search cancelled.');
+        expect(result.error).toBeUndefined();
+        expect(vi.getTimerCount()).toBe(0);
+      });
+
+      it('should return cancelled immediately when the caller signal is already aborted', async () => {
+        const params: WebSearchToolParams = { query: 'pre-aborted query' };
+        const controller = new AbortController();
+        controller.abort();
+
+        const invocation = tool.build(params);
+        const result = await invocation.execute({
+          abortSignal: controller.signal,
+        });
+
+        expect(result.llmContent).toBe('Web search was cancelled.');
+        expect(result.returnDisplay).toBe('Search cancelled.');
+        expect(result.error).toBeUndefined();
+        expect(mockGeminiClient.generateContent).not.toHaveBeenCalled();
         expect(vi.getTimerCount()).toBe(0);
       });
     });

@@ -3449,13 +3449,31 @@ ${JSON.stringify(
 
         abortController.abort();
 
-        await expect(promise).rejects.toThrow(
-          expect.objectContaining({ name: 'AbortError' }),
-        );
+        await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+        expect(vi.getTimerCount()).toBe(0);
+        await vi.advanceTimersByTimeAsync(60_000);
         expect(mockGenerateContentFn).toHaveBeenCalledTimes(1);
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    it('should reject immediately without calling the API when the abort signal is already aborted', async () => {
+      const contents = [
+        { role: 'user', parts: [{ text: 'test pre-aborted' }] },
+      ];
+      const abortController = new AbortController();
+      abortController.abort();
+
+      await expect(
+        client.generateContent(
+          { model: 'test-model' },
+          contents,
+          abortController.signal,
+          LlmRole.UTILITY_TOOL,
+        ),
+      ).rejects.toMatchObject({ name: 'AbortError' });
+      expect(mockGenerateContentFn).not.toHaveBeenCalled();
     });
 
     describe('Hook System', () => {
