@@ -23,6 +23,7 @@ import {
   getErrorMessage,
   getRealPath,
   IntegrityDataStatus,
+  debugLogger,
   type GeminiCLIExtension,
   type IExtensionIntegrity,
 } from '@google/gemini-cli-core';
@@ -904,6 +905,36 @@ describe('extension update consent', () => {
       expect(consentText()).toContain(`  * SessionStart: \`${HOOK_V1}\``);
       expect(readInstalledHookCommand()).toBe(HOOK_V1);
       expect(readInstalledVersion()).toBe('1.0.0');
+    });
+  });
+
+  describe('declined updates', () => {
+    it('rejects with the consent message, keeps the ERROR state, and restores nothing', async () => {
+      const errorSpy = vi.spyOn(debugLogger, 'error');
+      const installed = await installVersion1({ hookCommand: HOOK_V1 });
+      requestConsent.mockResolvedValue(false);
+      writeSource({ version: '1.0.1', hookCommand: HOOK_V2 });
+      const dispatch = vi.fn();
+
+      await expect(
+        updateExtension(
+          installed,
+          extensionManager,
+          ExtensionUpdateState.UPDATE_AVAILABLE,
+          dispatch,
+        ),
+      ).rejects.toThrow(
+        /^Installation cancelled for "update-consent-fixture"\.$/,
+      );
+
+      expect(dispatch).toHaveBeenLastCalledWith({
+        type: 'SET_STATE',
+        payload: { name: EXTENSION_NAME, state: ExtensionUpdateState.ERROR },
+      });
+      expect(errorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('rolling back'),
+      );
+      expect(readInstalledHookCommand()).toBe(HOOK_V1);
     });
   });
 

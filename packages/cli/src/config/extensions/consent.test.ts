@@ -158,6 +158,36 @@ describe('consent', () => {
       expect(debugLogger.log).toHaveBeenCalledWith('Test consent');
       expect(consent).toBe(false);
     });
+
+    it('should ask concurrent consent requests one at a time', async () => {
+      const answers: Array<(answer: string) => void> = [];
+      const questionMock = vi
+        .fn()
+        .mockImplementation(
+          (_prompt: string, callback: (answer: string) => void) => {
+            answers.push(callback);
+          },
+        );
+      mockReadline.createInterface.mockReturnValue({
+        question: questionMock,
+        close: vi.fn(),
+      });
+
+      const first = requestConsentNonInteractive('First consent');
+      const second = requestConsentNonInteractive('Second consent');
+
+      await vi.waitFor(() => expect(questionMock).toHaveBeenCalledTimes(1));
+      expect(debugLogger.log).toHaveBeenCalledWith('First consent');
+      expect(debugLogger.log).not.toHaveBeenCalledWith('Second consent');
+
+      answers[0]('y');
+      await expect(first).resolves.toBe(true);
+      await vi.waitFor(() => expect(questionMock).toHaveBeenCalledTimes(2));
+      expect(debugLogger.log).toHaveBeenCalledWith('Second consent');
+
+      answers[1]('n');
+      await expect(second).resolves.toBe(false);
+    });
   });
 
   describe('requestConsentInteractive', () => {

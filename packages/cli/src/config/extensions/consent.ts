@@ -36,6 +36,7 @@ import type {
   ReferencedPath,
   SkillsSummary,
 } from './extensionContentSummary.js';
+import { ExtensionConsentDeclinedError } from './extensionConsentErrors.js';
 
 export const INSTALL_WARNING_MESSAGE = chalk.yellow(
   'The extension you are about to install may have been created by a third-party developer and sourced from a public repository. Google does not vet, endorse, or guarantee the functionality or security of extensions. Please carefully inspect any extension and its source code before installing to understand the permissions it requires and the actions it may perform.',
@@ -76,6 +77,12 @@ export async function skillsConsentString(
 }
 
 /**
+ * Non-interactive prompts share stdin, so they run one at a time: each one
+ * prints its description only after the previous one has its answer.
+ */
+let nonInteractiveConsentQueue: Promise<unknown> = Promise.resolve();
+
+/**
  * Requests consent from the user to perform an action, by reading a Y/n
  * character from stdin.
  *
@@ -87,11 +94,15 @@ export async function skillsConsentString(
 export async function requestConsentNonInteractive(
   consentDescription: string,
 ): Promise<boolean> {
-  debugLogger.log(consentDescription);
-  const result = await promptForConsentNonInteractive(
-    'Do you want to continue? [y/N]: ',
-    false,
-  );
+  const ask = async () => {
+    debugLogger.log(consentDescription);
+    return promptForConsentNonInteractive(
+      'Do you want to continue? [y/N]: ',
+      false,
+    );
+  };
+  const result = nonInteractiveConsentQueue.then(ask);
+  nonInteractiveConsentQueue = result.catch(() => undefined);
   return result;
 }
 
@@ -994,6 +1005,6 @@ export async function maybeRequestConsentOrFail(
       ? [extensionConsent, '', CHANGES_HEADING, ...changes].join('\n')
       : extensionConsent;
   if (!(await requestConsent(consentText))) {
-    throw new Error(`Installation cancelled for "${extensionConfig.name}".`);
+    throw new ExtensionConsentDeclinedError(extensionConfig.name);
   }
 }
