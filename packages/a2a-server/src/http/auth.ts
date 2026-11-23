@@ -6,6 +6,7 @@
 
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Request, RequestHandler } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import type { UserBuilder } from '@a2a-js/sdk/server/express';
 import { logger } from '../utils/logger.js';
 
@@ -14,6 +15,11 @@ import { logger } from '../utils/logger.js';
 const LOOPBACK_HOST = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/i;
 const LOOPBACK_ORIGIN =
   /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/i;
+
+// Requests that do not carry the configured token are limited to this many per
+// window.
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 100;
 
 /**
  * Returns the token that clients must send as a bearer token, or `undefined`
@@ -63,6 +69,27 @@ function sha256(value: string): Buffer {
   return createHash('sha256').update(value).digest();
 }
 
+const BEARER_PREFIX = 'bearer ';
+
+/**
+ * Returns the token from an `Authorization: Bearer <token>` header value, or
+ * `undefined` if the header does not use the Bearer scheme or has no token.
+ * The scheme is case-insensitive and may be followed by more than one space.
+ */
+function getBearerToken(authorization: string | undefined): string | undefined {
+  if (
+    authorization === undefined ||
+    authorization.slice(0, BEARER_PREFIX.length).toLowerCase() !== BEARER_PREFIX
+  ) {
+    return undefined;
+  }
+  let start = BEARER_PREFIX.length;
+  while (authorization[start] === ' ') {
+    start++;
+  }
+  return start < authorization.length ? authorization.slice(start) : undefined;
+}
+
 /**
  * Builds a predicate that checks a request for
  * `Authorization: Bearer <secret>`.
@@ -79,9 +106,32 @@ function createBearerVerifier(
   }
   const expected = sha256(secret);
   return (req) => {
-    const token = /^Bearer +(.+)$/i.exec(req.headers.authorization ?? '')?.[1];
+    const token = getBearerToken(req.headers.authorization);
     return token !== undefined && timingSafeEqual(sha256(token), expected);
   };
+}
+
+/**
+ * Limits how many requests without the configured bearer token are handled
+ * per minute. Requests over the limit are answered with a 429 until the
+ * minute has passed.
+ *
+ * All clients connect from a loopback address and cannot be told apart, so
+ * they share one limit. Requests that carry the token are not counted, which
+ * keeps other requests from using up the limit of an authenticated client.
+ * Without a configured secret, every request is counted.
+ */
+export function createRateLimiter(secret: string | undefined): RequestHandler {
+  return rateLimit({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    limit: RATE_LIMIT_MAX_REQUESTS,
+    skip: createBearerVerifier(secret),
+    // A constant key makes all counted requests share one counter.
+    keyGenerator: () => 'requests-without-token',
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    message: { error: 'Too many requests' },
+  });
 }
 
 /**
@@ -95,9 +145,6 @@ export function createAuthMiddleware(
 ): RequestHandler {
   const isAuthenticated = createBearerVerifier(secret);
 
-  // Requests are not rate limited. All clients connect from the loopback
-  // address, so a limit keyed on the address would apply to every client at
-  // once.
   return (req, res, next) => {
     if (!secret) {
       res

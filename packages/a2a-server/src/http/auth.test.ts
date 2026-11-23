@@ -24,6 +24,7 @@ import { A2AExpressApp } from '@a2a-js/sdk/server/express';
 
 import {
   createAuthMiddleware,
+  createRateLimiter,
   createUserBuilder,
   requireLoopbackRequest,
   resolveAuthSecret,
@@ -203,6 +204,108 @@ describe('requireLoopbackRequest', () => {
   });
 });
 
+describe('createRateLimiter', () => {
+  const LIMIT = 100;
+  const WINDOW_MS = 60_000;
+  const BEARER = `Bearer ${SECRET}`;
+
+  let server: Server;
+
+  // Each test gets its own limiter, so it starts with no requests counted.
+  beforeEach(async () => {
+    server = await listen(
+      appWith(createRateLimiter(SECRET), createAuthMiddleware(SECRET)),
+    );
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    await close(server);
+  });
+
+  const send = (target: Server, authorization?: string) => {
+    const pending = request(target).get('/');
+    return authorization === undefined
+      ? pending
+      : pending.set('Authorization', authorization);
+  };
+
+  // Sends the requests one after the other and returns the distinct status
+  // codes of the responses.
+  const sendMany = async (
+    target: Server,
+    count: number,
+    authorization?: string,
+  ) => {
+    const statuses = new Set<number>();
+    for (let i = 0; i < count; i++) {
+      statuses.add((await send(target, authorization)).status);
+    }
+    return [...statuses];
+  };
+
+  it('should answer 429 after 100 requests without the token', async () => {
+    expect(await sendMany(server, LIMIT)).toEqual([401]);
+
+    const response = await send(server);
+    expect(response.status).toBe(429);
+    expect(response.body).toEqual({ error: 'Too many requests' });
+    const retryAfter = Number(response.headers['retry-after']);
+    expect(retryAfter).toBeGreaterThan(0);
+    expect(retryAfter).toBeLessThanOrEqual(WINDOW_MS / 1000);
+  });
+
+  it('should count requests that present a different token', async () => {
+    expect(await sendMany(server, LIMIT, 'Bearer invalid-token')).toEqual([
+      401,
+    ]);
+
+    expect((await send(server, 'Bearer invalid-token')).status).toBe(429);
+    expect((await send(server)).status).toBe(429);
+  });
+
+  it('should not count requests that carry the token', async () => {
+    expect(await sendMany(server, LIMIT + 1, BEARER)).toEqual([200]);
+
+    expect((await send(server)).status).toBe(401);
+  });
+
+  it('should keep accepting the token after the limit is reached', async () => {
+    await sendMany(server, LIMIT);
+    expect((await send(server)).status).toBe(429);
+
+    const response = await send(server, BEARER);
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ ok: true });
+  });
+
+  it('should handle requests without the token again after a minute', async () => {
+    // Only the clock is replaced, so that the requests themselves still run.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const start = Date.now();
+    await sendMany(server, LIMIT);
+    expect((await send(server)).status).toBe(429);
+
+    vi.setSystemTime(start + WINDOW_MS - 1);
+    expect((await send(server)).status).toBe(429);
+
+    vi.setSystemTime(start + WINDOW_MS);
+    expect((await send(server)).status).toBe(401);
+  });
+
+  it('should count every request when no secret is configured', async () => {
+    const unconfigured = await listen(
+      appWith(createRateLimiter(undefined), createAuthMiddleware(undefined)),
+    );
+    try {
+      expect(await sendMany(unconfigured, LIMIT, BEARER)).toEqual([500]);
+      expect((await send(unconfigured, BEARER)).status).toBe(429);
+    } finally {
+      await close(unconfigured);
+    }
+  });
+});
+
 describe('createAuthMiddleware', () => {
   let server: Server;
 
@@ -239,6 +342,12 @@ describe('createAuthMiddleware', () => {
     ['the secret in another case', `Bearer ${SECRET.toUpperCase()}`],
     ['a token much longer than the secret', `Bearer ${'a'.repeat(4096)}`],
     ['an empty token', 'Bearer '],
+    ['no space after the scheme', `Bearer${SECRET}`],
+    ['a tab instead of a space after the scheme', `Bearer\t${SECRET}`],
+    [
+      'a different token after many spaces',
+      `Bearer${' '.repeat(5000)}invalid-token`,
+    ],
   ])('should reject %s', async (_description, authorization) => {
     const response = await request(server)
       .get('/')
@@ -251,6 +360,10 @@ describe('createAuthMiddleware', () => {
     ['', `Bearer ${SECRET}`],
     [' with a lowercase scheme', `bearer ${SECRET}`],
     [' with several spaces after the scheme', `Bearer   ${SECRET}`],
+    [
+      ' with many spaces after the scheme',
+      `Bearer${' '.repeat(5000)}${SECRET}`,
+    ],
   ])('should accept the secret%s', async (_description, authorization) => {
     const response = await request(server)
       .get('/')

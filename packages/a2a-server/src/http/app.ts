@@ -23,6 +23,7 @@ import { CoderAgentExecutor } from '../agent/executor.js';
 import { requestStorage } from './requestStorage.js';
 import {
   createAuthMiddleware,
+  createRateLimiter,
   createUserBuilder,
   requireLoopbackRequest,
   resolveAuthSecret,
@@ -255,9 +256,11 @@ export async function createApp() {
     );
 
     let expressApp = express();
-    // Header validation and authentication run before the body is parsed and
-    // before every route, including the ones the A2A SDK registers below.
+    // Header validation, rate limiting, and authentication run before the body
+    // is parsed and before every route, including the ones the A2A SDK
+    // registers below.
     expressApp.use(requireLoopbackRequest);
+    expressApp.use(createRateLimiter(authSecret));
     expressApp.use(createAuthMiddleware(authSecret));
     expressApp.use((req, res, next) => {
       requestStorage.run({ req }, next);

@@ -516,6 +516,53 @@ describe('Agent Server Endpoints', () => {
     });
   });
 
+  describe('rate limiting', () => {
+    const LIMIT = 100;
+
+    // Sends the requests one after the other and returns the distinct status
+    // codes of the responses.
+    const sendMany = async (
+      target: Server,
+      count: number,
+      headers: Record<string, string> = {},
+    ) => {
+      const statuses = new Set<number>();
+      for (let i = 0; i < count; i++) {
+        const response = await request(target)
+          .get('/listCommands')
+          .set(headers);
+        statuses.add(response.status);
+      }
+      return [...statuses];
+    };
+
+    it('should answer 429 after 100 requests without the token and still accept the token', async () => {
+      await withNewServer(async (newServer) => {
+        expect(await sendMany(newServer, LIMIT)).toEqual([401]);
+
+        const limited = await request(newServer).get('/listCommands');
+        expect(limited.status).toBe(429);
+        expect(limited.body).toEqual({ error: 'Too many requests' });
+
+        const authenticated = await request(newServer)
+          .get('/listCommands')
+          .set('Authorization', BEARER);
+        expect(authenticated.status).toBe(200);
+      });
+    });
+
+    it('should not count requests that fail Host header validation', async () => {
+      await withNewServer(async (newServer) => {
+        expect(
+          await sendMany(newServer, LIMIT, { Host: 'external.example.com' }),
+        ).toEqual([403]);
+
+        const response = await request(newServer).get('/listCommands');
+        expect(response.status).toBe(401);
+      });
+    });
+  });
+
   describe('POST /tasks workspace trust', () => {
     const WORKSPACE_MCP_SERVER = 'workspace-server';
     const WORKSPACE_ENV_VAR = 'A2A_TEST_WORKSPACE_ENV_VAR';

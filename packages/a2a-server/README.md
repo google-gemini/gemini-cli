@@ -34,6 +34,12 @@ The server validates each request as follows:
 - If neither variable is set, the server responds to every request with
   `500 Internal Server Error`.
 
+The server limits requests that pass the `Host` and `Origin` checks but don't
+contain the configured token to 100 per minute. This includes every request when
+neither variable is set. After the limit is reached, the server responds to
+those requests with `429 Too Many Requests` until the limit resets. Requests
+that contain the token don't count toward the limit.
+
 To start the server manually from the repository root, set a token before you
 run it:
 
