@@ -64,6 +64,7 @@ import {
   HookType,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
+import { buildExtensionContentSummary } from './extensions/extensionContentSummary.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { ExtensionStorage } from './extensions/storage.js';
 import {
@@ -343,15 +344,16 @@ Would you like to attempt to install via "git clone" instead?`,
           );
         }
 
-        const newHasHooks = fs.existsSync(
-          path.join(localSourcePath, 'hooks', 'hooks.json'),
-        );
-        const previousHasHooks = !!(
-          isUpdate &&
-          previous &&
-          previous.hooks &&
-          Object.keys(previous.hooks).length > 0
-        );
+        // Both sides are read from the raw files, so they compare the same way
+        // whatever the settings (hooks, for example, load only when enabled).
+        const contentSummaries = {
+          current: await buildExtensionContentSummary(localSourcePath),
+          previous: previous
+            ? await buildExtensionContentSummary(previous.path)
+            : undefined,
+        };
+        const newHasHooks = contentSummaries.current.hooks !== undefined;
+        const previousHasHooks = contentSummaries.previous?.hooks !== undefined;
 
         const newSkills = await loadSkillsFromDir(
           path.join(localSourcePath, 'skills'),
@@ -381,6 +383,7 @@ Would you like to attempt to install via "git clone" instead?`,
           previousLinkedSource
             ? getRealPath(path.resolve(this.workspaceDir, previousLinkedSource))
             : undefined,
+          contentSummaries,
         );
         const extensionId = getExtensionId(newExtensionConfig, installMetadata);
         const destinationPath = new ExtensionStorage(

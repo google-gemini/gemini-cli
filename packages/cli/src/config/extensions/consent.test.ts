@@ -19,6 +19,11 @@ import {
 import type { ConfirmationRequest } from '../../ui/types.js';
 import type { ExtensionConfig } from '../extension.js';
 import { debugLogger, type SkillDefinition } from '@google/gemini-cli-core';
+import { ContentMarker } from './contentSignature.js';
+import type {
+  ExtensionContentSummary,
+  HooksSummary,
+} from './extensionContentSummary.js';
 
 const mockReadline = vi.hoisted(() => ({
   createInterface: vi.fn().mockReturnValue({
@@ -612,6 +617,207 @@ describe('consent', () => {
         let consentString = requestConsent.mock.calls[0][0] as string;
         consentString = normalizePathsForSnapshot(consentString, tempDir);
         await expectConsentSnapshot(consentString);
+      });
+    });
+
+    describe('content summaries', () => {
+      const signature = 'a'.repeat(64);
+      const otherSignature = 'b'.repeat(64);
+
+      function hooksSummary(
+        overrides: Partial<HooksSummary> = {},
+      ): HooksSummary {
+        return {
+          hooks: [{ eventName: 'SessionStart', command: 'echo v1', env: [] }],
+          files: [],
+          referencedPaths: [],
+          signature,
+          ...overrides,
+        };
+      }
+
+      async function consentTextFor(
+        current: ExtensionContentSummary,
+        previous?: ExtensionContentSummary,
+      ): Promise<string | undefined> {
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          baseConfig,
+          requestConsent,
+          false,
+          previous ? baseConfig : undefined,
+          false,
+          [],
+          [],
+          false,
+          undefined,
+          undefined,
+          { current, previous },
+        );
+        return requestConsent.mock.calls[0]?.[0] as string | undefined;
+      }
+
+      it('lists each hook with its details, the paths it uses, and a signature', async () => {
+        const text = await consentTextFor({
+          hooks: hooksSummary({
+            hooks: [
+              {
+                eventName: 'BeforeTool',
+                matcher: 'run_shell_command',
+                command: 'node ${extensionPath}/scripts/check.js',
+                env: [
+                  ['API_TOKEN', 'abc'],
+                  ['LOG_LEVEL', 'debug'],
+                ],
+              },
+              {
+                eventName: 'SessionStart',
+                name: 'greeting',
+                command: 'echo `id`',
+                env: [],
+              },
+              { eventName: 'SessionEnd', type: 'runtime', env: [] },
+            ],
+            referencedPaths: [
+              { path: '.', marker: ContentMarker.Root, signature },
+              {
+                path: '../shared.sh',
+                marker: ContentMarker.Outside,
+                signature,
+              },
+              { path: 'scripts/check.js', signature },
+              {
+                path: 'scripts/gone.js',
+                marker: ContentMarker.Missing,
+                signature,
+              },
+            ],
+          }),
+        });
+
+        expect(text).toContain(
+          [
+            '⚠️  This extension contains Hooks which can automatically execute commands:',
+            '  * BeforeTool (matcher: `run_shell_command`): `node ${extensionPath}/scripts/check.js`',
+            '      Environment variables:',
+            '        - API_TOKEN: ********',
+            '        - LOG_LEVEL: `debug`',
+            '  * SessionStart (name: `greeting`): `` echo `id` ``',
+            '  * SessionEnd: no command, type `runtime`',
+            '  Files used by hooks: `.` (the extension folder), `../shared.sh` (outside the extension folder), `scripts/check.js`, `scripts/gone.js` (not found)',
+            `  Hooks signature: ${signature}`,
+          ].join('\n'),
+        );
+      });
+
+      it('escapes control characters in hook values', async () => {
+        const text = await consentTextFor({
+          hooks: hooksSummary({
+            hooks: [
+              {
+                eventName: 'Session\u202eStart',
+                command: 'echo hi\n\u001b[2J\r',
+                env: [['MODE', 'a\tb']],
+              },
+            ],
+          }),
+        });
+
+        expect(text).toContain(
+          '  * Session\\u202eStart: `echo hi\\n\\u001b[2J\\r`',
+        );
+        expect(text).toContain('        - MODE: `a\\tb`');
+      });
+
+      it('says when hooks.json is not a valid hooks file', async () => {
+        const text = await consentTextFor({
+          hooks: hooksSummary({ hooks: undefined }),
+        });
+
+        expect(text).toContain(
+          "  * `hooks/hooks.json` isn't a valid hooks file, so its hooks can't be listed.",
+        );
+        expect(text).toContain(`  Hooks signature: ${signature}`);
+      });
+
+      it('prints no hooks section when the summary has no hooks', async () => {
+        const text = await consentTextFor({});
+
+        expect(text).not.toContain('Hooks');
+      });
+
+      it('does not ask for consent when both summaries match', async () => {
+        const text = await consentTextFor(
+          { hooks: hooksSummary() },
+          { hooks: hooksSummary() },
+        );
+
+        expect(text).toBeUndefined();
+      });
+
+      it('asks for consent when only the hooks signature changes', async () => {
+        const text = await consentTextFor(
+          { hooks: hooksSummary({ signature: otherSignature }) },
+          { hooks: hooksSummary() },
+        );
+
+        expect(text).toContain(`  Hooks signature: ${otherSignature}`);
+      });
+
+      it('shows the changes after the warnings without comparing them', async () => {
+        const current = {
+          hooks: hooksSummary({
+            hooks: [{ eventName: 'SessionStart', command: 'echo v2', env: [] }],
+            signature: otherSignature,
+          }),
+        };
+        const installText = await consentTextFor(current);
+
+        const updateText = await consentTextFor(current, {
+          hooks: hooksSummary(),
+        });
+
+        expect(updateText).toBe(
+          [
+            installText,
+            '',
+            'Changes since the installed version:',
+            '  * Hooks: new or changed `SessionStart: echo v2`',
+          ].join('\n'),
+        );
+      });
+
+      it('names the files and referenced paths that were added, changed, or removed', async () => {
+        const text = await consentTextFor(
+          {
+            hooks: hooksSummary({
+              files: [
+                { path: 'hooks/a.sh', type: 'file', value: otherSignature },
+                { path: 'hooks/new.sh', type: 'file', value: signature },
+              ],
+              referencedPaths: [{ path: 'scripts/run.js', signature }],
+              signature: otherSignature,
+            }),
+          },
+          {
+            hooks: hooksSummary({
+              files: [
+                { path: 'hooks/a.sh', type: 'file', value: signature },
+                { path: 'hooks/old.sh', type: 'file', value: signature },
+              ],
+            }),
+          },
+        );
+
+        expect(text).toContain(
+          [
+            'Changes since the installed version:',
+            '  * Hooks: `hooks/a.sh` changed',
+            '  * Hooks: `hooks/new.sh` added',
+            '  * Hooks: `hooks/old.sh` removed',
+            '  * Hooks: `scripts/run.js` added',
+          ].join('\n'),
+        );
       });
     });
   });

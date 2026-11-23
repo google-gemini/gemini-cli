@@ -17,6 +17,19 @@ import chalk from 'chalk';
 import type { ConfirmationRequest } from '../../ui/types.js';
 import { escapeAnsiCtrlCodes } from '../../ui/utils/textUtils.js';
 import type { ExtensionConfig } from '../extension.js';
+import {
+  compareCodeUnits,
+  ContentMarker,
+  escapeForDisplay,
+  formatValueForDisplay,
+  type ContentEntry,
+} from './contentSignature.js';
+import type {
+  ExtensionContentSummary,
+  HookSummary,
+  HooksSummary,
+  ReferencedPath,
+} from './extensionContentSummary.js';
 
 export const INSTALL_WARNING_MESSAGE = chalk.yellow(
   'The extension you are about to install may have been created by a third-party developer and sourced from a public repository. Google does not vet, endorse, or guarantee the functionality or security of extensions. Please carefully inspect any extension and its source code before installing to understand the permissions it requires and the actions it may perform.',
@@ -200,6 +213,184 @@ function getMcpServerConfigHash(mcpServer: MCPServerConfig): string {
   return crypto.createHash('sha256').update(canonicalString).digest('hex');
 }
 
+/** Environment variable names whose values the consent text masks. */
+const SENSITIVE_ENV_NAME =
+  /token|secret|password|passwd|key|auth|credential|creds|private|cert/i;
+
+const HOOKS_HEADING =
+  '⚠️  This extension contains Hooks which can automatically execute commands';
+
+const CHANGES_HEADING = 'Changes since the installed version:';
+
+function formatEnvValue(name: string, value: string): string {
+  return SENSITIVE_ENV_NAME.test(name) && value
+    ? '********'
+    : formatValueForDisplay(value);
+}
+
+function formatReferencedPath(reference: ReferencedPath): string {
+  const label = formatValueForDisplay(reference.path);
+  switch (reference.marker) {
+    case undefined:
+      return label;
+    case ContentMarker.Root:
+      return `${label} (the extension folder)`;
+    case ContentMarker.Outside:
+      return `${label} (outside the extension folder)`;
+    case ContentMarker.Missing:
+      return `${label} (not found)`;
+    case ContentMarker.Dangling:
+      return `${label} (broken link)`;
+    default:
+      return `${label} (unreadable)`;
+  }
+}
+
+function formatHook(hook: HookSummary): string {
+  const details: string[] = [];
+  if (hook.matcher !== undefined) {
+    details.push(`matcher: ${formatValueForDisplay(hook.matcher)}`);
+  }
+  if (hook.name !== undefined) {
+    details.push(`name: ${formatValueForDisplay(hook.name)}`);
+  }
+  const qualifier = details.length > 0 ? ` (${details.join(', ')})` : '';
+  const action =
+    hook.command !== undefined
+      ? formatValueForDisplay(hook.command)
+      : `no command, type ${formatValueForDisplay(hook.type ?? '')}`;
+  return `${escapeForDisplay(hook.eventName)}${qualifier}: ${action}`;
+}
+
+function renderHooksSection(summary: HooksSummary): string[] {
+  const output = [`${HOOKS_HEADING}:`];
+  if (!summary.hooks) {
+    output.push(
+      `  * ${formatValueForDisplay('hooks/hooks.json')} isn't a valid hooks file, so its hooks can't be listed.`,
+    );
+  }
+  for (const hook of summary.hooks ?? []) {
+    output.push(`  * ${formatHook(hook)}`);
+    if (hook.env.length > 0) {
+      output.push('      Environment variables:');
+      for (const [name, value] of hook.env) {
+        output.push(
+          `        - ${escapeForDisplay(name)}: ${formatEnvValue(name, value)}`,
+        );
+      }
+    }
+  }
+  if (summary.referencedPaths.length > 0) {
+    output.push(
+      `  Files used by hooks: ${summary.referencedPaths.map(formatReferencedPath).join(', ')}`,
+    );
+  }
+  output.push(`  Hooks signature: ${summary.signature}`);
+  return output;
+}
+
+/** Lists the items that were added, changed, or removed, keyed by label. */
+function describeItemChanges(
+  section: string,
+  previous: ReadonlyMap<string, string>,
+  current: ReadonlyMap<string, string>,
+): string[] {
+  const labels = [...new Set([...previous.keys(), ...current.keys()])].sort(
+    compareCodeUnits,
+  );
+  const lines: string[] = [];
+  for (const label of labels) {
+    const before = previous.get(label);
+    const after = current.get(label);
+    if (before === after) {
+      continue;
+    }
+    let change = 'changed';
+    if (before === undefined) {
+      change = 'added';
+    } else if (after === undefined) {
+      change = 'removed';
+    }
+    lines.push(`  * ${section}: ${formatValueForDisplay(label)} ${change}`);
+  }
+  return lines;
+}
+
+function fileHashes(
+  entries: readonly ContentEntry[],
+  excludedPath?: string,
+): Map<string, string> {
+  return new Map(
+    entries
+      .filter((entry) => entry.path !== excludedPath)
+      .map((entry) => [entry.path, `${entry.type}\0${entry.value}`]),
+  );
+}
+
+function referenceHashes(
+  references: readonly ReferencedPath[],
+): Map<string, string> {
+  return new Map(
+    references.map((reference) => [reference.path, reference.signature]),
+  );
+}
+
+function hookKey(hook: HookSummary): string {
+  return JSON.stringify([
+    hook.eventName,
+    hook.matcher,
+    hook.name,
+    hook.command,
+    hook.type,
+    hook.env,
+  ]);
+}
+
+function hookLabel(hook: HookSummary): string {
+  const matcher =
+    hook.matcher !== undefined ? ` (matcher: ${hook.matcher})` : '';
+  return `${hook.eventName}${matcher}: ${hook.command ?? hook.type ?? ''}`;
+}
+
+function describeHookChanges(
+  previous: HooksSummary | undefined,
+  current: HooksSummary | undefined,
+): string[] {
+  const previousHooks = new Set((previous?.hooks ?? []).map(hookKey));
+  const hookLines = (current?.hooks ?? [])
+    .filter((hook) => !previousHooks.has(hookKey(hook)))
+    .map(
+      (hook) =>
+        `  * Hooks: new or changed ${formatValueForDisplay(hookLabel(hook))}`,
+    );
+  // When hooks changed, they already describe the change to hooks.json.
+  const excludedPath = hookLines.length > 0 ? 'hooks/hooks.json' : undefined;
+  return [
+    ...hookLines,
+    ...describeItemChanges(
+      'Hooks',
+      fileHashes(previous?.files ?? [], excludedPath),
+      fileHashes(current?.files ?? [], excludedPath),
+    ),
+    ...describeItemChanges(
+      'Hooks',
+      referenceHashes(previous?.referencedPaths ?? []),
+      referenceHashes(current?.referencedPaths ?? []),
+    ),
+  ];
+}
+
+/**
+ * Describes what changed between the installed and the new content of an
+ * extension, for the block shown above the consent question.
+ */
+function describeContentChanges(
+  previous: ExtensionContentSummary,
+  current: ExtensionContentSummary,
+): string[] {
+  return [...new Set(describeHookChanges(previous.hooks, current.hooks))];
+}
+
 /**
  * Builds a consent string for installing an extension based on it's
  * extensionConfig.
@@ -211,6 +402,7 @@ async function extensionConsentString(
   previousName?: string,
   wasMigrated?: boolean,
   linkedSourcePath?: string,
+  contentSummary?: ExtensionContentSummary,
 ): Promise<string> {
   const sanitizedConfig = escapeAnsiCtrlCodes(extensionConfig);
   const sanitizedLinkedPath = linkedSourcePath
@@ -258,10 +450,7 @@ async function extensionConsentString(
           a.localeCompare(b),
         );
         for (const [envKey, envValue] of sortedEnv) {
-          const isSensitive =
-            /token|secret|password|passwd|key|auth|credential|creds|private|cert/i.test(
-              envKey,
-            );
+          const isSensitive = SENSITIVE_ENV_NAME.test(envKey);
           const displayValue =
             isSensitive && envValue ? '********' : (envValue ?? '');
           output.push(`      - ${envKey}: ${displayValue}`);
@@ -343,10 +532,12 @@ async function extensionConsentString(
       `This extension will exclude the following core tools: ${sanitizedConfig.excludeTools}`,
     );
   }
-  if (hasHooks) {
-    output.push(
-      '⚠️  This extension contains Hooks which can automatically execute commands.',
-    );
+  if (contentSummary) {
+    if (contentSummary.hooks) {
+      output.push(...renderHooksSection(contentSummary.hooks));
+    }
+  } else if (hasHooks) {
+    output.push(`${HOOKS_HEADING}.`);
   }
   if (skills.length > 0) {
     output.push(`\n${chalk.bold('Agent Skills:')}`);
@@ -411,6 +602,10 @@ export async function maybeRequestConsentOrFail(
   isMigrating: boolean = false,
   linkedSourcePath?: string,
   previousLinkedSourcePath?: string,
+  contentSummaries?: {
+    current: ExtensionContentSummary;
+    previous?: ExtensionContentSummary;
+  },
 ) {
   const extensionConsent = await extensionConsentString(
     extensionConfig,
@@ -419,8 +614,13 @@ export async function maybeRequestConsentOrFail(
     previousExtensionConfig?.name,
     isMigrating,
     linkedSourcePath,
+    contentSummaries?.current,
   );
+  let changes: string[] = [];
   if (previousExtensionConfig) {
+    const previousContentSummary = contentSummaries
+      ? (contentSummaries.previous ?? {})
+      : undefined;
     const previousExtensionConsent = await extensionConsentString(
       previousExtensionConfig,
       previousHasHooks ?? false,
@@ -428,12 +628,24 @@ export async function maybeRequestConsentOrFail(
       undefined,
       false,
       previousLinkedSourcePath,
+      previousContentSummary,
     );
     if (previousExtensionConsent === extensionConsent) {
       return;
     }
+    if (contentSummaries && previousContentSummary) {
+      changes = describeContentChanges(
+        previousContentSummary,
+        contentSummaries.current,
+      );
+    }
   }
-  if (!(await requestConsent(extensionConsent))) {
+  // The change block is shown above the question but isn't compared.
+  const consentText =
+    changes.length > 0
+      ? [extensionConsent, '', CHANGES_HEADING, ...changes].join('\n')
+      : extensionConsent;
+  if (!(await requestConsent(consentText))) {
     throw new Error(`Installation cancelled for "${extensionConfig.name}".`);
   }
 }
