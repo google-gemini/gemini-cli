@@ -94,6 +94,7 @@ vi.mock('../config/config.js', async () => {
 });
 
 describe('Agent Server Endpoints', () => {
+  const TEST_AUTH_TOKEN = 'test-endpoints-ipc-secret';
   let app: express.Express;
   let server: Server;
   let testWorkspace: string;
@@ -101,6 +102,7 @@ describe('Agent Server Endpoints', () => {
   const createTask = (contextId: string) =>
     request(app)
       .post('/tasks')
+      .set('Authorization', `Bearer ${TEST_AUTH_TOKEN}`)
       .send({
         contextId,
         agentSettings: {
@@ -111,6 +113,7 @@ describe('Agent Server Endpoints', () => {
       .set('Content-Type', 'application/json');
 
   beforeAll(async () => {
+    vi.stubEnv('GEMINI_IPC_SECRET', TEST_AUTH_TOKEN);
     // Create a unique temporary directory for the workspace to avoid conflicts
     testWorkspace = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-agent-test-'),
@@ -126,6 +129,7 @@ describe('Agent Server Endpoints', () => {
   });
 
   afterAll(async () => {
+    vi.unstubAllEnvs();
     if (server) {
       await new Promise<void>((resolve, reject) => {
         server.close((err) => {
@@ -151,7 +155,9 @@ describe('Agent Server Endpoints', () => {
   }, 7000);
 
   it('should create a new task via POST /tasks when request body is empty', async () => {
-    const response = await request(app).post('/tasks');
+    const response = await request(app)
+      .post('/tasks')
+      .set('Authorization', `Bearer ${TEST_AUTH_TOKEN}`);
     expect(response.status).toBe(201);
     expect(response.body).toBeTypeOf('string');
   }, 7000);
@@ -159,7 +165,9 @@ describe('Agent Server Endpoints', () => {
   it('should get metadata for a specific task via GET /tasks/:taskId/metadata', async () => {
     const createResponse = await createTask('test-context-2');
     const taskId = createResponse.body;
-    const response = await request(app).get(`/tasks/${taskId}/metadata`);
+    const response = await request(app)
+      .get(`/tasks/${taskId}/metadata`)
+      .set('Authorization', `Bearer ${TEST_AUTH_TOKEN}`);
     expect(response.status).toBe(200);
     expect(response.body.metadata.id).toBe(taskId);
   }, 6000);
@@ -167,7 +175,9 @@ describe('Agent Server Endpoints', () => {
   it('should get metadata for all tasks via GET /tasks/metadata', async () => {
     const createResponse = await createTask('test-context-3');
     const taskId = createResponse.body;
-    const response = await request(app).get('/tasks/metadata');
+    const response = await request(app)
+      .get('/tasks/metadata')
+      .set('Authorization', `Bearer ${TEST_AUTH_TOKEN}`);
     expect(response.status).toBe(200);
     expect(Array.isArray(response.body)).toBe(true);
     expect(response.body.length).toBeGreaterThan(0);
@@ -178,8 +188,16 @@ describe('Agent Server Endpoints', () => {
   });
 
   it('should return 404 for a non-existent task', async () => {
-    const response = await request(app).get('/tasks/fake-task/metadata');
+    const response = await request(app)
+      .get('/tasks/fake-task/metadata')
+      .set('Authorization', `Bearer ${TEST_AUTH_TOKEN}`);
     expect(response.status).toBe(404);
+  });
+
+  it('should return 401 when Authorization header is missing on protected endpoints', async () => {
+    await request(app).post('/tasks').expect(401);
+    await request(app).get('/tasks/metadata').expect(401);
+    await request(app).get('/tasks/fake-task/metadata').expect(401);
   });
 
   it('should return agent metadata via GET /.well-known/agent-card.json', async () => {
@@ -201,6 +219,7 @@ describe('Agent Server Endpoints', () => {
       nonInMemoryWorkspace = fs.mkdtempSync(
         path.join(os.tmpdir(), 'gemini-agent-gcs-test-'),
       );
+      vi.stubEnv('GEMINI_IPC_SECRET', TEST_AUTH_TOKEN);
       vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', nonInMemoryWorkspace);
       vi.stubEnv('GCS_BUCKET_NAME', 'test-bucket');
       nonInMemoryApp = await createApp();
@@ -238,7 +257,9 @@ describe('Agent Server Endpoints', () => {
 
     it('should return 501 and not fall through to send a second response', async () => {
       vi.mocked(logger.error).mockClear();
-      const response = await request(nonInMemoryApp).get('/tasks/metadata');
+      const response = await request(nonInMemoryApp)
+        .get('/tasks/metadata')
+        .set('Authorization', `Bearer ${TEST_AUTH_TOKEN}`);
       expect(response.status).toBe(501);
       expect(response.body).toEqual({
         error:

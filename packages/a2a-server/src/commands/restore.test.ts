@@ -105,6 +105,17 @@ describe('RestoreCommand', () => {
       'An unexpected error occurred during restore.',
     );
   });
+
+  it('should reject path traversal attempts outside checkpointDir', async () => {
+    const command = new RestoreCommand();
+    const result = await command.execute(mockConfig, ['../../etc/passwd']);
+    expect(mockFs.readFile).not.toHaveBeenCalled();
+    expect(result.data).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: 'Invalid checkpoint name: ../../etc/passwd.json',
+    });
+  });
 });
 
 describe('ListCheckpointsCommand', () => {

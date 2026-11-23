@@ -50,7 +50,18 @@ export class RestoreCommand implements Command {
         : `${argsStr}.json`;
 
       const checkpointDir = config.storage.getProjectTempCheckpointsDir();
-      const filePath = path.join(checkpointDir, selectedFile);
+      const resolvedDir = path.resolve(checkpointDir);
+      const filePath = path.resolve(resolvedDir, selectedFile);
+      if (!filePath.startsWith(resolvedDir + path.sep)) {
+        return {
+          name: this.name,
+          data: {
+            type: 'message',
+            messageType: 'error',
+            content: `Invalid checkpoint name: ${selectedFile}`,
+          },
+        };
+      }
 
       let data: string;
       try {

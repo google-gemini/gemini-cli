@@ -5,6 +5,7 @@
  */
 
 import express, { type Request } from 'express';
+import { timingSafeEqual } from 'node:crypto';
 
 import type { AgentCard, Message } from '@a2a-js/sdk';
 import {
@@ -63,12 +64,8 @@ const coderAgentCard: AgentCard = {
       type: 'http',
       scheme: 'bearer',
     },
-    basicAuth: {
-      type: 'http',
-      scheme: 'basic',
-    },
   },
-  security: [{ bearerAuth: [] }, { basicAuth: [] }],
+  security: [{ bearerAuth: [] }],
   defaultInputModes: ['text'],
   defaultOutputModes: ['text'],
   skills: [
@@ -93,34 +90,61 @@ export function updateCoderAgentCardUrl(port: number) {
   coderAgentCard.url = `http://localhost:${port}/`;
 }
 
-const customUserBuilder: UserBuilder = async (req: Request) => {
-  const auth = req.headers['authorization'];
-  if (auth) {
-    const scheme = auth.split(' ')[0];
-    logger.info(
-      `[customUserBuilder] Received Authorization header with scheme: ${scheme}`,
-    );
-  }
-  if (!auth) return new UnauthenticatedUser();
+const ALLOWED_LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
 
-  // 1. Bearer Auth
-  if (auth.startsWith('Bearer ')) {
-    const token = auth.substring(7);
-    if (token === 'valid-token') {
+function isValidLocalHost(hostHeader: string | undefined): boolean {
+  if (!hostHeader) {
+    return false;
+  }
+  try {
+    const parsed = new URL(`http://${hostHeader}`);
+    return (
+      parsed.username === '' &&
+      parsed.password === '' &&
+      parsed.pathname === '/' &&
+      ALLOWED_LOCAL_HOSTNAMES.has(parsed.hostname.toLowerCase())
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isValidLocalOrigin(originHeader: string | undefined): boolean {
+  if (originHeader === undefined) {
+    return true;
+  }
+  try {
+    const parsed = new URL(originHeader);
+    return (
+      (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+      ALLOWED_LOCAL_HOSTNAMES.has(parsed.hostname.toLowerCase())
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isAuthorized(req: Request, expectedToken: string): boolean {
+  const auth = req.headers['authorization'];
+  if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) {
+    return false;
+  }
+  const presented = Buffer.from(auth.substring(7));
+  const expected = Buffer.from(expectedToken);
+  if (presented.length !== expected.length) {
+    return false;
+  }
+  return timingSafeEqual(presented, expected);
+}
+
+function createUserBuilder(expectedToken: string): UserBuilder {
+  return async (req: Request) => {
+    if (isAuthorized(req, expectedToken)) {
       return { userName: 'bearer-user', isAuthenticated: true };
     }
-  }
-
-  // 2. Basic Auth
-  if (auth.startsWith('Basic ')) {
-    const credentials = Buffer.from(auth.substring(6), 'base64').toString();
-    if (credentials === 'admin:password') {
-      return { userName: 'basic-user', isAuthenticated: true };
-    }
-  }
-
-  return new UnauthenticatedUser();
-};
+    return new UnauthenticatedUser();
+  };
+}
 
 async function handleExecuteCommand(
   req: express.Request,
@@ -195,6 +219,14 @@ async function handleExecuteCommand(
 }
 
 export async function createApp() {
+  const expectedAuthToken =
+    process.env['GEMINI_IPC_SECRET'] || process.env['CODER_AGENT_AUTH_TOKEN'];
+  if (!expectedAuthToken) {
+    throw new Error(
+      'Neither GEMINI_IPC_SECRET nor CODER_AGENT_AUTH_TOKEN is set; refusing to start the a2a-server without an authentication token.',
+    );
+  }
+
   try {
     // Load the server configuration once on startup.
     const workspaceRoot = await setTargetDir(undefined);
@@ -279,7 +311,33 @@ export async function createApp() {
     });
     expressApp.use(express.json());
 
-    const appBuilder = new A2AExpressApp(requestHandler, customUserBuilder);
+    expressApp.use((req, res, next) => {
+      if (
+        !isValidLocalHost(req.headers['host']) ||
+        !isValidLocalOrigin(req.headers['origin'])
+      ) {
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
+      next();
+    });
+
+    expressApp.use((req, res, next) => {
+      if (req.method === 'GET' && req.path === '/.well-known/agent-card.json') {
+        next();
+        return;
+      }
+      if (!isAuthorized(req, expectedAuthToken)) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+      next();
+    });
+
+    const appBuilder = new A2AExpressApp(
+      requestHandler,
+      createUserBuilder(expectedAuthToken),
+    );
     expressApp = appBuilder.setupRoutes(expressApp, '');
 
     expressApp.post('/tasks', async (req, res) => {
