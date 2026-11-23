@@ -318,6 +318,14 @@ Would you like to attempt to install via "git clone" instead?`,
       let releaseLock: (() => Promise<void>) | undefined;
       try {
         newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
+        if (installMetadata.type === 'local') {
+          // The summary, the consent text, and the install all read this
+          // copy, so the installed files are the ones the user approved.
+          tempDir = await ExtensionStorage.createTmpDir();
+          await copyExtension(localSourcePath, tempDir);
+          localSourcePath = tempDir;
+          newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
+        }
 
         const newExtensionName = newExtensionConfig.name;
         const previousName = previousExtensionConfig?.name ?? newExtensionName;

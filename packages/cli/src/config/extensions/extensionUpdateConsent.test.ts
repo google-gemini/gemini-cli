@@ -33,7 +33,10 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { ConsentPrompt } from '../../ui/components/ConsentPrompt.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import { updateExtension } from './update.js';
-import { EXTENSIONS_DIRECTORY_NAME } from './variables.js';
+import {
+  EXTENSIONS_DIRECTORY_NAME,
+  INSTALL_METADATA_FILENAME,
+} from './variables.js';
 
 const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
 
@@ -862,6 +865,45 @@ describe('extension update consent', () => {
       expect(consentText()).toContain(
         '  * Hooks: new or changed `SessionStart: echo hook-v2-changed`',
       );
+    });
+  });
+
+  describe('local sources', () => {
+    it('installs the files that the consent text describes when the source changes during an update prompt', async () => {
+      const installed = await installVersion1({ hookCommand: HOOK_V1 });
+      writeSource({ version: '1.0.1', hookCommand: HOOK_V2 });
+      requestConsent.mockImplementation(async () => {
+        writeSource({ version: '1.0.2', hookCommand: 'echo hook-v3-late' });
+        return true;
+      });
+
+      expect(await settleUpdate(installed)).toBe('applied');
+
+      expect(consentText()).toContain(`  * SessionStart: \`${HOOK_V2}\``);
+      expect(readInstalledHookCommand()).toBe(HOOK_V2);
+      expect(readInstalledVersion()).toBe('1.0.1');
+      const metadata: unknown = JSON.parse(
+        fs.readFileSync(installedFile(INSTALL_METADATA_FILENAME), 'utf-8'),
+      );
+      expect(metadata).toMatchObject({ source: sourceDir, type: 'local' });
+    });
+
+    it('installs the files that the consent text describes when the source changes during a first install prompt', async () => {
+      writeSource({ version: '1.0.0', hookCommand: HOOK_V1 });
+      requestConsent.mockImplementation(async () => {
+        writeSource({ version: '1.0.1', hookCommand: HOOK_V2 });
+        return true;
+      });
+      await extensionManager.loadExtensions();
+
+      await extensionManager.installOrUpdateExtension({
+        source: sourceDir,
+        type: 'local',
+      });
+
+      expect(consentText()).toContain(`  * SessionStart: \`${HOOK_V1}\``);
+      expect(readInstalledHookCommand()).toBe(HOOK_V1);
+      expect(readInstalledVersion()).toBe('1.0.0');
     });
   });
 
