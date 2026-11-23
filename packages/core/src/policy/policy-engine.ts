@@ -11,11 +11,17 @@ import {
   REDIRECTION_NAMES,
   initializeShellParsers,
   parseCommandDetails,
+  parseCommandDetailsAsync,
+  isDefaultParseCommandDetails,
   stripShellWrapper,
   hasRedirection,
+  hasRedirectionAsync,
+  isDefaultHasRedirection,
+  hasUnresolvedShellExpansion,
   detectCommandSubstitution,
   extractStringFromParseEntry,
 } from '../utils/shell-utils.js';
+import { runWithCommandParseCache } from '../utils/shell-parse-cache.js';
 import { parse as shellParse } from 'shell-quote';
 import { isSubpath } from '../utils/paths.js';
 import {
@@ -29,6 +35,7 @@ import {
   ALWAYS_ALLOW_PRIORITY_FRACTION,
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
+import { SafeRegExp } from './safe-regex.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isRecord } from '../utils/markdownUtils.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
@@ -127,6 +134,25 @@ function matchesWildcard(
   return toolName === pattern;
 }
 
+/**
+ * Rejects a rule whose `argsPattern` is not a `SafeRegExp`.
+ *
+ * The type already requires `SafeRegExp`. This covers callers that are not
+ * type-checked, so that every pattern is evaluated by the linear-time engine.
+ */
+function assertSafeArgsPattern(
+  rule: PolicyRule | SafetyCheckerRule,
+  label: 'policy rule' | 'safety checker rule',
+): void {
+  const pattern: unknown = rule.argsPattern;
+  if (pattern !== undefined && !(pattern instanceof SafeRegExp)) {
+    throw new Error(
+      `Invalid ${label}: argsPattern must be created with SafeRegExp.compile(). ` +
+        `Native RegExp objects are not accepted. Source: ${rule.source || 'unknown'}`,
+    );
+  }
+}
+
 function ruleMatches(
   rule: PolicyRule | SafetyCheckerRule,
   toolCall: FunctionCall,
@@ -218,7 +244,9 @@ function ruleMatches(
     if (!toolCall.args) {
       return false;
     }
-    // Use stable JSON stringification with sorted keys to ensure consistent matching
+    // Use stable JSON stringification with sorted keys to ensure consistent matching.
+    // argsPattern is a SafeRegExp, so this runs on the linear-time engine and
+    // never on RegExp.prototype.test().
     if (
       stringifiedArgs === undefined ||
       !rule.argsPattern.test(stringifiedArgs)
@@ -280,6 +308,7 @@ export class PolicyEngine {
           `Invalid policy rule: subagent is required if specified (cannot be empty). Rule source: ${rule.source || 'unknown'}`,
         );
       }
+      assertSafeArgsPattern(rule, 'policy rule');
     }
 
     // Validate checkers
@@ -294,6 +323,7 @@ export class PolicyEngine {
           `Invalid safety checker rule: mcpName is required if specified (cannot be empty). Checker source: ${checker.source || 'unknown'}`,
         );
       }
+      assertSafeArgsPattern(checker, 'safety checker rule');
     }
 
     this.nonInteractive = config.nonInteractive ?? false;
@@ -335,13 +365,16 @@ export class PolicyEngine {
     );
   }
 
-  private shouldDowngradeForRedirection(
+  private async shouldDowngradeForRedirection(
     command: string,
     allowRedirection?: boolean,
     rule?: PolicyRule,
-  ): boolean {
+  ): Promise<boolean> {
     if (allowRedirection) return false;
-    if (!hasRedirection(command)) return false;
+    const redirected = isDefaultHasRedirection(hasRedirection)
+      ? await hasRedirectionAsync(command)
+      : hasRedirection(command);
+    if (!redirected) return false;
 
     // Require explicit allowRedirection when matching a command-prefix rule.
     if (rule?.argsPattern && !allowRedirection) {
@@ -459,6 +492,15 @@ export class PolicyEngine {
           return PolicyDecision.ASK_USER;
         }
 
+        // The classifier sees the unexpanded text, so it can't vouch for
+        // arguments that bash rewrites before the command runs.
+        if (hasUnresolvedShellExpansion(command)) {
+          debugLogger.debug(
+            `[PolicyEngine.check] Command contains unresolved shell expansion, preserving ASK_USER: ${command}`,
+          );
+          return PolicyDecision.ASK_USER;
+        }
+
         debugLogger.debug(
           `[PolicyEngine.check] Command evaluated as known safe, overriding ASK_USER to ALLOW: ${command}`,
         );
@@ -490,7 +532,9 @@ export class PolicyEngine {
     }
 
     await initializeShellParsers();
-    const parsed = parseCommandDetails(command);
+    const parsed = isDefaultParseCommandDetails(parseCommandDetails)
+      ? await parseCommandDetailsAsync(command)
+      : parseCommandDetails(command);
     const subCommands = parsed?.details ?? [];
 
     // Handle parser failures or syntax errors
@@ -544,11 +588,8 @@ export class PolicyEngine {
 
     // Check for redirection on the full command string.
     // Redirection always downgrades ALLOW to ASK_USER (it never upgrades).
-    const hasTopLevelRedirectionDowngrade = this.shouldDowngradeForRedirection(
-      command,
-      allowRedirection,
-      rule,
-    );
+    const hasTopLevelRedirectionDowngrade =
+      await this.shouldDowngradeForRedirection(command, allowRedirection, rule);
     if (hasTopLevelRedirectionDowngrade) {
       if (aggregateDecision === PolicyDecision.ALLOW) {
         debugLogger.debug(
@@ -647,11 +688,11 @@ export class PolicyEngine {
         // Downgrade if sub-command has redirection or disallowed substitution
         if (
           subResult.decision === PolicyDecision.ALLOW &&
-          (this.shouldDowngradeForRedirection(
+          ((await this.shouldDowngradeForRedirection(
             subCmd,
             subResult.rule?.allowRedirection ?? allowRedirection,
             subResult.rule,
-          ) ||
+          )) ||
             this.shouldDowngradeForCommandSubstitution(
               subCmd,
               subResult.rule?.allowCommandSubstitution ??
@@ -728,6 +769,24 @@ export class PolicyEngine {
    * Returns the decision and the matching rule (if any).
    */
   async check(
+    toolCall: FunctionCall,
+    serverName: string | undefined,
+    toolAnnotations?: Record<string, unknown>,
+    subagent?: string,
+    skipHeuristics = false,
+  ): Promise<CheckResult> {
+    return runWithCommandParseCache(() =>
+      this.checkInternal(
+        toolCall,
+        serverName,
+        toolAnnotations,
+        subagent,
+        skipHeuristics,
+      ),
+    );
+  }
+
+  private async checkInternal(
     toolCall: FunctionCall,
     serverName: string | undefined,
     toolAnnotations?: Record<string, unknown>,
@@ -1070,12 +1129,14 @@ export class PolicyEngine {
    * Add a new rule to the policy engine.
    */
   addRule(rule: PolicyRule): void {
+    assertSafeArgsPattern(rule, 'policy rule');
     this.rules.push(rule);
     // Re-sort rules by priority
     this.rules.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
   }
 
   addChecker(checker: SafetyCheckerRule): void {
+    assertSafeArgsPattern(checker, 'safety checker rule');
     this.checkers.push(checker);
     this.checkers.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
   }

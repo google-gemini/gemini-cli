@@ -30,8 +30,11 @@ import {
   getCommandName,
   initializeShellParsers,
   getCommandRoots,
+  getCommandRootsAsync,
+  isDefaultGetCommandRoots,
   stripShellWrapper,
 } from '../../utils/shell-utils.js';
+import { runWithCommandParseCache } from '../../utils/shell-parse-cache.js';
 import {
   isKnownSafeCommand,
   isDangerousCommand,
@@ -208,6 +211,12 @@ export class WindowsSandboxManager implements SandboxManager {
    * Prepares a command for sandboxed execution on Windows.
    */
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
+    return runWithCommandParseCache(() => this.prepareCommandInternal(req));
+  }
+
+  private async prepareCommandInternal(
+    req: SandboxRequest,
+  ): Promise<SandboxedCommand> {
     await this.ensureHelperCompiled();
 
     const sanitizationConfig = getSecureSanitizationConfig(
@@ -267,9 +276,10 @@ export class WindowsSandboxManager implements SandboxManager {
     await initializeShellParsers();
     const fullCmd = [command, ...args].join(' ');
     const stripped = stripShellWrapper(fullCmd);
-    const roots = getCommandRoots(stripped).filter(
-      (r) => r !== 'shopt' && r !== 'set',
-    );
+    const computedRoots = isDefaultGetCommandRoots(getCommandRoots)
+      ? await getCommandRootsAsync(stripped)
+      : getCommandRoots(stripped);
+    const roots = computedRoots.filter((r) => r !== 'shopt' && r !== 'set');
     const isGitCommand = roots.includes('git');
 
     const resolvedPaths = await resolveSandboxPaths(

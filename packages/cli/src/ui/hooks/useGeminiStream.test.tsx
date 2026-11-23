@@ -3423,6 +3423,55 @@ describe('useGeminiStream', () => {
       expect(mockMessageBus.publish).not.toHaveBeenCalled();
     });
 
+    it('should respect precomputed exec confirmationDetails.hasRedirection when switching to AUTO_EDIT mode', async () => {
+      const quotedArrowCall = createMockToolCall(
+        SHELL_TOOL_NAME,
+        'call-quoted-arrow',
+        'info',
+      );
+      quotedArrowCall.request.args = { command: 'Write-Output "a -> b"' };
+      quotedArrowCall.confirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Shell Command',
+        command: 'Write-Output "a -> b"',
+        rootCommand: 'Write-Output',
+        rootCommands: ['Write-Output'],
+        hasRedirection: false,
+      };
+
+      const redirectedCall = createMockToolCall(
+        SHELL_TOOL_NAME,
+        'call-redirected',
+        'info',
+      );
+      redirectedCall.request.args = { command: 'Get-ChildItem > out.txt' };
+      redirectedCall.confirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Shell Command',
+        command: 'Get-ChildItem > out.txt',
+        rootCommand: 'Get-ChildItem',
+        rootCommands: ['Get-ChildItem'],
+        hasRedirection: true,
+      };
+
+      const { result } = await renderTestHook([
+        quotedArrowCall,
+        redirectedCall,
+      ]);
+
+      await act(async () => {
+        await result.current.handleApprovalModeChange(ApprovalMode.AUTO_EDIT);
+      });
+
+      expect(mockMessageBus.publish).toHaveBeenCalledTimes(1);
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ correlationId: 'corr-call-redirected' }),
+      );
+      expect(mockMessageBus.publish).not.toHaveBeenCalledWith(
+        expect.objectContaining({ correlationId: 'corr-call-quoted-arrow' }),
+      );
+    });
+
     it('should not auto-approve any tools when switching to REQUIRE_CONFIRMATION mode', async () => {
       const awaitingApprovalToolCalls: TrackedToolCall[] = [
         createMockToolCall('replace', 'call1', 'edit'),

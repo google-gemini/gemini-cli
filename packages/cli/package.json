@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.70.0-nightly.20261110.g1603e9bab",
+  "version": "0.71.0-nightly.20261118.g615d6bc8c",
   "description": "Gemini CLI",
   "license": "Apache-2.0",
   "repository": {
@@ -27,14 +27,14 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.70.0-nightly.20261110.g1603e9bab"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.71.0-nightly.20261118.g615d6bc8c"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "0.16.1",
     "@google/gemini-cli-core": "file:../core",
     "@google/genai": "1.30.0",
     "@iarna/toml": "2.2.5",
-    "@modelcontextprotocol/sdk": "1.23.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "ansi-escapes": "7.3.0",
     "ansi-regex": "6.2.2",
     "chalk": "4.1.2",
@@ -47,7 +47,7 @@
     "dotenv": "17.1.0",
     "extract-zip": "2.0.1",
     "fzf": "0.5.2",
-    "glob": "12.0.0",
+    "glob": "14.0.3",
     "highlight.js": "11.11.1",
     "ink": "npm:@jrichman/ink@6.6.9",
     "ink-gradient": "3.0.0",
@@ -59,15 +59,15 @@
     "prompts": "2.4.2",
     "proper-lockfile": "4.1.2",
     "react": "19.2.4",
-    "shell-quote": "1.8.3",
-    "simple-git": "3.28.0",
+    "shell-quote": "1.12.0",
+    "simple-git": "4.0.2",
     "string-width": "8.1.0",
     "strip-ansi": "7.1.0",
     "strip-json-comments": "3.1.1",
-    "tar": "7.5.8",
+    "tar": "7.5.22",
     "tinygradient": "1.1.5",
-    "undici": "7.10.0",
-    "ws": "8.16.0",
+    "undici": "7.30.1",
+    "ws": "8.22.0",
     "yargs": "17.7.2",
     "zod": "3.25.76"
   },
