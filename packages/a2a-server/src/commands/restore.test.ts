@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as path from 'node:path';
 import { RestoreCommand, ListCheckpointsCommand } from './restore.js';
 import type { CommandContext } from './types.js';
-import type { Config } from '@google/gemini-cli-core';
+import type { Config, Storage } from '@google/gemini-cli-core';
 import { createMockConfig } from '../utils/testing_utils.js';
 
 beforeEach(() => {
@@ -140,6 +140,8 @@ describe('RestoreCommand', () => {
       ['checkpoint1', 'checkpoint1.json'],
       ['checkpoint1.json', 'checkpoint1.json'],
       ['nested/../checkpoint1.json', 'checkpoint1.json'],
+      // A file name that starts with two dots is not a parent directory.
+      ['..checkpoint1.json', '..checkpoint1.json'],
     ])(
       'should read %j from inside the checkpoint directory',
       async (checkpointName, expectedFile) => {
@@ -153,6 +155,87 @@ describe('RestoreCommand', () => {
           path.join(checkpointDir, expectedFile),
           'utf-8',
         );
+      },
+    );
+
+    // A context whose checkpoint directory is `dir`.
+    const contextWithCheckpointDir = (dir: string) =>
+      ({
+        config: createMockConfig({
+          storage: { getProjectTempCheckpointsDir: () => dir } as Storage,
+        }) as Config,
+        git: {},
+      }) as CommandContext;
+
+    it('should read a checkpoint when the checkpoint directory is a filesystem root', async () => {
+      const root = path.parse(checkpointDir).root;
+      const command = new RestoreCommand();
+      mockFs.readFile.mockResolvedValue('invalid json');
+
+      await command.execute(contextWithCheckpointDir(root), [
+        'checkpoint1.json',
+      ]);
+
+      expect(mockFs.readFile).toHaveBeenCalledTimes(1);
+      expect(mockFs.readFile).toHaveBeenCalledWith(
+        path.join(root, 'checkpoint1.json'),
+        'utf-8',
+      );
+    });
+
+    const parentDir = path.dirname(checkpointDir);
+
+    it.each([
+      [
+        'the checkpoint directory itself',
+        path.join(parentDir, 'checkpoints.json'),
+        '../checkpoints.json',
+      ],
+      [
+        'the parent of the checkpoint directory',
+        path.join(parentDir, 'parent.json', 'checkpoints'),
+        '../../parent.json',
+      ],
+    ])(
+      'should reject a name that resolves to %s',
+      async (_description, dir, checkpointName) => {
+        const command = new RestoreCommand();
+
+        const result = await command.execute(contextWithCheckpointDir(dir), [
+          checkpointName,
+        ]);
+
+        expect(result.data).toEqual({
+          type: 'message',
+          messageType: 'error',
+          content:
+            'Invalid checkpoint name: the checkpoint file must be inside the checkpoint directory.',
+        });
+        expect(mockFs.readFile).not.toHaveBeenCalled();
+      },
+    );
+
+    it.skipIf(process.platform !== 'win32')(
+      'should reject a path on another drive',
+      async () => {
+        const checkpointDrive = path
+          .parse(checkpointDir)
+          .root.slice(0, 2)
+          .toUpperCase();
+        const otherDrive = checkpointDrive === 'C:' ? 'D:' : 'C:';
+        const command = new RestoreCommand();
+
+        const result = await command.execute(mockConfig, [
+          `${otherDrive}\\outside-dir\\file.json`,
+        ]);
+
+        expect(result.data).toEqual({
+          type: 'message',
+          messageType: 'error',
+          content:
+            'Invalid checkpoint name: the checkpoint file must be inside the checkpoint directory.',
+        });
+        expect(mockFs.readFile).not.toHaveBeenCalled();
       },
     );
   });

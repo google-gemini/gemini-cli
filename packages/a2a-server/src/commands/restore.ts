@@ -31,9 +31,16 @@ function resolveCheckpointPath(
   }
   const resolvedBase = path.resolve(checkpointDir);
   const resolvedTarget = path.resolve(resolvedBase, fileName);
-  // The trailing separator also rules out the directory itself and siblings
-  // that merely share its prefix, such as "checkpoints-old".
-  if (!resolvedTarget.startsWith(resolvedBase + path.sep)) {
+  // An empty relative path is the directory itself. A relative path that
+  // starts with a ".." segment, or is absolute (another drive on Windows), is
+  // outside the directory.
+  const relative = path.relative(resolvedBase, resolvedTarget);
+  if (
+    relative === '' ||
+    relative === '..' ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
     return undefined;
   }
   return resolvedTarget;
