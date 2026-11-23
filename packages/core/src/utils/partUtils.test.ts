@@ -309,5 +309,13 @@ describe('partUtils', () => {
       const result = appendToLastTextPart(prompt, 'new text', '---');
       expect(result).toEqual(['first part---new text']);
     });
+
+    it('should not stringify a non-string text field into the prompt', () => {
+      // `Part.text` is optional, so a part may carry `text: undefined`.
+      // Appending must not turn that into the literal string "undefined".
+      const prompt: PartUnion[] = [{ text: undefined }];
+      const result = appendToLastTextPart(prompt, 'new text');
+      expect(result).toEqual([{ text: undefined }, { text: '\n\nnew text' }]);
+    });
   });
 });

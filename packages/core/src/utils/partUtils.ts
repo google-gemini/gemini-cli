@@ -204,7 +204,10 @@ export function appendToLastTextPart(
 
   if (typeof lastPart === 'string') {
     newPrompt[newPrompt.length - 1] = `${lastPart}${separator}${textToAppend}`;
-  } else if (lastPart && 'text' in lastPart) {
+  } else if (isTextPart(lastPart)) {
+    // `Part.text` is optional, so a part can carry a non-string `text` field.
+    // Merging into it would stringify that value into the prompt ("undefined"),
+    // which is why this uses the same type guard as the rest of the module.
     newPrompt[newPrompt.length - 1] = {
       ...lastPart,
       text: `${lastPart.text}${separator}${textToAppend}`,
