@@ -587,4 +587,64 @@ describe('extensionContentSummary', () => {
       });
     });
   });
+
+  describe('MCP servers', () => {
+    it('keeps ${extensionPath} and ${workspacePath} as written and resolves path separators', async () => {
+      writeFile(
+        'gemini-extension.json',
+        JSON.stringify({
+          name: 'demo',
+          version: '1.0.0',
+          mcpServers: {
+            nodeServer: {
+              command: 'node',
+              args: [
+                '${extensionPath}${/}example.js',
+                '--root=${workspacePath}${pathSeparator}src',
+              ],
+              cwd: '${extensionPath}',
+            },
+          },
+        }),
+      );
+      writeFile('example.js', 'server');
+
+      const summary = await buildExtensionContentSummary(rootDir);
+
+      const entries = [fileEntry('example.js', 'server')];
+      expect(summary.mcpServers).toEqual([
+        [
+          'nodeServer',
+          {
+            config: {
+              command: 'node',
+              args: [
+                '${extensionPath}/example.js',
+                '--root=${workspacePath}/src',
+              ],
+              cwd: '${extensionPath}',
+            },
+            referencedPaths: [
+              {
+                path: 'example.js',
+                signature: computeContentSignature(entries),
+              },
+            ],
+            filesSignature: computeContentSignature(entries),
+          },
+        ],
+      ]);
+    });
+
+    it('lists no MCP servers when the manifest declares none', async () => {
+      writeFile(
+        'gemini-extension.json',
+        JSON.stringify({ name: 'demo', version: '1.0.0' }),
+      );
+
+      expect((await buildExtensionContentSummary(rootDir)).mcpServers).toEqual(
+        [],
+      );
+    });
+  });
 });

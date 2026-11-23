@@ -24,6 +24,7 @@ import { ContentMarker } from './contentSignature.js';
 import type {
   ExtensionContentSummary,
   HooksSummary,
+  McpServerSummary,
 } from './extensionContentSummary.js';
 
 const mockReadline = vi.hoisted(() => ({
@@ -1094,6 +1095,103 @@ describe('consent', () => {
             '  * Sub-agents: `agents/triage.md` changed',
             '  * Custom commands: `commands/tag.toml` added',
             '  * Policies: `policies/old.toml` removed',
+          ].join('\n'),
+        );
+      });
+
+      it('shows MCP servers with their values as written and the files they use', async () => {
+        const text = await consentTextFor({
+          mcpServers: [
+            [
+              'nodeServer',
+              {
+                config: {
+                  command: 'node',
+                  args: ['${extensionPath}/example.js'],
+                  cwd: '${extensionPath}',
+                },
+                referencedPaths: [{ path: 'example.js', signature }],
+                filesSignature: otherSignature,
+              },
+            ],
+          ],
+        });
+
+        expect(text).toMatch(
+          new RegExp(
+            [
+              'This extension will run the following MCP servers:',
+              '  \\* nodeServer \\(local\\): node \\$\\{extensionPath\\}/example\\.js',
+              '    Working directory: \\$\\{extensionPath\\}',
+              '    Config signature: [0-9a-f]{64}',
+              '    Files used: `example\\.js`',
+              `    Files signature: ${otherSignature}`,
+            ].join('\\n'),
+          ),
+        );
+      });
+
+      it('shows the loaded MCP servers when the summary has none', async () => {
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          {
+            ...baseConfig,
+            mcpServers: { server1: { command: 'npm', args: ['start'] } },
+          },
+          requestConsent,
+          false,
+          undefined,
+          false,
+          [],
+          [],
+          false,
+          undefined,
+          undefined,
+          { current: {} },
+        );
+
+        expect(requestConsent.mock.calls[0][0]).toContain(
+          '  * server1 (local): npm start',
+        );
+      });
+
+      it('names the MCP servers and the files they use that changed', async () => {
+        const server = (
+          args: string[],
+          fileSignature: string,
+        ): McpServerSummary => ({
+          config: { command: 'node', args },
+          referencedPaths: [{ path: 'example.js', signature: fileSignature }],
+          filesSignature: fileSignature,
+        });
+
+        const text = await consentTextFor(
+          {
+            mcpServers: [
+              [
+                'nodeServer',
+                server(
+                  ['${extensionPath}/example.js', '--verbose'],
+                  otherSignature,
+                ),
+              ],
+            ],
+          },
+          {
+            mcpServers: [
+              [
+                'nodeServer',
+                server(['${extensionPath}/example.js'], signature),
+              ],
+            ],
+          },
+        );
+
+        expect(text).toContain(
+          [
+            'Changes since the installed version:',
+            '  * MCP servers: `nodeServer` changed',
+            '  * MCP servers: `example.js` changed',
           ].join('\n'),
         );
       });

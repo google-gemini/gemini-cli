@@ -85,6 +85,21 @@ export interface ExtensionContentSummary {
   agents?: AgentsSummary;
   commands?: FilesSummary;
   policies?: FilesSummary;
+  /** MCP servers of `gemini-extension.json`, in file order. */
+  mcpServers?: Array<[string, McpServerSummary]>;
+}
+
+/** One MCP server from `gemini-extension.json`. */
+export interface McpServerSummary {
+  /**
+   * The values as written. Only `${/}` and `${pathSeparator}` are resolved, to
+   * `/`, so the values don't depend on where the folder is.
+   */
+  config: MCPServerConfig;
+  /** Paths that the command, args, and env values reference. */
+  referencedPaths: ReferencedPath[];
+  /** Signature of the referenced paths, when there are any. */
+  filesSignature?: string;
 }
 
 /** One sub-agent from `agents/`, with its values as written. */
@@ -148,6 +163,7 @@ const PATH_SEPARATOR_VARIABLES = /\$\{(?:\/|pathSeparator)\}/g;
 const PATH_END = /[\s"'`;|&<>(),:$]/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const HOOKS_FILE = 'hooks/hooks.json';
+const MANIFEST_FILE = 'gemini-extension.json';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -208,15 +224,41 @@ function hasListedFiles(files: readonly ContentEntry[]): boolean {
 
 /** Values of an MCP server that can reference files: command, args, and env. */
 export function mcpServerValues(server: {
-  command?: string;
-  args?: string[];
-  env?: Record<string, string>;
+  command?: unknown;
+  args?: unknown;
+  env?: unknown;
 }): string[] {
-  return [
-    server.command ?? '',
-    ...(server.args ?? []),
-    ...Object.values(server.env ?? {}),
+  const values: unknown[] = [
+    server.command,
+    ...toArray(server.args),
+    ...(isRecord(server.env) ? Object.values(server.env) : []),
   ];
+  return values.filter((value): value is string => typeof value === 'string');
+}
+
+/** Resolves `${/}` and `${pathSeparator}` to `/` in every string of `value`. */
+function resolvePathSeparators(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return value.replace(PATH_SEPARATOR_VARIABLES, '/');
+  }
+  if (Array.isArray(value)) {
+    return value.map(resolvePathSeparators);
+  }
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        resolvePathSeparators(item),
+      ]),
+    );
+  }
+  return value;
+}
+
+function isMcpServerRecord(
+  value: unknown,
+): value is Record<string, MCPServerConfig> {
+  return isRecord(value) && Object.values(value).every(isRecord);
 }
 
 function toReferencedPath(suffix: string): Omit<ReferencedPath, 'signature'> {
@@ -604,6 +646,55 @@ async function summarizePolicies(
 }
 
 /**
+ * Summarizes the MCP servers of the raw `gemini-extension.json`, keeping
+ * `${extensionPath}` and `${workspacePath}` as written. Returns `undefined`
+ * when the file can't be read, so callers can use the loaded values instead.
+ */
+async function summarizeMcpServers(
+  rootDir: string,
+): Promise<Array<[string, McpServerSummary]> | undefined> {
+  const entries = (await collectContentEntries(rootDir, MANIFEST_FILE)) ?? [];
+  const content = hasReadableFile(entries, MANIFEST_FILE)
+    ? await readTextFile(rootDir, MANIFEST_FILE)
+    : undefined;
+  if (content === undefined) {
+    return undefined;
+  }
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(content);
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(manifest)) {
+    return undefined;
+  }
+  const rawServers = resolvePathSeparators(manifest['mcpServers'] ?? {});
+  if (!isMcpServerRecord(rawServers)) {
+    return undefined;
+  }
+  const servers: Array<[string, McpServerSummary]> = [];
+  for (const [name, config] of Object.entries(rawServers)) {
+    const { referencedPaths, entries: referencedEntries } =
+      await collectReferencedPaths(
+        rootDir,
+        findReferencedPaths(mcpServerValues(config)),
+      );
+    servers.push([
+      name,
+      {
+        config,
+        referencedPaths,
+        ...(referencedPaths.length > 0
+          ? { filesSignature: computeContentSignature(referencedEntries) }
+          : {}),
+      },
+    ]);
+  }
+  return servers;
+}
+
+/**
  * Builds the summary of an extension folder from its raw files. Variables such
  * as `${extensionPath}` stay as written, and nothing outside the folder is
  * read.
@@ -621,6 +712,7 @@ export async function buildExtensionContentSummary(
   const agents = await summarizeAgents(extensionDir);
   const commands = await summarizeCommands(extensionDir);
   const policies = await summarizePolicies(extensionDir);
+  const mcpServers = await summarizeMcpServers(extensionDir);
   return {
     ...(hooks ? { hooks } : {}),
     ...(contextFiles ? { contextFiles } : {}),
@@ -628,5 +720,6 @@ export async function buildExtensionContentSummary(
     ...(agents ? { agents } : {}),
     ...(commands ? { commands } : {}),
     ...(policies ? { policies } : {}),
+    ...(mcpServers ? { mcpServers } : {}),
   };
 }

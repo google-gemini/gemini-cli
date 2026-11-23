@@ -14,8 +14,10 @@ import {
   type MockedFunction,
 } from 'vitest';
 import * as fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import React from 'react';
 import {
   getErrorMessage,
@@ -108,6 +110,58 @@ function hooksFileContent(hook: HookOptions): string {
       ],
     },
   });
+}
+
+function agentFile(body: string): string {
+  return [
+    '---',
+    'name: release-helper',
+    'description: Helps with releases',
+    'mcp_servers:',
+    '  tracker:',
+    '    command: node',
+    '    args:',
+    '      - ${extensionPath}/servers/tracker.js',
+    '    trust: true',
+    '---',
+    body,
+  ].join('\n');
+}
+
+/** The MCP server layout of the `mcp-server` extension template. */
+const MCP_TEMPLATE_MANIFEST = {
+  mcpServers: {
+    nodeServer: {
+      command: 'node',
+      args: ['${extensionPath}${/}example.js'],
+      cwd: '${extensionPath}',
+    },
+  },
+};
+
+/** Runs git with a fixed identity and without the user's git settings. */
+function runGit(cwd: string, ...args: string[]): void {
+  execFileSync(
+    'git',
+    [
+      '-c',
+      'user.name=Test',
+      '-c',
+      'user.email=test@example.com',
+      '-c',
+      'commit.gpgsign=false',
+      ...args,
+    ],
+    {
+      cwd,
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        GIT_CONFIG_GLOBAL: os.devNull,
+        GIT_CONFIG_NOSYSTEM: '1',
+      },
+    },
+  );
 }
 
 describe('extension update consent', () => {
@@ -609,22 +663,6 @@ describe('extension update consent', () => {
   });
 
   describe('sub-agents, custom commands, and policies', () => {
-    function agentFile(body: string): string {
-      return [
-        '---',
-        'name: release-helper',
-        'description: Helps with releases',
-        'mcp_servers:',
-        '  tracker:',
-        '    command: node',
-        '    args:',
-        '      - ${extensionPath}/servers/tracker.js',
-        '    trust: true',
-        '---',
-        body,
-      ].join('\n');
-    }
-
     it('asks for consent when a sub-agent with MCP servers is added, and shows its trust setting', async () => {
       const installed = await installVersion1({});
       writeSource({
@@ -735,6 +773,94 @@ describe('extension update consent', () => {
 
       expect(consentText()).toContain(
         '  * Policies: `policies/release.toml` changed',
+      );
+    });
+  });
+
+  describe('MCP servers', () => {
+    it('does not ask for consent when only the version of the MCP server template changes', async () => {
+      const files = { 'example.js': 'console.log("server");' };
+      const installed = await installVersion1({
+        manifest: MCP_TEMPLATE_MANIFEST,
+        files,
+      });
+      writeSource({ version: '1.0.1', manifest: MCP_TEMPLATE_MANIFEST, files });
+
+      expect(await settleUpdate(installed)).toBe('applied');
+      expect(requestConsent).not.toHaveBeenCalled();
+    });
+
+    it('asks for consent again when the script of an MCP server changes', async () => {
+      const installed = await installVersion1({
+        manifest: MCP_TEMPLATE_MANIFEST,
+        files: { 'example.js': 'console.log("v1");' },
+      });
+      writeSource({
+        version: '1.0.1',
+        manifest: MCP_TEMPLATE_MANIFEST,
+        files: { 'example.js': 'console.log("v2");' },
+      });
+
+      await settleUpdate(installed);
+
+      const text = consentText();
+      expect(text).toContain(
+        '  * nodeServer (local): node ${extensionPath}/example.js\n    Working directory: ${extensionPath}',
+      );
+      expect(text).toContain('    Files used: `example.js`');
+      expect(text).toContain('  * MCP servers: `example.js` changed');
+    });
+  });
+
+  describe('whole extension', () => {
+    it('does not ask for consent for a version-only update when every kind of content is present', async () => {
+      const options: Omit<SourceOptions, 'version'> = {
+        manifest: MCP_TEMPLATE_MANIFEST,
+        hookCommand: ON_START_COMMAND,
+        context: 'Follow @./docs/rules.md',
+        skillBody: 'body',
+        files: {
+          'example.js': 'console.log("server");',
+          'scripts/on-start.js': 'console.log("start");',
+          'docs/rules.md': 'rules',
+          'agents/release-helper.md': agentFile('Help with releases.'),
+          'servers/tracker.js': 'tracker',
+          'commands/release/notes.toml': 'prompt = "notes"',
+          'policies/release.toml': '# release policy',
+        },
+      };
+      const installed = await installVersion1(options);
+      writeSource({ version: '1.0.1', ...options });
+
+      expect(await settleUpdate(installed)).toBe('applied');
+      expect(requestConsent).not.toHaveBeenCalled();
+    });
+
+    it('asks for consent again when a hook command changes in an update from a git repository', async () => {
+      const repoDir = path.join(tempHomeDir, 'remote', 'repo.git');
+      fs.mkdirSync(repoDir, { recursive: true });
+      runGit(repoDir, 'init', '--bare', '--initial-branch=main');
+      const publish = (options: SourceOptions) => {
+        writeSource(options);
+        runGit(sourceDir, 'init', '--initial-branch=main');
+        runGit(sourceDir, 'add', '-A');
+        runGit(sourceDir, 'commit', '-m', `Version ${options.version}`);
+        runGit(sourceDir, 'push', '--force', repoDir, 'HEAD:main');
+      };
+
+      publish({ version: '1.0.0', hookCommand: HOOK_V1 });
+      await extensionManager.loadExtensions();
+      const installed = await extensionManager.installOrUpdateExtension({
+        source: pathToFileURL(repoDir).href,
+        type: 'git',
+      });
+      requestConsent.mockClear();
+      publish({ version: '1.0.1', hookCommand: HOOK_V2 });
+
+      await settleUpdate(installed);
+
+      expect(consentText()).toContain(
+        '  * Hooks: new or changed `SessionStart: echo hook-v2-changed`',
       );
     });
   });

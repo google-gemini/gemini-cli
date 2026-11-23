@@ -32,6 +32,7 @@ import type {
   FilesSummary,
   HookSummary,
   HooksSummary,
+  McpServerSummary,
   ReferencedPath,
   SkillsSummary,
 } from './extensionContentSummary.js';
@@ -570,6 +571,25 @@ function referenceHashes(
   );
 }
 
+function mcpServerHashes(
+  servers: ReadonlyArray<[string, McpServerSummary]> | undefined,
+): Map<string, string> {
+  return new Map(
+    (servers ?? []).map(([name, server]) => [
+      name,
+      getMcpServerConfigHash(escapeAnsiCtrlCodes(server.config)),
+    ]),
+  );
+}
+
+function mcpReferenceHashes(
+  servers: ReadonlyArray<[string, McpServerSummary]> | undefined,
+): Map<string, string> {
+  return referenceHashes(
+    (servers ?? []).flatMap(([, server]) => server.referencedPaths),
+  );
+}
+
 function hookKey(hook: HookSummary): string {
   return JSON.stringify([
     hook.eventName,
@@ -656,6 +676,16 @@ function describeContentChanges(
         fileHashes(previous.policies?.files ?? []),
         fileHashes(current.policies?.files ?? []),
       ),
+      ...describeItemChanges(
+        'MCP servers',
+        mcpServerHashes(previous.mcpServers),
+        mcpServerHashes(current.mcpServers),
+      ),
+      ...describeItemChanges(
+        'MCP servers',
+        mcpReferenceHashes(previous.mcpServers),
+        mcpReferenceHashes(current.mcpServers),
+      ),
     ]),
   ];
 }
@@ -679,6 +709,15 @@ async function extensionConsentString(
     : undefined;
   const output: string[] = [];
   const mcpServerEntries = Object.entries(sanitizedConfig.mcpServers || {});
+  // With a summary, MCP servers show their values as written in the manifest.
+  const rawMcpServers = contentSummary?.mcpServers;
+  const mcpServers = rawMcpServers
+    ? rawMcpServers.map(([name, server]): [string, MCPServerConfig] => [
+        name,
+        escapeAnsiCtrlCodes(server.config),
+      ])
+    : mcpServerEntries;
+  const mcpServerFiles = new Map(rawMcpServers ?? []);
 
   if (wasMigrated) {
     if (previousName && previousName !== sanitizedConfig.name) {
@@ -702,9 +741,9 @@ async function extensionConsentString(
     output.push(`Installing extension "${sanitizedConfig.name}".`);
   }
 
-  if (mcpServerEntries.length) {
+  if (mcpServers.length) {
     output.push('This extension will run the following MCP servers:');
-    for (const [key, mcpServer] of mcpServerEntries) {
+    for (const [key, mcpServer] of mcpServers) {
       const isLocal = !!mcpServer.command;
       const source =
         mcpServer.httpUrl ??
@@ -787,6 +826,13 @@ async function extensionConsentString(
         }
       }
       output.push(`    Config signature: ${getMcpServerConfigHash(mcpServer)}`);
+      const serverFiles = mcpServerFiles.get(key);
+      if (serverFiles?.filesSignature) {
+        output.push(
+          `    Files used: ${serverFiles.referencedPaths.map(formatReferencedPath).join(', ')}`,
+        );
+        output.push(`    Files signature: ${serverFiles.filesSignature}`);
+      }
     }
   }
   if (sanitizedConfig.contextFileName) {
