@@ -13,7 +13,11 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
-import { WebSearchTool, type WebSearchToolParams } from './web-search.js';
+import {
+  WebSearchTool,
+  WEB_SEARCH_TIMEOUT_MS,
+  type WebSearchToolParams,
+} from './web-search.js';
 import type { Config } from '../config/config.js';
 import { GeminiClient } from '../core/client.js';
 import { ToolErrorType } from './tool-error.js';
@@ -272,6 +276,101 @@ Sources:
         'Search results for "multibyte query" returned.',
       );
       expect(result.sources).toHaveLength(3);
+    });
+
+    describe('time limit and cancellation', () => {
+      const neverSettles = () => new Promise<never>(() => {});
+
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('should return a timeout error when the search request never settles', async () => {
+        const params: WebSearchToolParams = { query: 'stalled query' };
+        // A request that never answers and ignores its abort signal.
+        (mockGeminiClient.generateContent as Mock).mockImplementation(
+          neverSettles,
+        );
+
+        const invocation = tool.build(params);
+        const resultPromise = invocation.execute({ abortSignal });
+        await vi.advanceTimersByTimeAsync(WEB_SEARCH_TIMEOUT_MS);
+        const result = await resultPromise;
+
+        expect(result.error?.type).toBe(ToolErrorType.WEB_SEARCH_FAILED);
+        expect(result.llmContent).toBe(
+          `Error: Web search for query "stalled query" timed out after ${
+            WEB_SEARCH_TIMEOUT_MS / 1000
+          } seconds.`,
+        );
+        expect(result.returnDisplay).toBe('Web search timed out.');
+      });
+
+      it('should abort the underlying request when the time limit is reached', async () => {
+        const params: WebSearchToolParams = { query: 'slow query' };
+        (mockGeminiClient.generateContent as Mock).mockImplementation(
+          neverSettles,
+        );
+
+        const invocation = tool.build(params);
+        const resultPromise = invocation.execute({ abortSignal });
+        const requestSignal = vi.mocked(mockGeminiClient.generateContent).mock
+          .calls[0][2];
+
+        await vi.advanceTimersByTimeAsync(WEB_SEARCH_TIMEOUT_MS - 1);
+        expect(requestSignal.aborted).toBe(false);
+
+        await vi.advanceTimersByTimeAsync(1);
+        expect(requestSignal.aborted).toBe(true);
+        await resultPromise;
+      });
+
+      it('should not leave a timer behind when the search completes in time', async () => {
+        const params: WebSearchToolParams = { query: 'fast query' };
+        (mockGeminiClient.generateContent as Mock).mockResolvedValue({
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'Here are your results.' }],
+              },
+            },
+          ],
+        });
+
+        const invocation = tool.build(params);
+        const result = await invocation.execute({ abortSignal });
+
+        expect(result.error).toBeUndefined();
+        expect(result.returnDisplay).toBe(
+          'Search results for "fast query" returned.',
+        );
+        expect(vi.getTimerCount()).toBe(0);
+      });
+
+      it('should report a cancellation, not a timeout, when the user aborts', async () => {
+        const params: WebSearchToolParams = { query: 'cancelled query' };
+        const controller = new AbortController();
+        (mockGeminiClient.generateContent as Mock).mockImplementation(
+          neverSettles,
+        );
+
+        const invocation = tool.build(params);
+        const resultPromise = invocation.execute({
+          abortSignal: controller.signal,
+        });
+        controller.abort();
+        const result = await resultPromise;
+
+        expect(result.llmContent).toBe('Web search was cancelled.');
+        expect(result.returnDisplay).toBe('Search cancelled.');
+        expect(result.error).toBeUndefined();
+        expect(vi.getTimerCount()).toBe(0);
+      });
     });
   });
 });

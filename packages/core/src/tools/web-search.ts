@@ -18,6 +18,8 @@ import {
 import { ToolErrorType } from './tool-error.js';
 
 import { getErrorMessage, isAbortError } from '../utils/errors.js';
+import { abortable } from '../utils/abortable.js';
+import { DeadlineTimer } from '../utils/deadlineTimer.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WEB_SEARCH_DEFINITION } from './definitions/coreTools.js';
@@ -47,6 +49,13 @@ interface GroundingSupportItem {
   groundingChunkIndices?: number[];
   confidenceScores?: number[]; // Optional as per example
 }
+
+/**
+ * Upper bound for one web search, covering every retry of the underlying
+ * request. Without it, a request that stalls or keeps being retried leaves the
+ * agent waiting on this tool call until the user cancels it.
+ */
+export const WEB_SEARCH_TIMEOUT_MS = 60_000;
 
 /**
  * Parameters for the WebSearchTool.
@@ -91,12 +100,28 @@ class WebSearchToolInvocation extends BaseToolInvocation<
   }: ExecuteOptions): Promise<WebSearchToolResult> {
     const geminiClient = this.context.geminiClient;
 
+    // One deadline covers the whole search, retries included. The combined
+    // signal cancels the request and its retry waits, and `abortable` returns
+    // control at the deadline even if a lower layer ignores the signal.
+    const deadlineTimer = new DeadlineTimer(
+      WEB_SEARCH_TIMEOUT_MS,
+      'Web search timed out.',
+    );
+    /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+    const combinedSignal = (
+      AbortSignal as unknown as { any: (signals: AbortSignal[]) => AbortSignal }
+    ).any([signal, deadlineTimer.signal]);
+    /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
+
     try {
-      const response = await geminiClient.generateContent(
-        { model: 'web-search' },
-        [{ role: 'user', parts: [{ text: this.params.query }] }],
-        signal,
-        LlmRole.UTILITY_TOOL,
+      const response = await abortable(
+        geminiClient.generateContent(
+          { model: 'web-search' },
+          [{ role: 'user', parts: [{ text: this.params.query }] }],
+          combinedSignal,
+          LlmRole.UTILITY_TOOL,
+        ),
+        combinedSignal,
       );
 
       const responseText = getResponseText(response);
@@ -179,6 +204,22 @@ class WebSearchToolInvocation extends BaseToolInvocation<
         sources,
       };
     } catch (error: unknown) {
+      // If the user cancelled as well, report the cancellation instead.
+      const timedOut = deadlineTimer.signal.aborted && !signal.aborted;
+      if (timedOut) {
+        const timeoutMessage = `Web search for query "${
+          this.params.query
+        }" timed out after ${WEB_SEARCH_TIMEOUT_MS / 1000} seconds.`;
+        debugLogger.warn(timeoutMessage);
+        return {
+          llmContent: `Error: ${timeoutMessage}`,
+          returnDisplay: 'Web search timed out.',
+          error: {
+            message: timeoutMessage,
+            type: ToolErrorType.WEB_SEARCH_FAILED,
+          },
+        };
+      }
       if (isAbortError(error)) {
         return {
           llmContent: 'Web search was cancelled.',
@@ -197,6 +238,9 @@ class WebSearchToolInvocation extends BaseToolInvocation<
           type: ToolErrorType.WEB_SEARCH_FAILED,
         },
       };
+    } finally {
+      // Clear the pending timer, which would otherwise keep the process alive.
+      deadlineTimer.abort();
     }
   }
 }

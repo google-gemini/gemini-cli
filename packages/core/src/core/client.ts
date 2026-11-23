@@ -1234,6 +1234,7 @@ export class GeminiClient {
         maxAttempts: availabilityMaxAttempts,
         retryFetchErrors: this.config.getRetryFetchErrors(),
         getAvailabilityContext,
+        signal: abortSignal,
         onRetry: (attempt, error, delayMs) => {
           const actualMaxAttempts =
             getAvailabilityContext()?.policy.maxAttempts ??
