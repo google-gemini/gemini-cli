@@ -22,13 +22,14 @@ export function abortable<T>(
   promise: Promise<T>,
   signal: AbortSignal,
 ): Promise<T> {
+  if (signal.aborted) {
+    promise.catch(() => {});
+    return Promise.reject(createAbortError());
+  }
+
   return new Promise<T>((resolve, reject) => {
     const onAbort = () => reject(createAbortError());
-    if (signal.aborted) {
-      onAbort();
-    } else {
-      signal.addEventListener('abort', onAbort, { once: true });
-    }
+    signal.addEventListener('abort', onAbort, { once: true });
 
     promise
       .finally(() => signal.removeEventListener('abort', onAbort))
