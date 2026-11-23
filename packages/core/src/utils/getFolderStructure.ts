@@ -100,8 +100,10 @@ async function readFullStructure(
 
     if (currentItemCount >= options.maxItems) {
       // If the root itself caused us to exceed, we can't really show anything.
-      // Otherwise, this folder won't be processed further.
-      // The parent that queued this would have set its own hasMoreSubfolders flag.
+      // Otherwise, this folder won't be processed further, so mark it here: the parent
+      // only sets its own hasMoreSubfolders flag when it skipped a *following* entry,
+      // which leaves the last folder whose contents were never scanned looking empty.
+      folderInfo.hasMoreSubfolders = true;
       continue;
     }
 

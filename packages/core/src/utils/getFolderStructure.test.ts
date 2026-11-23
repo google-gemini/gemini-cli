@@ -148,12 +148,13 @@ ${testRootDir}${path.sep}
       maxItems: 3,
     });
     const expected = `
-Showing up to 3 items (files + folders).
+Showing up to 3 items (files + folders). Folders or files indicated with ... contain more items not shown, were ignored, or the display limit (3 items) was reached.
 
 ${testRootDir}${path.sep}
 ├───fileA1.ts
 ├───fileA2.js
 └───subfolderB${path.sep}
+    └───...
 `.trim();
     expect(structure.trim()).toBe(expected);
   });
@@ -171,9 +172,13 @@ Showing up to 4 items (files + folders). Folders or files indicated with ... con
 
 ${testRootDir}${path.sep}
 ├───folder-0${path.sep}
+│   └───...
 ├───folder-1${path.sep}
+│   └───...
 ├───folder-2${path.sep}
+│   └───...
 ├───folder-3${path.sep}
+│   └───...
 └───...
 `.trim();
     expect(structure.trim()).toBe(expectedRevised);
@@ -231,12 +236,13 @@ ${testRootDir}${path.sep}
       maxItems: 3,
     });
     const expected = `
-Showing up to 3 items (files + folders).
+Showing up to 3 items (files + folders). Folders or files indicated with ... contain more items not shown, were ignored, or the display limit (3 items) was reached.
 
 ${testRootDir}${path.sep}
 └───level1${path.sep}
     └───level2${path.sep}
         └───level3${path.sep}
+            └───...
 `.trim();
     expect(structure.trim()).toBe(expected);
   });
