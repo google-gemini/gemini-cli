@@ -18,6 +18,27 @@ import type {
   CommandExecutionResponse,
 } from './types.js';
 
+/**
+ * Resolves a checkpoint file name against the checkpoint directory. Returns
+ * `undefined` if the resolved path is not inside that directory.
+ */
+function resolveCheckpointPath(
+  checkpointDir: string,
+  fileName: string,
+): string | undefined {
+  if (fileName.includes('\0')) {
+    return undefined;
+  }
+  const resolvedBase = path.resolve(checkpointDir);
+  const resolvedTarget = path.resolve(resolvedBase, fileName);
+  // The trailing separator also rules out the directory itself and siblings
+  // that merely share its prefix, such as "checkpoints-old".
+  if (!resolvedTarget.startsWith(resolvedBase + path.sep)) {
+    return undefined;
+  }
+  return resolvedTarget;
+}
+
 export class RestoreCommand implements Command {
   readonly name = 'restore';
   readonly description =
@@ -50,7 +71,18 @@ export class RestoreCommand implements Command {
         : `${argsStr}.json`;
 
       const checkpointDir = config.storage.getProjectTempCheckpointsDir();
-      const filePath = path.join(checkpointDir, selectedFile);
+      const filePath = resolveCheckpointPath(checkpointDir, selectedFile);
+      if (!filePath) {
+        return {
+          name: this.name,
+          data: {
+            type: 'message',
+            messageType: 'error',
+            content:
+              'Invalid checkpoint name: the checkpoint file must be inside the checkpoint directory.',
+          },
+        };
+      }
 
       let data: string;
       try {

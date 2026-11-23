@@ -48,6 +48,11 @@ import { requestStorage } from '../http/requestStorage.js';
 import { pushTaskStateFailed } from '../utils/executor_utils.js';
 
 function validateWorkspacePath(workspacePath?: string): string {
+  // The value comes from client requests or persisted task state, so the
+  // declared type is not guaranteed at runtime.
+  if (workspacePath != null && typeof workspacePath !== 'string') {
+    throw new Error('Invalid workspace path: expected a string.');
+  }
   const trimmed = workspacePath?.trim();
   if (!trimmed) {
     return process.env['CODER_AGENT_WORKSPACE_PATH'] ?? process.cwd();
@@ -238,9 +243,15 @@ export class CoderAgentExecutor implements AgentExecutor {
     agentSettingsInput?: AgentSettings,
     eventBus?: ExecutionEventBus,
   ): Promise<TaskWrapper> {
-    const agentSettings: AgentSettings = agentSettingsInput || {
+    // agentSettingsInput can come straight from an HTTP request body
+    // (POST /tasks), so it gets the same treatment as settings read from
+    // message metadata or persisted state.
+    const agentSettings: AgentSettings = {
       kind: CoderAgentEvent.StateAgentSettingsEvent,
-      workspacePath: process.cwd(),
+      ...(agentSettingsInput ?? {}),
+      workspacePath: validateWorkspacePath(agentSettingsInput?.workspacePath),
+      // Strip client-supplied isTrusted so setIsTrusted() evaluates server-side trust.
+      isTrusted: undefined,
     };
     return this.runInIsolatedEnv(
       agentSettings,

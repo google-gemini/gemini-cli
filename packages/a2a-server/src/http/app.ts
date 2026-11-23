@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import express, { type Request } from 'express';
+import express from 'express';
 
 import type { AgentCard, Message } from '@a2a-js/sdk';
 import {
@@ -13,15 +13,20 @@ import {
   InMemoryTaskStore,
   DefaultExecutionEventBus,
   type AgentExecutionEvent,
-  UnauthenticatedUser,
 } from '@a2a-js/sdk/server';
-import { A2AExpressApp, type UserBuilder } from '@a2a-js/sdk/server/express'; // Import server components
+import { A2AExpressApp } from '@a2a-js/sdk/server/express'; // Import server components
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
 import type { AgentSettings } from '../types.js';
 import { GCSTaskStore, NoOpTaskStore } from '../persistence/gcs.js';
 import { CoderAgentExecutor } from '../agent/executor.js';
 import { requestStorage } from './requestStorage.js';
+import {
+  createAuthMiddleware,
+  createUserBuilder,
+  requireLoopbackRequest,
+  resolveAuthSecret,
+} from './auth.js';
 import { loadConfig, loadEnvironment, setTargetDir } from '../config/config.js';
 import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
@@ -63,12 +68,8 @@ const coderAgentCard: AgentCard = {
       type: 'http',
       scheme: 'bearer',
     },
-    basicAuth: {
-      type: 'http',
-      scheme: 'basic',
-    },
   },
-  security: [{ bearerAuth: [] }, { basicAuth: [] }],
+  security: [{ bearerAuth: [] }],
   defaultInputModes: ['text'],
   defaultOutputModes: ['text'],
   skills: [
@@ -92,35 +93,6 @@ const coderAgentCard: AgentCard = {
 export function updateCoderAgentCardUrl(port: number) {
   coderAgentCard.url = `http://localhost:${port}/`;
 }
-
-const customUserBuilder: UserBuilder = async (req: Request) => {
-  const auth = req.headers['authorization'];
-  if (auth) {
-    const scheme = auth.split(' ')[0];
-    logger.info(
-      `[customUserBuilder] Received Authorization header with scheme: ${scheme}`,
-    );
-  }
-  if (!auth) return new UnauthenticatedUser();
-
-  // 1. Bearer Auth
-  if (auth.startsWith('Bearer ')) {
-    const token = auth.substring(7);
-    if (token === 'valid-token') {
-      return { userName: 'bearer-user', isAuthenticated: true };
-    }
-  }
-
-  // 2. Basic Auth
-  if (auth.startsWith('Basic ')) {
-    const credentials = Buffer.from(auth.substring(6), 'base64').toString();
-    if (credentials === 'admin:password') {
-      return { userName: 'basic-user', isAuthenticated: true };
-    }
-  }
-
-  return new UnauthenticatedUser();
-};
 
 async function handleExecuteCommand(
   req: express.Request,
@@ -196,6 +168,15 @@ async function handleExecuteCommand(
 
 export async function createApp() {
   try {
+    // The auth token is read once from the process environment, before any
+    // workspace configuration or .env file is loaded.
+    const authSecret = resolveAuthSecret();
+    if (!authSecret) {
+      logger.error(
+        '[CoreAgent] No authentication secret is configured, so every request will be rejected. Set GEMINI_IPC_SECRET or CODER_AGENT_AUTH_TOKEN and restart the server.',
+      );
+    }
+
     // Load the server configuration once on startup.
     const workspaceRoot = await setTargetDir(undefined);
 
@@ -274,17 +255,26 @@ export async function createApp() {
     );
 
     let expressApp = express();
+    // Header validation and authentication run before the body is parsed and
+    // before every route, including the ones the A2A SDK registers below.
+    expressApp.use(requireLoopbackRequest);
+    expressApp.use(createAuthMiddleware(authSecret));
     expressApp.use((req, res, next) => {
       requestStorage.run({ req }, next);
     });
     expressApp.use(express.json());
 
-    const appBuilder = new A2AExpressApp(requestHandler, customUserBuilder);
+    const appBuilder = new A2AExpressApp(
+      requestHandler,
+      createUserBuilder(authSecret),
+    );
     expressApp = appBuilder.setupRoutes(expressApp, '');
 
     expressApp.post('/tasks', async (req, res) => {
       try {
         const taskId = uuidv4();
+        // createTask() validates workspacePath and ignores isTrusted: workspace
+        // trust is evaluated from server-side configuration.
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const agentSettings = req.body?.agentSettings as
           | AgentSettings

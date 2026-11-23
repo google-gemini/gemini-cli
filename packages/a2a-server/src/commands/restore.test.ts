@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as path from 'node:path';
 import { RestoreCommand, ListCheckpointsCommand } from './restore.js';
 import type { CommandContext } from './types.js';
 import type { Config } from '@google/gemini-cli-core';
@@ -103,6 +104,56 @@ describe('RestoreCommand', () => {
     const result = await command.execute(mockConfig, ['checkpoint1.json']);
     expect((result.data as { content: string }).content).toContain(
       'An unexpected error occurred during restore.',
+    );
+  });
+
+  describe('checkpoint path validation', () => {
+    const checkpointDir =
+      mockConfig.config.storage.getProjectTempCheckpointsDir();
+
+    it.each([
+      '../outside-dir/file.json',
+      '../outside.json',
+      // A sibling directory whose name starts with the checkpoint directory's
+      // name.
+      `../${path.basename(checkpointDir)}-other/checkpoint1.json`,
+      'nested/../../outside.json',
+      '/outside-dir/file.json',
+      path.join(path.dirname(checkpointDir), 'outside.json'),
+      'checkpoint1\0.json',
+    ])('should reject %j without reading any file', async (checkpointName) => {
+      const command = new RestoreCommand();
+
+      const result = await command.execute(mockConfig, [checkpointName]);
+
+      expect(result.data).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content:
+          'Invalid checkpoint name: the checkpoint file must be inside the checkpoint directory.',
+      });
+      expect(mockFs.readFile).not.toHaveBeenCalled();
+      expect(mockPerformRestore).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['checkpoint1', 'checkpoint1.json'],
+      ['checkpoint1.json', 'checkpoint1.json'],
+      ['nested/../checkpoint1.json', 'checkpoint1.json'],
+    ])(
+      'should read %j from inside the checkpoint directory',
+      async (checkpointName, expectedFile) => {
+        const command = new RestoreCommand();
+        mockFs.readFile.mockResolvedValue('invalid json');
+
+        await command.execute(mockConfig, [checkpointName]);
+
+        expect(mockFs.readFile).toHaveBeenCalledTimes(1);
+        expect(mockFs.readFile).toHaveBeenCalledWith(
+          path.join(checkpointDir, expectedFile),
+          'utf-8',
+        );
+      },
     );
   });
 });
