@@ -28,6 +28,7 @@ import type { ExtensionManager } from '../../config/extension-manager.js';
 type ConfirmationRequestWrapper = {
   prompt: React.ReactNode;
   onConfirm: (confirmed: boolean) => void;
+  defaultToNo?: boolean;
 };
 
 type ConfirmationRequestAction =
@@ -55,8 +56,9 @@ export const useConfirmUpdateRequests = () => {
   ] = useReducer(confirmationRequestsReducer, []);
   const addConfirmUpdateExtensionRequest = useCallback(
     (original: ConfirmationRequest) => {
-      const wrappedRequest = {
+      const wrappedRequest: ConfirmationRequestWrapper = {
         prompt: original.prompt,
+        ...(original.defaultToNo ? { defaultToNo: true } : {}),
         onConfirm: (confirmed: boolean) => {
           // Remove it from the outstanding list of requests by identity.
           dispatchConfirmUpdateExtensionRequests({

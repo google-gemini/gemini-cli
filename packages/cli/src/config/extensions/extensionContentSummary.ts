@@ -8,7 +8,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import {
   loadAgentsFromDirectory,
-  loadSkillsFromDir,
+  loadSkillFromFile,
   processImports,
   type MCPServerConfig,
 } from '@google/gemini-cli-core';
@@ -18,8 +18,13 @@ import {
   compareCodeUnits,
   computeContentSignature,
   ContentMarker,
+  sha256,
   type ContentEntry,
 } from './contentSignature.js';
+import {
+  EXTENSION_SETTINGS_FILENAME,
+  INSTALL_METADATA_FILENAME,
+} from './variables.js';
 
 /** A path that a command or variable references through `${extensionPath}`. */
 export interface ReferencedPath {
@@ -87,6 +92,24 @@ export interface ExtensionContentSummary {
   policies?: FilesSummary;
   /** MCP servers of `gemini-extension.json`, in file order. */
   mcpServers?: Array<[string, McpServerSummary]>;
+  /** Settings of `gemini-extension.json`, in file order. */
+  settings?: SettingSummary[];
+  /** `plan.directory` of `gemini-extension.json`, as written. */
+  planDirectory?: string;
+  /**
+   * Every file in the folder, so a change to any of them shows. `.git` folders
+   * and the files that Gemini CLI writes there are left out, and
+   * `gemini-extension.json` is hashed without its `version`.
+   */
+  extensionFiles?: FilesSummary;
+}
+
+/** One setting from `gemini-extension.json`, with its values as written. */
+export interface SettingSummary {
+  name: string;
+  /** The environment variable that the setting's value is passed in. */
+  envVar: string;
+  sensitive: boolean;
 }
 
 /** One MCP server from `gemini-extension.json`. */
@@ -96,7 +119,7 @@ export interface McpServerSummary {
    * `/`, so the values don't depend on where the folder is.
    */
   config: MCPServerConfig;
-  /** Paths that the command, args, and env values reference. */
+  /** Paths that the command, args, cwd, and env values reference. */
   referencedPaths: ReferencedPath[];
   /** Signature of the referenced paths, when there are any. */
   filesSignature?: string;
@@ -156,14 +179,31 @@ export interface SkillsSummary {
 export interface ExtensionContentSources {
   /** Context files that exist, as returned by `resolveContextFilePaths`. */
   contextFilePaths?: readonly string[];
+  /**
+   * Whether to summarize every file of the folder (default `true`). Linked
+   * extensions skip it: they run their source folder as it is and never
+   * update, and that folder can be large.
+   */
+  includeAllFiles?: boolean;
 }
 
 const EXTENSION_PATH_VARIABLE = '${extensionPath}';
 const PATH_SEPARATOR_VARIABLES = /\$\{(?:\/|pathSeparator)\}/g;
 const PATH_END = /[\s"'`;|&<>(),:$]/;
+/** Ends a path that follows a quote, along with the matching quote. */
+const QUOTED_PATH_END = /[\r\n`;,:$]/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const HOOKS_FILE = 'hooks/hooks.json';
 const MANIFEST_FILE = 'gemini-extension.json';
+const SKILL_FILE = 'SKILL.md';
+/** Files that Gemini CLI writes in an installed extension folder. */
+const CLI_FILES: ReadonlySet<string> = new Set([
+  INSTALL_METADATA_FILENAME,
+  EXTENSION_SETTINGS_FILENAME,
+]);
+/** Platforms where the skill loader's glob matches names in any case. */
+const CASE_INSENSITIVE_GLOB =
+  process.platform === 'darwin' || process.platform === 'win32';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -190,7 +230,7 @@ function asText(value: unknown): string | undefined {
 }
 
 /** Returns true for a link that leaves the extension folder or is broken. */
-function isUnresolvedLink(entry: ContentEntry): boolean {
+export function isUnresolvedLink(entry: ContentEntry): boolean {
   return (
     entry.type === 'link' &&
     (entry.value === ContentMarker.Outside ||
@@ -222,15 +262,20 @@ function hasListedFiles(files: readonly ContentEntry[]): boolean {
   return files.some((entry) => entry.value !== ContentMarker.Directory);
 }
 
-/** Values of an MCP server that can reference files: command, args, and env. */
+/**
+ * Values of an MCP server that can reference files: command, args, the working
+ * directory, and env.
+ */
 export function mcpServerValues(server: {
   command?: unknown;
   args?: unknown;
+  cwd?: unknown;
   env?: unknown;
 }): string[] {
   const values: unknown[] = [
     server.command,
     ...toArray(server.args),
+    server.cwd,
     ...(isRecord(server.env) ? Object.values(server.env) : []),
   ];
   return values.filter((value): value is string => typeof value === 'string');
@@ -285,7 +330,10 @@ function toReferencedPath(suffix: string): Omit<ReferencedPath, 'signature'> {
 /**
  * Finds the paths that `values` reference through `${extensionPath}`, sorted
  * by UTF-16 code units. `${/}` and `${pathSeparator}` count as `/`, and each
- * path ends at whitespace, a quote, or a shell operator.
+ * path ends at whitespace, a quote, or a shell operator. A path that follows a
+ * quote ends at the matching quote instead, so it can contain spaces and shell
+ * operators. Every path ends at a line break, `$`, a backtick, or a list
+ * separator (`:`, `;`, `,`).
  */
 export function findReferencedPaths(
   values: readonly string[],
@@ -295,8 +343,15 @@ export function findReferencedPaths(
     const text = value.replace(PATH_SEPARATOR_VARIABLES, '/');
     let start = text.indexOf(EXTENSION_PATH_VARIABLE);
     while (start !== -1) {
+      const before = text.charAt(start - 1);
+      const quote = before === '"' || before === "'" ? before : undefined;
+      const pathEnd = quote ? QUOTED_PATH_END : PATH_END;
       let end = start + EXTENSION_PATH_VARIABLE.length;
-      while (end < text.length && !PATH_END.test(text[end])) {
+      while (
+        end < text.length &&
+        text[end] !== quote &&
+        !pathEnd.test(text[end])
+      ) {
         end++;
       }
       const reference = toReferencedPath(
@@ -488,6 +543,12 @@ async function summarizeContextFiles(
       rootDir,
       'tree',
     );
+    // processImports returns a finite tree: it stops at depth 5, skips files
+    // that are already in the current import chain, and creates a new node
+    // for each import, so this loop ends after visiting each node once. A
+    // file can appear more than once, for example as a leaf where the depth
+    // limit cuts a chain and again with its own imports, so skipping paths
+    // that were already seen would drop those imports.
     const pending = [...(importTree.imports ?? [])];
     for (let node = pending.pop(); node; node = pending.pop()) {
       imported.add(toRelative(node.path));
@@ -509,37 +570,65 @@ async function summarizeContextFiles(
 }
 
 /**
+ * Returns true for the files that `loadSkillsFromDir` loads from `skills/`:
+ * `SKILL.md` and `<folder>/SKILL.md`, where its glob skips hidden folders and
+ * `node_modules`.
+ */
+function isSkillFile(relativePath: string): boolean {
+  const parts = relativePath.split('/');
+  if (parts[0] !== 'skills' || parts.length < 2 || parts.length > 3) {
+    return false;
+  }
+  const fileName = parts[parts.length - 1];
+  const isSkillName = CASE_INSENSITIVE_GLOB
+    ? fileName.toLowerCase() === SKILL_FILE.toLowerCase()
+    : fileName === SKILL_FILE;
+  const folder = parts.length === 3 ? parts[1] : '';
+  return isSkillName && !folder.startsWith('.') && folder !== 'node_modules';
+}
+
+/**
  * Summarizes the skills that `loadSkillsFromDir` finds under `skills/`, with
  * paths relative to the extension folder and a signature over every file of
- * that folder.
+ * that folder. The loader follows links, so the skills are read here only from
+ * the `SKILL.md` files that were hashed inside the extension folder; links that
+ * leave it or are broken stay in `files` with a marker and aren't read.
  */
 async function summarizeSkills(
   rootDir: string,
 ): Promise<SkillsSummary | undefined> {
-  const definitions = await loadSkillsFromDir(path.join(rootDir, 'skills'));
-  if (!Array.isArray(definitions) || definitions.length === 0) {
-    return undefined;
-  }
   const files = (await collectContentEntries(rootDir, 'skills')) ?? [];
   const skills: SkillSummary[] = [];
-  for (const definition of definitions) {
-    const location = toRelativePath(rootDir, definition.location);
-    const folder = path.posix.dirname(location);
+  for (const entry of files) {
+    if (!isSkillFile(entry.path) || !SHA256_PATTERN.test(entry.value)) {
+      continue;
+    }
+    const definition = await loadSkillFromFile(
+      path.join(rootDir, ...entry.path.split('/')),
+    );
+    if (!definition) {
+      continue;
+    }
+    const folder = path.posix.dirname(entry.path);
     let itemCount: number | undefined;
     try {
-      itemCount = (await fs.readdir(path.dirname(definition.location))).length;
+      itemCount = (await fs.readdir(path.join(rootDir, ...folder.split('/'))))
+        .length;
     } catch {
       // The consent text says that the items can't be counted.
     }
     skills.push({
       name: definition.name,
       description: definition.description,
-      location,
+      location: entry.path,
       ...(itemCount !== undefined ? { itemCount } : {}),
       signature: computeContentSignature(
-        files.filter((entry) => isInFolder(entry, folder)),
+        files.filter((item) => isInFolder(item, folder)),
       ),
     });
+  }
+  if (skills.length === 0 && !files.some(isUnresolvedLink)) {
+    return undefined;
   }
   skills.sort((a, b) => compareCodeUnits(a.location, b.location));
   return { skills, files, signature: computeContentSignature(files) };
@@ -583,7 +672,9 @@ async function summarizeAgents(
     }
     for (const error of loaded?.errors ?? []) {
       agents.push({
-        path: toRelativePath(rootDir, error.filePath),
+        path: error.filePath
+          ? toRelativePath(rootDir, error.filePath)
+          : 'agents',
         mcpServers: [],
       });
     }
@@ -646,13 +737,12 @@ async function summarizePolicies(
 }
 
 /**
- * Summarizes the MCP servers of the raw `gemini-extension.json`, keeping
- * `${extensionPath}` and `${workspacePath}` as written. Returns `undefined`
- * when the file can't be read, so callers can use the loaded values instead.
+ * Reads the raw `gemini-extension.json`, or returns `undefined` when it can't
+ * be read or isn't a JSON object, so callers can use the loaded values.
  */
-async function summarizeMcpServers(
+async function readManifest(
   rootDir: string,
-): Promise<Array<[string, McpServerSummary]> | undefined> {
+): Promise<Record<string, unknown> | undefined> {
   const entries = (await collectContentEntries(rootDir, MANIFEST_FILE)) ?? [];
   const content = hasReadableFile(entries, MANIFEST_FILE)
     ? await readTextFile(rootDir, MANIFEST_FILE)
@@ -660,15 +750,22 @@ async function summarizeMcpServers(
   if (content === undefined) {
     return undefined;
   }
-  let manifest: unknown;
   try {
-    manifest = JSON.parse(content);
+    const manifest: unknown = JSON.parse(content);
+    return isRecord(manifest) ? manifest : undefined;
   } catch {
     return undefined;
   }
-  if (!isRecord(manifest)) {
-    return undefined;
-  }
+}
+
+/**
+ * Summarizes the MCP servers of the raw manifest, keeping `${extensionPath}`
+ * and `${workspacePath}` as written.
+ */
+async function summarizeMcpServers(
+  rootDir: string,
+  manifest: Record<string, unknown>,
+): Promise<Array<[string, McpServerSummary]> | undefined> {
   const rawServers = resolvePathSeparators(manifest['mcpServers'] ?? {});
   if (!isMcpServerRecord(rawServers)) {
     return undefined;
@@ -695,6 +792,90 @@ async function summarizeMcpServers(
 }
 
 /**
+ * Lists the settings of the raw manifest. The extension receives each value in
+ * the setting's environment variable, in its hooks and MCP servers.
+ */
+function summarizeSettings(
+  manifest: Record<string, unknown>,
+): SettingSummary[] | undefined {
+  const settings = toArray(manifest['settings'])
+    .filter(isRecord)
+    .map((setting) => ({
+      name: asText(setting['name']) ?? '',
+      envVar: asText(setting['envVar']) ?? '',
+      sensitive: setting['sensitive'] === true,
+    }));
+  return settings.length > 0 ? settings : undefined;
+}
+
+/** Returns `plan.directory` of the raw manifest, as written. */
+function readPlanDirectory(
+  manifest: Record<string, unknown>,
+): string | undefined {
+  const plan = manifest['plan'];
+  return isRecord(plan) ? asText(plan['directory']) : undefined;
+}
+
+/** Returns the JSON of `value` with object keys sorted by code units. */
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) =>
+    isRecord(item)
+      ? Object.fromEntries(
+          Object.keys(item)
+            .sort(compareCodeUnits)
+            .map((key) => [key, item[key]]),
+        )
+      : item,
+  );
+}
+
+/**
+ * Summarizes every file in the extension folder, so an update that changes a
+ * file asks again even when nothing declares it, for example a module that a
+ * hook script imports. `.git` folders, `.gemini-extension-install.json`, and
+ * `.env` (the settings that Gemini CLI stores there) are left out. When
+ * `gemini-extension.json` is valid JSON, its entry is the hash of its content
+ * without `version`, with sorted keys, so an update that only changes the
+ * version doesn't ask again.
+ */
+async function summarizeExtensionFiles(
+  rootDir: string,
+  manifest: Record<string, unknown> | undefined,
+): Promise<FilesSummary | undefined> {
+  let names: string[];
+  try {
+    names = (await fs.readdir(rootDir)).sort(compareCodeUnits);
+  } catch {
+    return undefined;
+  }
+  const files: ContentEntry[] = [];
+  for (const name of names) {
+    if (name === '.git' || CLI_FILES.has(name)) {
+      continue;
+    }
+    for (const entry of (await collectContentEntries(rootDir, name)) ?? []) {
+      if (entry.path.split('/').includes('.git')) {
+        continue;
+      }
+      if (
+        entry.path === MANIFEST_FILE &&
+        manifest &&
+        SHA256_PATTERN.test(entry.value)
+      ) {
+        const withoutVersion = { ...manifest };
+        delete withoutVersion['version'];
+        files.push({ ...entry, value: sha256(canonicalJson(withoutVersion)) });
+      } else {
+        files.push(entry);
+      }
+    }
+  }
+  return files.length > 0
+    ? { files, signature: computeContentSignature(files) }
+    : undefined;
+}
+
+/**
  * Builds the summary of an extension folder from its raw files. Variables such
  * as `${extensionPath}` stay as written, and nothing outside the folder is
  * read.
@@ -703,6 +884,7 @@ export async function buildExtensionContentSummary(
   extensionDir: string,
   sources: ExtensionContentSources = {},
 ): Promise<ExtensionContentSummary> {
+  const manifest = await readManifest(extensionDir);
   const hooks = await summarizeHooks(extensionDir);
   const contextFiles = await summarizeContextFiles(
     extensionDir,
@@ -712,7 +894,15 @@ export async function buildExtensionContentSummary(
   const agents = await summarizeAgents(extensionDir);
   const commands = await summarizeCommands(extensionDir);
   const policies = await summarizePolicies(extensionDir);
-  const mcpServers = await summarizeMcpServers(extensionDir);
+  const mcpServers = manifest
+    ? await summarizeMcpServers(extensionDir, manifest)
+    : undefined;
+  const settings = manifest ? summarizeSettings(manifest) : undefined;
+  const planDirectory = manifest ? readPlanDirectory(manifest) : undefined;
+  const extensionFiles =
+    sources.includeAllFiles === false
+      ? undefined
+      : await summarizeExtensionFiles(extensionDir, manifest);
   return {
     ...(hooks ? { hooks } : {}),
     ...(contextFiles ? { contextFiles } : {}),
@@ -721,5 +911,8 @@ export async function buildExtensionContentSummary(
     ...(commands ? { commands } : {}),
     ...(policies ? { policies } : {}),
     ...(mcpServers ? { mcpServers } : {}),
+    ...(settings ? { settings } : {}),
+    ...(planDirectory !== undefined ? { planDirectory } : {}),
+    ...(extensionFiles ? { extensionFiles } : {}),
   };
 }

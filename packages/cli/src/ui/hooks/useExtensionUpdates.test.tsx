@@ -10,13 +10,16 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { createExtension } from '../../test-utils/createExtension.js';
-import { useExtensionUpdates } from './useExtensionUpdates.js';
+import {
+  useConfirmUpdateRequests,
+  useExtensionUpdates,
+} from './useExtensionUpdates.js';
 import {
   GEMINI_DIR,
   loadAgentsFromDirectory,
   loadSkillsFromDir,
 } from '@google/gemini-cli-core';
-import { render } from '../../test-utils/render.js';
+import { render, renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { MessageType } from '../types.js';
 import {
@@ -425,5 +428,32 @@ describe('useExtensionUpdates', () => {
         expect.any(Number),
       );
     });
+  });
+});
+
+describe('useConfirmUpdateRequests', () => {
+  it('keeps defaultToNo only on the requests that set it', async () => {
+    const { result, unmount } = await renderHook(() =>
+      useConfirmUpdateRequests(),
+    );
+
+    act(() => {
+      result.current.addConfirmUpdateExtensionRequest({
+        prompt: 'Install this extension?',
+        onConfirm: vi.fn(),
+        defaultToNo: true,
+      });
+      result.current.addConfirmUpdateExtensionRequest({
+        prompt: 'Set up Shift+Enter?',
+        onConfirm: vi.fn(),
+      });
+    });
+
+    expect(
+      result.current.confirmUpdateExtensionRequests.map(
+        (request) => request.defaultToNo,
+      ),
+    ).toEqual([true, undefined]);
+    unmount();
   });
 });

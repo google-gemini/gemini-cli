@@ -177,12 +177,13 @@ export async function updateAllUpdatableExtensions(
       ExtensionUpdateState.UPDATE_AVAILABLE,
   );
   // Every update runs to the end, even when another one fails or is declined.
+  // The filter above leaves only extensions whose state is UPDATE_AVAILABLE.
   const results = await Promise.allSettled(
     updatableExtensions.map((extension) =>
       updateExtension(
         extension,
         extensionManager,
-        extensionsState.get(extension.name)!.status,
+        ExtensionUpdateState.UPDATE_AVAILABLE,
         dispatch,
         enableExtensionReloading,
       ),

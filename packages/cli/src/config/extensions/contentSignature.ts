@@ -5,7 +5,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import type { Stats } from 'node:fs';
+import { createReadStream, type Stats } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { isSubpath } from '@google/gemini-cli-core';
@@ -69,6 +69,20 @@ export function compareCodeUnits(a: string, b: string): number {
 /** Returns the SHA-256 (hex) of `content`. */
 export function sha256(content: string | Uint8Array): string {
   return createHash('sha256').update(content).digest('hex');
+}
+
+/**
+ * Returns the SHA-256 (hex) of a file's bytes. The file is read as a stream,
+ * so a large file in the extension folder isn't loaded into memory at once.
+ */
+function hashFile(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha256');
+    createReadStream(filePath)
+      .on('data', (chunk) => hash.update(chunk))
+      .on('end', () => resolve(hash.digest('hex')))
+      .on('error', reject);
+  });
 }
 
 function entryLine(entry: ContentEntry): string {
@@ -150,7 +164,7 @@ async function walk(
       state.entries.push({
         path: relativePath,
         type,
-        value: sha256(await fs.readFile(realPath)),
+        value: await hashFile(realPath),
       });
       return;
     }
@@ -266,13 +280,16 @@ function escapeCodeUnit(code: number): string {
  * JSON-style escapes (`\n`, `\r`, `\t`, `\u001b`): C0 and C1 controls, DEL,
  * zero-width characters, line and paragraph separators, bidirectional
  * controls, and the byte order mark. The result always fits on one line, and
- * ANSI sequences show as text.
+ * ANSI sequences show as text. Values read from `gemini-extension.json` can
+ * have any JSON type, so a value that isn't a string prints the way a template
+ * string prints it, and `null` or `undefined` prints as an empty string.
  */
-export function escapeForDisplay(value: string): string {
+export function escapeForDisplay(value: unknown): string {
+  const text = String(value ?? '');
   let result = '';
-  for (let i = 0; i < value.length; i++) {
-    const code = value.charCodeAt(i);
-    result += needsEscape(code) ? escapeCodeUnit(code) : value[i];
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    result += needsEscape(code) ? escapeCodeUnit(code) : text[i];
   }
   return result;
 }

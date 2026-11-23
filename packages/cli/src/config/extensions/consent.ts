@@ -34,8 +34,10 @@ import type {
   HooksSummary,
   McpServerSummary,
   ReferencedPath,
+  SettingSummary,
   SkillsSummary,
 } from './extensionContentSummary.js';
+import { isUnresolvedLink } from './extensionContentSummary.js';
 import { ExtensionConsentDeclinedError } from './extensionConsentErrors.js';
 
 export const INSTALL_WARNING_MESSAGE = chalk.yellow(
@@ -78,7 +80,10 @@ export async function skillsConsentString(
 
 /**
  * Non-interactive prompts share stdin, so they run one at a time: each one
- * prints its description only after the previous one has its answer.
+ * prints its description only after the previous one has its answer. The
+ * queue is module-scoped on purpose: every caller reads the same process
+ * stdin, so a queue per caller or per ExtensionManager wouldn't keep their
+ * prompts apart. It only holds the promise of the latest prompt.
  */
 let nonInteractiveConsentQueue: Promise<unknown> = Promise.resolve();
 
@@ -113,17 +118,21 @@ export async function requestConsentNonInteractive(
  *
  * @param consentDescription The description of the thing they will be consenting to.
  * @param addExtensionUpdateConfirmationRequest A function to actually add a prompt to the UI.
+ * @param options.defaultToNo Selects "No" first in the dialog, so pressing
+ *   Enter declines. Extension installs and updates use it.
  * @returns boolean, whether they consented or not.
  */
 export async function requestConsentInteractive(
   consentDescription: string,
   addExtensionUpdateConfirmationRequest: (value: ConfirmationRequest) => void,
   clearConfirmationRequest?: () => void,
+  options: { defaultToNo?: boolean } = {},
 ): Promise<boolean> {
   return promptForConsentInteractive(
     consentDescription + '\n\nDo you want to continue?',
     addExtensionUpdateConfirmationRequest,
     clearConfirmationRequest,
+    options.defaultToNo ?? false,
   );
 }
 
@@ -179,16 +188,19 @@ export async function promptForConsentNonInteractive(
  *
  * @param prompt A markdown prompt to ask the user
  * @param addExtensionUpdateConfirmationRequest Function to update the UI state with the confirmation request.
+ * @param defaultToNo Whether the dialog selects "No" first.
  * @returns Whether or not the user answers yes.
  */
 async function promptForConsentInteractive(
   prompt: string,
   addExtensionUpdateConfirmationRequest: (value: ConfirmationRequest) => void,
   clearConfirmationRequest?: () => void,
+  defaultToNo = false,
 ): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     addExtensionUpdateConfirmationRequest({
       prompt,
+      ...(defaultToNo ? { defaultToNo } : {}),
       onConfirm: (resolvedConfirmed) => {
         clearConfirmationRequest?.();
         setImmediate(() => resolve(resolvedConfirmed));
@@ -244,6 +256,19 @@ const HOOKS_HEADING =
   '⚠️  This extension contains Hooks which can automatically execute commands';
 
 const CHANGES_HEADING = 'Changes since the installed version:';
+
+/** Most file lines that the change block lists outside the other sections. */
+const MAX_FILE_CHANGE_LINES = 20;
+
+/**
+ * Escapes a value, or each value of a list joined with `,` (the way a list
+ * prints in a template string), with {@link escapeForDisplay}.
+ */
+function escapeListForDisplay(value: unknown): string {
+  return Array.isArray(value)
+    ? value.map((item) => escapeForDisplay(String(item))).join(',')
+    : escapeForDisplay(String(value));
+}
 
 function formatEnvValue(name: string, value: string): string {
   return SENSITIVE_ENV_NAME.test(name) && value
@@ -400,10 +425,10 @@ function renderAgentMcpServer(name: string, server: MCPServerConfig): string[] {
     output.push(`${indent}Type: ${formatValueForDisplay(server.type)}`);
   }
   if (server.timeout !== undefined) {
-    output.push(`${indent}Timeout: ${server.timeout}`);
+    output.push(`${indent}Timeout: ${escapeListForDisplay(server.timeout)}`);
   }
   if (server.trust !== undefined) {
-    output.push(`${indent}Trust: ${server.trust}`);
+    output.push(`${indent}Trust: ${escapeListForDisplay(server.trust)}`);
   }
   if (server.description) {
     output.push(
@@ -493,7 +518,8 @@ function renderFilesSection(
 
 /**
  * Lists skills like `renderSkillsList`, with paths relative to the extension
- * folder, escaped values, and a signature line.
+ * folder, escaped values, the links under `skills/` that leave the folder or
+ * are broken, and a signature line.
  */
 function renderSkillSummaries(summary: SkillsSummary): string[] {
   const output: string[] = [];
@@ -512,8 +538,32 @@ function renderSkillSummaries(summary: SkillsSummary): string[] {
     );
     output.push('');
   }
+  for (const entry of summary.files) {
+    if (isUnresolvedLink(entry)) {
+      output.push(`  * ${formatEntryPath(entry)}`, '');
+    }
+  }
   output.push(`  Skills signature: ${summary.signature}`);
   return output;
+}
+
+/** The settings of a loaded config, for a consent text without a summary. */
+function loadedSettings(config: ExtensionConfig): SettingSummary[] {
+  return (config.settings ?? []).map((setting) => ({
+    name: String(setting.name ?? ''),
+    envVar: String(setting.envVar ?? ''),
+    sensitive: setting.sensitive === true,
+  }));
+}
+
+function renderSettings(settings: readonly SettingSummary[]): string[] {
+  return [
+    'This extension will receive these settings in environment variables:',
+    ...settings.map(
+      (setting) =>
+        `  * ${formatValueForDisplay(setting.name)}: ${formatValueForDisplay(setting.envVar)}${setting.sensitive ? ' (sensitive)' : ''}`,
+    ),
+  ];
 }
 
 /** Hashes per skill folder, plus files under `skills/` outside any skill. */
@@ -599,6 +649,90 @@ function mcpReferenceHashes(
   return referenceHashes(
     (servers ?? []).flatMap(([, server]) => server.referencedPaths),
   );
+}
+
+function settingHashes(
+  settings: readonly SettingSummary[] | undefined,
+): Map<string, string> {
+  return new Map(
+    (settings ?? []).map((setting) => [
+      setting.name,
+      JSON.stringify([setting.envVar, setting.sensitive]),
+    ]),
+  );
+}
+
+function planDirectoryHashes(
+  planDirectory: string | undefined,
+): Map<string, string> {
+  return new Map(planDirectory !== undefined ? [[planDirectory, '']] : []);
+}
+
+/**
+ * Paths that the other lines of the change block cover: the files of each
+ * section, and the paths inside the folder that hooks and MCP servers
+ * reference. The entry of a folder link doesn't count, only the files listed
+ * under it.
+ */
+function coveredPaths(summary: ExtensionContentSummary): string[] {
+  const references = [
+    ...(summary.hooks?.referencedPaths ?? []),
+    ...(summary.agents?.referencedPaths ?? []),
+    ...(summary.mcpServers ?? []).flatMap(
+      ([, server]) => server.referencedPaths,
+    ),
+  ];
+  return [
+    ...[
+      summary.hooks,
+      summary.contextFiles,
+      summary.skills,
+      summary.agents,
+      summary.commands,
+      summary.policies,
+    ].flatMap((section) =>
+      (section?.files ?? [])
+        .filter((entry) => entry.value !== ContentMarker.Directory)
+        .map((entry) => entry.path),
+    ),
+    ...references
+      .filter((reference) => reference.marker === undefined)
+      .map((reference) => reference.path),
+  ];
+}
+
+/**
+ * Names the files that changed and that no other line of the change block
+ * covers, up to {@link MAX_FILE_CHANGE_LINES} lines.
+ */
+function describeOtherFileChanges(
+  previous: ExtensionContentSummary,
+  current: ExtensionContentSummary,
+): string[] {
+  const covered = [...coveredPaths(previous), ...coveredPaths(current)];
+  const otherFiles = (summary: ExtensionContentSummary) =>
+    new Map(
+      [...fileHashes(summary.extensionFiles?.files ?? [])].filter(
+        ([filePath]) =>
+          !covered.some(
+            (coveredPath) =>
+              filePath === coveredPath ||
+              filePath.startsWith(`${coveredPath}/`),
+          ),
+      ),
+    );
+  const lines = describeItemChanges(
+    'Files',
+    otherFiles(previous),
+    otherFiles(current),
+  );
+  if (lines.length <= MAX_FILE_CHANGE_LINES) {
+    return lines;
+  }
+  return [
+    ...lines.slice(0, MAX_FILE_CHANGE_LINES),
+    `  * Files: ${lines.length - MAX_FILE_CHANGE_LINES} more added, changed, or removed`,
+  ];
 }
 
 function hookKey(hook: HookSummary): string {
@@ -697,6 +831,17 @@ function describeContentChanges(
         mcpReferenceHashes(previous.mcpServers),
         mcpReferenceHashes(current.mcpServers),
       ),
+      ...describeItemChanges(
+        'Settings',
+        settingHashes(previous.settings),
+        settingHashes(current.settings),
+      ),
+      ...describeItemChanges(
+        'Plan directory',
+        planDirectoryHashes(previous.planDirectory),
+        planDirectoryHashes(current.planDirectory),
+      ),
+      ...describeOtherFileChanges(previous, current),
     ]),
   ];
 }
@@ -759,9 +904,13 @@ async function extensionConsentString(
       const source =
         mcpServer.httpUrl ??
         `${mcpServer.command || ''}${mcpServer.args ? ' ' + mcpServer.args.join(' ') : ''}`;
-      output.push(`  * ${key} (${isLocal ? 'local' : 'remote'}): ${source}`);
+      output.push(
+        `  * ${escapeForDisplay(key)} (${isLocal ? 'local' : 'remote'}): ${escapeForDisplay(source)}`,
+      );
       if (mcpServer.cwd) {
-        output.push(`    Working directory: ${mcpServer.cwd}`);
+        output.push(
+          `    Working directory: ${escapeForDisplay(mcpServer.cwd)}`,
+        );
       }
       if (mcpServer.env && Object.keys(mcpServer.env).length > 0) {
         output.push('    Environment variables:');
@@ -771,8 +920,10 @@ async function extensionConsentString(
         for (const [envKey, envValue] of sortedEnv) {
           const isSensitive = SENSITIVE_ENV_NAME.test(envKey);
           const displayValue =
-            isSensitive && envValue ? '********' : (envValue ?? '');
-          output.push(`      - ${envKey}: ${displayValue}`);
+            isSensitive && envValue
+              ? '********'
+              : escapeForDisplay(envValue ?? '');
+          output.push(`      - ${escapeForDisplay(envKey)}: ${displayValue}`);
         }
       }
       if (mcpServer.headers && Object.keys(mcpServer.headers).length > 0) {
@@ -783,43 +934,57 @@ async function extensionConsentString(
         for (const [headerKey, headerValue] of sortedHeaders) {
           const isSensitive = SENSITIVE_HEADER_NAME.test(headerKey);
           const displayValue =
-            isSensitive && headerValue ? '********' : (headerValue ?? '');
-          output.push(`      - ${headerKey}: ${displayValue}`);
+            isSensitive && headerValue
+              ? '********'
+              : escapeForDisplay(headerValue ?? '');
+          output.push(
+            `      - ${escapeForDisplay(headerKey)}: ${displayValue}`,
+          );
         }
       }
       if (mcpServer.url) {
-        output.push(`    URL: ${mcpServer.url}`);
+        output.push(`    URL: ${escapeForDisplay(mcpServer.url)}`);
       }
       if (mcpServer.tcp) {
-        output.push(`    TCP: ${mcpServer.tcp}`);
+        output.push(`    TCP: ${escapeForDisplay(mcpServer.tcp)}`);
       }
       if (mcpServer.type) {
-        output.push(`    Type: ${mcpServer.type}`);
+        output.push(`    Type: ${escapeForDisplay(mcpServer.type)}`);
       }
       if (mcpServer.timeout !== undefined) {
-        output.push(`    Timeout: ${mcpServer.timeout}`);
+        output.push(`    Timeout: ${escapeListForDisplay(mcpServer.timeout)}`);
       }
       if (mcpServer.trust !== undefined) {
-        output.push(`    Trust: ${mcpServer.trust}`);
+        output.push(`    Trust: ${escapeListForDisplay(mcpServer.trust)}`);
       }
       if (mcpServer.description) {
-        output.push(`    Description: ${mcpServer.description}`);
+        output.push(
+          `    Description: ${escapeForDisplay(mcpServer.description)}`,
+        );
       }
       if (mcpServer.includeTools && mcpServer.includeTools.length > 0) {
-        output.push(`    Include tools: ${mcpServer.includeTools.join(', ')}`);
+        output.push(
+          `    Include tools: ${mcpServer.includeTools.map((tool) => escapeForDisplay(tool)).join(', ')}`,
+        );
       }
       if (mcpServer.excludeTools && mcpServer.excludeTools.length > 0) {
-        output.push(`    Exclude tools: ${mcpServer.excludeTools.join(', ')}`);
+        output.push(
+          `    Exclude tools: ${mcpServer.excludeTools.map((tool) => escapeForDisplay(tool)).join(', ')}`,
+        );
       }
       if (mcpServer.authProviderType) {
-        output.push(`    Auth Provider Type: ${mcpServer.authProviderType}`);
+        output.push(
+          `    Auth Provider Type: ${escapeForDisplay(mcpServer.authProviderType)}`,
+        );
       }
       if (mcpServer.targetAudience) {
-        output.push(`    Target Audience: ${mcpServer.targetAudience}`);
+        output.push(
+          `    Target Audience: ${escapeForDisplay(mcpServer.targetAudience)}`,
+        );
       }
       if (mcpServer.targetServiceAccount) {
         output.push(
-          `    Target Service Account: ${mcpServer.targetServiceAccount}`,
+          `    Target Service Account: ${escapeForDisplay(mcpServer.targetServiceAccount)}`,
         );
       }
       if (mcpServer.oauth) {
@@ -832,8 +997,9 @@ async function extensionConsentString(
           const valStr = Array.isArray(oValue)
             ? oValue.join(', ')
             : String(oValue ?? '');
-          const displayValue = isSensitive && valStr ? '********' : valStr;
-          output.push(`      - ${oKey}: ${displayValue}`);
+          const displayValue =
+            isSensitive && valStr ? '********' : escapeForDisplay(valStr);
+          output.push(`      - ${escapeForDisplay(oKey)}: ${displayValue}`);
         }
       }
       output.push(`    Config signature: ${getMcpServerConfigHash(mcpServer)}`);
@@ -848,7 +1014,7 @@ async function extensionConsentString(
   }
   if (sanitizedConfig.contextFileName) {
     output.push(
-      `This extension will append info to your gemini.md context using ${sanitizedConfig.contextFileName}`,
+      `This extension will append info to your gemini.md context using ${escapeListForDisplay(sanitizedConfig.contextFileName)}`,
     );
   } else if (contentSummary?.contextFiles) {
     output.push(
@@ -860,7 +1026,23 @@ async function extensionConsentString(
   }
   if (sanitizedConfig.excludeTools) {
     output.push(
-      `This extension will exclude the following core tools: ${sanitizedConfig.excludeTools}`,
+      `This extension will exclude the following core tools: ${escapeListForDisplay(sanitizedConfig.excludeTools)}`,
+    );
+  }
+  // With a summary, settings and the plan directory are read as written in
+  // the manifest, so they don't depend on where the folder is.
+  const settings = contentSummary
+    ? contentSummary.settings
+    : loadedSettings(sanitizedConfig);
+  if (settings && settings.length > 0) {
+    output.push(...renderSettings(settings));
+  }
+  const planDirectory = contentSummary
+    ? contentSummary.planDirectory
+    : sanitizedConfig.plan?.directory;
+  if (planDirectory) {
+    output.push(
+      `This extension will store plans in ${formatValueForDisplay(planDirectory)}`,
     );
   }
   if (contentSummary) {
@@ -901,6 +1083,11 @@ async function extensionConsentString(
       ...(contentSummary?.skills
         ? renderSkillSummaries(contentSummary.skills)
         : await renderSkillsList(skills)),
+    );
+  }
+  if (contentSummary?.extensionFiles) {
+    output.push(
+      `Extension files signature: ${contentSummary.extensionFiles.signature}`,
     );
   }
 

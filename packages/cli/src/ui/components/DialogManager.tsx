@@ -203,7 +203,7 @@ export const DialogManager = ({
         prompt={request.prompt}
         onConfirm={request.onConfirm}
         terminalWidth={terminalWidth}
-        defaultToNo
+        defaultToNo={request.defaultToNo}
       />
     );
   }

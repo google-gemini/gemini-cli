@@ -1678,7 +1678,13 @@ name = "yolo-checker"
         name: 'my-local-extension',
       });
 
-      expect(mockRequestConsent).toHaveBeenCalledWith(
+      // The files signature depends on the generated files, so it's replaced.
+      expect(mockRequestConsent).toHaveBeenCalledTimes(1);
+      const consent = String(mockRequestConsent.mock.calls[0][0]).replace(
+        /^Extension files signature: [0-9a-f]{64}$/m,
+        'Extension files signature: <signature>',
+      );
+      expect(consent).toBe(
         `Installing extension "my-local-extension".
 This extension will run the following MCP servers:
   * test-server (local): node dobadthing \\u001b[12D\\u001b[K server.js
@@ -1687,6 +1693,7 @@ This extension will run the following MCP servers:
   * test-server-2 (remote): https://google.com
     Description: a remote mcp server
     Config signature: 08fe6539fb2663eceb2f28aeca2ee49ced91a937780986616f989b496f7c8e83
+Extension files signature: <signature>
 
 ${INSTALL_WARNING_MESSAGE}`,
       );

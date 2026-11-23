@@ -583,6 +583,8 @@ export type SlashCommandProcessorResult =
 export interface ConfirmationRequest {
   prompt: ReactNode;
   onConfirm: (confirm: boolean) => void;
+  /** Selects "No" first in the dialog, so pressing Enter declines. */
+  defaultToNo?: boolean;
 }
 
 export interface LoopDetectionConfirmationRequest {

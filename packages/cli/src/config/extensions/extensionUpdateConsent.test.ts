@@ -33,6 +33,7 @@ import { isWorkspaceTrusted } from '../trustedFolders.js';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { ConsentPrompt } from '../../ui/components/ConsentPrompt.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
+import { checkForExtensionUpdate } from './github.js';
 import { updateExtension } from './update.js';
 import {
   EXTENSIONS_DIRECTORY_NAME,
@@ -66,6 +67,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 const EXTENSION_NAME = 'update-consent-fixture';
+const isWindows = process.platform === 'win32';
 const HOOK_V1 = 'echo hook-v1';
 const HOOK_V2 = 'echo hook-v2-changed';
 const ON_START_COMMAND = 'node ${extensionPath}/scripts/on-start.js';
@@ -143,8 +145,13 @@ const MCP_TEMPLATE_MANIFEST = {
   },
 };
 
-/** Runs git with a fixed identity and without the user's git settings. */
-function runGit(cwd: string, ...args: string[]): void {
+/**
+ * Runs git with a fixed identity and without the user's git settings.
+ * `globalConfig` is an empty file that replaces the global git config. It is
+ * a real file because Git for Windows can't read `os.devNull` (`\\.\nul`) as
+ * a config file.
+ */
+function runGit(globalConfig: string, cwd: string, ...args: string[]): void {
   execFileSync(
     'git',
     [
@@ -161,7 +168,7 @@ function runGit(cwd: string, ...args: string[]): void {
       stdio: 'pipe',
       env: {
         ...process.env,
-        GIT_CONFIG_GLOBAL: os.devNull,
+        GIT_CONFIG_GLOBAL: globalConfig,
         GIT_CONFIG_NOSYSTEM: '1',
       },
     },
@@ -574,7 +581,7 @@ describe('extension update consent', () => {
       expect(consentText()).toContain('  * Context files: `b.md` changed');
     });
 
-    it('ignores GEMINI.md when contextFileName is set', async () => {
+    it('names a changed GEMINI.md under files, not context files, when contextFileName is set', async () => {
       const manifest = { contextFileName: 'CONTEXT.md' };
       const installed = await installVersion1({
         manifest,
@@ -588,8 +595,12 @@ describe('extension update consent', () => {
         files: { 'CONTEXT.md': 'context' },
       });
 
-      expect(await settleUpdate(installed)).toBe('applied');
-      expect(requestConsent).not.toHaveBeenCalled();
+      await settleUpdate(installed);
+
+      const text = consentText();
+      expect(text).toContain('context using CONTEXT.md');
+      expect(text).toContain('  * Files: `GEMINI.md` changed');
+      expect(text).not.toContain('Context files: `GEMINI.md`');
     });
 
     it('asks for consent again when a file imported by GEMINI.md changes', async () => {
@@ -728,7 +739,7 @@ describe('extension update consent', () => {
       );
     });
 
-    it('does not ask for consent when a file starting with _ in agents/ changes', async () => {
+    it('names a changed file starting with _ in agents/ under files, not sub-agents', async () => {
       const files = { 'agents/release-helper.md': agentFile('Help.') };
       const installed = await installVersion1({
         files: { ...files, 'agents/_notes.md': 'notes v1' },
@@ -738,8 +749,11 @@ describe('extension update consent', () => {
         files: { ...files, 'agents/_notes.md': 'notes v2' },
       });
 
-      expect(await settleUpdate(installed)).toBe('applied');
-      expect(requestConsent).not.toHaveBeenCalled();
+      await settleUpdate(installed);
+
+      const text = consentText();
+      expect(text).toContain('  * Files: `agents/_notes.md` changed');
+      expect(text).not.toContain('Sub-agents: `agents/_notes.md`');
     });
 
     it.each([
@@ -811,8 +825,67 @@ describe('extension update consent', () => {
       expect(text).toContain(
         '  * nodeServer (local): node ${extensionPath}/example.js\n    Working directory: ${extensionPath}',
       );
-      expect(text).toContain('    Files used: `example.js`');
+      expect(text).toContain(
+        '    Files used: `.` (the extension folder), `example.js`',
+      );
       expect(text).toContain('  * MCP servers: `example.js` changed');
+    });
+
+    it('asks for consent again when a file in the working directory of an MCP server changes', async () => {
+      const manifest = {
+        mcpServers: {
+          srv: {
+            command: 'node',
+            args: ['server.js'],
+            cwd: '${extensionPath}/server',
+          },
+        },
+      };
+      const installed = await installVersion1({
+        manifest,
+        files: { 'server/server.js': 'v1' },
+      });
+      writeSource({
+        version: '1.0.1',
+        manifest,
+        files: { 'server/server.js': 'v2' },
+      });
+
+      await settleUpdate(installed);
+
+      const text = consentText();
+      expect(text).toContain('    Files used: `server`');
+      expect(text).toContain('  * MCP servers: `server` changed');
+    });
+  });
+
+  describe('settings', () => {
+    it('asks for consent again when an update adds a setting', async () => {
+      const installed = await installVersion1({});
+      writeSource({
+        version: '1.0.1',
+        manifest: {
+          settings: [
+            {
+              name: 'AWS key',
+              description: 'The secret key',
+              envVar: 'AWS_SECRET_ACCESS_KEY',
+              sensitive: true,
+            },
+          ],
+        },
+      });
+
+      await settleUpdate(installed);
+
+      const text = consentText();
+      expect(text).toContain(
+        [
+          'This extension will receive these settings in environment variables:',
+          '  * `AWS key`: `AWS_SECRET_ACCESS_KEY` (sensitive)',
+        ].join('\n'),
+      );
+      expect(text).toContain('  * Settings: `AWS key` added');
     });
   });
 
@@ -840,16 +913,77 @@ describe('extension update consent', () => {
       expect(requestConsent).not.toHaveBeenCalled();
     });
 
+    it('asks for consent again when a module that a hook script loads changes', async () => {
+      const hookCommand = 'node ${extensionPath}/scripts/hook.js';
+      const hookScript = "require('./lib.js');";
+      const installed = await installVersion1({
+        hookCommand,
+        files: { 'scripts/hook.js': hookScript, 'scripts/lib.js': 'v1' },
+      });
+      writeSource({
+        version: '1.0.1',
+        hookCommand,
+        files: { 'scripts/hook.js': hookScript, 'scripts/lib.js': 'v2' },
+      });
+
+      await settleUpdate(installed);
+
+      const text = consentText();
+      expect(text).toContain('Extension files signature: ');
+      expect(text).toContain('  * Files: `scripts/lib.js` changed');
+    });
+
+    it.skipIf(isWindows)(
+      'keeps relative links inside a local install, so the hooks signature covers their targets',
+      async () => {
+        const writeVersion = (version: string, script: string) => {
+          writeSource({
+            version,
+            hookCommand: HOOK_V1,
+            files: { 'shared/run.sh': script },
+          });
+          fs.symlinkSync(
+            '../shared/run.sh',
+            path.join(sourceDir, 'hooks', 'run.sh'),
+          );
+        };
+        writeVersion('1.0.0', 'echo v1');
+        await extensionManager.loadExtensions();
+        const installed = await extensionManager.installOrUpdateExtension({
+          source: sourceDir,
+          type: 'local',
+        });
+        requestConsent.mockClear();
+
+        expect(fs.readlinkSync(installedFile('hooks', 'run.sh'))).toBe(
+          '../shared/run.sh',
+        );
+
+        writeVersion('1.0.1', 'echo v2');
+        await settleUpdate(installed);
+
+        expect(consentText()).toContain('  * Hooks: `hooks/run.sh` changed');
+      },
+    );
+
     it('asks for consent again when a hook command changes in an update from a git repository', async () => {
+      const gitConfig = path.join(tempHomeDir, 'empty.gitconfig');
+      fs.writeFileSync(gitConfig, '');
       const repoDir = path.join(tempHomeDir, 'remote', 'repo.git');
       fs.mkdirSync(repoDir, { recursive: true });
-      runGit(repoDir, 'init', '--bare', '--initial-branch=main');
+      runGit(gitConfig, repoDir, 'init', '--bare', '--initial-branch=main');
       const publish = (options: SourceOptions) => {
         writeSource(options);
-        runGit(sourceDir, 'init', '--initial-branch=main');
-        runGit(sourceDir, 'add', '-A');
-        runGit(sourceDir, 'commit', '-m', `Version ${options.version}`);
-        runGit(sourceDir, 'push', '--force', repoDir, 'HEAD:main');
+        runGit(gitConfig, sourceDir, 'init', '--initial-branch=main');
+        runGit(gitConfig, sourceDir, 'add', '-A');
+        runGit(
+          gitConfig,
+          sourceDir,
+          'commit',
+          '-m',
+          `Version ${options.version}`,
+        );
+        runGit(gitConfig, sourceDir, 'push', '--force', repoDir, 'HEAD:main');
       };
 
       publish({ version: '1.0.0', hookCommand: HOOK_V1 });
@@ -860,6 +994,10 @@ describe('extension update consent', () => {
       });
       requestConsent.mockClear();
       publish({ version: '1.0.1', hookCommand: HOOK_V2 });
+      expect(
+        await checkForExtensionUpdate(installed, extensionManager),
+        'Precondition: the update check finds the new commit.',
+      ).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
 
       await settleUpdate(installed);
 

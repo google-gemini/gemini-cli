@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -20,6 +20,34 @@ import {
 } from './extensionContentSummary.js';
 
 const isWindows = process.platform === 'win32';
+
+const agentLoaderErrors = vi.hoisted(() => {
+  const extra: Array<{ filePath: string; message: string }> = [];
+  return { extra };
+});
+
+// Delegates to the real loader and appends the errors a test sets, to cover
+// load errors that the real loader doesn't produce.
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    loadAgentsFromDirectory: async (dir: string) => {
+      const result = await actual.loadAgentsFromDirectory(dir);
+      return {
+        ...result,
+        errors: [
+          ...result.errors,
+          ...agentLoaderErrors.extra.map(
+            ({ filePath, message }) =>
+              new actual.AgentLoadError(filePath, message),
+          ),
+        ],
+      };
+    },
+  };
+});
 
 function fileEntry(relativePath: string, content: string): ContentEntry {
   return { path: relativePath, type: 'file', value: sha256(content) };
@@ -55,6 +83,7 @@ describe('extensionContentSummary', () => {
 
   afterEach(() => {
     fs.rmSync(tempDir, { recursive: true, force: true });
+    agentLoaderErrors.extra = [];
   });
 
   describe('findReferencedPaths', () => {
@@ -71,6 +100,29 @@ describe('extensionContentSummary', () => {
         { path: 'scripts/on-start.js' },
         { path: 'tools/run.py' },
       ]);
+    });
+
+    it('reads a quoted path up to the matching quote', () => {
+      expect(
+        findReferencedPaths([
+          'node "${extensionPath}/my scripts/on start.js" --verbose',
+          "bash '${extensionPath}${/}tools (v2)${/}setup.sh'",
+          'cat "${extensionPath}/Bob\'s notes.txt"',
+        ]),
+      ).toEqual([
+        { path: "Bob's notes.txt" },
+        { path: 'my scripts/on start.js' },
+        { path: 'tools (v2)/setup.sh' },
+      ]);
+    });
+
+    it('ends a quoted path at a list separator or a variable', () => {
+      expect(
+        findReferencedPaths([
+          'PYTHONPATH="${extensionPath}/lib dir:${extensionPath}/vendor" python3 app.py',
+          'node "${extensionPath}/scripts/$NAME.js"',
+        ]),
+      ).toEqual([{ path: 'lib dir' }, { path: 'scripts' }, { path: 'vendor' }]);
     });
 
     it('marks references to the folder itself and to paths outside it', () => {
@@ -96,7 +148,9 @@ describe('extensionContentSummary', () => {
     it('is absent without hooks/hooks.json', async () => {
       writeFile('hooks/notes.txt', 'notes');
 
-      expect(await buildExtensionContentSummary(rootDir)).toEqual({});
+      expect(
+        await buildExtensionContentSummary(rootDir, { includeAllFiles: false }),
+      ).toEqual({});
     });
 
     it('lists hooks by event name, in file order within an event', async () => {
@@ -302,6 +356,28 @@ describe('extensionContentSummary', () => {
       expect(after.hooks?.signature).not.toBe(before.hooks?.signature);
       expect(after.hooks?.files).toEqual(before.hooks?.files);
     });
+
+    it('signs a quoted referenced path that contains spaces', async () => {
+      writeFile(
+        'hooks/hooks.json',
+        hooksFile('node "${extensionPath}/my scripts/on start.js"'),
+      );
+      writeFile('my scripts/on start.js', 'v1');
+      const before = await buildExtensionContentSummary(rootDir);
+
+      writeFile('my scripts/on start.js', 'v2');
+      const after = await buildExtensionContentSummary(rootDir);
+
+      expect(before.hooks?.referencedPaths).toEqual([
+        {
+          path: 'my scripts/on start.js',
+          signature: computeContentSignature([
+            fileEntry('my scripts/on start.js', 'v1'),
+          ]),
+        },
+      ]);
+      expect(after.hooks?.signature).not.toBe(before.hooks?.signature);
+    });
   });
 
   describe('context files', () => {
@@ -317,7 +393,10 @@ describe('extensionContentSummary', () => {
       writeFile('GEMINI.md', 'context');
 
       expect(
-        await buildExtensionContentSummary(rootDir, contextSources()),
+        await buildExtensionContentSummary(rootDir, {
+          ...contextSources(),
+          includeAllFiles: false,
+        }),
       ).toEqual({});
     });
 
@@ -377,6 +456,56 @@ describe('extensionContentSummary', () => {
         fileEntry('GEMINI.md', context),
       ]);
     });
+
+    it('finishes and lists each file once when imports form a cycle', async () => {
+      const context = 'Start with @./docs/a.md';
+      const first = 'A. See @./b.md';
+      const second = 'B. Back to @./a.md';
+      writeFile('GEMINI.md', context);
+      writeFile('docs/a.md', first);
+      writeFile('docs/b.md', second);
+
+      const summary = await buildExtensionContentSummary(
+        rootDir,
+        contextSources('GEMINI.md'),
+      );
+
+      expect(summary.contextFiles?.importedPaths).toEqual([
+        'docs/a.md',
+        'docs/b.md',
+      ]);
+      expect(summary.contextFiles?.files).toEqual([
+        fileEntry('GEMINI.md', context),
+        fileEntry('docs/a.md', first),
+        fileEntry('docs/b.md', second),
+      ]);
+    });
+
+    it('keeps the imports of a file that a long import chain also reaches', async () => {
+      // shared.md is imported directly and at the end of a chain that the
+      // import depth limit cuts off, where it has no imports of its own.
+      writeFile('GEMINI.md', 'Read @./shared.md\nThen @./chain1.md');
+      writeFile('shared.md', 'Shared. See @./leaf.md');
+      writeFile('leaf.md', 'Leaf');
+      writeFile('chain1.md', 'Next @./chain2.md');
+      writeFile('chain2.md', 'Next @./chain3.md');
+      writeFile('chain3.md', 'Next @./chain4.md');
+      writeFile('chain4.md', 'Back to @./shared.md');
+
+      const summary = await buildExtensionContentSummary(
+        rootDir,
+        contextSources('GEMINI.md'),
+      );
+
+      expect(summary.contextFiles?.importedPaths).toEqual([
+        'chain1.md',
+        'chain2.md',
+        'chain3.md',
+        'chain4.md',
+        'leaf.md',
+        'shared.md',
+      ]);
+    });
   });
 
   describe('skills', () => {
@@ -387,7 +516,9 @@ describe('extensionContentSummary', () => {
     it('is absent without skills', async () => {
       writeFile('skills/notes.txt', 'not a skill');
 
-      expect(await buildExtensionContentSummary(rootDir)).toEqual({});
+      expect(
+        await buildExtensionContentSummary(rootDir, { includeAllFiles: false }),
+      ).toEqual({});
     });
 
     it('lists skills by location, relative to the extension folder, with a signature per skill', async () => {
@@ -443,6 +574,47 @@ describe('extensionContentSummary', () => {
         (await buildExtensionContentSummary(rootDir)).skills,
       );
     });
+
+    it.skipIf(isWindows)(
+      'does not read skills through a folder link that leaves the extension folder',
+      async () => {
+        const outsideDir = path.join(tempDir, 'outside-skills');
+        writeFile('demo/SKILL.md', skillFile('outside', 'Outside'), outsideDir);
+        fs.symlinkSync(outsideDir, path.join(rootDir, 'skills'));
+
+        const summary = await buildExtensionContentSummary(rootDir);
+
+        const files: ContentEntry[] = [
+          { path: 'skills', type: 'link', value: ContentMarker.Outside },
+        ];
+        expect(summary.skills).toEqual({
+          skills: [],
+          files,
+          signature: computeContentSignature(files),
+        });
+      },
+    );
+
+    it.skipIf(isWindows)(
+      'lists the skills inside the folder and does not read a skill folder link that leaves it',
+      async () => {
+        const outsideDir = path.join(tempDir, 'outside-skill');
+        writeFile('SKILL.md', skillFile('outside', 'Outside'), outsideDir);
+        writeFile('skills/inside/SKILL.md', skillFile('inside', 'Inside'));
+        fs.symlinkSync(outsideDir, path.join(rootDir, 'skills', 'linked'));
+
+        const summary = await buildExtensionContentSummary(rootDir);
+
+        expect(summary.skills?.skills.map((skill) => skill.name)).toEqual([
+          'inside',
+        ]);
+        expect(summary.skills?.files).toContainEqual({
+          path: 'skills/linked',
+          type: 'link',
+          value: ContentMarker.Outside,
+        });
+      },
+    );
   });
 
   describe('sub-agents', () => {
@@ -524,11 +696,25 @@ describe('extensionContentSummary', () => {
       );
     });
 
+    it('lists a load error without a file path under agents', async () => {
+      writeFile('agents/release-helper.md', localAgent);
+      agentLoaderErrors.extra = [{ filePath: '', message: 'unreadable' }];
+
+      const summary = await buildExtensionContentSummary(rootDir);
+
+      expect(summary.agents?.agents.map((agent) => agent.path)).toEqual([
+        'agents',
+        'agents/release-helper.md',
+      ]);
+    });
+
     it('is absent when agents/ has no file that the loader reads', async () => {
       writeFile('agents/_draft.md', 'skipped');
       writeFile('agents/README.txt', 'skipped');
 
-      expect(await buildExtensionContentSummary(rootDir)).toEqual({});
+      expect(
+        await buildExtensionContentSummary(rootDir, { includeAllFiles: false }),
+      ).toEqual({});
     });
 
     it.skipIf(isWindows)(
@@ -611,6 +797,9 @@ describe('extensionContentSummary', () => {
 
       const summary = await buildExtensionContentSummary(rootDir);
 
+      const rootEntries: ContentEntry[] = [
+        { path: '.', type: 'reference', value: ContentMarker.Root },
+      ];
       const entries = [fileEntry('example.js', 'server')];
       expect(summary.mcpServers).toEqual([
         [
@@ -626,14 +815,53 @@ describe('extensionContentSummary', () => {
             },
             referencedPaths: [
               {
+                path: '.',
+                marker: ContentMarker.Root,
+                signature: computeContentSignature(rootEntries),
+              },
+              {
                 path: 'example.js',
                 signature: computeContentSignature(entries),
               },
             ],
-            filesSignature: computeContentSignature(entries),
+            filesSignature: computeContentSignature([
+              ...rootEntries,
+              ...entries,
+            ]),
           },
         ],
       ]);
+    });
+
+    it('counts the working directory among the files that a server uses', async () => {
+      writeFile(
+        'gemini-extension.json',
+        JSON.stringify({
+          name: 'demo',
+          version: '1.0.0',
+          mcpServers: {
+            srv: {
+              command: 'node',
+              args: ['server.js'],
+              cwd: '${extensionPath}/server',
+            },
+          },
+        }),
+      );
+      writeFile('server/server.js', 'v1');
+      const before = (await buildExtensionContentSummary(rootDir))
+        .mcpServers?.[0]?.[1];
+      writeFile('server/server.js', 'v2');
+      const after = (await buildExtensionContentSummary(rootDir))
+        .mcpServers?.[0]?.[1];
+
+      expect(
+        before?.referencedPaths.map((reference) => reference.path),
+      ).toEqual(['server']);
+      expect(before?.filesSignature).toBe(
+        computeContentSignature([fileEntry('server/server.js', 'v1')]),
+      );
+      expect(after?.filesSignature).not.toBe(before?.filesSignature);
     });
 
     it('lists no MCP servers when the manifest declares none', async () => {
@@ -645,6 +873,117 @@ describe('extensionContentSummary', () => {
       expect((await buildExtensionContentSummary(rootDir)).mcpServers).toEqual(
         [],
       );
+    });
+  });
+
+  describe('settings and plan directory', () => {
+    it('reads the settings and the plan directory as written in the manifest', async () => {
+      writeFile(
+        'gemini-extension.json',
+        JSON.stringify({
+          name: 'demo',
+          version: '1.0.0',
+          settings: [
+            {
+              name: 'API key',
+              description: 'The key',
+              envVar: 'API_KEY',
+              sensitive: true,
+            },
+            { name: 'Region', description: 'The region', envVar: 'REGION' },
+          ],
+          plan: { directory: '${extensionPath}/plans' },
+        }),
+      );
+
+      const summary = await buildExtensionContentSummary(rootDir);
+
+      expect(summary.settings).toEqual([
+        { name: 'API key', envVar: 'API_KEY', sensitive: true },
+        { name: 'Region', envVar: 'REGION', sensitive: false },
+      ]);
+      expect(summary.planDirectory).toBe('${extensionPath}/plans');
+    });
+  });
+
+  describe('extension files', () => {
+    it('lists every file except .git folders and the files that Gemini CLI writes there', async () => {
+      writeFile(
+        'gemini-extension.json',
+        '{"name": "demo", "version": "1.0.0"}',
+      );
+      writeFile('lib/helper.js', 'helper');
+      writeFile('vendor/tool/index.js', 'tool');
+      writeFile('vendor/tool/.git/HEAD', 'ref');
+      writeFile('.git/HEAD', 'ref');
+      writeFile('.gemini-extension-install.json', '{}');
+      writeFile('.env', 'API_KEY=value');
+
+      const summary = await buildExtensionContentSummary(rootDir);
+
+      expect(summary.extensionFiles?.files.map((entry) => entry.path)).toEqual([
+        'gemini-extension.json',
+        'lib/helper.js',
+        'vendor/tool/index.js',
+      ]);
+    });
+
+    it('hashes gemini-extension.json without its version and with sorted keys', async () => {
+      const otherRoot = path.join(tempDir, 'other');
+      writeFile(
+        'gemini-extension.json',
+        JSON.stringify({ name: 'demo', version: '1.0.0', description: 'Demo' }),
+      );
+      writeFile(
+        'gemini-extension.json',
+        JSON.stringify(
+          { description: 'Demo', version: '2.0.0', name: 'demo' },
+          null,
+          2,
+        ),
+        otherRoot,
+      );
+      const signature = (await buildExtensionContentSummary(rootDir))
+        .extensionFiles?.signature;
+
+      expect(
+        (await buildExtensionContentSummary(otherRoot)).extensionFiles
+          ?.signature,
+      ).toBe(signature);
+
+      writeFile(
+        'gemini-extension.json',
+        JSON.stringify({ name: 'demo', version: '2.0.0', description: 'New' }),
+        otherRoot,
+      );
+      expect(
+        (await buildExtensionContentSummary(otherRoot)).extensionFiles
+          ?.signature,
+      ).not.toBe(signature);
+    });
+
+    it('changes when a file that only a script loads changes', async () => {
+      writeFile('lib/helper.js', 'v1');
+      const before = await buildExtensionContentSummary(rootDir);
+      writeFile('lib/helper.js', 'v2');
+
+      const after = await buildExtensionContentSummary(rootDir);
+
+      expect(after.extensionFiles?.signature).not.toBe(
+        before.extensionFiles?.signature,
+      );
+    });
+
+    it('is left out when includeAllFiles is false', async () => {
+      writeFile('lib/helper.js', 'helper');
+
+      expect(
+        (
+          await buildExtensionContentSummary(rootDir, {
+            includeAllFiles: false,
+          })
+        ).extensionFiles,
+      ).toBeUndefined();
     });
   });
 });

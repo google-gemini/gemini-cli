@@ -490,8 +490,14 @@ export const AppContainer = (props: AppContainerProps) => {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
   // We are in the interactive CLI, update how we request consent and settings.
+  // Extension consent dialogs select "No" first, so pressing Enter declines.
   extensionManager.setRequestConsent((description) =>
-    requestConsentInteractive(description, addConfirmUpdateExtensionRequest),
+    requestConsentInteractive(
+      description,
+      addConfirmUpdateExtensionRequest,
+      undefined,
+      { defaultToNo: true },
+    ),
   );
   extensionManager.setRequestSetting();
 

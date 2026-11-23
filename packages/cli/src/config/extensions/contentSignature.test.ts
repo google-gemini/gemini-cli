@@ -31,6 +31,15 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   };
 });
 
+// Files are hashed through read streams.
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    createReadStream: vi.fn(actual.createReadStream),
+  };
+});
+
 const isWindows = process.platform === 'win32';
 
 describe('contentSignature', () => {
@@ -50,17 +59,24 @@ describe('contentSignature', () => {
     fs.symlinkSync(target, linkPath);
   }
 
-  /** Paths passed to `readFile` and `readdir` since the test started. */
+  /**
+   * Paths passed to `readFile`, `readdir`, and `createReadStream` since the
+   * test started.
+   */
   function readPaths(): string[] {
     return [
       ...vi.mocked(fsPromises.readFile).mock.calls,
       ...vi.mocked(fsPromises.readdir).mock.calls,
+      ...vi.mocked(fs.createReadStream).mock.calls,
     ].map(([target]) => String(target));
   }
 
   beforeEach(() => {
     vi.clearAllMocks();
-    tempDir = fs.realpathSync(
+    // The native realpath expands the 8.3 short form of the temp folder on
+    // Windows (C:\Users\RUNNER~1\...) like `collectContentEntries` does, so
+    // the paths that the tests compare have the same form.
+    tempDir = fs.realpathSync.native(
       fs.mkdtempSync(path.join(os.tmpdir(), 'content-signature-')),
     );
     rootDir = path.join(tempDir, 'extension');
@@ -119,6 +135,19 @@ describe('contentSignature', () => {
           value: sha256('{"hooks": '),
         },
       ]);
+    });
+
+    it('hashes a file that takes many read chunks, through a stream', async () => {
+      const large = Buffer.alloc(1024 * 1024 + 7);
+      for (let i = 0; i < large.length; i++) {
+        large[i] = (i * 31) % 251;
+      }
+      writeFile('assets/large.bin', large);
+
+      expect(await collectContentEntries(rootDir, 'assets')).toEqual([
+        { path: 'assets/large.bin', type: 'file', value: sha256(large) },
+      ]);
+      expect(readPaths()).toContain(path.join(rootDir, 'assets', 'large.bin'));
     });
 
     it('returns the same entries for identical folders in different places', async () => {
@@ -330,6 +359,14 @@ describe('contentSignature', () => {
     it('keeps printable text unchanged', () => {
       const value = 'node ${extensionPath}/run.js --name="café" 😀 *a* _b_';
       expect(escapeForDisplay(value)).toBe(value);
+    });
+
+    it('prints other JSON types the way a template string does, and null or undefined as empty', () => {
+      expect(escapeForDisplay(3)).toBe('3');
+      expect(escapeForDisplay(false)).toBe('false');
+      expect(escapeForDisplay(['a', 'b\nc'])).toBe('a,b\\nc');
+      expect(escapeForDisplay(null)).toBe('');
+      expect(escapeForDisplay(undefined)).toBe('');
     });
   });
 

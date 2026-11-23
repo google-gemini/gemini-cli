@@ -360,6 +360,7 @@ Would you like to attempt to install via "git clone" instead?`,
               newExtensionConfig,
               localSourcePath,
             ),
+            includeAllFiles: installMetadata.type !== 'link',
           }),
           previous:
             previous && previousExtensionConfig
@@ -368,6 +369,7 @@ Would you like to attempt to install via "git clone" instead?`,
                     previousExtensionConfig,
                     previous.path,
                   ),
+                  includeAllFiles: previous.installMetadata?.type !== 'link',
                 })
               : undefined,
         };
@@ -1368,7 +1370,14 @@ export async function copyExtension(
   source: string,
   destination: string,
 ): Promise<void> {
-  await fs.promises.cp(source, destination, { recursive: true });
+  // Copy links as written. By default `fs.cp` turns a relative link into an
+  // absolute one that points back into `source`, so a link inside the
+  // extension would leave the copy, and would break once a temporary source
+  // is removed.
+  await fs.promises.cp(source, destination, {
+    recursive: true,
+    verbatimSymlinks: true,
+  });
   await makeWritableRecursive(destination);
 }
 
