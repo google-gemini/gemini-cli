@@ -13,6 +13,11 @@ import type {
 } from '@a2a-js/sdk/server';
 import { EventEmitter } from 'node:events';
 import { requestStorage } from '../http/requestStorage.js';
+import {
+  CoderAgentEvent,
+  getPersistedState,
+  type AgentSettings,
+} from '../types.js';
 
 vi.mock('../utils/path_utils.js', () => ({
   validateWorkspacePath: vi
@@ -666,6 +671,96 @@ describe('CoderAgentExecutor', () => {
       }),
       '/tmp',
     );
+  });
+
+  it('should strip client-supplied isTrusted in createTask so only the server-side evaluation can trust a workspace', async () => {
+    const { setIsTrusted, loadConfig } = await import('../config/config.js');
+    const { loadSettings } = await import('../config/settings.js');
+    const { loadExtensions } = await import('../config/extension.js');
+    const { Task } = await import('./task.js');
+    // The server-side evaluation does not trust this workspace.
+    vi.mocked(setIsTrusted).mockReturnValue(false);
+
+    const taskId = 'test-create-task-is-trusted';
+    const contextId = 'test-context';
+
+    const wrapper = await executor.createTask(taskId, contextId, {
+      kind: CoderAgentEvent.StateAgentSettingsEvent,
+      workspacePath: '/tmp',
+      isTrusted: true,
+      autoExecute: true,
+    });
+
+    expect(setIsTrusted).toHaveBeenCalledTimes(1);
+    expect(setIsTrusted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspacePath: '/tmp',
+        isTrusted: undefined,
+      }),
+      '/tmp',
+    );
+    expect(loadSettings).toHaveBeenCalledWith('/tmp', false);
+    expect(loadExtensions).toHaveBeenCalledWith('/tmp', false);
+    expect(loadConfig).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      taskId,
+      false,
+      '/tmp',
+    );
+
+    // The client's value is not kept with the task either, so it cannot come
+    // back when the task is executed or reloaded from the store.
+    expect(wrapper.agentSettings.isTrusted).toBeUndefined();
+    const persistedState = getPersistedState(
+      wrapper.toSDKTask().metadata ?? {},
+    );
+    expect(persistedState?._agentSettings.isTrusted).toBeUndefined();
+
+    // autoExecute is still the client's to set.
+    expect(Task.create).toHaveBeenCalledWith(
+      taskId,
+      contextId,
+      expect.anything(),
+      undefined,
+      true,
+    );
+  });
+
+  it('should resolve the workspacePath given to createTask before using it', async () => {
+    const { resolveToRealPath } = await import('@google/gemini-cli-core');
+    const { setTargetDir } = await import('../config/config.js');
+    vi.mocked(resolveToRealPath).mockReturnValueOnce('/private/tmp');
+
+    const wrapper = await executor.createTask(
+      'test-create-task-resolved-path',
+      'test-context',
+      {
+        kind: CoderAgentEvent.StateAgentSettingsEvent,
+        workspacePath: '  /tmp  ',
+      },
+    );
+
+    expect(resolveToRealPath).toHaveBeenCalledWith('/tmp');
+    expect(setTargetDir).toHaveBeenCalledWith(
+      expect.objectContaining({ workspacePath: '/private/tmp' }),
+    );
+    expect(wrapper.agentSettings.workspacePath).toBe('/private/tmp');
+  });
+
+  it('should reject a workspacePath that is not a string in createTask', async () => {
+    const { setTargetDir } = await import('../config/config.js');
+    const taskId = 'test-create-task-invalid-path';
+
+    await expect(
+      executor.createTask(taskId, 'test-context', {
+        kind: CoderAgentEvent.StateAgentSettingsEvent,
+        workspacePath: ['/tmp'],
+      } as unknown as AgentSettings),
+    ).rejects.toThrow('Invalid workspace path: expected a string.');
+
+    expect(setTargetDir).not.toHaveBeenCalled();
+    expect(executor.getTask(taskId)).toBeUndefined();
   });
 
   it('should clean up already-registered socket listeners if a subsequent listener registration throws synchronously', async () => {
