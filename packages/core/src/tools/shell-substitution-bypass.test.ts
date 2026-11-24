@@ -290,6 +290,8 @@ describe('shell wrapper and command substitution bypass prevention', () => {
       'cmd.exe /d /v:on /k \'powershell -c "$(whoami)"\'',
       'cmd.exe "/k" "powershell -c \'$(whoami)\'"',
       "pwsh -ExecutionPolicy Bypass -c '$(whoami)'",
+      "pwsh -executionpol Bypass -windowst Hidden -noprof -c '$(whoami)'",
+      `pwsh -encodedc ${encodedWhoamiSub}`,
       "pwsh '-c' '$(whoami)'",
       'pwsh "-c" \'$(whoami)\'',
       "pwsh -ep:Bypass -WindowStyle Hidden -c '$(whoami)'",

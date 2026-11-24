@@ -2301,56 +2301,97 @@ const CMD_INSPECTION_FLAGS = new Set([
   '/v:off',
 ]);
 
-const PS_INSPECTION_BOOL_FLAGS = new Set([
-  '-nologo',
-  '-nol',
-  '-noprofile',
-  '-nop',
-  '-noninteractive',
-  '-noni',
-  '-noexit',
-  '-noe',
-  '-sta',
-  '-mta',
-  '-login',
-  '-l',
-  '-interactive',
-  '-i',
-]);
+function isPowerShellBoolFlag(flagName: string): boolean {
+  if (!flagName) {
+    return false;
+  }
+  if (flagName === 'sta' || flagName === 'mta') {
+    return true;
+  }
+  if (flagName.startsWith('nol')) {
+    return 'nologo'.startsWith(flagName);
+  }
+  if (flagName.startsWith('nop')) {
+    return 'noprofile'.startsWith(flagName);
+  }
+  if (flagName.startsWith('non')) {
+    return 'noninteractive'.startsWith(flagName);
+  }
+  if (flagName.startsWith('noe')) {
+    return 'noexit'.startsWith(flagName);
+  }
+  if (flagName.startsWith('l')) {
+    return 'login'.startsWith(flagName);
+  }
+  if (flagName === 'i' || flagName.startsWith('int')) {
+    return 'interactive'.startsWith(flagName);
+  }
+  return false;
+}
 
-const PS_INSPECTION_VALUE_FLAGS = new Set([
-  '-executionpolicy',
-  '-ep',
-  '-ex',
-  '-windowstyle',
-  '-w',
-  '-inputformat',
-  '-if',
-  '-outputformat',
-  '-of',
-  '-workingdirectory',
-  '-wd',
-  '-configurationname',
-  '-settingsfile',
-  '-version',
-  '-v',
-]);
+function isPowerShellValueFlag(flagName: string): boolean {
+  if (!flagName) {
+    return false;
+  }
+  if (flagName === 'ep' || flagName === 'ex') {
+    return true;
+  }
+  if (flagName.startsWith('exe')) {
+    return 'executionpolicy'.startsWith(flagName);
+  }
+  if (flagName.startsWith('w') && !flagName.startsWith('wo')) {
+    return 'windowstyle'.startsWith(flagName);
+  }
+  if (flagName === 'if') {
+    return true;
+  }
+  if (flagName.startsWith('inp')) {
+    return 'inputformat'.startsWith(flagName);
+  }
+  if (flagName === 'of') {
+    return true;
+  }
+  if (flagName.startsWith('out')) {
+    return 'outputformat'.startsWith(flagName);
+  }
+  if (flagName === 'wd') {
+    return true;
+  }
+  if (flagName.startsWith('wo')) {
+    return 'workingdirectory'.startsWith(flagName);
+  }
+  if (flagName.startsWith('con')) {
+    return 'configurationname'.startsWith(flagName);
+  }
+  if (flagName.startsWith('se')) {
+    return 'settingsfile'.startsWith(flagName);
+  }
+  if (flagName.startsWith('v')) {
+    return 'version'.startsWith(flagName);
+  }
+  return false;
+}
 
-const PS_COMMAND_FLAGS = new Set([
-  '-c',
-  '-com',
-  '-comm',
-  '-comma',
-  '-comman',
-  '-command',
-]);
+function isPowerShellCommandFlag(flagName: string): boolean {
+  if (!flagName) {
+    return false;
+  }
+  return (
+    flagName === 'c' ||
+    (flagName.startsWith('com') && 'command'.startsWith(flagName))
+  );
+}
 
-const PS_ENCODED_COMMAND_FLAGS = new Set([
-  '-e',
-  '-ec',
-  '-enc',
-  '-encodedcommand',
-]);
+function isPowerShellEncodedCommandFlag(flagName: string): boolean {
+  if (!flagName) {
+    return false;
+  }
+  return (
+    flagName === 'e' ||
+    flagName === 'ec' ||
+    (flagName.startsWith('en') && 'encodedcommand'.startsWith(flagName))
+  );
+}
 
 function isShellControlMetachar(ch: string): boolean {
   return (
@@ -3029,12 +3070,16 @@ function unwrapPowerShellInspectionWrapper(
     const lowerFlag = rawFlag.toLowerCase();
     const colonIdx = lowerFlag.indexOf(':');
     const flagName = colonIdx === -1 ? lowerFlag : lowerFlag.slice(0, colonIdx);
+    if (!flagName.startsWith('-')) {
+      return null;
+    }
+    const flagNameWithoutDash = flagName.slice(1);
 
-    if (PS_INSPECTION_BOOL_FLAGS.has(flagName)) {
+    if (isPowerShellBoolFlag(flagNameWithoutDash)) {
       cursor = flagToken.nextIndex;
       continue;
     }
-    if (PS_INSPECTION_VALUE_FLAGS.has(flagName)) {
+    if (isPowerShellValueFlag(flagNameWithoutDash)) {
       cursor = flagToken.nextIndex;
       if (colonIdx === -1) {
         const valToken = readWrapperToken(command, cursor);
@@ -3046,7 +3091,7 @@ function unwrapPowerShellInspectionWrapper(
       continue;
     }
 
-    if (PS_ENCODED_COMMAND_FLAGS.has(flagName)) {
+    if (isPowerShellEncodedCommandFlag(flagNameWithoutDash)) {
       const rawArg =
         colonIdx !== -1
           ? flagToken.value.slice(colonIdx + 1) +
@@ -3057,7 +3102,7 @@ function unwrapPowerShellInspectionWrapper(
     }
 
     if (
-      PS_COMMAND_FLAGS.has(flagName) &&
+      isPowerShellCommandFlag(flagNameWithoutDash) &&
       colonIdx === -1 &&
       flagToken.nextIndex < command.length &&
       /\s/.test(command[flagToken.nextIndex])
