@@ -243,6 +243,10 @@ describe('shell wrapper and command substitution bypass prevention', () => {
       "sh <<< '$(whoami)'",
       "env bash <<< '$(whoami)'",
       "echo '$(whoami)' | sh",
+      "echo '$(whoami)' | (sh)",
+      "echo '$(whoami)' | { sh; }",
+      "(echo '$(whoami)') | sh",
+      "{ echo '$(whoami)'; } | { env bash >/tmp/x; }",
       "printf '%s\\n' '$(whoami)' | bash",
       // Flag, shell, POSIX $0 arg, ANSI-C, backtick, process-subst, and escaped-quote shaping
       "bash -lc '$(whoami)'",
@@ -408,8 +412,11 @@ describe('shell wrapper and command substitution bypass prevention', () => {
       "sh '-c' 'echo hi'",
       "cat <<< '$(not_run)'",
       "echo 'hello world' | sh",
+      "echo 'hello world' | { sh; }",
       "echo '$(not_run)' | grep foo",
+      "echo '$(not_run)' | (cat)",
       "echo '$(not_run)' | sh -c 'cat'",
+      "echo '$(not_run)' | (sh -c 'cat')",
       'pwsh -c \'echo "It\u2019s fine"\'',
     ])('does not false-positive on benign command: %s', (command) => {
       expect(detectCommandSubstitution(stripShellWrapper(command))).toBe(false);

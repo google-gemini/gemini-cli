@@ -3223,6 +3223,49 @@ function isBarePosixShellInvocation(segment: string): boolean {
   return true;
 }
 
+function collectBashStageCommands(stage: Node): Node[] {
+  const commands: Node[] = [];
+  const walkStack: Node[] = [stage];
+  while (walkStack.length > 0) {
+    const node = walkStack.pop()!;
+    if (node.type === 'command') {
+      commands.push(node);
+      continue;
+    }
+    if (node.type === 'redirected_statement') {
+      const body = node.childForFieldName('body');
+      if (body) {
+        walkStack.push(body);
+      }
+      continue;
+    }
+    for (let i = node.childCount - 1; i >= 0; i--) {
+      const child = node.child(i);
+      if (child) {
+        walkStack.push(child);
+      }
+    }
+  }
+  return commands;
+}
+
+function getBashCommandTextWithoutRedirects(
+  node: Node,
+  command: string,
+): string {
+  const parts: string[] = [];
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i);
+    if (child && !BASH_REDIRECT_NODE_TYPES.has(child.type)) {
+      const text = command.slice(child.startIndex, child.endIndex).trim();
+      if (text) {
+        parts.push(text);
+      }
+    }
+  }
+  return parts.join(' ');
+}
+
 function extractBashCommandNodesForInspection(
   command: string,
 ): string[] | null {
@@ -3244,27 +3287,28 @@ function extractBashCommandNodesForInspection(
     while (stack.length > 0) {
       const current = stack.pop()!;
       if (current.type === 'pipeline') {
-        const stageCommands: Node[] = [];
+        const stages: Node[] = [];
         for (let i = 0; i < current.childCount; i++) {
           const child = current.child(i);
-          if (!child) {
-            continue;
-          }
-          if (child.type === 'command') {
-            stageCommands.push(child);
-          } else if (child.type === 'redirected_statement') {
-            const body = child.childForFieldName('body');
-            if (body?.type === 'command') {
-              stageCommands.push(body);
-            }
+          if (
+            child &&
+            child.type !== '|' &&
+            child.type !== '|&' &&
+            child.type !== 'comment'
+          ) {
+            stages.push(child);
           }
         }
+        const stageCommandLists = stages.map((stage) =>
+          collectBashStageCommands(stage),
+        );
         let lastShellStageIndex = -1;
-        for (let s = 1; s < stageCommands.length; s++) {
-          const stage = stageCommands[s];
+        for (let s = 1; s < stageCommandLists.length; s++) {
           if (
-            isBarePosixShellInvocation(
-              command.slice(stage.startIndex, stage.endIndex),
+            stageCommandLists[s].some((cmdNode) =>
+              isBarePosixShellInvocation(
+                getBashCommandTextWithoutRedirects(cmdNode, command),
+              ),
             )
           ) {
             lastShellStageIndex = s;
@@ -3272,36 +3316,37 @@ function extractBashCommandNodesForInspection(
         }
         if (lastShellStageIndex > 0) {
           for (let s = 0; s < lastShellStageIndex; s++) {
-            const producer = stageCommands[s];
-            const nameNode = producer.childForFieldName('name');
-            const nameText = nameNode
-              ? command.slice(nameNode.startIndex, nameNode.endIndex).trim()
-              : '';
-            const producerBase = nameText
-              .slice(nameText.lastIndexOf('/') + 1)
-              .replace(/^['"]|['"]$/g, '')
-              .toLowerCase();
-            if (producerBase !== 'echo' && producerBase !== 'printf') {
-              continue;
-            }
-            const argParts: string[] = [];
-            for (let j = 0; j < producer.childCount; j++) {
-              const part = producer.child(j);
-              if (
-                part &&
-                part !== nameNode &&
-                !BASH_REDIRECT_NODE_TYPES.has(part.type)
-              ) {
-                const text = command
-                  .slice(part.startIndex, part.endIndex)
-                  .trim();
-                if (text) {
-                  argParts.push(text);
+            for (const producer of stageCommandLists[s]) {
+              const nameNode = producer.childForFieldName('name');
+              const nameText = nameNode
+                ? command.slice(nameNode.startIndex, nameNode.endIndex).trim()
+                : '';
+              const producerBase = nameText
+                .slice(nameText.lastIndexOf('/') + 1)
+                .replace(/^['"]|['"]$/g, '')
+                .toLowerCase();
+              if (producerBase !== 'echo' && producerBase !== 'printf') {
+                continue;
+              }
+              const argParts: string[] = [];
+              for (let j = 0; j < producer.childCount; j++) {
+                const part = producer.child(j);
+                if (
+                  part &&
+                  part !== nameNode &&
+                  !BASH_REDIRECT_NODE_TYPES.has(part.type)
+                ) {
+                  const text = command
+                    .slice(part.startIndex, part.endIndex)
+                    .trim();
+                  if (text) {
+                    argParts.push(text);
+                  }
                 }
               }
-            }
-            if (argParts.length > 0) {
-              segments.push(`eval ${argParts.join(' ')}`);
+              if (argParts.length > 0) {
+                segments.push(`eval ${argParts.join(' ')}`);
+              }
             }
           }
         }
