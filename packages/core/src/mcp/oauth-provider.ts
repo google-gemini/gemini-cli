@@ -11,6 +11,7 @@ import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import { getErrorMessage, FatalCancellationError } from '../utils/errors.js';
 import {
+  OAUTH_DISCOVERY_TIMEOUT_MS,
   OAuthUtils,
   ResourceMismatchError,
   OAuthSecurityError,
@@ -336,6 +337,7 @@ export class MCPOAuthProvider {
         const response = await fetch(mcpServerUrl, {
           method: 'HEAD',
           headers,
+          signal: AbortSignal.timeout(OAUTH_DISCOVERY_TIMEOUT_MS),
         });
 
         if (response.status === 401 || response.status === 307) {

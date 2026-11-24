@@ -374,6 +374,8 @@ describe('MCPOAuthProvider', () => {
       );
 
       expect(result).toBeDefined();
+      // The WWW-Authenticate probe must carry a deadline.
+      expect(mockFetch.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
       expect(mockFetch).toHaveBeenCalledWith(
         'https://discovered.auth.com/token',
         expect.objectContaining({

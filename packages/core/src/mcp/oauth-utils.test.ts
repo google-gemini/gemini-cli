@@ -9,6 +9,7 @@ import * as dnsPromises from 'node:dns/promises';
 import type { LookupAddress, LookupAllOptions } from 'node:dns';
 import ipaddr from 'ipaddr.js';
 import {
+  OAUTH_DISCOVERY_TIMEOUT_MS,
   OAuthUtils,
   OAuthSecurityError,
   validateOAuthEndpointUrl,
@@ -24,6 +25,14 @@ vi.mock('node:dns/promises', () => ({
 // Mock fetch globally
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
+
+// Fetch that never answers but rejects when its signal aborts, like real fetch.
+const hangingFetch = (_url: unknown, init?: { signal?: AbortSignal }) =>
+  new Promise<never>((_resolve, reject) => {
+    const signal = init?.signal;
+    if (signal?.aborted) reject(signal.reason);
+    signal?.addEventListener('abort', () => reject(signal.reason));
+  });
 
 describe('OAuthUtils', () => {
   beforeEach(() => {
@@ -137,6 +146,19 @@ describe('OAuthUtils', () => {
 
       expect(result).toBeNull();
     });
+
+    it('should give up on a request that never answers', async () => {
+      // Fire the deadline immediately instead of waiting for it.
+      const timeout = vi
+        .spyOn(AbortSignal, 'timeout')
+        .mockReturnValue(AbortSignal.abort(new Error('timed out')));
+      mockFetch.mockImplementationOnce(hangingFetch);
+      const result = await OAuthUtils.fetchProtectedResourceMetadata(
+        'https://example.com/.well-known/oauth-protected-resource',
+      );
+      expect(result).toBeNull();
+      expect(timeout).toHaveBeenCalledWith(OAUTH_DISCOVERY_TIMEOUT_MS);
+    });
   });
 
   describe('fetchAuthorizationServerMetadata', () => {
@@ -171,6 +193,19 @@ describe('OAuthUtils', () => {
 
       expect(result).toBeNull();
     });
+
+    it('should give up on a request that never answers', async () => {
+      // Fire the deadline immediately instead of waiting for it.
+      const timeout = vi
+        .spyOn(AbortSignal, 'timeout')
+        .mockReturnValue(AbortSignal.abort(new Error('timed out')));
+      mockFetch.mockImplementationOnce(hangingFetch);
+      const result = await OAuthUtils.fetchAuthorizationServerMetadata(
+        'https://auth.example.com/.well-known/oauth-authorization-server',
+      );
+      expect(result).toBeNull();
+      expect(timeout).toHaveBeenCalledWith(OAUTH_DISCOVERY_TIMEOUT_MS);
+    });
   });
 
   describe('discoverAuthorizationServerMetadata', () => {
@@ -200,10 +235,12 @@ describe('OAuthUtils', () => {
       expect(mockFetch).nthCalledWith(
         1,
         'https://auth.example.com/.well-known/oauth-authorization-server',
+        { signal: expect.any(AbortSignal) },
       );
       expect(mockFetch).nthCalledWith(
         2,
         'https://auth.example.com/.well-known/openid-configuration',
+        { signal: expect.any(AbortSignal) },
       );
     });
 
@@ -229,14 +266,17 @@ describe('OAuthUtils', () => {
       expect(mockFetch).nthCalledWith(
         1,
         'https://auth.example.com/.well-known/oauth-authorization-server/mcp',
+        { signal: expect.any(AbortSignal) },
       );
       expect(mockFetch).nthCalledWith(
         2,
         'https://auth.example.com/.well-known/openid-configuration/mcp',
+        { signal: expect.any(AbortSignal) },
       );
       expect(mockFetch).nthCalledWith(
         3,
         'https://auth.example.com/mcp/.well-known/openid-configuration',
+        { signal: expect.any(AbortSignal) },
       );
     });
   });

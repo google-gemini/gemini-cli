@@ -219,6 +219,9 @@ export interface OAuthProtectedResourceMetadata {
 
 export const FIVE_MIN_BUFFER_MS = 5 * 60 * 1000;
 
+/** Per-request deadline for OAuth discovery fetches, same as the MCP HEAD probe. */
+export const OAUTH_DISCOVERY_TIMEOUT_MS = 5000;
+
 /**
  * Utility class for common OAuth operations.
  */
@@ -278,7 +281,9 @@ export class OAuthUtils {
         allowPrivateNetwork: options?.allowPrivateNetwork,
       });
 
-      const response = await fetch(validatedUrl);
+      const response = await fetch(validatedUrl, {
+        signal: AbortSignal.timeout(OAUTH_DISCOVERY_TIMEOUT_MS),
+      });
       if (!response.ok) {
         return null;
       }
@@ -315,7 +320,9 @@ export class OAuthUtils {
         },
       );
 
-      const response = await fetch(validatedUrl);
+      const response = await fetch(validatedUrl, {
+        signal: AbortSignal.timeout(OAUTH_DISCOVERY_TIMEOUT_MS),
+      });
       if (!response.ok) {
         return null;
       }
