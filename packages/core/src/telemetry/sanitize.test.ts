@@ -588,10 +588,156 @@ describe('Telemetry Sanitization', () => {
         sanitizeHookName('"/path/to/my hooks/check.sh" --api-key=abc123'),
       ).toBe('check.sh');
       expect(
+        sanitizeHookName('"C:\\Program Files\\My App\\hook.exe" /c test.bat'),
+      ).toBe('hook.exe');
+      expect(
+        sanitizeHookName(
+          '"C:\\Program Files (x86)\\My App\\hook.exe" /c test.bat',
+        ),
+      ).toBe('hook.exe');
+      expect(
         sanitizeHookName("'C:\\Program Files\\My App\\hook.exe' /c test.bat"),
       ).toBe('hook.exe');
       expect(sanitizeHookName('/tmp/dir=1/check-script.sh --flag')).toBe(
         'check-script.sh',
+      );
+    });
+
+    it('should fail closed on unterminated quotes, trailing Windows backslash quotes, and wrapped command strings', () => {
+      expect(
+        sanitizeHookName('"/path/to/hook.sh --api-key sk-secret-12345'),
+      ).toBe('unknown-command');
+      expect(
+        sanitizeHookName(
+          '"C:\\Program Files\\My App\\" --token sk-secret-12345',
+        ),
+      ).toBe('unknown-command');
+      expect(
+        sanitizeHookName(
+          '"C:\\Program Files\\My App\\" --header "Bearer sk-secret-12345"',
+        ),
+      ).toBe('unknown-command');
+      expect(
+        sanitizeHookName(
+          '"python /home/alice/scan.py --token sk-secret-12345"',
+        ),
+      ).toBe('unknown-command');
+      expect(sanitizeHookName('"python /home/alice/scan.py"')).toBe(
+        'unknown-command',
+      );
+      expect(
+        sanitizeHookName('"/path/to/hook.sh --api-key sk-secret-12345"'),
+      ).toBe('unknown-command');
+      expect(sanitizeHookName('"/path/to/hook.sh /home/alice/secret"')).toBe(
+        'unknown-command',
+      );
+      expect(sanitizeHookName('"/path/to/hook.sh ./sk-secret-12345"')).toBe(
+        'unknown-command',
+      );
+      expect(sanitizeHookName('"/path/to/hook.sh ../sk-secret-12345"')).toBe(
+        'unknown-command',
+      );
+      expect(
+        sanitizeHookName('"curl https://api.example.com/sk-secret-12345"'),
+      ).toBe('unknown-command');
+    });
+
+    it('should keep command and parameter substitutions in env assignments as a single token', () => {
+      expect(
+        sanitizeHookName('API_KEY=$(echo sk-secret-12345) node hook.js'),
+      ).toBe('node');
+      expect(
+        sanitizeHookName('SECRET=$(cat /Users/alice/.netrc) python3 hook.py'),
+      ).toBe('python3');
+      expect(
+        sanitizeHookName(
+          'AUTH_TOKEN=$(gcloud auth print-access-token) /opt/hooks/run.sh',
+        ),
+      ).toBe('run.sh');
+      expect(
+        sanitizeHookName(
+          'AUTH="Bearer $(gcloud auth print-access-token)" /opt/hooks/run.sh',
+        ),
+      ).toBe('run.sh');
+      expect(
+        sanitizeHookName('TOKEN=$(echo $(cat /etc/secret)) /opt/hooks/run.sh'),
+      ).toBe('run.sh');
+      expect(sanitizeHookName('TOKEN=$(echo "a)b") node hook.js')).toBe('node');
+      expect(sanitizeHookName('COUNT=$((1 + 2)) node hook.js')).toBe('node');
+      expect(
+        sanitizeHookName(
+          'API_KEY=${API_KEY:-default sk-secret-12345} node hook.js',
+        ),
+      ).toBe('node');
+      expect(
+        sanitizeHookName(
+          'AUTH="prefix ${API_KEY:-"quoted default"}" /opt/hooks/run.sh',
+        ),
+      ).toBe('run.sh');
+      expect(
+        sanitizeHookName('API_KEY=${API_KEY:-unclosed sk-secret node hook.js'),
+      ).toBe('unknown-command');
+      expect(
+        sanitizeHookName('API_KEY=`echo sk-secret-12345` node hook.js'),
+      ).toBe('node');
+      expect(sanitizeHookName("API_KEY=`echo don\\'t` node hook.js")).toBe(
+        'node',
+      );
+      expect(
+        sanitizeHookName('API_KEY=$(echo sk-secret-12345 node hook.js'),
+      ).toBe('unknown-command');
+      expect(
+        sanitizeHookName('API_KEY=`echo sk-secret-12345 node hook.js'),
+      ).toBe('unknown-command');
+      expect(sanitizeHookName('$(echo sk-secret-12345)')).toBe(
+        'unknown-command',
+      );
+      expect(sanitizeHookName('`echo sk-secret-12345`')).toBe(
+        'unknown-command',
+      );
+      expect(
+        sanitizeHookName('${GEMINI_PROJECT_DIR}/.gemini/hooks/add-context.sh'),
+      ).toBe('add-context.sh');
+    });
+
+    it('should honor POSIX escapes and ANSI-C quoting in env assignment values', () => {
+      expect(
+        sanitizeHookName(
+          "MSG=don\\'t curl https://example.com -H 'Bearer sk-secret-12345'",
+        ),
+      ).toBe('curl');
+      expect(sanitizeHookName('FOO=bar\\\\ curl sk-secret-12345')).toBe('curl');
+      expect(sanitizeHookName('FOO=bar\\')).toBe('unknown-command');
+      expect(
+        sanitizeHookName('TOKEN="price is \\$5 and \\`literal\\`" node app.js'),
+      ).toBe('node');
+      expect(
+        sanitizeHookName("MSG=$'don\\'t fail' curl https://example.com"),
+      ).toBe('curl');
+      expect(sanitizeHookName("MSG=$'unclosed curl secret")).toBe(
+        'unknown-command',
+      );
+      expect(sanitizeHookName("echo don't fail")).toBe('echo');
+    });
+
+    it('should handle bash append assignments and reject bare shell operators', () => {
+      expect(sanitizeHookName('PATH+=/opt/bin /opt/hooks/run.sh')).toBe(
+        'run.sh',
+      );
+      expect(sanitizeHookName('FOO=bar && /opt/hooks/run.sh')).toBe(
+        'unknown-command',
+      );
+      expect(sanitizeHookName('FOO=bar || /opt/hooks/run.sh')).toBe(
+        'unknown-command',
+      );
+      expect(sanitizeHookName('FOO=bar | /opt/hooks/run.sh')).toBe(
+        'unknown-command',
+      );
+      expect(sanitizeHookName('FOO=bar ; /opt/hooks/run.sh')).toBe(
+        'unknown-command',
+      );
+      expect(sanitizeHookName('FOO=bar & /opt/hooks/run.sh')).toBe(
+        'unknown-command',
       );
     });
   });
