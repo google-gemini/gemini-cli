@@ -136,7 +136,7 @@
     "eslint": "9.25.1",
     "npm-run-all2": "8.0.2",
     "typescript": "5.8.3",
-    "vitest": "3.2.4"
+    "vitest": "5.1.1"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
