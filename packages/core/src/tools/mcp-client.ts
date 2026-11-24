@@ -62,7 +62,11 @@ import {
   type MCPOAuthConfig,
 } from '../mcp/oauth-provider.js';
 import { DynamicStoredOAuthProvider } from '../mcp/stored-token-provider.js';
-import { OAuthUtils } from '../mcp/oauth-utils.js';
+import {
+  OAuthUtils,
+  OAuthSecurityError,
+  areIssuersEqual,
+} from '../mcp/oauth-utils.js';
 
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import {
@@ -953,14 +957,26 @@ async function handleAutomaticOAuth(
     }
 
     // OAuth configuration discovered - proceed with authentication
+    if (
+      mcpServerConfig.oauth?.issuer &&
+      (!oauthConfig.issuer ||
+        !areIssuersEqual(oauthConfig.issuer, mcpServerConfig.oauth.issuer))
+    ) {
+      throw new OAuthSecurityError(
+        `Discovered OAuth issuer "${oauthConfig.issuer ?? ''}" does not match configured issuer "${mcpServerConfig.oauth.issuer}".`,
+      );
+    }
 
     // Create OAuth configuration for authentication
     const oauthAuthConfig: MCPOAuthConfig = {
       enabled: true,
       authorizationUrl: oauthConfig.authorizationUrl,
-      issuer: oauthConfig.issuer,
+      issuer: mcpServerConfig.oauth?.issuer || oauthConfig.issuer,
       tokenUrl: oauthConfig.tokenUrl,
       scopes: oauthConfig.scopes || [],
+      ...(oauthConfig.registrationUrl
+        ? { registrationUrl: oauthConfig.registrationUrl }
+        : {}),
       authorizationResponseIssParameterSupported:
         mcpServerConfig.oauth?.authorizationResponseIssParameterSupported ??
         oauthConfig.authorizationResponseIssParameterSupported,
@@ -2145,13 +2161,29 @@ export async function connectToMcpServer(
               `Discovered OAuth configuration from base URL for server '${mcpServerName}'`,
             );
 
+            if (
+              mcpServerConfig.oauth?.issuer &&
+              (!oauthConfig.issuer ||
+                !areIssuersEqual(
+                  oauthConfig.issuer,
+                  mcpServerConfig.oauth.issuer,
+                ))
+            ) {
+              throw new OAuthSecurityError(
+                `Discovered OAuth issuer "${oauthConfig.issuer ?? ''}" does not match configured issuer "${mcpServerConfig.oauth.issuer}".`,
+              );
+            }
+
             // Create OAuth configuration for authentication
             const oauthAuthConfig: MCPOAuthConfig = {
               enabled: true,
               authorizationUrl: oauthConfig.authorizationUrl,
-              issuer: oauthConfig.issuer,
+              issuer: mcpServerConfig.oauth?.issuer || oauthConfig.issuer,
               tokenUrl: oauthConfig.tokenUrl,
               scopes: oauthConfig.scopes || [],
+              ...(oauthConfig.registrationUrl
+                ? { registrationUrl: oauthConfig.registrationUrl }
+                : {}),
               authorizationResponseIssParameterSupported:
                 mcpServerConfig.oauth
                   ?.authorizationResponseIssParameterSupported ??

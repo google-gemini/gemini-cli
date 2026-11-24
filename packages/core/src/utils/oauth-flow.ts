@@ -16,7 +16,13 @@ import * as crypto from 'node:crypto';
 import type * as net from 'node:net';
 import { URL } from 'node:url';
 import { debugLogger } from './debugLogger.js';
-import { validateOAuthEndpointUrl, isLoopbackUrl } from '../mcp/oauth-utils.js';
+import {
+  validateOAuthEndpointUrl,
+  isLoopbackUrl,
+  areIssuersEqual,
+} from '../mcp/oauth-utils.js';
+
+export { areIssuersEqual };
 
 /**
  * Configuration for an OAuth 2.0 Authorization Code flow.
@@ -134,50 +140,6 @@ export function generatePKCEParams(): PKCEParams {
   const state = crypto.randomBytes(16).toString('base64url');
 
   return { codeVerifier, codeChallenge, state };
-}
-
-/**
- * Compares two OAuth issuer URLs per RFC 8414 / RFC 9207.
- * Normalizes trailing slashes and origins to ensure consistent matching,
- * while rejecting userinfo (preventing OAuth mix-up attacks) and preserving
- * query parameters and fragments.
- */
-export function areIssuersEqual(issuerA: string, issuerB: string): boolean {
-  if (issuerA === issuerB && !issuerA.includes('@')) return true;
-
-  const normalize = (iss: string): string | null => {
-    try {
-      const u = new URL(iss);
-
-      // RFC 8414 & RFC 9207: Valid OAuth issuers MUST NOT contain userinfo.
-      // Discarding or accepting userinfo can enable URL confusion / mix-up attacks
-      // (e.g., https://attacker.com@github.com/login/oauth).
-      if (u.username || u.password) {
-        return null;
-      }
-
-      // Normalize trailing slashes on pathname (e.g., "/oauth/" -> "/oauth")
-      const normalizedPath = u.pathname.replace(/\/+$/, '');
-
-      // Reconstruct canonical URL:
-      // - u.protocol and u.host handle lowercasing and default port removal (:443)
-      // - normalizedPath handles trailing slash equivalence
-      // - u.search and u.hash are preserved so different tenants/queries never collide
-      return `${u.protocol}//${u.host}${normalizedPath}${u.search}${u.hash}`;
-    } catch {
-      // Fallback for non-standard / relative strings
-      return iss.replace(/\/+$/, '');
-    }
-  };
-
-  const normA = normalize(issuerA);
-  const normB = normalize(issuerB);
-
-  if (normA === null || normB === null) {
-    return false;
-  }
-
-  return normA === normB;
 }
 
 /**
@@ -625,7 +587,7 @@ export async function exchangeCodeForToken(
   codeVerifier: string,
   redirectPort: number,
   resource?: string,
-  options?: { allowPrivateNetwork?: boolean },
+  options?: { allowPrivateNetwork?: boolean; expectedOrigin?: string },
 ): Promise<OAuthTokenResponse> {
   const redirectUri = getRedirectUri(config, redirectPort);
 
@@ -655,6 +617,7 @@ export async function exchangeCodeForToken(
   const validatedTokenUrl = await validateOAuthEndpointUrl(config.tokenUrl, {
     allowLoopback,
     allowPrivateNetwork: options?.allowPrivateNetwork,
+    expectedOrigin: options?.expectedOrigin,
   });
 
   const response = await fetch(validatedTokenUrl, {
@@ -687,7 +650,7 @@ export async function refreshAccessToken(
   refreshToken: string,
   tokenUrl: string,
   resource?: string,
-  options?: { allowPrivateNetwork?: boolean },
+  options?: { allowPrivateNetwork?: boolean; expectedOrigin?: string },
 ): Promise<OAuthTokenResponse> {
   const params = new URLSearchParams({
     grant_type: 'refresh_token',
@@ -717,6 +680,7 @@ export async function refreshAccessToken(
   const validatedTokenUrl = await validateOAuthEndpointUrl(tokenUrl, {
     allowLoopback,
     allowPrivateNetwork: options?.allowPrivateNetwork,
+    expectedOrigin: options?.expectedOrigin,
   });
 
   const response = await fetch(validatedTokenUrl, {
