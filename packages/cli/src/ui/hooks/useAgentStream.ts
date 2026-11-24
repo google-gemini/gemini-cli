@@ -177,6 +177,7 @@ export const useAgentStream = ({
           prompt_id: '',
         },
         status: t.status,
+        confirmationDetails: t.confirmationDetails,
       })),
     [trackedTools],
   );

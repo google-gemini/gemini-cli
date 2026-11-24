@@ -18,6 +18,64 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.71.0 - 2026-11-24
+
+- **Asynchronous PowerShell Parsing & UI Responsiveness:** Parsed PowerShell
+  commands asynchronously and introduced scoped parse caching to eliminate
+  redundant shell spawns and prevent UI spinner freezes
+  ([#30334](https://github.com/google-gemini/gemini-cli/pull/30334) by
+  @tadipavan).
+- **Development Infrastructure & Artifact Registry:** Pushed development worker
+  images to a private Artifact Registry to improve container builds and release
+  workflows ([#30319](https://github.com/google-gemini/gemini-cli/pull/30319) by
+  @DavidAPierce).
+
+## Announcements: v0.70.0 - 2026-11-19
+
+- **Policy Engine Hardening & Shell Safety:** Evaluated policy regex patterns
+  with re2js for linear-time evaluation and matched prefix and regex rules
+  against top-level command arguments
+  ([#30282](https://github.com/google-gemini/gemini-cli/pull/30282) by
+  @diegogodinezr,
+  [#30355](https://github.com/google-gemini/gemini-cli/pull/30355) by
+  @luisfelipe-alt).
+- **System MCP & IDE Security Isolation:** Skipped system MCP servers with
+  insecure command permissions and isolated IDE companion discovery using
+  per-user directories with atomic port writes
+  ([#30283](https://github.com/google-gemini/gemini-cli/pull/30283) by
+  @elberthc-byte,
+  [#30340](https://github.com/google-gemini/gemini-cli/pull/30340) by
+  @villahernandez-coder).
+- **Model Token Limits & HTTP Timeout Scaling:** Reported accurate output token
+  limits in model listings and dynamically scaled HTTP client body timeouts for
+  long-running requests
+  ([#30253](https://github.com/google-gemini/gemini-cli/pull/30253) by
+  @tadipavan, [#30258](https://github.com/google-gemini/gemini-cli/pull/30258)
+  by @tadipavan).
+
+## Announcements: v0.69.0 - 2026-11-19
+
+- **Daily Token Heatmap & Custom Themes:** Added a `/stats heatmap` subcommand
+  for daily token usage analysis and supported standalone `theme.json`
+  configurations for custom themes
+  ([#30135](https://github.com/google-gemini/gemini-cli/pull/30135) by
+  @jvargassanchez-dot,
+  [#30119](https://github.com/google-gemini/gemini-cli/pull/30119) by
+  @jesussamuel-byte).
+- **API Timeout Overrides & Network Resilience:** Enabled custom API header
+  timeout configuration across all authentication modes and prevented silent
+  loading hangs during network failures
+  ([#30183](https://github.com/google-gemini/gemini-cli/pull/30183) by
+  @jesussamuel-byte,
+  [#30182](https://github.com/google-gemini/gemini-cli/pull/30182) by
+  @villahernandez-coder).
+- **Multimodal Memory & Sandbox Hardening:** Bounded multi-part tool outputs to
+  evict older inline data and resolved folder trust before entering macOS
+  Seatbelt sandboxes
+  ([#30180](https://github.com/google-gemini/gemini-cli/pull/30180) by
+  @tadipavan, [#30164](https://github.com/google-gemini/gemini-cli/pull/30164)
+  by @diegogodinezr).
+
 ## Announcements: v0.68.0 - 2026-11-10
 
 - **Extension Validation & Install Safety:** Added an extension validation

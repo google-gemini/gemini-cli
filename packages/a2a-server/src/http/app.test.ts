@@ -15,6 +15,7 @@ import type {
   SendStreamingMessageSuccessResponse,
 } from '@a2a-js/sdk';
 import express from 'express';
+import { randomUUID } from 'node:crypto';
 import type { Server } from 'node:http';
 import request from 'supertest';
 import {
@@ -41,6 +42,11 @@ import type { Command, CommandContext } from '../commands/types.js';
 
 const mockToolConfirmationFn = async () =>
   ({}) as unknown as ToolCallConfirmationDetails;
+
+// Every route requires `Authorization: Bearer <GEMINI_IPC_SECRET>`.
+const TEST_AUTH_TOKEN = randomUUID();
+const authedAgent = (target: express.Express) =>
+  request.agent(target).set('Authorization', `Bearer ${TEST_AUTH_TOKEN}`);
 
 const streamToSSEEvents = (
   stream: string,
@@ -112,11 +118,15 @@ describe('E2E Tests', () => {
   let server: Server;
 
   beforeAll(async () => {
+    // createApp() reads the secret once, so it has to be set before the shared
+    // app is created as well as for the tests that create their own.
+    vi.stubEnv('GEMINI_IPC_SECRET', TEST_AUTH_TOKEN);
     app = await createApp();
     server = app.listen(0); // Listen on a random available port
   });
 
   beforeEach(() => {
+    vi.stubEnv('GEMINI_IPC_SECRET', TEST_AUTH_TOKEN);
     getApprovalModeSpy.mockReturnValue(ApprovalMode.DEFAULT);
   });
 
@@ -139,7 +149,7 @@ describe('E2E Tests', () => {
       yield* [{ type: 'content', value: 'Hello how are you?' }];
     });
 
-    const agent = request.agent(app);
+    const agent = authedAgent(app);
     const res = await agent
       .post('/')
       .send(createStreamMessageRequest('hello', 'a2a-test-message'))
@@ -201,7 +211,7 @@ describe('E2E Tests', () => {
       getTool: vi.fn().mockReturnValue(mockTool),
     });
 
-    const agent = request.agent(app);
+    const agent = authedAgent(app);
     const res = await agent
       .post('/')
       .send(createStreamMessageRequest('run a tool', 'a2a-tool-test-message'))
@@ -303,7 +313,7 @@ describe('E2E Tests', () => {
       }),
     });
 
-    const agent = request.agent(app);
+    const agent = authedAgent(app);
     const res = await agent
       .post('/')
       .send(
@@ -492,7 +502,7 @@ describe('E2E Tests', () => {
       return config;
     });
 
-    const agent = request.agent(app);
+    const agent = authedAgent(app);
 
     // 1. Initial prompt schedules write-call-1 and write-call-2.
     // write-call-1 transitions to awaiting_approval while write-call-2 stays queued.
@@ -705,7 +715,7 @@ describe('E2E Tests', () => {
       }),
     });
 
-    const agent = request.agent(app);
+    const agent = authedAgent(app);
     const res = await agent
       .post('/')
       .send(
@@ -827,7 +837,7 @@ describe('E2E Tests', () => {
       getTool: vi.fn().mockReturnValue(mockTool),
     });
 
-    const agent = request.agent(app);
+    const agent = authedAgent(app);
     const res = await agent
       .post('/')
       .send(
@@ -972,7 +982,7 @@ describe('E2E Tests', () => {
       getTool: vi.fn().mockReturnValue(mockTool),
     });
 
-    const agent = request.agent(app);
+    const agent = authedAgent(app);
     const res = await agent
       .post('/')
       .send(
@@ -1089,7 +1099,7 @@ describe('E2E Tests', () => {
       ];
     });
 
-    const agent = request.agent(app);
+    const agent = authedAgent(app);
     const res = await agent
       .post('/')
       .send(createStreamMessageRequest('hello', 'a2a-trace-id-test'))
@@ -1144,7 +1154,7 @@ describe('E2E Tests', () => {
         .spyOn(commandRegistry, 'getAllCommands')
         .mockReturnValue(mockCommands);
 
-      const agent = request.agent(app);
+      const agent = authedAgent(app);
       const res = await agent.get('/listCommands').expect(200);
 
       expect(res.body).toEqual({
@@ -1191,7 +1201,7 @@ describe('E2E Tests', () => {
         .spyOn(commandRegistry, 'getAllCommands')
         .mockReturnValue([cyclicCommand]);
 
-      const agent = request.agent(app);
+      const agent = authedAgent(app);
       const res = await agent.get('/listCommands').expect(200);
 
       expect(res.body.commands[0].name).toBe('cyclic-command');
@@ -1229,7 +1239,7 @@ describe('E2E Tests', () => {
       };
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockExtensionsCommand);
 
-      const agent = request.agent(app);
+      const agent = authedAgent(app);
       const res = await agent
         .post('/executeCommand')
         .send({ command: 'extensions list', args: [] })
@@ -1246,7 +1256,7 @@ describe('E2E Tests', () => {
     it('should return 404 for invalid command', async () => {
       vi.spyOn(commandRegistry, 'get').mockReturnValue(undefined);
 
-      const agent = request.agent(app);
+      const agent = authedAgent(app);
       const res = await agent
         .post('/executeCommand')
         .send({ command: 'invalid command' })
@@ -1258,7 +1268,7 @@ describe('E2E Tests', () => {
     });
 
     it('should return 400 for missing command', async () => {
-      const agent = request.agent(app);
+      const agent = authedAgent(app);
       await agent
         .post('/executeCommand')
         .send({ args: [] })
@@ -1268,14 +1278,14 @@ describe('E2E Tests', () => {
     });
 
     it('should return 400 when request body is empty', async () => {
-      const agent = request.agent(app);
+      const agent = authedAgent(app);
       const res = await agent.post('/executeCommand').expect(400);
       expect(res.body.error).toBe('Invalid "command" field.');
       expect(getExtensionsSpy).not.toHaveBeenCalled();
     });
 
     it('should return 400 if args is not an array', async () => {
-      const agent = request.agent(app);
+      const agent = authedAgent(app);
       const res = await agent
         .post('/executeCommand')
         .send({ command: 'extensions.list', args: 'not-an-array' })
@@ -1297,7 +1307,7 @@ describe('E2E Tests', () => {
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockCommand);
 
       vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', '');
-      const response = await request(app)
+      const response = await authedAgent(app)
         .post('/executeCommand')
         .send({ command: 'test-command', args: [] });
 
@@ -1317,7 +1327,7 @@ describe('E2E Tests', () => {
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockWorkspaceCommand);
 
       vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', '');
-      const response = await request(app)
+      const response = await authedAgent(app)
         .post('/executeCommand')
         .send({ command: 'workspace-command', args: [] });
 
@@ -1339,7 +1349,7 @@ describe('E2E Tests', () => {
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockWorkspaceCommand);
 
       vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', '/tmp/test-workspace');
-      const response = await request(app)
+      const response = await authedAgent(app)
         .post('/executeCommand')
         .send({ command: 'workspace-command', args: [] });
 
@@ -1360,7 +1370,7 @@ describe('E2E Tests', () => {
       };
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockCommand);
 
-      const agent = request.agent(app);
+      const agent = authedAgent(app);
       const res = await agent
         .post('/executeCommand')
         .send({ command: 'context-check-command', args: [] })
@@ -1400,7 +1410,7 @@ describe('E2E Tests', () => {
         };
         vi.spyOn(commandRegistry, 'get').mockReturnValue(mockStreamCommand);
 
-        const agent = request.agent(app);
+        const agent = authedAgent(app);
         agent
           .post('/executeCommand')
           .send({ command: 'stream-test', args: [] })
@@ -1449,7 +1459,7 @@ describe('E2E Tests', () => {
         };
         vi.spyOn(commandRegistry, 'get').mockReturnValue(mockNonStreamCommand);
 
-        const agent = request.agent(app);
+        const agent = authedAgent(app);
         const res = await agent
           .post('/executeCommand')
           .send({ command: 'non-stream-test', args: [] })
@@ -1590,7 +1600,7 @@ describe('E2E Tests', () => {
           },
         };
 
-        const res = await request(testApp)
+        const res = await authedAgent(testApp)
           .post('/__sdk_route_body_probe')
           .set('Content-Type', 'application/json')
           .send(payload)
