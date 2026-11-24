@@ -14,6 +14,8 @@ import {
   parseCommandDetailsAsync,
   isDefaultParseCommandDetails,
   stripShellWrapper,
+  stripShellWrapperWithTarget,
+  isDefaultStripShellWrapper,
   unwrapShellCommandForInspection,
   hasRedirection,
   hasRedirectionAsync,
@@ -702,9 +704,22 @@ export class PolicyEngine {
         (detail.startIndex === 0 && detail.text.length === command.length);
 
       // Recursive check for shell wrappers (bash -c, etc.)
-      const stripped = stripShellWrapper(subCmd);
-      if (stripped !== subCmd) {
-        if (inspectionDepth >= MAX_SHELL_INSPECTION_DEPTH) {
+      const strippedInfo =
+        typeof stripShellWrapperWithTarget === 'function' &&
+        (typeof isDefaultStripShellWrapper !== 'function' ||
+          isDefaultStripShellWrapper(stripShellWrapper))
+          ? stripShellWrapperWithTarget(subCmd)
+          : (() => {
+              const fallback = stripShellWrapper(subCmd);
+              return {
+                command: fallback,
+                depth: fallback !== subCmd ? 1 : 0,
+              };
+            })();
+      const stripped = strippedInfo.command;
+      const strippedDepth = strippedInfo.depth;
+      if (strippedDepth > 0 && stripped !== subCmd) {
+        if (inspectionDepth + strippedDepth > MAX_SHELL_INSPECTION_DEPTH) {
           allSubCommandsExplicitlyAllowed = false;
           const depthDecision = this.getDepthLimitExceededDecision(
             toolName,
@@ -731,8 +746,8 @@ export class PolicyEngine {
             toolAnnotations,
             subagent,
             true,
-            inspectionDepth + 1,
-            recursionDepth + 1,
+            inspectionDepth + strippedDepth,
+            recursionDepth + strippedDepth,
           );
 
           if (wrapperResult.decision === PolicyDecision.DENY)

@@ -598,7 +598,52 @@ describe('shell wrapper and command substitution bypass prevention', () => {
       );
       expect(veryDeepResult.decision).toBe(PolicyDecision.ALLOW);
 
-      // Also verify stripShellWrapper depth limit fails closed for deeply nested sh -c.
+      // Also verify stripShellWrapperWithTarget depth accounting enforces the exact
+      // 5-layer limit (5 nested `sh -c` allowed when inner is allowed; 6 fails closed).
+      let nestedSh5 = 'echo hi';
+      for (let i = 0; i < 5; i++) {
+        nestedSh5 = `sh -c ${JSON.stringify(nestedSh5)}`;
+      }
+      const nestedSh6 = `sh -c ${JSON.stringify(nestedSh5)}`;
+      const shEchoAllowEngine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'run_shell_command',
+            argsPattern: SafeRegExp.compile(
+              buildArgsPatterns(undefined, 'sh')[0]!,
+            ),
+            decision: PolicyDecision.ALLOW,
+            priority: 100,
+          },
+          {
+            toolName: 'run_shell_command',
+            argsPattern: SafeRegExp.compile(
+              buildArgsPatterns(undefined, 'echo')[0]!,
+            ),
+            decision: PolicyDecision.ALLOW,
+            priority: 100,
+          },
+        ],
+        approvalMode: ApprovalMode.DEFAULT,
+        defaultDecision: PolicyDecision.ASK_USER,
+      });
+      expect(
+        (
+          await shEchoAllowEngine.check(
+            { name: 'run_shell_command', args: { command: nestedSh5 } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (
+          await shEchoAllowEngine.check(
+            { name: 'run_shell_command', args: { command: nestedSh6 } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+
       let nestedSh = 'whoami';
       for (let i = 0; i < 8; i++) {
         nestedSh = `sh -c ${JSON.stringify(nestedSh)}`;

@@ -1894,7 +1894,7 @@ function stripSingleShellWrapperWithTarget(
   return null;
 }
 
-function stripShellWrapperWithTarget(command: string): {
+export function stripShellWrapperWithTarget(command: string): {
   command: string;
   targetShell?: ShellType;
   depth: number;
@@ -1919,6 +1919,12 @@ function stripShellWrapperWithTarget(command: string): {
 
 export function stripShellWrapper(command: string): string {
   return stripShellWrapperWithTarget(command).command;
+}
+
+const defaultStripShellWrapperRef = stripShellWrapper;
+
+export function isDefaultStripShellWrapper(fn: unknown): boolean {
+  return fn === defaultStripShellWrapperRef;
 }
 
 /**
