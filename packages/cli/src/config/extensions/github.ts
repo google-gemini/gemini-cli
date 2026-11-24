@@ -35,10 +35,23 @@ import type { ExtensionConfig } from '../extension.js';
 import type { ExtensionManager } from '../extension-manager.js';
 import { EXTENSIONS_CONFIG_FILENAME } from './variables.js';
 
+/**
+ * simple-git refuses to run when the environment it is given sets variables or
+ * config keys it considers unsafe. `getSafeGitEnv()` intentionally sets several
+ * of these to harden git (e.g. `GIT_CONFIG_SYSTEM`, plus `GIT_CONFIG_COUNT`
+ * entries that blank out `credential.helper`, `core.fsmonitor`,
+ * `core.hooksPath`, `core.sshCommand`, `core.pager` and the editors), so every
+ * category it touches must be allowed here or clone/update fail before git runs.
+ */
 const GIT_EXTENSION_OPTIONS: Partial<SimpleGitOptions> = {
   unsafe: {
     allowUnsafeAskPass: true,
+    allowUnsafeConfigEnvCount: true,
+    allowUnsafeConfigPaths: true,
+    allowUnsafeCredentialHelper: true,
     allowUnsafeEditor: true,
+    allowUnsafeFsMonitor: true,
+    allowUnsafeHooksPath: true,
     allowUnsafePager: true,
     allowUnsafeSshCommand: true,
   },
