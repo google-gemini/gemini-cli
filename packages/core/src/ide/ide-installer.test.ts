@@ -37,7 +37,7 @@ const HOME_DIR = '/home/user';
 beforeEach(() => {
   vi.spyOn(os, 'homedir').mockReturnValue(HOME_DIR);
   vi.mocked(pathsHomedir).mockReturnValue(HOME_DIR);
-  vi.spyOn(child_process, 'spawnSync').mockReturnValue({
+  vi.mocked(child_process.spawnSync).mockReturnValue({
     status: 0,
     stdout: Buffer.from(''),
     stderr: Buffer.from(''),
@@ -203,7 +203,7 @@ describe('ide-installer', () => {
       });
 
       it('successfully installs on windows when path contains spaces (#30245 behavior)', async () => {
-        vi.spyOn(child_process, 'spawnSync').mockImplementationOnce(
+        vi.mocked(child_process.spawnSync).mockImplementationOnce(
           (cmd, _args, opts) => {
             // Windows cmd.exe fails if an unquoted command path contains spaces
             if (
