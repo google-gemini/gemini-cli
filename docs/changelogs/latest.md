@@ -1,4 +1,4 @@
-# Latest stable release: v0.71.0
+# Latest stable release: v0.71.1
 
 Released: November 24, 2026
 
@@ -23,6 +23,9 @@ npm install -g @google/gemini-cli
 
 ## What's Changed
 
+- fix(patch): cherry-pick aafdfdf to release/v0.71.0-pr-30420 to patch version
+  v0.71.0 and create version 0.71.1 by @gemini-cli-robot in
+  [#30429](https://github.com/google-gemini/gemini-cli/pull/30429)
 - Changelog for v0.70.0-preview.0 by @gemini-cli-robot in
   [#30361](https://github.com/google-gemini/gemini-cli/pull/30361)
 - chore(release): bump version to 0.71.0-nightly.20261118.g615d6bc8c by
@@ -38,4 +41,4 @@ npm install -g @google/gemini-cli
   [#30319](https://github.com/google-gemini/gemini-cli/pull/30319)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.70.0...v0.71.0
+https://github.com/google-gemini/gemini-cli/compare/v0.70.0...v0.71.1
