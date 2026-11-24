@@ -53,7 +53,6 @@ afterEach(() => {
 });
 
 describe('ide-installer', () => {
-
   describe('getIdeInstaller', () => {
     it.each([
       { ide: IDE_DEFINITIONS.vscode },
