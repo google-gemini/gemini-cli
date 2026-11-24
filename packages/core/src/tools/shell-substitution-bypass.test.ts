@@ -279,6 +279,8 @@ describe('shell wrapper and command substitution bypass prevention', () => {
       "& pwsh -c '$(whoami)'",
       `pwsh -EncodedCommand ${encodedWhoamiSub}`,
       'pwsh -c \u2018$(whoami)\u2019',
+      'pwsh -c \u201c$(whoami)\u201d',
+      "pwsh -c 'echo \u2018ok\u2019; $(whoami)'",
       "pwsh \u2013c '$(whoami)'",
       "bash -c '`whoami`'",
     ];
@@ -351,6 +353,7 @@ describe('shell wrapper and command substitution bypass prevention', () => {
       'cmd.exe /k "whoami"',
       'cmd.exe /k"whoami"',
       "pwsh -ExecutionPolicy Bypass -c 'whoami'",
+      "pwsh -c 'echo \u2018ok\u2019; whoami'",
       `pwsh -ec ${encodedWhoami}`,
     ];
 
@@ -377,8 +380,18 @@ describe('shell wrapper and command substitution bypass prevention', () => {
       "bash -lc 'git status && echo ok'",
       "sh -c 'echo \"$1\"' _ '$(not_evaled)'",
       "sh -c 'echo hi' >/tmp/x",
+      'pwsh -c \'echo "It\u2019s fine"\'',
     ])('does not false-positive on benign command: %s', (command) => {
       expect(detectCommandSubstitution(stripShellWrapper(command))).toBe(false);
+    });
+
+    it('unwraps ASCII-quoted pwsh commands containing smart apostrophes while still catching cross-shell substitution', () => {
+      expect(stripShellWrapper('pwsh -c \'echo "It\u2019s fine"\'')).toBe(
+        'echo "It\u2019s fine"',
+      );
+      expect(
+        detectCommandSubstitution("pwsh -c 'echo \u2018ok\u2019; $(whoami)'"),
+      ).toBe(true);
     });
 
     it('preserves redirection detection when stripShellWrapper declines partial stripping', () => {

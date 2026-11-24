@@ -1620,19 +1620,28 @@ function unwrapCmdCommandArg(rawArg: string): string | null {
 }
 
 function unwrapPowerShellCommandArg(rawArg: string): string | null {
+  // When enclosed in standard ASCII `'...'`, preserve Unicode smart quotes
+  // (\u2018..\u201b) inside the payload: POSIX shells invoking `pwsh` treat
+  // them as literal characters (so `pwsh -c 'echo \u2018ok\u2019; $(whoami)'`
+  // must unwrap for inner PowerShell inspection), and typographic apostrophes
+  // (e.g. "It\u2019s") do not break unwrapping. When enclosed in smart quotes
+  // (e.g. `pwsh -c \u2018$(whoami)\u2019`), follow PowerShell's
+  // interchangeable `SpecialCharacters.IsSingleQuote` delimiter rules.
   if (
     rawArg.length >= 2 &&
     isPowerShellSingleQuote(rawArg[0]) &&
     isPowerShellSingleQuote(rawArg[rawArg.length - 1])
   ) {
+    const isAsciiDelimited =
+      rawArg[0] === "'" && rawArg[rawArg.length - 1] === "'";
+    const isSingleDelimiter = (ch: string) =>
+      isAsciiDelimited ? ch === "'" : isPowerShellSingleQuote(ch);
+
     let j = 1;
     let out = '';
     while (j < rawArg.length - 1) {
-      if (isPowerShellSingleQuote(rawArg[j])) {
-        if (
-          j + 1 < rawArg.length - 1 &&
-          isPowerShellSingleQuote(rawArg[j + 1])
-        ) {
+      if (isSingleDelimiter(rawArg[j])) {
+        if (j + 1 < rawArg.length - 1 && isSingleDelimiter(rawArg[j + 1])) {
           out += "'";
           j += 2;
           continue;
@@ -1645,11 +1654,17 @@ function unwrapPowerShellCommandArg(rawArg: string): string | null {
     return out;
   }
 
+  // Same distinction for ASCII `"..."` vs smart double quotes (\u201c..\u201e).
   if (
     rawArg.length >= 2 &&
     isPowerShellDoubleQuote(rawArg[0]) &&
     isPowerShellDoubleQuote(rawArg[rawArg.length - 1])
   ) {
+    const isAsciiDelimited =
+      rawArg[0] === '"' && rawArg[rawArg.length - 1] === '"';
+    const isDoubleDelimiter = (ch: string) =>
+      isAsciiDelimited ? ch === '"' : isPowerShellDoubleQuote(ch);
+
     let outerHasSubExpression = false;
     let out = '';
     let j = 1;
@@ -1695,8 +1710,8 @@ function unwrapPowerShellCommandArg(rawArg: string): string | null {
         j += 2;
         continue;
       }
-      if (ch === '"') {
-        if (j + 1 < end && rawArg[j + 1] === '"') {
+      if (isDoubleDelimiter(ch)) {
+        if (j + 1 < end && isDoubleDelimiter(rawArg[j + 1])) {
           out += '"';
           j += 2;
           continue;
