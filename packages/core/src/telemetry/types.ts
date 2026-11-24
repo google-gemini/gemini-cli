@@ -2386,7 +2386,7 @@ export class HookCallEvent implements BaseTelemetryEvent {
   }
 
   toLogBody(): string {
-    const hookId = `${this.hook_event_name}.${this.hook_name}`;
+    const hookId = `${this.hook_event_name}.${sanitizeHookName(this.hook_name)}`;
     const status = `${this.success ? 'succeeded' : 'failed'}`;
     return `Hook call ${hookId} ${status} in ${this.duration_ms}ms`;
   }

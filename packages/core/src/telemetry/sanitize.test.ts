@@ -14,6 +14,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { HookCallEvent, EVENT_HOOK_CALL } from './types.js';
+import { sanitizeHookName } from './sanitize.js';
 import { HookType } from '../hooks/types.js';
 import type { Config } from '../config/config.js';
 
@@ -350,6 +351,21 @@ describe('Telemetry Sanitization', () => {
           'Hook call AfterTool.validation-hook failed in 75ms',
         );
       });
+
+      it('should sanitize hook name in log body', () => {
+        const event = new HookCallEvent(
+          'BeforeTool',
+          HookType.Command,
+          'AWS_SECRET_KEY=abc123 /path/to/check.sh --token=xyz',
+          {},
+          42,
+          true,
+        );
+
+        expect(event.toLogBody()).toBe(
+          'Hook call BeforeTool.check.sh succeeded in 42ms',
+        );
+      });
     });
 
     describe('integration scenarios', () => {
@@ -478,7 +494,7 @@ describe('Telemetry Sanitization', () => {
         );
 
         const attributes = event.toOpenTelemetryAttributes(config);
-        expect(attributes['hook_name']).toBe('AWS_SECRET_KEY=abc123');
+        expect(attributes['hook_name']).toBe('aws');
       });
 
       it('should sanitize Python scripts with file paths', () => {
@@ -494,6 +510,89 @@ describe('Telemetry Sanitization', () => {
         const attributes = event.toOpenTelemetryAttributes(config);
         expect(attributes['hook_name']).toBe('python');
       });
+    });
+  });
+
+  describe('sanitizeHookName', () => {
+    it('should skip single and multiple leading POSIX environment variable assignments', () => {
+      expect(
+        sanitizeHookName('AWS_SECRET_KEY=AKIAIOSFODNN7EXAMPLE aws s3 ls'),
+      ).toBe('aws');
+      expect(
+        sanitizeHookName(
+          'AWS_ACCESS_KEY_ID=key1 AWS_SECRET_ACCESS_KEY=secret2 /opt/hooks/run.sh --flag',
+        ),
+      ).toBe('run.sh');
+      expect(sanitizeHookName('EMPTY= ./hooks/run.sh')).toBe('run.sh');
+      expect(sanitizeHookName('_PRIVATE_1=val123 node hook.js')).toBe('node');
+    });
+
+    it('should skip quoted and escaped environment variable values containing spaces', () => {
+      expect(
+        sanitizeHookName(
+          'AUTH_HEADER="Bearer token-value" curl https://example.com',
+        ),
+      ).toBe('curl');
+      expect(
+        sanitizeHookName("API_TOKEN='part1 part2' /usr/local/bin/node hook.js"),
+      ).toBe('node');
+      expect(
+        sanitizeHookName('TOKEN="escaped \\"quote\\" value" python script.py'),
+      ).toBe('python');
+      expect(
+        sanitizeHookName('PASSWORD=my\\ secret\\ value python script.py'),
+      ).toBe('python');
+      expect(sanitizeHookName('TOKEN="unclosed value with spaces')).toBe(
+        'unknown-command',
+      );
+    });
+
+    it('should skip env assignments whose values contain slashes or equals signs', () => {
+      expect(
+        sanitizeHookName(
+          'DATABASE_URL=postgres://user:pass@localhost/db node migrate.js',
+        ),
+      ).toBe('node');
+      expect(sanitizeHookName('TOKEN=abc=def== node app.js')).toBe('node');
+      expect(sanitizeHookName('SECRET_PATH=/home/user/token.txt')).toBe(
+        'unknown-command',
+      );
+    });
+
+    it('should return unknown-command when only env assignments are provided', () => {
+      expect(sanitizeHookName('AWS_SECRET_KEY=abc123')).toBe('unknown-command');
+      expect(sanitizeHookName('FOO=1 BAR=2')).toBe('unknown-command');
+      expect(sanitizeHookName('"" aws s3 ls')).toBe('unknown-command');
+      expect(sanitizeHookName("''")).toBe('unknown-command');
+    });
+
+    it('should defensively drop non-POSIX tokens containing equals signs', () => {
+      expect(sanitizeHookName('(AWS_SECRET_KEY=abc123 aws s3 ls)')).toBe(
+        'unknown-command',
+      );
+      expect(sanitizeHookName('(API_KEY=https://host/secret123 aws)')).toBe(
+        'unknown-command',
+      );
+      expect(sanitizeHookName('$env:API_KEY="secret123"; aws s3 ls')).toBe(
+        'unknown-command',
+      );
+      expect(sanitizeHookName('--api-key=secret123')).toBe('unknown-command');
+      expect(sanitizeHookName('"AWS_SECRET_KEY=abc123" aws s3 ls')).toBe(
+        'unknown-command',
+      );
+      expect(sanitizeHookName('/path/to/key=value.sh')).toBe('unknown-command');
+    });
+
+    it('should extract basenames from quoted paths and paths with equals in parent directories', () => {
+      expect(
+        sanitizeHookName('"/path/to/my hooks/check.sh" --api-key=abc123'),
+      ).toBe('check.sh');
+      expect(
+        sanitizeHookName("'C:\\Program Files\\My App\\hook.exe' /c test.bat"),
+      ).toBe('hook.exe');
+      expect(sanitizeHookName('/tmp/dir=1/check-script.sh --flag')).toBe(
+        'check-script.sh',
+      );
     });
   });
 });
