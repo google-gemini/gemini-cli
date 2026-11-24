@@ -69,7 +69,7 @@
     "undici": "7.30.1",
     "ws": "8.22.0",
     "yargs": "17.7.2",
-    "zod": "3.25.76"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@google/gemini-cli-test-utils": "file:../test-utils",
