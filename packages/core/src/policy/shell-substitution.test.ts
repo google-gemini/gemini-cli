@@ -215,4 +215,104 @@ describe('PolicyEngine Command Substitution Validation', () => {
     );
     expect(safeInteractive.decision).toBe(PolicyDecision.ALLOW);
   });
+
+  it('should fail closed when shell wrapper nesting exceeds policy recursion depth limit', async () => {
+    const prefixes = ['sh', 'env', 'true', 'echo'];
+    const rules = prefixes.flatMap((prefix) =>
+      buildArgsPatterns(undefined, prefix, undefined)
+        .filter((pattern): pattern is string => pattern !== undefined)
+        .map((pattern) => ({
+          toolName: 'run_shell_command',
+          argsPattern: SafeRegExp.compile(pattern),
+          decision: PolicyDecision.ALLOW,
+          allowRedirection: true,
+          priority: 4.1,
+        })),
+    );
+
+    const interactiveEngine = new PolicyEngine({
+      rules,
+      defaultDecision: PolicyDecision.ASK_USER,
+      approvalMode: ApprovalMode.DEFAULT,
+      nonInteractive: false,
+    });
+    const headlessEngine = new PolicyEngine({
+      rules,
+      defaultDecision: PolicyDecision.ASK_USER,
+      approvalMode: ApprovalMode.DEFAULT,
+      nonInteractive: true,
+    });
+
+    // Interleave `true &&` with `env sh -c` so neither stripShellWrapper alone
+    // nor compound command splitting can bypass the wrapperDepth cap.
+    const deepWrapped = [
+      'true && env sh -c "',
+      'true && env sh -c \\"',
+      'true && env sh -c \\\\\\"',
+      'true && env sh -c \\\\\\\\\\\\\\"',
+      'true && env sh -c \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"echo deep\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"',
+      '\\\\\\\\\\\\\\"',
+      '\\\\\\"',
+      '\\"',
+      '"',
+    ].join('');
+
+    const interactive = await interactiveEngine.check(
+      { name: 'run_shell_command', args: { command: deepWrapped } },
+      undefined,
+    );
+    const headless = await headlessEngine.check(
+      { name: 'run_shell_command', args: { command: deepWrapped } },
+      undefined,
+    );
+
+    expect(interactive.decision).toBe(PolicyDecision.ASK_USER);
+    expect(headless.decision).toBe(PolicyDecision.DENY);
+  });
+
+  it('should not upgrade a compound command to ALLOW when a wrapped payload is only allowed by a catch-all rule', async () => {
+    const envRules = buildArgsPatterns(undefined, 'env', undefined)
+      .filter((pattern): pattern is string => pattern !== undefined)
+      .map((pattern) => ({
+        toolName: 'run_shell_command',
+        argsPattern: SafeRegExp.compile(pattern),
+        decision: PolicyDecision.ALLOW,
+        priority: 4.1,
+      }));
+    const trueRules = buildArgsPatterns(undefined, 'true', undefined)
+      .filter((pattern): pattern is string => pattern !== undefined)
+      .map((pattern) => ({
+        toolName: 'run_shell_command',
+        argsPattern: SafeRegExp.compile(pattern),
+        decision: PolicyDecision.ALLOW,
+        priority: 4.1,
+      }));
+
+    // Top-level compound command falls back to catch-all ASK_USER (no argsPattern),
+    // while an inner wrapped command `ls -la` is only allowed via known-safe
+    // heuristics (no explicit argsPattern rule).
+    const engine = new PolicyEngine({
+      rules: [
+        ...envRules,
+        ...trueRules,
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 1,
+        },
+      ],
+      defaultDecision: PolicyDecision.ASK_USER,
+      approvalMode: ApprovalMode.DEFAULT,
+      nonInteractive: false,
+    });
+
+    const result = await engine.check(
+      {
+        name: 'run_shell_command',
+        args: { command: "true && env sh -c 'ls -la'" },
+      },
+      undefined,
+    );
+    expect(result.decision).toBe(PolicyDecision.ASK_USER);
+  });
 });

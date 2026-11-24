@@ -64,6 +64,8 @@ import {
   type SandboxPermissions,
 } from '../services/sandboxManager.js';
 
+const MAX_POLICY_WRAPPER_DEPTH = 5;
+
 function containsGitCommand(args: string[]): boolean {
   if (!args || args.length === 0) return false;
   const allowedPredecessors = new Set([
@@ -533,6 +535,22 @@ export class PolicyEngine {
       };
     }
 
+    if (ruleDecision === PolicyDecision.DENY) {
+      return { decision: PolicyDecision.DENY, rule };
+    }
+
+    if (wrapperDepth >= MAX_POLICY_WRAPPER_DEPTH) {
+      debugLogger.debug(
+        `[PolicyEngine.check] Shell wrapper nesting exceeded depth limit (${MAX_POLICY_WRAPPER_DEPTH}), failing closed: ${command}`,
+      );
+      return {
+        decision: this.nonInteractive
+          ? PolicyDecision.DENY
+          : PolicyDecision.ASK_USER,
+        rule: undefined,
+      };
+    }
+
     await initializeShellParsers();
     const parsed = isDefaultParseCommandDetails(parseCommandDetails)
       ? await parseCommandDetailsAsync(command)
@@ -541,11 +559,6 @@ export class PolicyEngine {
 
     // Handle parser failures or syntax errors
     if (subCommands.length === 0 || parsed?.hasError) {
-      // If the matched rule says DENY, we should respect it immediately even if parsing fails.
-      if (ruleDecision === PolicyDecision.DENY) {
-        return { decision: PolicyDecision.DENY, rule };
-      }
-
       if (this.approvalMode === ApprovalMode.YOLO) {
         // Block execution if arguments cannot be validated
         if (rule?.argsPattern) {
@@ -575,10 +588,6 @@ export class PolicyEngine {
     debugLogger.debug(
       `[PolicyEngine.check] Validating shell command: ${subCommands.length} parts`,
     );
-
-    if (ruleDecision === PolicyDecision.DENY) {
-      return { decision: PolicyDecision.DENY, rule };
-    }
 
     // Start with the decision from the rule or heuristics.
     // If the tool call was already downgraded (e.g. by heuristics), we start there.
@@ -642,7 +651,7 @@ export class PolicyEngine {
       if (extraPayloads.length === 0) {
         return null;
       }
-      if (wrapperDepth >= 5) {
+      if (wrapperDepth >= MAX_POLICY_WRAPPER_DEPTH) {
         allSubCommandsExplicitlyAllowed = false;
         if (aggregateDecision === PolicyDecision.ALLOW) {
           aggregateDecision = PolicyDecision.ASK_USER;
@@ -671,6 +680,14 @@ export class PolicyEngine {
             responsibleRule ??= wrappedResult.rule;
           }
           aggregateDecision = PolicyDecision.ASK_USER;
+        } else if (
+          wrappedResult.decision === PolicyDecision.ALLOW &&
+          wrappedResult.rule?.decision === PolicyDecision.ALLOW &&
+          Boolean(wrappedResult.rule?.argsPattern)
+        ) {
+          lastAllowedSubRule = wrappedResult.rule;
+        } else {
+          allSubCommandsExplicitlyAllowed = false;
         }
       }
       return null;
@@ -732,12 +749,13 @@ export class PolicyEngine {
 
       if (!isAtomic) {
         evaluatedSubCommands++;
-        const subResult = await this.check(
+        const subResult = await this.checkInternal(
           { name: toolName, args: { command: subCmd, dir_path } },
           serverName,
           toolAnnotations,
           subagent,
           true,
+          wrapperDepth,
         );
 
         if (subResult.decision === PolicyDecision.DENY) return subResult;
