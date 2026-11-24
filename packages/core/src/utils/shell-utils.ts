@@ -1897,6 +1897,8 @@ function stripSingleShellWrapperWithTarget(
   return null;
 }
 
+const MAX_WRAPPER_DEPTH = 5;
+
 export function stripShellWrapperWithTarget(command: string): {
   command: string;
   targetShell?: ShellType;
@@ -2158,7 +2160,6 @@ interface PrefixUtilitySpec {
   abortFlags?: ReadonlySet<string>;
 }
 
-const MAX_WRAPPER_DEPTH = 5;
 const MAX_ENCODED_COMMAND_B64_LENGTH = 65_536;
 
 const POTENTIAL_SHELL_WRAPPER_PATTERN =
