@@ -1609,26 +1609,47 @@ function unwrapCmdCommandArg(rawArg: string): string | null {
     return inner.includes("'") ? null : inner;
   }
 
+  // Refuse to strip wrapper when an opening quote is followed by trailing
+  // tokens or operators (e.g. `cmd.exe /c 'echo a' & whoami`), because
+  // dropping the wrapper while leaving outer quotes intact hides inner syntax.
+  if (rawArg.startsWith('"') || rawArg.startsWith("'")) {
+    return null;
+  }
+
   return rawArg;
 }
 
 function unwrapPowerShellCommandArg(rawArg: string): string | null {
-  if (rawArg.startsWith("'") && rawArg.endsWith("'")) {
+  if (
+    rawArg.length >= 2 &&
+    isPowerShellSingleQuote(rawArg[0]) &&
+    isPowerShellSingleQuote(rawArg[rawArg.length - 1])
+  ) {
     let j = 1;
+    let out = '';
     while (j < rawArg.length - 1) {
-      if (rawArg[j] === "'") {
-        if (rawArg[j + 1] === "'" && j + 1 < rawArg.length - 1) {
+      if (isPowerShellSingleQuote(rawArg[j])) {
+        if (
+          j + 1 < rawArg.length - 1 &&
+          isPowerShellSingleQuote(rawArg[j + 1])
+        ) {
+          out += "'";
           j += 2;
           continue;
         }
         return null;
       }
+      out += rawArg[j];
       j++;
     }
-    return rawArg.slice(1, -1).replace(/''/g, "'");
+    return out;
   }
 
-  if (rawArg.startsWith('"') && rawArg.endsWith('"')) {
+  if (
+    rawArg.length >= 2 &&
+    isPowerShellDoubleQuote(rawArg[0]) &&
+    isPowerShellDoubleQuote(rawArg[rawArg.length - 1])
+  ) {
     let outerHasSubExpression = false;
     let out = '';
     let j = 1;
@@ -1703,13 +1724,25 @@ function unwrapPowerShellCommandArg(rawArg: string): string | null {
     return out;
   }
 
+  // Refuse to strip wrapper when an opening quote is followed by trailing
+  // statements (e.g. `pwsh -c '$(whoami)'; echo ok`), so outer quotes are not
+  // left orphaned without their wrapper context.
+  if (
+    isPowerShellSingleQuote(rawArg[0]) ||
+    isPowerShellDoubleQuote(rawArg[0])
+  ) {
+    return null;
+  }
+
   return rawArg;
 }
 
-function stripSingleShellWrapper(command: string): string {
+function stripSingleShellWrapperWithTarget(
+  command: string,
+): InspectedShellWrapper | null {
   const exeToken = readWrapperToken(command, 0);
   if (!exeToken) {
-    return command.trim();
+    return null;
   }
 
   if (!exeToken.quoted && !exeToken.value.includes('\\')) {
@@ -1736,26 +1769,35 @@ function stripSingleShellWrapper(command: string): string {
               if (parsed.length === 1 && typeof firstEntry === 'string') {
                 unwrapped = firstEntry;
               } else if (parsed.length > 1) {
-                return command.trim();
+                return null;
               }
             } catch {
               // Fall through to simple outer quote removal below.
             }
             const candidate = unwrapped ?? newCommand.slice(1, -1);
             if (outerHasSubstitution && !detectBashSubstitution(candidate)) {
-              return command.trim();
+              return null;
             }
-            return candidate;
+            return { command: candidate, targetShell: 'bash' };
           }
           if (newCommand.startsWith("'") && newCommand.endsWith("'")) {
             const inner = newCommand.slice(1, -1);
             if (!inner.includes("'")) {
-              return inner;
+              return { command: inner, targetShell: 'bash' };
             }
-            return command.trim();
+            return null;
+          }
+          if (
+            newCommand.startsWith('"') ||
+            newCommand.startsWith("'") ||
+            newCommand.startsWith("$'") ||
+            newCommand.startsWith('-') ||
+            newCommand.startsWith('+')
+          ) {
+            return null;
           }
         }
-        return newCommand;
+        return { command: newCommand, targetShell: 'bash' };
       }
     }
   }
@@ -1789,9 +1831,11 @@ function stripSingleShellWrapper(command: string): string {
         const newCommand = command.substring(flagToken.nextIndex).trim();
         if (newCommand.length >= 2) {
           const unwrapped = unwrapCmdCommandArg(newCommand);
-          return unwrapped === null ? command.trim() : unwrapped;
+          return unwrapped === null
+            ? null
+            : { command: unwrapped, targetShell: 'cmd' };
         }
-        return newCommand;
+        return { command: newCommand, targetShell: 'cmd' };
       }
       break;
     }
@@ -1822,28 +1866,42 @@ function stripSingleShellWrapper(command: string): string {
         const newCommand = command.substring(flagToken.nextIndex).trim();
         if (newCommand.length >= 2) {
           const unwrapped = unwrapPowerShellCommandArg(newCommand);
-          return unwrapped === null ? command.trim() : unwrapped;
+          return unwrapped === null
+            ? null
+            : { command: unwrapped, targetShell: 'powershell' };
         }
-        return newCommand;
+        return { command: newCommand, targetShell: 'powershell' };
       }
       break;
     }
   }
 
-  return command.trim();
+  return null;
+}
+
+function stripShellWrapperWithTarget(command: string): {
+  command: string;
+  targetShell?: ShellType;
+} {
+  let current = command.trim();
+  let targetShell: ShellType | undefined;
+  for (let depth = 0; depth < MAX_WRAPPER_DEPTH; depth++) {
+    const unwrapped = stripSingleShellWrapperWithTarget(current);
+    if (!unwrapped || unwrapped.command === current) {
+      break;
+    }
+    current = unwrapped.command;
+    if (unwrapped.targetShell !== 'cmd') {
+      targetShell = unwrapped.targetShell;
+    } else if (targetShell === undefined) {
+      targetShell = unwrapped.targetShell;
+    }
+  }
+  return { command: current, targetShell };
 }
 
 export function stripShellWrapper(command: string): string {
-  let current = command.trim();
-  const MAX_WRAPPER_DEPTH = 5;
-  for (let depth = 0; depth < MAX_WRAPPER_DEPTH; depth++) {
-    const next = stripSingleShellWrapper(current);
-    if (next === current) {
-      break;
-    }
-    current = next;
-  }
-  return current;
+  return stripShellWrapperWithTarget(command).command;
 }
 
 /**
@@ -2054,16 +2112,1308 @@ export async function* execStreaming(
   }
 }
 
+export interface InspectedShellWrapper {
+  command: string;
+  targetShell: ShellType;
+}
+
+interface ShellWordToken {
+  raw: string;
+  value: string;
+  quoted: boolean;
+  startIndex: number;
+  nextIndex: number;
+  hadOuterSubstitution: boolean;
+}
+
+interface PrefixUtilitySpec {
+  valueFlags?: ReadonlySet<string>;
+  positionalArgsBeforeCmd?: number;
+  abortFlags?: ReadonlySet<string>;
+}
+
+const MAX_WRAPPER_DEPTH = 5;
+const MAX_ENCODED_COMMAND_B64_LENGTH = 65_536;
+
+const POTENTIAL_SHELL_WRAPPER_PATTERN =
+  /\b(?:sh|bash|zsh|dash|ksh|ash|mksh|eval|cmd(?:\.exe)?|powershell(?:\.exe)?|pwsh(?:\.exe)?)\b/i;
+
+const POSIX_SHELL_NAMES = new Set([
+  'sh',
+  'bash',
+  'zsh',
+  'dash',
+  'ksh',
+  'ash',
+  'mksh',
+]);
+
+const POSIX_SHELL_LONG_VALUE_FLAGS = new Set(['--rcfile', '--init-file']);
+
+const INSPECTION_PREFIX_UTILITIES: Record<string, PrefixUtilitySpec> = {
+  env: {
+    valueFlags: new Set([
+      '-u',
+      '--unset',
+      '-c',
+      '--chdir',
+      '-s',
+      '--split-string',
+      '--default-signal',
+      '--ignore-signal',
+      '--block-signal',
+    ]),
+  },
+  nice: {
+    valueFlags: new Set(['-n', '--adjustment']),
+  },
+  timeout: {
+    valueFlags: new Set(['-k', '--kill-after', '-s', '--signal']),
+    positionalArgsBeforeCmd: 1,
+  },
+  nohup: {},
+  setsid: {},
+  command: {
+    abortFlags: new Set(['-v', '-V']),
+  },
+  exec: {
+    valueFlags: new Set(['-a']),
+  },
+  sudo: {
+    valueFlags: new Set([
+      '-u',
+      '-g',
+      '-h',
+      '-p',
+      '-r',
+      '-t',
+      '-U',
+      '-C',
+      '-D',
+      '-R',
+      '-T',
+      '--user',
+      '--group',
+      '--host',
+      '--prompt',
+      '--role',
+      '--type',
+      '--other-user',
+      '--close-from',
+      '--chdir',
+      '--chroot',
+      '--command-timeout',
+    ]),
+  },
+  stdbuf: {
+    valueFlags: new Set(['-i', '-o', '-e', '--input', '--output', '--error']),
+  },
+  ionice: {
+    valueFlags: new Set([
+      '-c',
+      '-n',
+      '-p',
+      '-P',
+      '-u',
+      '--class',
+      '--classdata',
+    ]),
+  },
+  time: {
+    valueFlags: new Set(['-f', '-o', '--format', '--output']),
+  },
+  chrt: {
+    abortFlags: new Set(['-p', '--pid']),
+    positionalArgsBeforeCmd: 1,
+  },
+  builtin: {},
+  busybox: {},
+};
+
+const CMD_INSPECTION_FLAGS = new Set([
+  '/d',
+  '/s',
+  '/a',
+  '/u',
+  '/q',
+  '/e:on',
+  '/e:off',
+  '/f:on',
+  '/f:off',
+  '/v:on',
+  '/v:off',
+]);
+
+const PS_INSPECTION_BOOL_FLAGS = new Set([
+  '-nologo',
+  '-nol',
+  '-noprofile',
+  '-nop',
+  '-noninteractive',
+  '-noni',
+  '-noexit',
+  '-noe',
+  '-sta',
+  '-mta',
+  '-login',
+  '-l',
+  '-interactive',
+  '-i',
+]);
+
+const PS_INSPECTION_VALUE_FLAGS = new Set([
+  '-executionpolicy',
+  '-ep',
+  '-ex',
+  '-windowstyle',
+  '-w',
+  '-inputformat',
+  '-if',
+  '-outputformat',
+  '-of',
+  '-workingdirectory',
+  '-wd',
+  '-configurationname',
+  '-settingsfile',
+  '-version',
+  '-v',
+]);
+
+const PS_COMMAND_FLAGS = new Set([
+  '-c',
+  '-com',
+  '-comm',
+  '-comma',
+  '-comman',
+  '-command',
+]);
+
+const PS_ENCODED_COMMAND_FLAGS = new Set([
+  '-e',
+  '-ec',
+  '-enc',
+  '-encodedcommand',
+]);
+
+function isShellControlMetachar(ch: string): boolean {
+  return (
+    ch === ';' ||
+    ch === '&' ||
+    ch === '|' ||
+    ch === '<' ||
+    ch === '>' ||
+    ch === '(' ||
+    ch === ')' ||
+    ch === '\n' ||
+    ch === '\r'
+  );
+}
+
+function readAnsiCSingleQuoted(
+  input: string,
+  startIndex: number,
+): { value: string; nextIndex: number } | null {
+  let i = startIndex + 2; // Skip leading `$'`
+  let out = '';
+  while (i < input.length) {
+    const ch = input[i];
+    if (ch === "'") {
+      return { value: out, nextIndex: i + 1 };
+    }
+    if (ch !== '\\' || i + 1 >= input.length) {
+      out += ch;
+      i++;
+      continue;
+    }
+    const next = input[i + 1];
+    switch (next) {
+      case 'n':
+        out += '\n';
+        i += 2;
+        break;
+      case 'r':
+        out += '\r';
+        i += 2;
+        break;
+      case 't':
+        out += '\t';
+        i += 2;
+        break;
+      case 'x': {
+        const hex = input.slice(i + 2, i + 4).match(/^[0-9a-fA-F]{1,2}/)?.[0];
+        if (hex) {
+          out += String.fromCharCode(parseInt(hex, 16));
+          i += 2 + hex.length;
+        } else {
+          out += '\\x';
+          i += 2;
+        }
+        break;
+      }
+      case 'u':
+      case 'U': {
+        const maxDigits = next === 'u' ? 4 : 8;
+        const hex = input
+          .slice(i + 2, i + 2 + maxDigits)
+          .match(/^[0-9a-fA-F]+/)?.[0];
+        if (hex) {
+          const cp = parseInt(hex, 16);
+          if (cp <= 0x10ffff) {
+            out += String.fromCodePoint(cp);
+          }
+          i += 2 + hex.length;
+        } else {
+          out += '\\' + next;
+          i += 2;
+        }
+        break;
+      }
+      default: {
+        if (next >= '0' && next <= '7') {
+          const oct =
+            input.slice(i + 1, i + 4).match(/^[0-7]{1,3}/)?.[0] ?? next;
+          out += String.fromCharCode(parseInt(oct, 8) & 0xff);
+          i += 1 + oct.length;
+        } else {
+          out += next;
+          i += 2;
+        }
+        break;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Reads a single POSIX-style shell word starting at `startIndex`, handling
+ * concatenated single-quoted, ANSI-C `$'...'`, double-quoted, and
+ * backslash-escaped segments. Returns null if no word is present, if a control
+ * operator starts the token, or if a quote is unclosed.
+ */
+function readPosixShellWord(
+  input: string,
+  startIndex: number,
+): ShellWordToken | null {
+  let i = startIndex;
+  while (i < input.length && (input[i] === ' ' || input[i] === '\t')) {
+    i++;
+  }
+  if (
+    i >= input.length ||
+    isShellControlMetachar(input[i]) ||
+    input[i] === '#'
+  ) {
+    return null;
+  }
+
+  const wordStart = i;
+  let value = '';
+  let quoted = false;
+  let hadOuterSubstitution = false;
+
+  while (i < input.length) {
+    const ch = input[i];
+    if (ch === ' ' || ch === '\t' || isShellControlMetachar(ch)) {
+      break;
+    }
+
+    if (ch === '$' && input[i + 1] === "'") {
+      quoted = true;
+      const decoded = readAnsiCSingleQuoted(input, i);
+      if (!decoded) {
+        return null;
+      }
+      value += decoded.value;
+      i = decoded.nextIndex;
+      continue;
+    }
+
+    if (ch === "'") {
+      quoted = true;
+      const closeIdx = input.indexOf("'", i + 1);
+      if (closeIdx === -1) {
+        return null;
+      }
+      value += input.slice(i + 1, closeIdx);
+      i = closeIdx + 1;
+      continue;
+    }
+
+    if (ch === '"') {
+      quoted = true;
+      i++;
+      let closed = false;
+      while (i < input.length) {
+        const inner = input[i];
+        if (inner === '"') {
+          closed = true;
+          i++;
+          break;
+        }
+        if (inner === '\\' && i + 1 < input.length) {
+          const next = input[i + 1];
+          if (
+            next === '"' ||
+            next === '\\' ||
+            next === '$' ||
+            next === '`' ||
+            next === '\n'
+          ) {
+            if (next !== '\n') {
+              value += next;
+            }
+            i += 2;
+            continue;
+          }
+        }
+        if ((inner === '$' && input[i + 1] === '(') || inner === '`') {
+          hadOuterSubstitution = true;
+        }
+        value += inner;
+        i++;
+      }
+      if (!closed) {
+        return null;
+      }
+      continue;
+    }
+
+    if (ch === '\\' && i + 1 < input.length) {
+      value += input[i + 1];
+      i += 2;
+      continue;
+    }
+
+    value += ch;
+    i++;
+  }
+
+  return {
+    raw: input.slice(wordStart, i),
+    value,
+    quoted,
+    startIndex: wordStart,
+    nextIndex: i,
+    hadOuterSubstitution,
+  };
+}
+
+function hasUnquotedControlOperator(text: string): boolean {
+  let inSingle = false;
+  let inDouble = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inSingle) {
+      if (ch === "'") {
+        inSingle = false;
+      }
+      continue;
+    }
+    if (inDouble) {
+      if (ch === '\\' && i + 1 < text.length) {
+        i++;
+        continue;
+      }
+      if (ch === '"') {
+        inDouble = false;
+      }
+      continue;
+    }
+    if (ch === '\\' && i + 1 < text.length) {
+      i++;
+      continue;
+    }
+    if (ch === "'") {
+      inSingle = true;
+      continue;
+    }
+    if (ch === '"') {
+      inDouble = true;
+      continue;
+    }
+    if (
+      isShellControlMetachar(ch) ||
+      (ch === '#' && (i === 0 || /\s/.test(text[i - 1])))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function getWindowsExeBasename(word: ShellWordToken): string {
+  const raw = word.raw;
+  const unquoted =
+    raw.length >= 2 &&
+    ((raw.startsWith('"') && raw.endsWith('"')) ||
+      (raw.startsWith("'") && raw.endsWith("'")))
+      ? raw.slice(1, -1)
+      : raw;
+  const slashIdx = Math.max(
+    unquoted.lastIndexOf('/'),
+    unquoted.lastIndexOf('\\'),
+  );
+  return unquoted.slice(slashIdx + 1).toLowerCase();
+}
+
+function isPosixEnvAssignmentWord(word: ShellWordToken): boolean {
+  const eqIdx = word.value.indexOf('=');
+  if (eqIdx <= 0) {
+    return false;
+  }
+  const name = word.value.slice(0, eqIdx);
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
+}
+
+function getPosixUtilityBasename(word: ShellWordToken): string {
+  const val = word.value;
+  return val.slice(val.lastIndexOf('/') + 1).toLowerCase();
+}
+
+interface PrefixAdvanceResult {
+  cursor: number;
+  splitStringCommand?: string;
+}
+
+function advancePastWrapperPrefixes(
+  command: string,
+  startIndex: number,
+): PrefixAdvanceResult | null {
+  let cursor = startIndex;
+
+  // Skip optional PowerShell call operator `& ` at statement start.
+  let ws = cursor;
+  while (ws < command.length && (command[ws] === ' ' || command[ws] === '\t')) {
+    ws++;
+  }
+  if (
+    ws < command.length &&
+    command[ws] === '&' &&
+    ws + 1 < command.length &&
+    (command[ws + 1] === ' ' || command[ws + 1] === '\t')
+  ) {
+    cursor = ws + 1;
+  }
+
+  while (cursor < command.length) {
+    const word = readPosixShellWord(command, cursor);
+    if (!word) {
+      return { cursor };
+    }
+
+    if (isPosixEnvAssignmentWord(word)) {
+      cursor = word.nextIndex;
+      continue;
+    }
+
+    const base = getPosixUtilityBasename(word);
+    const spec = INSPECTION_PREFIX_UTILITIES[base];
+    if (!spec) {
+      return { cursor };
+    }
+
+    cursor = word.nextIndex;
+    while (cursor < command.length) {
+      const flag = readPosixShellWord(command, cursor);
+      if (!flag || !flag.value.startsWith('-')) {
+        break;
+      }
+      cursor = flag.nextIndex;
+      if (flag.value === '--') {
+        break;
+      }
+      if (spec.abortFlags?.has(flag.value)) {
+        return null;
+      }
+
+      const lowerFlag = flag.value.toLowerCase();
+      if (base === 'env') {
+        if (lowerFlag.startsWith('--split-string=')) {
+          const splitCmd = flag.value.slice('--split-string='.length).trim();
+          if (splitCmd) {
+            return { cursor, splitStringCommand: splitCmd };
+          }
+          continue;
+        }
+        if (flag.value.startsWith('-S') && flag.value.length > 2) {
+          const splitCmd = flag.value.slice(2).trim();
+          if (splitCmd) {
+            return { cursor, splitStringCommand: splitCmd };
+          }
+          continue;
+        }
+        if (lowerFlag === '-s' || lowerFlag === '--split-string') {
+          const splitArg = readPosixShellWord(command, cursor);
+          if (!splitArg) {
+            return null;
+          }
+          const splitCmd = splitArg.value.trim();
+          if (splitCmd) {
+            return { cursor: splitArg.nextIndex, splitStringCommand: splitCmd };
+          }
+          cursor = splitArg.nextIndex;
+          continue;
+        }
+      }
+
+      if (
+        !flag.value.includes('=') &&
+        (spec.valueFlags?.has(flag.value) || spec.valueFlags?.has(lowerFlag))
+      ) {
+        const valToken = readPosixShellWord(command, cursor);
+        if (!valToken) {
+          return null;
+        }
+        cursor = valToken.nextIndex;
+      }
+    }
+
+    if (spec.positionalArgsBeforeCmd) {
+      for (let p = 0; p < spec.positionalArgsBeforeCmd; p++) {
+        const posToken = readPosixShellWord(command, cursor);
+        if (!posToken) {
+          return null;
+        }
+        cursor = posToken.nextIndex;
+      }
+    }
+  }
+
+  return { cursor };
+}
+
+function unwrapPosixInspectionWrapper(
+  command: string,
+  exeWord: ShellWordToken,
+): InspectedShellWrapper | null {
+  // Avoid misinterpreting Windows paths like `C:\...\sh.exe`.
+  if (exeWord.raw.includes(':\\') || exeWord.raw.endsWith('.exe')) {
+    return null;
+  }
+
+  const posixBase = getPosixUtilityBasename(exeWord);
+  if (posixBase === 'eval') {
+    const rest = command.slice(exeWord.nextIndex).trim();
+    if (!rest || hasUnquotedControlOperator(rest)) {
+      return null;
+    }
+    const parts: string[] = [];
+    let cursor = exeWord.nextIndex;
+    let outerHasSubstitution =
+      exeWord.startIndex > 0 &&
+      detectBashSubstitution(command.slice(0, exeWord.startIndex));
+    while (cursor < command.length) {
+      const arg = readPosixShellWord(command, cursor);
+      if (!arg) {
+        return null;
+      }
+      if (arg.hadOuterSubstitution) {
+        outerHasSubstitution = true;
+      }
+      parts.push(arg.value);
+      cursor = arg.nextIndex;
+    }
+    const joined = parts.join(' ').trim();
+    if (!joined) {
+      return null;
+    }
+    if (outerHasSubstitution && !detectBashSubstitution(joined)) {
+      return null;
+    }
+    return { command: joined, targetShell: 'bash' };
+  }
+
+  if (!POSIX_SHELL_NAMES.has(posixBase)) {
+    return null;
+  }
+
+  let cursor = exeWord.nextIndex;
+  let foundCFlag = false;
+
+  // In POSIX sh/bash, `-c` is a boolean option rather than taking an immediate
+  // option-argument: additional flags and `--` may follow `-c` before the
+  // command_string operand (e.g. `sh -c -- '$(whoami)'`, `bash -c -e '$(whoami)'`).
+  while (cursor < command.length) {
+    const flag = readPosixShellWord(command, cursor);
+    if (!flag) {
+      return null;
+    }
+    if (flag.quoted) {
+      break;
+    }
+
+    const val = flag.value;
+    if (val === '--') {
+      cursor = flag.nextIndex;
+      break;
+    }
+    if (val.startsWith('--')) {
+      cursor = flag.nextIndex;
+      if (POSIX_SHELL_LONG_VALUE_FLAGS.has(val.toLowerCase())) {
+        const arg = readPosixShellWord(command, cursor);
+        if (!arg) {
+          return null;
+        }
+        cursor = arg.nextIndex;
+      }
+      continue;
+    }
+    if ((val.startsWith('-') || val.startsWith('+')) && val.length >= 2) {
+      cursor = flag.nextIndex;
+      const flagChars = val.slice(1);
+      const isOptionSwitch = val.startsWith('-');
+      if (flagChars.endsWith('o')) {
+        const optName = readPosixShellWord(command, cursor);
+        if (!optName) {
+          return null;
+        }
+        cursor = optName.nextIndex;
+      }
+      if (isOptionSwitch && flagChars.includes('c')) {
+        foundCFlag = true;
+      }
+      continue;
+    }
+    break;
+  }
+
+  if (!foundCFlag) {
+    return null;
+  }
+
+  const rest = command.slice(cursor).trim();
+  if (!rest) {
+    return null;
+  }
+
+  const prefixText = command.slice(0, exeWord.startIndex);
+  const prefixHasSubstitution =
+    prefixText.length > 0 && detectBashSubstitution(prefixText);
+
+  if (rest.startsWith("'") || rest.startsWith('"') || rest.startsWith("$'")) {
+    const scriptWord = readPosixShellWord(command, cursor);
+    if (!scriptWord) {
+      return null;
+    }
+    const trailing = command.slice(scriptWord.nextIndex).trim();
+    if (trailing && hasUnquotedControlOperator(trailing)) {
+      return null;
+    }
+    const trailingHasSubstitution =
+      trailing.length > 0 && detectBashSubstitution(trailing);
+    const outerHasSubstitution =
+      scriptWord.hadOuterSubstitution ||
+      prefixHasSubstitution ||
+      trailingHasSubstitution;
+
+    if (outerHasSubstitution && !detectBashSubstitution(scriptWord.value)) {
+      return null;
+    }
+    return { command: scriptWord.value, targetShell: 'bash' };
+  }
+
+  if (hasUnquotedControlOperator(rest)) {
+    return null;
+  }
+  if (prefixHasSubstitution && !detectBashSubstitution(rest)) {
+    return null;
+  }
+  return { command: rest, targetShell: 'bash' };
+}
+
+function unwrapCmdInspectionWrapper(
+  command: string,
+  exeWord: ShellWordToken,
+): InspectedShellWrapper | null {
+  const winBase = getWindowsExeBasename(exeWord);
+  if (winBase !== 'cmd' && winBase !== 'cmd.exe') {
+    return null;
+  }
+
+  let cursor = exeWord.nextIndex;
+  while (cursor < command.length) {
+    const flagToken = readWrapperToken(command, cursor);
+    if (!flagToken || flagToken.quoted) {
+      return null;
+    }
+    const lowerFlag = flagToken.value.toLowerCase();
+    if (
+      CMD_INSPECTION_FLAGS.has(lowerFlag) ||
+      /^\/t:[0-9a-f]{1,2}$/i.test(lowerFlag)
+    ) {
+      cursor = flagToken.nextIndex;
+      continue;
+    }
+
+    const isExecSwitch = lowerFlag === '/c' || lowerFlag === '/k';
+    const isAttachedExecSwitch =
+      (lowerFlag.startsWith('/c') || lowerFlag.startsWith('/k')) &&
+      flagToken.value.length > 2 &&
+      (flagToken.value[2] === '"' || flagToken.value[2] === "'");
+
+    if (!isExecSwitch && !isAttachedExecSwitch) {
+      return null;
+    }
+
+    let rawArg: string;
+    if (isAttachedExecSwitch) {
+      const flagStart = flagToken.nextIndex - flagToken.value.length;
+      rawArg = command.slice(flagStart + 2).trim();
+    } else {
+      if (
+        flagToken.nextIndex >= command.length ||
+        !/\s/.test(command[flagToken.nextIndex])
+      ) {
+        return null;
+      }
+      rawArg = command.slice(flagToken.nextIndex).trim();
+    }
+
+    if (!rawArg) {
+      return null;
+    }
+    const unwrapped = unwrapCmdCommandArg(rawArg);
+    if (unwrapped === null) {
+      return null;
+    }
+    if (
+      !rawArg.startsWith('"') &&
+      !rawArg.startsWith("'") &&
+      hasUnquotedControlOperator(rawArg)
+    ) {
+      return null;
+    }
+    return { command: unwrapped, targetShell: 'cmd' };
+  }
+
+  return null;
+}
+
+function decodePowerShellEncodedCommand(rawArg: string): string | null {
+  const token = readWrapperToken(rawArg, 0);
+  if (!token) {
+    return null;
+  }
+  if (rawArg.slice(token.nextIndex).trim().length > 0) {
+    return null;
+  }
+  const b64 = token.value.trim();
+  if (
+    b64.length === 0 ||
+    b64.length > MAX_ENCODED_COMMAND_B64_LENGTH ||
+    !/^[A-Za-z0-9+/]+=*$/.test(b64)
+  ) {
+    return null;
+  }
+  const decoded = Buffer.from(b64, 'base64')
+    .toString('utf16le')
+    .replace(/\0/g, '')
+    .trim();
+  return decoded.length > 0 ? decoded : null;
+}
+
+function unwrapPowerShellInspectionWrapper(
+  command: string,
+  exeWord: ShellWordToken,
+): InspectedShellWrapper | null {
+  const winBase = getWindowsExeBasename(exeWord);
+  if (
+    winBase !== 'powershell' &&
+    winBase !== 'powershell.exe' &&
+    winBase !== 'pwsh' &&
+    winBase !== 'pwsh.exe'
+  ) {
+    return null;
+  }
+
+  let cursor = exeWord.nextIndex;
+  while (cursor < command.length) {
+    const flagToken = readWrapperToken(command, cursor);
+    if (!flagToken || flagToken.quoted) {
+      return null;
+    }
+    const rawFlag =
+      flagToken.value.length > 0 && isPowerShellDash(flagToken.value[0])
+        ? '-' + flagToken.value.slice(1)
+        : flagToken.value;
+    const lowerFlag = rawFlag.toLowerCase();
+    const colonIdx = lowerFlag.indexOf(':');
+    const flagName = colonIdx === -1 ? lowerFlag : lowerFlag.slice(0, colonIdx);
+
+    if (PS_INSPECTION_BOOL_FLAGS.has(flagName)) {
+      cursor = flagToken.nextIndex;
+      continue;
+    }
+    if (PS_INSPECTION_VALUE_FLAGS.has(flagName)) {
+      cursor = flagToken.nextIndex;
+      if (colonIdx === -1) {
+        const valToken = readWrapperToken(command, cursor);
+        if (!valToken) {
+          return null;
+        }
+        cursor = valToken.nextIndex;
+      }
+      continue;
+    }
+
+    if (PS_ENCODED_COMMAND_FLAGS.has(flagName)) {
+      const rawArg =
+        colonIdx !== -1
+          ? flagToken.value.slice(colonIdx + 1) +
+            command.slice(flagToken.nextIndex)
+          : command.slice(flagToken.nextIndex).trim();
+      const decoded = decodePowerShellEncodedCommand(rawArg);
+      return decoded ? { command: decoded, targetShell: 'powershell' } : null;
+    }
+
+    if (
+      PS_COMMAND_FLAGS.has(flagName) &&
+      colonIdx === -1 &&
+      flagToken.nextIndex < command.length &&
+      /\s/.test(command[flagToken.nextIndex])
+    ) {
+      const rawArg = command.slice(flagToken.nextIndex).trim();
+      if (!rawArg) {
+        return null;
+      }
+      const unwrapped = unwrapPowerShellCommandArg(rawArg);
+      if (unwrapped === null) {
+        return null;
+      }
+      if (
+        !isPowerShellSingleQuote(rawArg[0]) &&
+        !isPowerShellDoubleQuote(rawArg[0]) &&
+        hasUnquotedControlOperator(rawArg)
+      ) {
+        return null;
+      }
+      return { command: unwrapped, targetShell: 'powershell' };
+    }
+
+    return null;
+  }
+
+  return null;
+}
+
+/**
+ * Unwraps a single shell-invocation layer for security inspection (command
+ * substitution detection and policy enforcement). Unlike `stripShellWrapper`,
+ * this also handles leading environment assignments, transparent prefix
+ * utilities (`env`, `nice`, `timeout`, `nohup`, `setsid`, `sudo`, etc.),
+ * combined POSIX flags (`-lc`, `-e -c`), alternative POSIX shells (`dash`,
+ * `ksh`, `ash`), POSIX `$0` positional args, escaped single-quote
+ * concatenations, `cmd.exe /k`, and extended PowerShell flags.
+ *
+ * Callers must ONLY use this for restrictive checks (blocking, downgrading to
+ * `ASK_USER`, or enforcing `DENY`), never to upgrade a command to `ALLOW`.
+ */
+export function unwrapShellCommandForInspection(
+  command: string,
+): InspectedShellWrapper | null {
+  const trimmed = command.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const advanced = advancePastWrapperPrefixes(trimmed, 0);
+  if (!advanced) {
+    return null;
+  }
+  if (advanced.splitStringCommand) {
+    return { command: advanced.splitStringCommand, targetShell: 'bash' };
+  }
+
+  const exeWord = readPosixShellWord(trimmed, advanced.cursor);
+  if (!exeWord) {
+    return null;
+  }
+
+  return (
+    unwrapPosixInspectionWrapper(trimmed, exeWord) ??
+    unwrapCmdInspectionWrapper(trimmed, exeWord) ??
+    unwrapPowerShellInspectionWrapper(trimmed, exeWord)
+  );
+}
+
+const BASH_REDIRECT_NODE_TYPES = new Set([
+  'file_redirect',
+  'heredoc_redirect',
+  'herestring_redirect',
+]);
+
+function extractBashCommandNodesForInspection(
+  command: string,
+): string[] | null {
+  if (!bashLanguage) {
+    return null;
+  }
+  const tree = parseCommandTree(command);
+  if (!tree) {
+    return null;
+  }
+
+  try {
+    if (tree.rootNode.hasError) {
+      return null;
+    }
+
+    const segments: string[] = [];
+    const stack: Node[] = [tree.rootNode];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      if (current.type === 'redirected_statement') {
+        const body = current.childForFieldName('body');
+        if (body?.type === 'command') {
+          const trailingArgs: string[] = [];
+          for (let i = 0; i < current.childCount; i++) {
+            const child = current.child(i);
+            if (child?.type === 'file_redirect') {
+              const destinations = child.childrenForFieldName('destination');
+              for (let d = 1; d < destinations.length; d++) {
+                const argNode = destinations[d];
+                if (argNode) {
+                  trailingArgs.push(
+                    command.slice(argNode.startIndex, argNode.endIndex).trim(),
+                  );
+                }
+              }
+            }
+          }
+          if (trailingArgs.length > 0) {
+            const bodyText = command
+              .slice(body.startIndex, body.endIndex)
+              .trim();
+            if (bodyText) {
+              segments.push(`${bodyText} ${trailingArgs.join(' ')}`);
+            }
+          }
+        }
+      }
+
+      if (current.type === 'command') {
+        let hasInlineRedirect = false;
+        for (let i = 0; i < current.childCount; i++) {
+          const child = current.child(i);
+          if (child && BASH_REDIRECT_NODE_TYPES.has(child.type)) {
+            hasInlineRedirect = true;
+            break;
+          }
+        }
+        if (!hasInlineRedirect) {
+          const text = command
+            .slice(current.startIndex, current.endIndex)
+            .trim();
+          if (text) {
+            segments.push(text);
+          }
+        } else {
+          const parts: string[] = [];
+          for (let i = 0; i < current.childCount; i++) {
+            const child = current.child(i);
+            if (child && !BASH_REDIRECT_NODE_TYPES.has(child.type)) {
+              const part = command
+                .slice(child.startIndex, child.endIndex)
+                .trim();
+              if (part) {
+                parts.push(part);
+              }
+            }
+          }
+          if (parts.length > 0) {
+            segments.push(parts.join(' '));
+          }
+        }
+      }
+
+      for (let i = current.childCount - 1; i >= 0; i--) {
+        const child = current.child(i);
+        if (child) {
+          stack.push(child);
+        }
+      }
+    }
+    return segments;
+  } finally {
+    tree.delete();
+  }
+}
+
+function stripTrailingUnquotedRedirections(
+  segment: string,
+  shellType: 'bash' | 'powershell',
+): string {
+  const escapeChar = shellType === 'powershell' ? '`' : '\\';
+  let inSingle = false;
+  let inDouble = false;
+
+  for (let i = 0; i < segment.length; i++) {
+    const ch = segment[i];
+    if (inSingle) {
+      if (ch === "'") {
+        inSingle = false;
+      }
+      continue;
+    }
+    if (inDouble) {
+      if (ch === escapeChar && i + 1 < segment.length) {
+        i++;
+        continue;
+      }
+      if (ch === '"') {
+        inDouble = false;
+      }
+      continue;
+    }
+    if (ch === escapeChar && i + 1 < segment.length) {
+      i++;
+      continue;
+    }
+    if (ch === "'") {
+      inSingle = true;
+      continue;
+    }
+    if (ch === '"') {
+      inDouble = true;
+      continue;
+    }
+    if (ch === '>' || ch === '<') {
+      let cutAt = i;
+      // Include a preceding file-descriptor digit (e.g. `2>/dev/null`).
+      while (
+        cutAt > 0 &&
+        segment[cutAt - 1] >= '0' &&
+        segment[cutAt - 1] <= '9'
+      ) {
+        cutAt--;
+      }
+      if (cutAt === 0 || /\s/.test(segment[cutAt - 1])) {
+        return segment.slice(0, cutAt).trim();
+      }
+      return segment.slice(0, i).trim();
+    }
+  }
+
+  return segment.trim();
+}
+
+function splitLexicalSegmentsForInspection(
+  command: string,
+  shellType: 'bash' | 'powershell',
+): string[] {
+  const segments: string[] = [];
+  const escapeChar = shellType === 'powershell' ? '`' : '\\';
+  let segStart = 0;
+  let inSingle = false;
+  let inDouble = false;
+
+  const pushSegment = (endIndex: number) => {
+    const raw = command.slice(segStart, endIndex).trim();
+    if (!raw) {
+      return;
+    }
+    segments.push(raw);
+    const withoutRedirects = stripTrailingUnquotedRedirections(raw, shellType);
+    if (withoutRedirects && withoutRedirects !== raw) {
+      segments.push(withoutRedirects);
+    }
+  };
+
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i];
+    if (inSingle) {
+      if (shellType === 'powershell' && ch === "'" && command[i + 1] === "'") {
+        i++;
+        continue;
+      }
+      if (ch === "'") {
+        inSingle = false;
+      }
+      continue;
+    }
+    if (inDouble) {
+      if (ch === escapeChar && i + 1 < command.length) {
+        i++;
+        continue;
+      }
+      if (shellType === 'powershell' && ch === '"' && command[i + 1] === '"') {
+        i++;
+        continue;
+      }
+      if (ch === '"') {
+        inDouble = false;
+      }
+      continue;
+    }
+    if (ch === escapeChar && i + 1 < command.length) {
+      i++;
+      continue;
+    }
+    if (ch === "'") {
+      inSingle = true;
+      continue;
+    }
+    if (ch === '"') {
+      inDouble = true;
+      continue;
+    }
+    if (
+      shellType === 'powershell' &&
+      ch === '<' &&
+      command[i + 1] === '#' &&
+      (i === 0 || /[\s;(){}|]/.test(command[i - 1]))
+    ) {
+      const closeIdx = command.indexOf('#>', i + 2);
+      if (closeIdx !== -1) {
+        i = closeIdx + 1;
+        continue;
+      }
+      break;
+    }
+    if (ch === '#' && (i === 0 || /[\s;()&|]/.test(command[i - 1]))) {
+      pushSegment(i);
+      while (i < command.length && command[i] !== '\n' && command[i] !== '\r') {
+        i++;
+      }
+      segStart = i + 1;
+      continue;
+    }
+    if (
+      ch === ';' ||
+      ch === '|' ||
+      ch === '&' ||
+      ch === '(' ||
+      ch === ')' ||
+      ch === '\n' ||
+      ch === '\r'
+    ) {
+      pushSegment(i);
+      segStart = i + 1;
+    }
+  }
+
+  pushSegment(command.length);
+  return segments;
+}
+
+function extractCommandSegmentsForSubstitutionCheck(
+  command: string,
+  shellType: 'bash' | 'powershell',
+): string[] {
+  if (shellType === 'bash') {
+    const astSegments = extractBashCommandNodesForInspection(command);
+    if (astSegments && astSegments.length > 0) {
+      return astSegments;
+    }
+  }
+  return splitLexicalSegmentsForInspection(command, shellType);
+}
+
+function resolveInspectionShellType(
+  targetShell: ShellType,
+  fallbackShell: 'bash' | 'powershell',
+): 'bash' | 'powershell' {
+  if (targetShell === 'powershell') {
+    return 'powershell';
+  }
+  if (targetShell === 'bash') {
+    return 'bash';
+  }
+  return fallbackShell;
+}
+
+function detectCommandSubstitutionRecursive(
+  command: string,
+  shellType: 'bash' | 'powershell',
+  depth: number,
+): boolean {
+  if (
+    shellType === 'powershell'
+      ? detectPowerShellSubstitution(command)
+      : detectBashSubstitution(command)
+  ) {
+    return true;
+  }
+
+  if (
+    depth >= MAX_WRAPPER_DEPTH ||
+    !POTENTIAL_SHELL_WRAPPER_PATTERN.test(command)
+  ) {
+    return false;
+  }
+
+  const trimmed = command.trim();
+  const directUnwrapped = unwrapShellCommandForInspection(trimmed);
+  if (directUnwrapped && directUnwrapped.command !== trimmed) {
+    const nextShell = resolveInspectionShellType(
+      directUnwrapped.targetShell,
+      shellType,
+    );
+    if (
+      detectCommandSubstitutionRecursive(
+        directUnwrapped.command,
+        nextShell,
+        depth + 1,
+      )
+    ) {
+      return true;
+    }
+  }
+
+  const segments = extractCommandSegmentsForSubstitutionCheck(
+    trimmed,
+    shellType,
+  );
+  for (const segment of segments) {
+    if (!segment || segment === trimmed) {
+      continue;
+    }
+    const unwrapped = unwrapShellCommandForInspection(segment);
+    if (!unwrapped || unwrapped.command === segment) {
+      continue;
+    }
+    const nextShell = resolveInspectionShellType(
+      unwrapped.targetShell,
+      shellType,
+    );
+    if (
+      detectCommandSubstitutionRecursive(
+        unwrapped.command,
+        nextShell,
+        depth + 1,
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function detectCommandSubstitution(command: string): boolean {
   const shell = getShellConfiguration().shell;
-  const isPowerShell =
+  const hostShellType: 'bash' | 'powershell' =
     typeof shell === 'string' &&
     (shell.toLowerCase().includes('powershell') ||
-      shell.toLowerCase().includes('pwsh'));
-  if (isPowerShell) {
-    return detectPowerShellSubstitution(command);
-  }
-  return detectBashSubstitution(command);
+      shell.toLowerCase().includes('pwsh'))
+      ? 'powershell'
+      : 'bash';
+
+  // Unwrap clean outer shell wrappers first (preserving target shell type and
+  // C-argv quote unescaping) so e.g. PowerShell `-Command "node -e \"...\""`
+  // does not false-positive and cross-shell wrappers (`pwsh -c` on Linux or
+  // `bash -c` on Windows) are scanned with the target shell's grammar.
+  const stripped = stripShellWrapperWithTarget(command);
+  const effectiveShellType = stripped.targetShell
+    ? resolveInspectionShellType(stripped.targetShell, hostShellType)
+    : hostShellType;
+
+  return detectCommandSubstitutionRecursive(
+    stripped.command,
+    effectiveShellType,
+    0,
+  );
 }
 
 function detectBashSubstitution(command: string): boolean {

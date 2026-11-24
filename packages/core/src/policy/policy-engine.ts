@@ -14,6 +14,7 @@ import {
   parseCommandDetailsAsync,
   isDefaultParseCommandDetails,
   stripShellWrapper,
+  unwrapShellCommandForInspection,
   hasRedirection,
   hasRedirectionAsync,
   isDefaultHasRedirection,
@@ -401,7 +402,10 @@ export class PolicyEngine {
     if (allowCommandSubstitution ?? false) {
       return false;
     }
-    if (!detectCommandSubstitution(stripShellWrapper(command))) {
+    if (
+      !detectCommandSubstitution(command) &&
+      !detectCommandSubstitution(stripShellWrapper(command))
+    ) {
       return false;
     }
 
@@ -659,6 +663,41 @@ export class PolicyEngine {
         ) {
           lastAllowedSubRule = wrapperResult.rule;
         } else {
+          allSubCommandsExplicitlyAllowed = false;
+        }
+      } else if (typeof unwrapShellCommandForInspection === 'function') {
+        const inspected = unwrapShellCommandForInspection(subCmd);
+        if (
+          inspected &&
+          inspected.command !== subCmd &&
+          inspected.command !== command.trim()
+        ) {
+          // Preserve heuristic auto-approval (e.g. `bash -lc "ls -la"`) only
+          // when the outer command itself was allowed via heuristics rather
+          // than an explicit ALLOW rule.
+          const allowedByHeuristics =
+            ruleDecision === PolicyDecision.ALLOW &&
+            rule?.decision !== PolicyDecision.ALLOW;
+          const inspectedResult = await this.check(
+            { name: toolName, args: { command: inspected.command, dir_path } },
+            serverName,
+            toolAnnotations,
+            subagent,
+            !allowedByHeuristics,
+          );
+          if (inspectedResult.decision === PolicyDecision.DENY) {
+            return inspectedResult;
+          }
+          if (inspectedResult.decision === PolicyDecision.ASK_USER) {
+            if (aggregateDecision === PolicyDecision.ALLOW) {
+              responsibleRule = inspectedResult.rule;
+            } else {
+              responsibleRule ??= inspectedResult.rule;
+            }
+            aggregateDecision = PolicyDecision.ASK_USER;
+          }
+          // Prefix-wrapped / shaped shell invocations must never upgrade an
+          // outer ASK_USER decision to ALLOW.
           allSubCommandsExplicitlyAllowed = false;
         }
       }

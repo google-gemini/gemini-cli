@@ -536,7 +536,7 @@ describe('stripShellWrapper', () => {
       ),
     ).toEqual('node -e "console.log(\\"hello (world)\\")"');
     expect(stripShellWrapper('powershell -Command "echo a"; whoami')).toEqual(
-      '"echo a"; whoami',
+      'powershell -Command "echo a"; whoami',
     );
     expect(stripShellWrapper('powershell -Command "echo a"; echo "b"')).toEqual(
       'powershell -Command "echo a"; echo "b"',

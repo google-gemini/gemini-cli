@@ -785,7 +785,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
     }
 
     if (
-      detectCommandSubstitution(strippedCommand) &&
+      (detectCommandSubstitution(this.params.command) ||
+        detectCommandSubstitution(strippedCommand)) &&
       !(await this.isCommandSubstitutionAllowed(options))
     ) {
       return {
