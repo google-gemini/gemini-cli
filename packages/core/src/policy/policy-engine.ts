@@ -405,10 +405,7 @@ export class PolicyEngine {
     if (allowCommandSubstitution ?? false) {
       return false;
     }
-    if (
-      !detectCommandSubstitution(command) &&
-      !detectCommandSubstitution(stripShellWrapper(command))
-    ) {
+    if (!detectCommandSubstitution(command)) {
       return false;
     }
 
