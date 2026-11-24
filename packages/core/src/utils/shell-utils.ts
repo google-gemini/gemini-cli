@@ -3072,9 +3072,16 @@ function extractBashCommandNodesForInspection(
           for (let i = 0; i < current.childCount; i++) {
             const child = current.child(i);
             if (child?.type === 'file_redirect') {
-              const destinations = child.childrenForFieldName('destination');
-              for (let d = 1; d < destinations.length; d++) {
-                const argNode = destinations[d];
+              let seenFirstDestination = false;
+              for (let j = 0; j < child.childCount; j++) {
+                if (child.fieldNameForChild(j) !== 'destination') {
+                  continue;
+                }
+                if (!seenFirstDestination) {
+                  seenFirstDestination = true;
+                  continue;
+                }
+                const argNode = child.child(j);
                 if (argNode) {
                   trailingArgs.push(
                     command.slice(argNode.startIndex, argNode.endIndex).trim(),
