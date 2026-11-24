@@ -14,6 +14,7 @@ import {
   parseCommandDetailsAsync,
   isDefaultParseCommandDetails,
   stripShellWrapper,
+  extractWrappedShellCommands,
   hasRedirection,
   hasRedirectionAsync,
   isDefaultHasRedirection,
@@ -523,6 +524,7 @@ export class PolicyEngine {
     toolAnnotations?: Record<string, unknown>,
     subagent?: string,
     hasTopLevelHeuristicDowngrade = false,
+    wrapperDepth = 0,
   ): Promise<CheckResult> {
     if (!command) {
       return {
@@ -619,6 +621,60 @@ export class PolicyEngine {
     let evaluatedSubCommands = 0;
     let allSubCommandsExplicitlyAllowed = true;
     let lastAllowedSubRule: PolicyRule | undefined;
+    const checkedWrappedPayloads = new Set<string>();
+
+    const checkExtractedPayloads = async (
+      sourceCommand: string,
+      alreadyStripped?: string,
+    ): Promise<CheckResult | null> => {
+      if (typeof extractWrappedShellCommands !== 'function') {
+        return null;
+      }
+      const extraPayloads = extractWrappedShellCommands(sourceCommand)
+        .map((payload) => payload.command.trim())
+        .filter(
+          (payload) =>
+            Boolean(payload) &&
+            payload !== sourceCommand &&
+            payload !== alreadyStripped &&
+            !checkedWrappedPayloads.has(payload),
+        );
+      if (extraPayloads.length === 0) {
+        return null;
+      }
+      if (wrapperDepth >= 5) {
+        allSubCommandsExplicitlyAllowed = false;
+        if (aggregateDecision === PolicyDecision.ALLOW) {
+          aggregateDecision = PolicyDecision.ASK_USER;
+          responsibleRule = undefined;
+        }
+        return null;
+      }
+      for (const wrappedPayload of new Set(extraPayloads)) {
+        checkedWrappedPayloads.add(wrappedPayload);
+        const wrappedResult = await this.checkInternal(
+          { name: toolName, args: { command: wrappedPayload, dir_path } },
+          serverName,
+          toolAnnotations,
+          subagent,
+          Boolean(rule?.argsPattern),
+          wrapperDepth + 1,
+        );
+        if (wrappedResult.decision === PolicyDecision.DENY) {
+          return wrappedResult;
+        }
+        if (wrappedResult.decision === PolicyDecision.ASK_USER) {
+          allSubCommandsExplicitlyAllowed = false;
+          if (aggregateDecision === PolicyDecision.ALLOW) {
+            responsibleRule = wrappedResult.rule;
+          } else {
+            responsibleRule ??= wrappedResult.rule;
+          }
+          aggregateDecision = PolicyDecision.ASK_USER;
+        }
+      }
+      return null;
+    };
 
     for (const detail of subCommands) {
       if (REDIRECTION_NAMES.has(detail.name)) {
@@ -633,13 +689,15 @@ export class PolicyEngine {
       // Recursive check for shell wrappers (bash -c, etc.)
       const stripped = stripShellWrapper(subCmd);
       if (stripped !== subCmd) {
+        checkedWrappedPayloads.add(stripped);
         evaluatedSubCommands++;
-        const wrapperResult = await this.check(
+        const wrapperResult = await this.checkInternal(
           { name: toolName, args: { command: stripped, dir_path } },
           serverName,
           toolAnnotations,
           subagent,
           true,
+          wrapperDepth + 1,
         );
 
         if (wrapperResult.decision === PolicyDecision.DENY)
@@ -661,6 +719,15 @@ export class PolicyEngine {
         } else {
           allSubCommandsExplicitlyAllowed = false;
         }
+      }
+
+      // Also recursively inspect inner payloads wrapped by prefix utilities,
+      // intermediate flags, trailing positional args, or Windows shell switches.
+      // These checks only restrict (DENY/ASK_USER) and never upgrade an
+      // unapproved outer wrapper to ALLOW.
+      const subPayloadDeny = await checkExtractedPayloads(subCmd, stripped);
+      if (subPayloadDeny) {
+        return subPayloadDeny;
       }
 
       if (!isAtomic) {
@@ -717,6 +784,13 @@ export class PolicyEngine {
       } else if (stripped === subCmd) {
         allSubCommandsExplicitlyAllowed = false;
       }
+    }
+
+    // Also inspect the full command for any wrapper payload split across AST
+    // redirections (e.g., `sh -c >/dev/null 'dangerous_cmd'`).
+    const topLevelPayloadDeny = await checkExtractedPayloads(command.trim());
+    if (topLevelPayloadDeny) {
+      return topLevelPayloadDeny;
     }
 
     const workspace =
@@ -792,6 +866,7 @@ export class PolicyEngine {
     toolAnnotations?: Record<string, unknown>,
     subagent?: string,
     skipHeuristics = false,
+    wrapperDepth = 0,
   ): Promise<CheckResult> {
     // Case 1: Metadata injection is the primary and safest way to identify an MCP server.
     // If we have explicit `_serverName` metadata (usually injected by tool-registry for active tools), use it.
@@ -918,6 +993,7 @@ export class PolicyEngine {
             toolAnnotations,
             subagent,
             hasTopLevelHeuristicDowngrade,
+            wrapperDepth,
           );
           decision = shellResult.decision;
           matchedRule = shellResult.rule;
@@ -970,6 +1046,7 @@ export class PolicyEngine {
             toolAnnotations,
             subagent,
             hasTopLevelHeuristicDowngrade,
+            wrapperDepth,
           );
           decision = shellResult.decision;
           matchedRule = shellResult.rule;

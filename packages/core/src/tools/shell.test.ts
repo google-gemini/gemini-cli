@@ -2320,6 +2320,46 @@ EOF`;
       });
       expect(taintedResult.returnDisplay).toContain('Blocked');
     });
+
+    it('should block command substitution hidden behind prefix wrappers, shell flags, trailing args, or Windows switches when unconfirmed', async () => {
+      const configWithAskPolicy = Object.assign(Object.create(mockConfig), {
+        getPolicyEngine: () => ({
+          check: vi.fn().mockResolvedValue({ decision: 'ask_user' }),
+        }),
+      }) as Config;
+      const tool = new ShellTool(configWithAskPolicy, createMockMessageBus());
+
+      const bypassCommands = [
+        "env sh -c '$(whoami > ./bypass-proof)'",
+        "nice sh -c '$(whoami)'",
+        "timeout 10 sh -c '$(whoami)'",
+        "nohup sh -c '$(whoami)'",
+        "setsid sh -c '$(whoami)'",
+        "/usr/bin/env sh -c '$(whoami)'",
+        "sh -e -c '$(whoami)'",
+        "bash -lc '$(whoami)'",
+        "sh -c '$(whoami)' ''",
+        "sh -c '$(whoami)' &",
+        "sh -c '$(whoami)' ;",
+        "sh -c '$(whoami)' >/tmp/x",
+        "sh -c '$(whoami)' # comment",
+        "pwsh -com '$(Get-Process)'",
+        "pwsh -ExecutionPolicy Bypass -Command '$(Get-Process)'",
+        "cmd.exe /k '$(whoami)'",
+        "cmd.exe /q /c '$(whoami)'",
+      ];
+
+      for (const command of bypassCommands) {
+        const invocation = tool.build({ command });
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
+        expect(
+          result.returnDisplay,
+          `Expected command to be blocked: ${command}`,
+        ).toContain('Blocked');
+      }
+    });
   });
 
   describe('recursive interactive gemini command guard', () => {
