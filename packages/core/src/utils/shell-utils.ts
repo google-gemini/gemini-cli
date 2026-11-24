@@ -1882,10 +1882,12 @@ function stripSingleShellWrapperWithTarget(
 function stripShellWrapperWithTarget(command: string): {
   command: string;
   targetShell?: ShellType;
+  depth: number;
 } {
   let current = command.trim();
   let targetShell: ShellType | undefined;
-  for (let depth = 0; depth < MAX_WRAPPER_DEPTH; depth++) {
+  let depth = 0;
+  for (; depth < MAX_WRAPPER_DEPTH; depth++) {
     const unwrapped = stripSingleShellWrapperWithTarget(current);
     if (!unwrapped || unwrapped.command === current) {
       break;
@@ -1897,7 +1899,7 @@ function stripShellWrapperWithTarget(command: string): {
       targetShell = unwrapped.targetShell;
     }
   }
-  return { command: current, targetShell };
+  return { command: current, targetShell, depth };
 }
 
 export function stripShellWrapper(command: string): string {
@@ -3336,16 +3338,17 @@ function detectCommandSubstitutionRecursive(
     return true;
   }
 
-  if (
-    depth >= MAX_WRAPPER_DEPTH ||
-    !POTENTIAL_SHELL_WRAPPER_PATTERN.test(command)
-  ) {
+  if (!POTENTIAL_SHELL_WRAPPER_PATTERN.test(command)) {
     return false;
   }
 
   const trimmed = command.trim();
   const directUnwrapped = unwrapShellCommandForInspection(trimmed);
   if (directUnwrapped && directUnwrapped.command !== trimmed) {
+    if (depth >= MAX_WRAPPER_DEPTH) {
+      // Fail closed if another shell wrapper layer remains beyond the recursion limit.
+      return true;
+    }
     const nextShell = resolveInspectionShellType(
       directUnwrapped.targetShell,
       shellType,
@@ -3372,6 +3375,10 @@ function detectCommandSubstitutionRecursive(
     const unwrapped = unwrapShellCommandForInspection(segment);
     if (!unwrapped || unwrapped.command === segment) {
       continue;
+    }
+    if (depth >= MAX_WRAPPER_DEPTH) {
+      // Fail closed if another shell wrapper layer remains beyond the recursion limit.
+      return true;
     }
     const nextShell = resolveInspectionShellType(
       unwrapped.targetShell,
@@ -3412,7 +3419,7 @@ export function detectCommandSubstitution(command: string): boolean {
   return detectCommandSubstitutionRecursive(
     stripped.command,
     effectiveShellType,
-    0,
+    stripped.depth,
   );
 }
 

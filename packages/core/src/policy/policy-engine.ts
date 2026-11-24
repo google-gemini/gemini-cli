@@ -269,6 +269,9 @@ function ruleMatches(
   return true;
 }
 
+const MAX_SHELL_INSPECTION_DEPTH = 5;
+const MAX_SHELL_RECURSION_DEPTH = 15;
+
 export class PolicyEngine {
   private rules: PolicyRule[];
   private checkers: SafetyCheckerRule[];
@@ -516,6 +519,56 @@ export class PolicyEngine {
     return decision;
   }
 
+  private hasActiveShellDenyRule(
+    toolName: string,
+    serverName: string | undefined,
+    toolAnnotations?: Record<string, unknown>,
+    subagent?: string,
+  ): boolean {
+    const toolCallWithoutArgs: FunctionCall = { name: toolName };
+    return this.rules.some(
+      (r) =>
+        r.decision === PolicyDecision.DENY &&
+        ruleMatches(
+          { ...r, argsPattern: undefined },
+          toolCallWithoutArgs,
+          undefined,
+          serverName,
+          this.approvalMode,
+          this.nonInteractive,
+          toolAnnotations,
+          subagent,
+        ),
+    );
+  }
+
+  private getDepthLimitExceededDecision(
+    toolName: string,
+    currentDecision: PolicyDecision,
+    serverName: string | undefined,
+    rule?: PolicyRule,
+    toolAnnotations?: Record<string, unknown>,
+    subagent?: string,
+  ): PolicyDecision {
+    if (
+      currentDecision === PolicyDecision.DENY ||
+      this.hasActiveShellDenyRule(
+        toolName,
+        serverName,
+        toolAnnotations,
+        subagent,
+      )
+    ) {
+      return PolicyDecision.DENY;
+    }
+    if (this.approvalMode === ApprovalMode.YOLO) {
+      return rule?.argsPattern ? PolicyDecision.DENY : PolicyDecision.ALLOW;
+    }
+    return this.defaultDecision === PolicyDecision.DENY
+      ? PolicyDecision.DENY
+      : PolicyDecision.ASK_USER;
+  }
+
   private async checkShellCommand(
     toolName: string,
     command: string | undefined,
@@ -527,11 +580,28 @@ export class PolicyEngine {
     toolAnnotations?: Record<string, unknown>,
     subagent?: string,
     hasTopLevelHeuristicDowngrade = false,
+    inspectionDepth = 0,
+    recursionDepth = 0,
   ): Promise<CheckResult> {
     if (!command) {
       return {
         decision: ruleDecision,
         rule,
+      };
+    }
+
+    if (recursionDepth >= MAX_SHELL_RECURSION_DEPTH) {
+      const depthDecision = this.getDepthLimitExceededDecision(
+        toolName,
+        ruleDecision,
+        serverName,
+        rule,
+        toolAnnotations,
+        subagent,
+      );
+      return {
+        decision: depthDecision,
+        rule: depthDecision === ruleDecision ? rule : undefined,
       };
     }
 
@@ -637,33 +707,56 @@ export class PolicyEngine {
       // Recursive check for shell wrappers (bash -c, etc.)
       const stripped = stripShellWrapper(subCmd);
       if (stripped !== subCmd) {
-        evaluatedSubCommands++;
-        const wrapperResult = await this.check(
-          { name: toolName, args: { command: stripped, dir_path } },
-          serverName,
-          toolAnnotations,
-          subagent,
-          true,
-        );
-
-        if (wrapperResult.decision === PolicyDecision.DENY)
-          return wrapperResult;
-        if (wrapperResult.decision === PolicyDecision.ASK_USER) {
+        if (inspectionDepth >= MAX_SHELL_INSPECTION_DEPTH) {
           allSubCommandsExplicitlyAllowed = false;
-          if (aggregateDecision === PolicyDecision.ALLOW) {
-            responsibleRule = wrapperResult.rule;
-          } else {
-            responsibleRule ??= wrapperResult.rule;
+          const depthDecision = this.getDepthLimitExceededDecision(
+            toolName,
+            aggregateDecision,
+            serverName,
+            rule,
+            toolAnnotations,
+            subagent,
+          );
+          if (depthDecision === PolicyDecision.DENY) {
+            return { decision: PolicyDecision.DENY, rule: undefined };
           }
-          aggregateDecision = PolicyDecision.ASK_USER;
-        } else if (
-          wrapperResult.decision === PolicyDecision.ALLOW &&
-          wrapperResult.rule?.decision === PolicyDecision.ALLOW &&
-          Boolean(wrapperResult.rule?.argsPattern)
-        ) {
-          lastAllowedSubRule = wrapperResult.rule;
+          if (depthDecision === PolicyDecision.ASK_USER) {
+            if (aggregateDecision === PolicyDecision.ALLOW) {
+              responsibleRule = undefined;
+            }
+            aggregateDecision = PolicyDecision.ASK_USER;
+          }
         } else {
-          allSubCommandsExplicitlyAllowed = false;
+          evaluatedSubCommands++;
+          const wrapperResult = await this.checkInternal(
+            { name: toolName, args: { command: stripped, dir_path } },
+            serverName,
+            toolAnnotations,
+            subagent,
+            true,
+            inspectionDepth + 1,
+            recursionDepth + 1,
+          );
+
+          if (wrapperResult.decision === PolicyDecision.DENY)
+            return wrapperResult;
+          if (wrapperResult.decision === PolicyDecision.ASK_USER) {
+            allSubCommandsExplicitlyAllowed = false;
+            if (aggregateDecision === PolicyDecision.ALLOW) {
+              responsibleRule = wrapperResult.rule;
+            } else {
+              responsibleRule ??= wrapperResult.rule;
+            }
+            aggregateDecision = PolicyDecision.ASK_USER;
+          } else if (
+            wrapperResult.decision === PolicyDecision.ALLOW &&
+            wrapperResult.rule?.decision === PolicyDecision.ALLOW &&
+            Boolean(wrapperResult.rule?.argsPattern)
+          ) {
+            lastAllowedSubRule = wrapperResult.rule;
+          } else {
+            allSubCommandsExplicitlyAllowed = false;
+          }
         }
       } else if (typeof unwrapShellCommandForInspection === 'function') {
         const inspected = unwrapShellCommandForInspection(subCmd);
@@ -672,29 +765,56 @@ export class PolicyEngine {
           inspected.command !== subCmd &&
           inspected.command !== command.trim()
         ) {
-          // Preserve heuristic auto-approval (e.g. `bash -lc "ls -la"`) only
-          // when the outer command itself was allowed via heuristics rather
-          // than an explicit ALLOW rule.
-          const allowedByHeuristics =
-            ruleDecision === PolicyDecision.ALLOW &&
-            rule?.decision !== PolicyDecision.ALLOW;
-          const inspectedResult = await this.check(
-            { name: toolName, args: { command: inspected.command, dir_path } },
-            serverName,
-            toolAnnotations,
-            subagent,
-            !allowedByHeuristics,
-          );
-          if (inspectedResult.decision === PolicyDecision.DENY) {
-            return inspectedResult;
-          }
-          if (inspectedResult.decision === PolicyDecision.ASK_USER) {
-            if (aggregateDecision === PolicyDecision.ALLOW) {
-              responsibleRule = inspectedResult.rule;
-            } else {
-              responsibleRule ??= inspectedResult.rule;
+          if (inspectionDepth >= MAX_SHELL_INSPECTION_DEPTH) {
+            // Fail closed when wrapper nesting exceeds the inspection limit
+            // to prevent both stack exhaustion and depth-based policy evasion.
+            const depthDecision = this.getDepthLimitExceededDecision(
+              toolName,
+              aggregateDecision,
+              serverName,
+              rule,
+              toolAnnotations,
+              subagent,
+            );
+            if (depthDecision === PolicyDecision.DENY) {
+              return { decision: PolicyDecision.DENY, rule: undefined };
             }
-            aggregateDecision = PolicyDecision.ASK_USER;
+            if (depthDecision === PolicyDecision.ASK_USER) {
+              if (aggregateDecision === PolicyDecision.ALLOW) {
+                responsibleRule = undefined;
+              }
+              aggregateDecision = PolicyDecision.ASK_USER;
+            }
+          } else {
+            // Preserve heuristic auto-approval (e.g. `bash -lc "ls -la"`) only
+            // when the outer command itself was allowed via heuristics rather
+            // than an explicit ALLOW rule.
+            const allowedByHeuristics =
+              ruleDecision === PolicyDecision.ALLOW &&
+              rule?.decision !== PolicyDecision.ALLOW;
+            const inspectedResult = await this.checkInternal(
+              {
+                name: toolName,
+                args: { command: inspected.command, dir_path },
+              },
+              serverName,
+              toolAnnotations,
+              subagent,
+              !allowedByHeuristics,
+              inspectionDepth + 1,
+              recursionDepth + 1,
+            );
+            if (inspectedResult.decision === PolicyDecision.DENY) {
+              return inspectedResult;
+            }
+            if (inspectedResult.decision === PolicyDecision.ASK_USER) {
+              if (aggregateDecision === PolicyDecision.ALLOW) {
+                responsibleRule = inspectedResult.rule;
+              } else {
+                responsibleRule ??= inspectedResult.rule;
+              }
+              aggregateDecision = PolicyDecision.ASK_USER;
+            }
           }
           // Prefix-wrapped / shaped shell invocations must never upgrade an
           // outer ASK_USER decision to ALLOW.
@@ -704,12 +824,14 @@ export class PolicyEngine {
 
       if (!isAtomic) {
         evaluatedSubCommands++;
-        const subResult = await this.check(
+        const subResult = await this.checkInternal(
           { name: toolName, args: { command: subCmd, dir_path } },
           serverName,
           toolAnnotations,
           subagent,
           true,
+          inspectionDepth,
+          recursionDepth + 1,
         );
 
         if (subResult.decision === PolicyDecision.DENY) return subResult;
@@ -831,6 +953,8 @@ export class PolicyEngine {
     toolAnnotations?: Record<string, unknown>,
     subagent?: string,
     skipHeuristics = false,
+    inspectionDepth = 0,
+    recursionDepth = 0,
   ): Promise<CheckResult> {
     // Case 1: Metadata injection is the primary and safest way to identify an MCP server.
     // If we have explicit `_serverName` metadata (usually injected by tool-registry for active tools), use it.
@@ -957,6 +1081,8 @@ export class PolicyEngine {
             toolAnnotations,
             subagent,
             hasTopLevelHeuristicDowngrade,
+            inspectionDepth,
+            recursionDepth,
           );
           decision = shellResult.decision;
           matchedRule = shellResult.rule;
@@ -1009,6 +1135,8 @@ export class PolicyEngine {
             toolAnnotations,
             subagent,
             hasTopLevelHeuristicDowngrade,
+            inspectionDepth,
+            recursionDepth,
           );
           decision = shellResult.decision;
           matchedRule = shellResult.rule;

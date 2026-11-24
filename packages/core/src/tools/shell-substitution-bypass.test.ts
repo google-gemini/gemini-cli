@@ -480,5 +480,122 @@ describe('shell wrapper and command substitution bypass prevention', () => {
       );
       expect(performance.now() - start).toBeLessThan(1000);
     });
+
+    it('bounds wrapper recursion depth and fails closed for deeply nested wrappers', async () => {
+      // Build 8 nested shell wrappers (exceeding MAX_WRAPPER_DEPTH / MAX_SHELL_INSPECTION_DEPTH = 5).
+      let nested = 'whoami';
+      for (let i = 0; i < 8; i++) {
+        nested = `eval ${JSON.stringify(nested)}`;
+      }
+      // Also build a compound command hiding an extra wrapper beyond the depth limit.
+      let nestedCompound = "echo ok && sh -c '$(whoami)'";
+      for (let i = 0; i < 6; i++) {
+        nestedCompound = `eval ${JSON.stringify(nestedCompound)}`;
+      }
+
+      expect(detectCommandSubstitution(nested)).toBe(true);
+      expect(detectCommandSubstitution(nestedCompound)).toBe(true);
+
+      // Default mode with an ALLOW rule for eval: deeply nested wrappers must downgrade to ASK_USER.
+      const evalAllowEngine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'run_shell_command',
+            argsPattern: SafeRegExp.compile(
+              buildArgsPatterns(undefined, 'eval')[0]!,
+            ),
+            decision: PolicyDecision.ALLOW,
+            priority: 100,
+          },
+        ],
+        approvalMode: ApprovalMode.DEFAULT,
+        defaultDecision: PolicyDecision.ASK_USER,
+      });
+      const defaultResult = await evalAllowEngine.check(
+        { name: 'run_shell_command', args: { command: nested } },
+        undefined,
+      );
+      expect(defaultResult.decision).toBe(PolicyDecision.ASK_USER);
+
+      // Admin DENY rule in YOLO mode: deeply nested wrappers must fail closed to DENY.
+      const yoloDenyEngine = new PolicyEngine({
+        rules: [
+          {
+            toolName: '*',
+            decision: PolicyDecision.ALLOW,
+            priority: 100,
+          },
+          {
+            toolName: 'run_shell_command',
+            argsPattern: SafeRegExp.compile(
+              buildArgsPatterns(undefined, 'whoami')[0]!,
+            ),
+            decision: PolicyDecision.DENY,
+            priority: 200,
+          },
+        ],
+        approvalMode: ApprovalMode.YOLO,
+        defaultDecision: PolicyDecision.ALLOW,
+      });
+      const yoloDenyResult = await yoloDenyEngine.check(
+        { name: 'run_shell_command', args: { command: nested } },
+        undefined,
+      );
+      expect(yoloDenyResult.decision).toBe(PolicyDecision.DENY);
+
+      // Admin DENY rule in DEFAULT mode: deeply nested wrappers must also fail closed to DENY.
+      const defaultDenyEngine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'run_shell_command',
+            argsPattern: SafeRegExp.compile(
+              buildArgsPatterns(undefined, 'whoami')[0]!,
+            ),
+            decision: PolicyDecision.DENY,
+            priority: 200,
+          },
+        ],
+        approvalMode: ApprovalMode.DEFAULT,
+        defaultDecision: PolicyDecision.ASK_USER,
+      });
+      const defaultDenyResult = await defaultDenyEngine.check(
+        { name: 'run_shell_command', args: { command: nested } },
+        undefined,
+      );
+      expect(defaultDenyResult.decision).toBe(PolicyDecision.DENY);
+
+      // Deeply nested wrappers without active DENY rules or argsPattern in YOLO mode
+      // must still terminate cleanly without stack overflow.
+      const veryDeep = 'eval '.repeat(25) + 'echo hi';
+      const unrestrictedYolo = new PolicyEngine({
+        rules: [
+          {
+            toolName: '*',
+            decision: PolicyDecision.ALLOW,
+            priority: 100,
+            allowCommandSubstitution: true,
+          },
+        ],
+        approvalMode: ApprovalMode.YOLO,
+        defaultDecision: PolicyDecision.ALLOW,
+      });
+      const veryDeepResult = await unrestrictedYolo.check(
+        { name: 'run_shell_command', args: { command: veryDeep } },
+        undefined,
+      );
+      expect(veryDeepResult.decision).toBe(PolicyDecision.ALLOW);
+
+      // Also verify stripShellWrapper depth limit fails closed for deeply nested sh -c.
+      let nestedSh = 'whoami';
+      for (let i = 0; i < 8; i++) {
+        nestedSh = `sh -c ${JSON.stringify(nestedSh)}`;
+      }
+      expect(detectCommandSubstitution(nestedSh)).toBe(true);
+      const shDenyResult = await yoloDenyEngine.check(
+        { name: 'run_shell_command', args: { command: nestedSh } },
+        undefined,
+      );
+      expect(shDenyResult.decision).toBe(PolicyDecision.DENY);
+    });
   });
 });
