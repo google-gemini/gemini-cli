@@ -18,6 +18,18 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.71.0 - 2026-11-24
+
+- **Asynchronous PowerShell Parsing & UI Responsiveness:** Parsed PowerShell
+  commands asynchronously and introduced scoped parse caching to eliminate
+  redundant shell spawns and prevent UI spinner freezes
+  ([#30334](https://github.com/google-gemini/gemini-cli/pull/30334) by
+  @tadipavan).
+- **Development Infrastructure & Artifact Registry:** Pushed development worker
+  images to a private Artifact Registry to improve container builds and release
+  workflows ([#30319](https://github.com/google-gemini/gemini-cli/pull/30319) by
+  @DavidAPierce).
+
 ## Announcements: v0.70.0 - 2026-11-19
 
 - **Policy Engine Hardening & Shell Safety:** Evaluated policy regex patterns
