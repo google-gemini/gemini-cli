@@ -1807,7 +1807,10 @@ function stripSingleShellWrapperWithTarget(
             newCommand.startsWith("'") ||
             newCommand.startsWith("$'") ||
             newCommand.startsWith('-') ||
-            newCommand.startsWith('+')
+            newCommand.startsWith('+') ||
+            newCommand.startsWith('>') ||
+            newCommand.startsWith('<') ||
+            /^\d+[<>]/.test(newCommand)
           ) {
             return null;
           }
@@ -2249,6 +2252,36 @@ const INSPECTION_PREFIX_UTILITIES: Record<string, PrefixUtilitySpec> = {
     abortFlags: new Set(['-p', '--pid']),
     positionalArgsBeforeCmd: 1,
   },
+  caffeinate: {
+    valueFlags: new Set(['-t', '-w']),
+  },
+  arch: {
+    valueFlags: new Set(['-e']),
+  },
+  doas: {
+    valueFlags: new Set(['-u', '-C']),
+  },
+  unshare: {
+    valueFlags: new Set([
+      '-R',
+      '-S',
+      '-G',
+      '--root',
+      '--wd',
+      '--setuid',
+      '--setgid',
+      '--propagation',
+      '--setgroups',
+      '--map-user',
+      '--map-group',
+      '--map-users',
+      '--map-groups',
+    ]),
+  },
+  taskset: {
+    abortFlags: new Set(['-p', '--pid']),
+    valueFlags: new Set(['-c', '--cpu-list']),
+  },
   builtin: {},
   busybox: {},
 };
@@ -2637,6 +2670,7 @@ function advancePastWrapperPrefixes(
     }
 
     cursor = word.nextIndex;
+    let sawTasksetCpuList = false;
     while (cursor < command.length) {
       const flag = readPosixShellWord(command, cursor);
       if (!flag || !flag.value.startsWith('-')) {
@@ -2651,6 +2685,14 @@ function advancePastWrapperPrefixes(
       }
 
       const lowerFlag = flag.value.toLowerCase();
+      if (
+        base === 'taskset' &&
+        (lowerFlag === '-c' ||
+          lowerFlag === '--cpu-list' ||
+          lowerFlag.startsWith('--cpu-list='))
+      ) {
+        sawTasksetCpuList = true;
+      }
       if (base === 'env') {
         if (lowerFlag.startsWith('--split-string=')) {
           const splitCmd = flag.value.slice('--split-string='.length).trim();
@@ -2692,8 +2734,12 @@ function advancePastWrapperPrefixes(
       }
     }
 
-    if (spec.positionalArgsBeforeCmd) {
-      for (let p = 0; p < spec.positionalArgsBeforeCmd; p++) {
+    const positionalArgs =
+      base === 'taskset' && !sawTasksetCpuList
+        ? 1
+        : (spec.positionalArgsBeforeCmd ?? 0);
+    if (positionalArgs > 0) {
+      for (let p = 0; p < positionalArgs; p++) {
         const posToken = readPosixShellWord(command, cursor);
         if (!posToken) {
           return null;
@@ -2737,6 +2783,9 @@ function unwrapPosixInspectionWrapper(
       parts.push(arg.value);
       cursor = arg.nextIndex;
     }
+    if (parts[0] === '--') {
+      parts.shift();
+    }
     const joined = parts.join(' ').trim();
     if (!joined) {
       return null;
@@ -2760,9 +2809,11 @@ function unwrapPosixInspectionWrapper(
   while (cursor < command.length) {
     const flag = readPosixShellWord(command, cursor);
     if (!flag) {
-      return null;
+      break;
     }
-    if (flag.quoted) {
+    // Allow quoted flags before `-c` (e.g. `sh '-c' '$(whoami)'`), but stop on
+    // quoted operands once `-c` has been seen so `sh -c '-echo'` keeps its script.
+    if (flag.quoted && foundCFlag) {
       break;
     }
 
@@ -2802,6 +2853,20 @@ function unwrapPosixInspectionWrapper(
   }
 
   if (!foundCFlag) {
+    // Handle herestring execution into a POSIX shell (e.g. `sh <<< '$(whoami)'`).
+    const trimmedAfterFlags = command.slice(cursor).trim();
+    if (trimmedAfterFlags.startsWith('<<<')) {
+      const hereWord = readPosixShellWord(trimmedAfterFlags, 3);
+      if (
+        hereWord &&
+        hereWord.value.trim().length > 0 &&
+        !hasUnquotedControlOperator(
+          trimmedAfterFlags.slice(hereWord.nextIndex).trim(),
+        )
+      ) {
+        return { command: hereWord.value.trim(), targetShell: 'bash' };
+      }
+    }
     return null;
   }
 
@@ -2857,7 +2922,7 @@ function unwrapCmdInspectionWrapper(
   let cursor = exeWord.nextIndex;
   while (cursor < command.length) {
     const flagToken = readWrapperToken(command, cursor);
-    if (!flagToken || flagToken.quoted) {
+    if (!flagToken) {
       return null;
     }
     const lowerFlag = flagToken.value.toLowerCase();
@@ -2953,7 +3018,7 @@ function unwrapPowerShellInspectionWrapper(
   let cursor = exeWord.nextIndex;
   while (cursor < command.length) {
     const flagToken = readWrapperToken(command, cursor);
-    if (!flagToken || flagToken.quoted) {
+    if (!flagToken) {
       return null;
     }
     const rawFlag =
@@ -3066,6 +3131,52 @@ const BASH_REDIRECT_NODE_TYPES = new Set([
   'herestring_redirect',
 ]);
 
+function isBarePosixShellInvocation(segment: string): boolean {
+  const trimmed = segment.trim();
+  if (!trimmed) {
+    return false;
+  }
+  const advanced = advancePastWrapperPrefixes(trimmed, 0);
+  if (!advanced || advanced.splitStringCommand) {
+    return false;
+  }
+  const exeWord = readPosixShellWord(trimmed, advanced.cursor);
+  if (!exeWord || exeWord.raw.includes(':\\') || exeWord.raw.endsWith('.exe')) {
+    return false;
+  }
+  if (!POSIX_SHELL_NAMES.has(getPosixUtilityBasename(exeWord))) {
+    return false;
+  }
+  let cursor = exeWord.nextIndex;
+  while (cursor < trimmed.length) {
+    const token = readPosixShellWord(trimmed, cursor);
+    if (!token) {
+      break;
+    }
+    const val = token.value;
+    if (val === '--' || val === '-s') {
+      cursor = token.nextIndex;
+      continue;
+    }
+    if ((val.startsWith('-') || val.startsWith('+')) && val.length >= 2) {
+      if (val.startsWith('-') && val.slice(1).includes('c')) {
+        return false;
+      }
+      cursor = token.nextIndex;
+      if (val.slice(1).endsWith('o')) {
+        const opt = readPosixShellWord(trimmed, cursor);
+        if (!opt) {
+          return false;
+        }
+        cursor = opt.nextIndex;
+      }
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
 function extractBashCommandNodesForInspection(
   command: string,
 ): string[] | null {
@@ -3086,6 +3197,70 @@ function extractBashCommandNodesForInspection(
     const stack: Node[] = [tree.rootNode];
     while (stack.length > 0) {
       const current = stack.pop()!;
+      if (current.type === 'pipeline') {
+        const stageCommands: Node[] = [];
+        for (let i = 0; i < current.childCount; i++) {
+          const child = current.child(i);
+          if (!child) {
+            continue;
+          }
+          if (child.type === 'command') {
+            stageCommands.push(child);
+          } else if (child.type === 'redirected_statement') {
+            const body = child.childForFieldName('body');
+            if (body?.type === 'command') {
+              stageCommands.push(body);
+            }
+          }
+        }
+        let lastShellStageIndex = -1;
+        for (let s = 1; s < stageCommands.length; s++) {
+          const stage = stageCommands[s];
+          if (
+            isBarePosixShellInvocation(
+              command.slice(stage.startIndex, stage.endIndex),
+            )
+          ) {
+            lastShellStageIndex = s;
+          }
+        }
+        if (lastShellStageIndex > 0) {
+          for (let s = 0; s < lastShellStageIndex; s++) {
+            const producer = stageCommands[s];
+            const nameNode = producer.childForFieldName('name');
+            const nameText = nameNode
+              ? command.slice(nameNode.startIndex, nameNode.endIndex).trim()
+              : '';
+            const producerBase = nameText
+              .slice(nameText.lastIndexOf('/') + 1)
+              .replace(/^['"]|['"]$/g, '')
+              .toLowerCase();
+            if (producerBase !== 'echo' && producerBase !== 'printf') {
+              continue;
+            }
+            const argParts: string[] = [];
+            for (let j = 0; j < producer.childCount; j++) {
+              const part = producer.child(j);
+              if (
+                part &&
+                part !== nameNode &&
+                !BASH_REDIRECT_NODE_TYPES.has(part.type)
+              ) {
+                const text = command
+                  .slice(part.startIndex, part.endIndex)
+                  .trim();
+                if (text) {
+                  argParts.push(text);
+                }
+              }
+            }
+            if (argParts.length > 0) {
+              segments.push(`eval ${argParts.join(' ')}`);
+            }
+          }
+        }
+      }
+
       if (current.type === 'redirected_statement') {
         const body = current.childForFieldName('body');
         if (body?.type === 'command') {
@@ -3124,11 +3299,17 @@ function extractBashCommandNodesForInspection(
 
       if (current.type === 'command') {
         let hasInlineRedirect = false;
+        const herestrings: string[] = [];
         for (let i = 0; i < current.childCount; i++) {
           const child = current.child(i);
           if (child && BASH_REDIRECT_NODE_TYPES.has(child.type)) {
             hasInlineRedirect = true;
-            break;
+            if (child.type === 'herestring_redirect') {
+              const hs = command.slice(child.startIndex, child.endIndex).trim();
+              if (hs) {
+                herestrings.push(hs);
+              }
+            }
           }
         }
         if (!hasInlineRedirect) {
@@ -3152,7 +3333,11 @@ function extractBashCommandNodesForInspection(
             }
           }
           if (parts.length > 0) {
-            segments.push(parts.join(' '));
+            const baseCommand = parts.join(' ');
+            segments.push(baseCommand);
+            for (const hs of herestrings) {
+              segments.push(`${baseCommand} ${hs}`);
+            }
           }
         }
       }
