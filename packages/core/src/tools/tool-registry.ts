@@ -285,7 +285,25 @@ export class ToolRegistry {
    * @param tool - The tool object containing schema and execution logic.
    */
   registerTool(tool: AnyDeclarativeTool): void {
-    if (this.allKnownTools.has(tool.name)) {
+        const existing = this.allKnownTools.get(tool.name);
+    if (existing) {
+      // Two DIFFERENT MCP tools (different server/tool pairs) whose names
+      // truncate to the same registry name must not silently overwrite
+      // each other: the second registration is refused and the first is
+      // kept, so the model keeps calling the tool the user approved.
+      // Re-registering the SAME tool (same server + tool, e.g. after a
+      // refresh) still overwrites as before.
+      if (
+        tool instanceof DiscoveredMCPTool &&
+        existing instanceof DiscoveredMCPTool &&
+        (existing.serverName !== tool.serverName ||
+          existing.serverToolName !== tool.serverToolName)
+      ) {
+        debugLogger.error(
+          `Refusing to register MCP tool "${tool.name}" from server "${tool.serverName}" (tool "${tool.serverToolName}"): the name is already used by server "${existing.serverName}" (tool "${existing.serverToolName}"). The two tools truncate to the same registry name; the first registration is kept.`,
+        );
+        return;
+      }
       // Decide on behavior: throw error, log warning, or allow overwrite
       debugLogger.warn(
         `Tool with name "${tool.name}" is already registered. Overwriting.`,
