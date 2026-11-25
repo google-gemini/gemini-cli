@@ -137,6 +137,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getRetryFetchErrors: vi.fn().mockReturnValue(true),
     getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
     getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
+    getToolCallTimeout: vi.fn().mockReturnValue(0),
     getRequestTimeoutMs: vi.fn().mockReturnValue(undefined),
     getShellExecutionConfig: vi.fn().mockReturnValue({
       sandboxManager: new NoopSandboxManager(),

@@ -18,6 +18,7 @@ import {
   type ToolLiveOutput,
 } from '../index.js';
 import { isAbortError } from '../utils/errors.js';
+import { Kind } from '../tools/tools.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { ToolOutputDistillationService } from '../context/toolDistillationService.js';
@@ -54,6 +55,66 @@ export interface ToolExecutionContext {
   signal: AbortSignal;
   outputUpdateHandler?: (callId: string, output: ToolLiveOutput) => void;
   onUpdateToolCall: (updatedCall: ToolCall) => void;
+}
+
+const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
+
+interface TimeoutSignal {
+  /** Aborts when the parent signal aborts or the timeout elapses. */
+  readonly signal: AbortSignal;
+  /** True only if the timeout, rather than the parent, caused the abort. */
+  readonly timedOut: boolean;
+  /** Clears the timer and detaches from the parent without aborting. */
+  dispose(): void;
+}
+
+/**
+ * Derives a signal that aborts when `parent` aborts or `timeoutMs` elapses,
+ * whichever comes first.
+ *
+ * Composed by hand rather than with `AbortSignal.any`, which requires
+ * Node >= 20.3 (the engines field allows 20.0) and offers no way to detach
+ * from the parent. The parent signal can outlive many tool calls, so the
+ * listener is removed explicitly in `dispose()`.
+ */
+function createTimeoutSignal(
+  parent: AbortSignal,
+  timeoutMs: number,
+): TimeoutSignal {
+  const controller = new AbortController();
+  let timedOut = false;
+
+  const onParentAbort = () => controller.abort(parent.reason);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  if (parent.aborted) {
+    onParentAbort();
+  } else {
+    parent.addEventListener('abort', onParentAbort, { once: true });
+    timer = setTimeout(
+      () => {
+        if (controller.signal.aborted) return;
+        timedOut = true;
+        controller.abort(
+          new Error(`Tool call timed out after ${timeoutMs}ms.`),
+        );
+      },
+      // setTimeout fires after 1ms for delays above 2^31-1, so clamp very
+      // large values rather than timing out every call immediately.
+      Math.min(timeoutMs, MAX_TIMER_DELAY_MS),
+    );
+  }
+
+  return {
+    signal: controller.signal,
+    get timedOut() {
+      return timedOut;
+    },
+    dispose() {
+      clearTimeout(timer);
+      parent.removeEventListener('abort', onParentAbort);
+    },
+  };
 }
 
 export class ToolExecutor {
@@ -103,6 +164,21 @@ export class ToolExecutor {
 
         let completedToolCall: CompletedToolCall;
 
+        // Apply an optional wall-clock timeout to the tool execution. When it
+        // elapses, the tool's AbortSignal is triggered and the call is reported
+        // as a timeout error so the model can adjust its approach. A value <= 0
+        // disables the timeout. Subagent invocations are exempt: they enforce
+        // their own time budget (`maxTimeMinutes`) with a graceful wrap-up, and
+        // the tool calls they make are still individually subject to this limit.
+        const toolCallTimeoutMs = this.config.getToolCallTimeout();
+        const timeout =
+          toolCallTimeoutMs > 0 && tool.kind !== Kind.Agent
+            ? createTimeoutSignal(signal, toolCallTimeoutMs)
+            : undefined;
+        const effectiveSignal = timeout?.signal ?? signal;
+        // True only when the timeout (and not the user) aborted execution.
+        const timedOut = () => timeout?.timedOut === true;
+
         try {
           const setExecutionIdCallback = (executionId: number) => {
             const executingCall: ExecutingToolCall = {
@@ -119,7 +195,7 @@ export class ToolExecutor {
           const promise = executeToolWithHooks(
             invocation,
             toolName,
-            signal,
+            effectiveSignal,
             tool,
             liveOutputCallback,
             {
@@ -149,7 +225,12 @@ export class ToolExecutor {
             }
           }
 
-          if (signal.aborted) {
+          if (timedOut()) {
+            completedToolCall = this.createTimeoutResult(
+              call,
+              toolCallTimeoutMs,
+            );
+          } else if (signal.aborted) {
             completedToolCall = await this.createCancelledResult(
               call,
               'User cancelled tool execution.',
@@ -181,7 +262,12 @@ export class ToolExecutor {
             (executionError instanceof Error &&
               executionError.message.includes('Operation cancelled by user'));
 
-          if (signal.aborted || abortedByError) {
+          if (timedOut()) {
+            completedToolCall = this.createTimeoutResult(
+              call,
+              toolCallTimeoutMs,
+            );
+          } else if (signal.aborted || abortedByError) {
             completedToolCall = await this.createCancelledResult(
               call,
               isAbortError(executionError)
@@ -199,6 +285,11 @@ export class ToolExecutor {
               ToolErrorType.UNHANDLED_EXCEPTION,
             );
           }
+        } finally {
+          // Clear the pending timer and detach from the caller's signal. This
+          // deliberately does not abort the signal handed to the tool, so a
+          // call that completed normally never observes a spurious abort.
+          timeout?.dispose();
         }
 
         spanMetadata.output = completedToolCall;
@@ -590,6 +681,22 @@ export class ToolExecutor {
       outcome: call.outcome,
       tailToolCallRequest: toolResult.tailToolCallRequest,
     };
+  }
+
+  private createTimeoutResult(
+    call: ToolCall,
+    timeoutMs: number,
+  ): ErroredToolCall {
+    const seconds = timeoutMs / 1000;
+    const message =
+      `Tool execution timed out after ${seconds} second${seconds === 1 ? '' : 's'} ` +
+      `and was aborted (configured via the \`tools.callTimeout\` setting). ` +
+      `Consider breaking the work into smaller steps or increasing the timeout.`;
+    return this.createErrorResult(
+      call,
+      new Error(message),
+      ToolErrorType.TOOL_CALL_TIMEOUT,
+    );
   }
 
   private createErrorResult(
