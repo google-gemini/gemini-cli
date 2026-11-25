@@ -14,10 +14,13 @@ import {
   type CommandContext,
 } from './types.js';
 import type { ReactElement } from 'react';
-import { coreEvents } from '@google/gemini-cli-core';
+import { coreEvents, uiTelemetryService } from '@google/gemini-cli-core';
 
 // Mock dependencies
 const mockRewindTo = vi.fn();
+const mockForkAsync = vi.fn();
+const mockResumeChat = vi.fn();
+const mockSetSessionId = vi.fn();
 const mockRecordMessage = vi.fn();
 const mockSetHistory = vi.fn();
 const mockClearCurrentSequenceModel = vi.fn();
@@ -47,6 +50,11 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...actual.coreEvents,
       emitFeedback: vi.fn(),
+    },
+    uiTelemetryService: {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
+      ...actual.uiTelemetryService,
+      hydrate: vi.fn(),
     },
     logRewind: vi.fn(),
     RewindEvent: class {},
@@ -96,9 +104,24 @@ describe('rewindCommand', () => {
       messages: [], // Mocked rewound messages
     });
 
+    mockForkAsync.mockResolvedValue({
+      sessionId: 'forked-session-id',
+      sourceSessionId: 'test-session',
+      filePath: '/mock/chats/session-forked.jsonl',
+      conversation: {
+        sessionId: 'forked-session-id',
+        projectHash: 'hash',
+        startTime: '2026-11-24T20:00:00.000Z',
+        lastUpdated: '2026-11-24T20:00:00.000Z',
+        messages: [],
+      },
+    });
+    mockResumeChat.mockResolvedValue(undefined);
+
     mockGetChatRecordingService.mockReturnValue({
       getConversation: mockGetConversation,
       rewindTo: mockRewindTo,
+      forkAsync: mockForkAsync,
       recordMessage: mockRecordMessage,
     });
 
@@ -108,11 +131,13 @@ describe('rewindCommand', () => {
           geminiClient: {
             getChatRecordingService: mockGetChatRecordingService,
             setHistory: mockSetHistory,
+            resumeChat: mockResumeChat,
             clearCurrentSequenceModel: mockClearCurrentSequenceModel,
             sendMessageStream: mockSendMessageStream,
           },
           config: {
             getSessionId: () => 'test-session-id',
+            setSessionId: mockSetSessionId,
             getMemoryContextManager: () => ({ refresh: mockResetContext }),
             getModelAvailabilityService: () => ({
               reset: mockResetAvailability,
@@ -418,6 +443,78 @@ describe('rewindCommand', () => {
     await waitFor(() => {
       expect(mockRewindToAsync).toHaveBeenCalledWith('msg-1');
       expect(mockRewindTo).not.toHaveBeenCalled();
+    });
+  });
+
+  it('should handle Fork outcome by creating a new session without reverting files', async () => {
+    const result = (await rewindCommand.action!(
+      mockContext,
+      '',
+    )) as OpenCustomDialogActionReturn;
+    const component = result.component as ReactElement<RewindViewerProps>;
+
+    await component.props.onRewind(
+      'msg-id-123',
+      'Edited Prompt',
+      RewindOutcome.Fork,
+    );
+
+    await waitFor(() => {
+      expect(mockRevertFileChanges).not.toHaveBeenCalled();
+      expect(mockRewindTo).not.toHaveBeenCalled();
+      expect(mockForkAsync).toHaveBeenCalledWith({
+        upToMessageId: 'msg-id-123',
+      });
+      expect(mockResumeChat).toHaveBeenCalledWith(expect.any(Array), {
+        conversation: expect.objectContaining({
+          sessionId: 'forked-session-id',
+        }),
+        filePath: '/mock/chats/session-forked.jsonl',
+      });
+      expect(mockSetSessionId).toHaveBeenCalledWith('forked-session-id');
+      expect(uiTelemetryService.hydrate).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionId: 'forked-session-id' }),
+      );
+      expect(mockClearCurrentSequenceModel).toHaveBeenCalled();
+      expect(mockResetAvailability).toHaveBeenCalled();
+      expect(mockSetActiveModel).toHaveBeenCalledWith(
+        'gemini-3.1-pro-preview-customtools',
+      );
+      expect(mockResetContext).toHaveBeenCalled();
+      expect(mockRemoveComponent).toHaveBeenCalled();
+      expect(mockLoadHistory).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({ text: 'old user', id: 1 }),
+          expect.objectContaining({ text: 'old gemini', id: 2 }),
+        ],
+        'Edited Prompt',
+      );
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('gemini --resume test-session'),
+      );
+    });
+  });
+
+  it('should emit an error when Fork fails to create a forked session', async () => {
+    mockForkAsync.mockResolvedValue(null);
+
+    const result = (await rewindCommand.action!(
+      mockContext,
+      '',
+    )) as OpenCustomDialogActionReturn;
+    const component = result.component as ReactElement<RewindViewerProps>;
+
+    await component.props.onRewind('msg-1', 'Prompt', RewindOutcome.Fork);
+
+    await waitFor(() => {
+      expect(mockResumeChat).not.toHaveBeenCalled();
+      expect(mockSetSessionId).not.toHaveBeenCalled();
+      expect(mockRemoveComponent).toHaveBeenCalled();
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        'Could not fork conversation from selected message',
+      );
     });
   });
 });

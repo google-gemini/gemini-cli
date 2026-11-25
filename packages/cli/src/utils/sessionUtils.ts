@@ -110,6 +110,8 @@ export interface SessionInfo {
   index: number;
   /** AI-generated summary of the session (if available) */
   summary?: string;
+  /** Original session ID if this session was forked from another session */
+  forkedFrom?: string;
   /** Full concatenated content (only loaded when needed for search) */
   fullContent?: string;
   /** Processed messages with normalized roles (only loaded when needed) */
@@ -336,6 +338,7 @@ export const getAllSessionFiles = async (
             isCurrentSession,
             index: 0, // Will be set after sorting valid sessions
             summary: content.summary,
+            forkedFrom: content.forkedFrom,
             fullContent,
             messages,
           };

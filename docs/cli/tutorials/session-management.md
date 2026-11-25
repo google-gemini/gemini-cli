@@ -93,21 +93,36 @@ Gemini gives you granular control over the undo process. You can choose to:
 
 1.  **Rewind conversation:** Only remove the chat history. The files stay
     changed. (Useful if the code is good but the chat got off track).
-2.  **Revert code changes:** Keep the chat history but undo the file edits.
+2.  **Fork conversation from here:** Create a new independent session from this
+    point and switch into it while leaving your original full conversation and
+    files untouched.
+3.  **Revert code changes:** Keep the chat history but undo the file edits.
     (Useful if you want to keep the context but retry the implementation).
-3.  **Rewind both:** Restore everything to exactly how it was.
+4.  **Rewind both:** Restore everything to exactly how it was.
 
 ## How to fork conversations
 
-Sometimes you want to try two different approaches to the same problem.
+Sometimes you want to try two different approaches to the same problem without
+losing your original thread.
+
+### Fork from the current point
 
 1.  Start a session and get to a decision point.
-2.  Save the current state with `/resume save decision-point`.
-3.  Try your first approach.
-4.  Later, use `/resume resume decision-point` to fork the conversation back to
-    that moment and try a different approach.
+2.  Run `/fork approach-a` to branch into a new named session while keeping your
+    original conversation intact.
+3.  To keep working in the current terminal and run a second approach in
+    parallel, run `/fork --stay approach-b` and open the printed
+    `gemini --resume <session_id>` command in another terminal.
 
-This creates a new branch of history without losing your original work.
+### Fork from an earlier turn
+
+1.  Run `/rewind` (or press **Esc** twice) and select the earlier prompt you
+    want to branch from.
+2.  Choose **Fork conversation from here**. Gemini CLI switches you to a new
+    session at that turn and preserves your original session in `/resume`.
+
+You can also use manual checkpoints (`/resume save <tag>` and
+`/resume resume <tag>`) to save and reload named snapshots.
 
 ## Next steps
 

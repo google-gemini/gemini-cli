@@ -27,12 +27,15 @@ import { partListUnionToString } from '../core/geminiRequest.js';
 import { isIgnoredUserContent } from '../utils/sessionUtils.js';
 import {
   SESSION_FILE_PREFIX,
+  CHATS_DIR_NAME,
   MAX_HISTORY_MESSAGES,
   type TokensSummary,
   type ToolCallRecord,
   type ConversationRecordExtra,
   type MessageRecord,
   type ConversationRecord,
+  type ForkSessionOptions,
+  type ForkSessionResult,
   type ResumedSessionData,
   type LoadConversationOptions,
   type RewindRecord,
@@ -50,6 +53,46 @@ const ENOSPC_WARNING_MESSAGE =
   'Chat recording disabled: No space left on device. ' +
   'The conversation will continue but will not be saved to disk. ' +
   'Free up disk space and restart to enable recording.';
+
+const FORK_SUMMARY_SUFFIX = ' (fork)';
+const MAX_FORK_SUMMARY_BASE_LENGTH = 60;
+
+function buildDefaultForkSummary(
+  sourceConversation: ConversationRecord,
+  newSessionId: string,
+): string {
+  const fallback = `Fork ${newSessionId.slice(0, 8)}`;
+  let base = sourceConversation.summary?.trim() ?? '';
+
+  if (!base) {
+    const firstUserMsg = sourceConversation.messages.find(
+      (msg) => msg.type === 'user' && isResumableMessageRecord(msg),
+    );
+    if (firstUserMsg?.content) {
+      base = partListUnionToString(firstUserMsg.content)
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+  }
+
+  if (!base) {
+    return fallback;
+  }
+
+  if (base.endsWith(FORK_SUMMARY_SUFFIX)) {
+    base = base.slice(0, -FORK_SUMMARY_SUFFIX.length).trim();
+  }
+
+  if (!base) {
+    return fallback;
+  }
+
+  if (base.length > MAX_FORK_SUMMARY_BASE_LENGTH) {
+    base = `${base.slice(0, MAX_FORK_SUMMARY_BASE_LENGTH - 1).trimEnd()}…`;
+  }
+
+  return `${base}${FORK_SUMMARY_SUFFIX}`;
+}
 
 function hasProperty<T extends string>(
   obj: unknown,
@@ -601,6 +644,7 @@ function createJsonlRecordAccumulator(options?: LoadConversationOptions) {
       memoryScratchpad: metadata.memoryScratchpad,
       directories: metadata.directories,
       kind: metadata.kind,
+      forkedFrom: metadata.forkedFrom,
       messages: options?.metadataOnly ? [] : loadedMessages,
       messageCount: options?.metadataOnly
         ? loadedMessages.length || messageIds.length
@@ -757,6 +801,7 @@ export class ChatRecordingService {
               kind: this.cachedConversation.kind,
               directories: this.cachedConversation.directories,
               summary: this.cachedConversation.summary,
+              forkedFrom: this.cachedConversation.forkedFrom,
             };
             this.appendRecord(initialMetadata);
             for (const msg of this.cachedConversation.messages) {
@@ -796,7 +841,7 @@ export class ChatRecordingService {
         this.sessionId = this.context.promptId;
         let chatsDir = path.join(
           this.context.config.storage.getProjectTempDir(),
-          'chats',
+          CHATS_DIR_NAME,
         );
 
         // subagents are nested under the complete parent session id
@@ -1543,6 +1588,131 @@ export class ChatRecordingService {
       ...this.cachedConversation,
       messages: rewoundMessages,
     };
+  }
+
+  /**
+   * Forks the current conversation into a new independent JSONL session file
+   * with a fresh session ID, leaving the original session untouched.
+   *
+   * When `options.upToMessageId` is specified, only messages before that ID
+   * (exclusive) are copied, matching rewind semantics.
+   */
+  async forkAsync(
+    options?: ForkSessionOptions,
+  ): Promise<ForkSessionResult | null> {
+    if (!this.conversationFile || !this.cachedConversation) {
+      return null;
+    }
+
+    const sourceConversation = await this.getConversationAsync();
+    if (!sourceConversation) {
+      return null;
+    }
+
+    let messagesToCopy: MessageRecord[];
+    if (options?.upToMessageId !== undefined) {
+      const targetIndex = sourceConversation.messages.findIndex(
+        (m) => m.id === options.upToMessageId,
+      );
+      if (targetIndex === -1) {
+        debugLogger.error(
+          'Message to fork from not found in conversation history',
+        );
+        return null;
+      }
+      messagesToCopy = sourceConversation.messages.slice(0, targetIndex);
+    } else {
+      if (!hasResumableConversationContent(sourceConversation.messages)) {
+        return null;
+      }
+      messagesToCopy = sourceConversation.messages;
+    }
+
+    const newSessionId = randomUUID();
+    const safeSessionId = sanitizeFilenamePart(newSessionId);
+    if (!safeSessionId) {
+      throw new Error(
+        `Invalid forked sessionId after sanitization: ${newSessionId}`,
+      );
+    }
+
+    const now = new Date().toISOString();
+    const customSummary = options?.summary?.trim();
+    const summary =
+      customSummary ||
+      buildDefaultForkSummary(sourceConversation, newSessionId);
+
+    const forkedConversation: ConversationRecord = {
+      sessionId: newSessionId,
+      projectHash: sourceConversation.projectHash,
+      startTime: now,
+      lastUpdated: now,
+      kind: sourceConversation.kind,
+      directories: sourceConversation.directories
+        ? [...sourceConversation.directories]
+        : undefined,
+      summary,
+      memoryScratchpad:
+        options?.upToMessageId !== undefined
+          ? undefined
+          : sourceConversation.memoryScratchpad
+            ? structuredClone(sourceConversation.memoryScratchpad)
+            : undefined,
+      forkedFrom: sourceConversation.sessionId,
+      messages: structuredClone(messagesToCopy),
+    };
+
+    const { messages, memoryScratchpad, ...metadata } = forkedConversation;
+    const lines: string[] = [JSON.stringify(metadata)];
+    for (const msg of messages) {
+      lines.push(JSON.stringify(msg));
+    }
+    if (memoryScratchpad) {
+      lines.push(JSON.stringify({ $set: { memoryScratchpad } }));
+    }
+    const content = lines.join('\n') + '\n';
+
+    try {
+      const chatsDir = path.join(
+        this.context.config.storage.getProjectTempDir(),
+        CHATS_DIR_NAME,
+      );
+      await fs.promises.mkdir(chatsDir, { recursive: true });
+
+      const timestamp = now.slice(0, 16).replace(/:/g, '-');
+      const shortId = safeSessionId.slice(0, 8);
+      let filename = `${SESSION_FILE_PREFIX}${timestamp}-${shortId}.jsonl`;
+      let collisionIndex = 1;
+      while (fs.existsSync(path.join(chatsDir, filename))) {
+        filename = `${SESSION_FILE_PREFIX}${timestamp}-${collisionIndex++}-${shortId}.jsonl`;
+      }
+
+      const forkFilePath = path.join(chatsDir, filename);
+      const tempFile = `${forkFilePath}.tmp-${process.pid}-${Date.now()}`;
+      try {
+        await fs.promises.writeFile(tempFile, content, 'utf8');
+        await fs.promises.rename(tempFile, forkFilePath);
+      } catch (writeError) {
+        await fs.promises.unlink(tempFile).catch(() => {
+          // Ignore cleanup errors so the original failure surfaces.
+        });
+        throw writeError;
+      }
+
+      return {
+        sessionId: newSessionId,
+        sourceSessionId: sourceConversation.sessionId,
+        filePath: forkFilePath,
+        conversation: forkedConversation,
+      };
+    } catch (error) {
+      if (isNodeError(error) && error.code === 'ENOSPC') {
+        debugLogger.warn(ENOSPC_WARNING_MESSAGE);
+        return null;
+      }
+      debugLogger.error('Error forking conversation:', error);
+      throw error;
+    }
   }
 
   updateMessagesFromHistory(history: readonly HistoryTurn[]): void {

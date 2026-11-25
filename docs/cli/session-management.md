@@ -96,6 +96,45 @@ Compatibility aliases:
 - `/chat ...` works for the same commands.
 - `/resume checkpoints ...` also remains supported during migration.
 
+## Forking sessions
+
+You can branch a conversation into a new independent session file without
+affecting the original session. Each fork receives its own session ID and file
+so you can safely explore alternative approaches or work in parallel across
+multiple terminals.
+
+### Fork the current session
+
+Run `/fork` during any active conversation:
+
+```text
+# Fork and switch to the new session (original session is preserved)
+/fork
+
+# Fork with a custom name shown in /resume
+/fork try-redis-cache
+
+# Create a fork in the background while staying on the current session
+/fork --stay parallel-task
+```
+
+- By default, `/fork` switches your current terminal to the new session and
+  prints the `gemini --resume <session_id>` command for the preserved original
+  session.
+- Pass `--stay` to remain on your current session and receive the
+  `gemini --resume <session_id>` command to open the fork in another terminal.
+- If you omit `[name]`, the forked session defaults to `<original name> (fork)`.
+  When you provide a custom name, it is shown directly without a `(fork)`
+  suffix.
+
+### Fork from an earlier turn
+
+To branch from a previous message without losing later turns in the original
+session, open `/rewind` (or press **Esc** twice), select a past user prompt, and
+choose **Fork conversation from here**. Gemini CLI creates a new session up to
+that point, switches into it, and pre-fills the selected prompt in your input
+box while keeping your original conversation and files untouched.
+
 ## Parallel sessions with Git worktrees
 
 When working on multiple tasks at once, you can use

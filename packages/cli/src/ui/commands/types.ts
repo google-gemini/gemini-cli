@@ -212,6 +212,13 @@ export interface SlashCommand {
   autoExecute?: boolean;
 
   /**
+   * Optional inline argument hint rendered as dimmed ghost text after the
+   * command and trailing space when no arguments have been typed yet
+   * (e.g., `'[name] [--stay]'`).
+   */
+  argumentHint?: string;
+
+  /**
    * Whether this command can be safely executed while the agent is busy (e.g. streaming a response).
    */
   isSafeConcurrent?: boolean;

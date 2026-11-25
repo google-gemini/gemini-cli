@@ -10,11 +10,14 @@ import { sanitizeFilenamePart } from './fileUtils.js';
 import { debugLogger } from './debugLogger.js';
 import { isNodeError } from './errors.js';
 import type { Config } from '../config/config.js';
-import { SESSION_FILE_PREFIX } from '../services/chatRecordingTypes.js';
+import {
+  CHATS_DIR_NAME,
+  SESSION_FILE_PREFIX,
+} from '../services/chatRecordingTypes.js';
 
 const LOGS_DIR = 'logs';
 const TOOL_OUTPUTS_DIR = 'tool-outputs';
-const CHATS_DIR = 'chats';
+const CHATS_DIR = CHATS_DIR_NAME;
 
 /**
  * Reserved directory names that must never be treated as a session id. A

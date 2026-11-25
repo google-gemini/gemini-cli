@@ -64,7 +64,8 @@ exports[`RewindViewer > Interaction Selection > 'cancels on Escape' > confirmati
 │ Select an action:                                                                                │
 │                                                                                                  │
 │ ● 1. Rewind conversation                                                                         │
-│   2. Do nothing (esc)                                                                            │
+│   2. Fork conversation from here                                                                 │
+│   3. Do nothing (esc)                                                                            │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
@@ -80,7 +81,8 @@ exports[`RewindViewer > Interaction Selection > 'confirms on Enter' > confirmati
 │ Select an action:                                                                                │
 │                                                                                                  │
 │ ● 1. Rewind conversation                                                                         │
-│   2. Do nothing (esc)                                                                            │
+│   2. Fork conversation from here                                                                 │
+│   3. Do nothing (esc)                                                                            │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "

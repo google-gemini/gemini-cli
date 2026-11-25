@@ -10,6 +10,7 @@ import type { ToolResultDisplay } from '../tools/tools.js';
 import { type ThoughtSummary } from '../utils/thoughtUtils.js';
 
 export const SESSION_FILE_PREFIX = 'session-';
+export const CHATS_DIR_NAME = 'chats';
 export const MAX_HISTORY_MESSAGES = 50;
 export const MAX_TOOL_OUTPUT_SIZE = 50 * 1024; // 50KB
 
@@ -101,6 +102,38 @@ export interface ConversationRecord {
   directories?: string[];
   /** The kind of conversation (main agent or subagent) */
   kind?: 'main' | 'subagent';
+  /** Original session ID if this session was forked from another session */
+  forkedFrom?: string;
+}
+
+/**
+ * Options for forking an existing recorded conversation into a new session.
+ */
+export interface ForkSessionOptions {
+  /**
+   * Optional custom summary/label for the forked session.
+   * When omitted, a default "(fork)" label is derived from the source session.
+   */
+  summary?: string;
+  /**
+   * Optional message ID to fork before (exclusive), mirroring rewind semantics.
+   * When provided, only messages before this ID are copied to the forked session.
+   */
+  upToMessageId?: string;
+}
+
+/**
+ * Result of forking a conversation into a new independent session file.
+ */
+export interface ForkSessionResult {
+  /** Newly created session ID */
+  sessionId: string;
+  /** Original session ID that was forked from */
+  sourceSessionId: string;
+  /** Path to the newly created JSONL session file */
+  filePath: string;
+  /** Complete forked conversation record */
+  conversation: ConversationRecord;
 }
 
 /**
@@ -162,4 +195,5 @@ export interface PartialMetadataRecord {
   memoryScratchpad?: MemoryScratchpad;
   directories?: string[];
   kind?: 'main' | 'subagent';
+  forkedFrom?: string;
 }

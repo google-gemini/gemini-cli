@@ -195,6 +195,19 @@ Slash commands provide meta-level control over the CLI itself.
   - **`update`**:
     - **Description:** Update extensions. Usage: update <extension-names>|--all
 
+### `/fork`
+
+- **Description:** Fork the current conversation into a new independent session
+  without modifying the original session.
+- **Usage:** `/fork [name] [--stay]`
+- **Options:**
+  - **`[name]`**: Optional custom name saved as the forked session's summary in
+    `/resume`. When omitted, defaults to `<original name> (fork)`.
+  - **`--stay`**: Create the forked session in the background and stay on the
+    current session instead of switching to the new fork.
+- **See also:**
+  [Session Management](../cli/session-management.md#forking-sessions).
+
 ### `/help` (or `/?`)
 
 - **Description:** Display help information about Gemini CLI, including
@@ -352,8 +365,9 @@ Slash commands provide meta-level control over the CLI itself.
 - **Usage:** Press **Esc** twice as a shortcut.
 - **Features:**
   - **Select Interaction:** Preview user prompts and file changes.
-  - **Action Selection:** Choose to rewind history only, revert code changes
-    only, or both.
+  - **Action Selection:** Choose to rewind history only, fork the conversation
+    from that point into a new session, revert code changes only, or rewind both
+    conversation and code changes.
 
 ### `/resume`
 

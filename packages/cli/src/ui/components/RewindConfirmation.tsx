@@ -21,6 +21,7 @@ import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 export enum RewindOutcome {
   RewindAndRevert = 'rewind_and_revert',
   RewindOnly = 'rewind_only',
+  Fork = 'fork',
   RevertOnly = 'revert_only',
   Cancel = 'cancel',
 }
@@ -35,6 +36,11 @@ const REWIND_OPTIONS: Array<RadioSelectItem<RewindOutcome>> = [
     label: 'Rewind conversation',
     value: RewindOutcome.RewindOnly,
     key: 'Rewind conversation',
+  },
+  {
+    label: 'Fork conversation from here',
+    value: RewindOutcome.Fork,
+    key: 'Fork conversation from here',
   },
   {
     label: 'Revert code changes',

@@ -5557,6 +5557,53 @@ describe('InputPrompt', () => {
 
       unmount();
     });
+
+    it('renders slash command argumentHint as inline ghost text after trailing space', async () => {
+      props.slashCommands = [
+        {
+          name: 'fork',
+          description: 'Fork conversation',
+          kind: CommandKind.BUILT_IN,
+          autoExecute: false,
+          argumentHint: '[name] [--stay]',
+        },
+      ];
+      mockBuffer.setText('/fork ');
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        { uiActions },
+      );
+
+      await waitFor(() => {
+        expect(clean(lastFrame())).toContain('/fork  [name] [--stay]');
+      });
+      unmount();
+    });
+
+    it('hides slash command argumentHint once arguments are typed', async () => {
+      props.slashCommands = [
+        {
+          name: 'fork',
+          description: 'Fork conversation',
+          kind: CommandKind.BUILT_IN,
+          autoExecute: false,
+          argumentHint: '[name] [--stay]',
+        },
+      ];
+      mockBuffer.setText('/fork my-branch ');
+
+      const { lastFrame, unmount } = await renderWithProviders(
+        <TestInputPrompt {...props} />,
+        { uiActions },
+      );
+
+      await waitFor(() => {
+        expect(clean(lastFrame())).toContain('/fork my-branch');
+        expect(clean(lastFrame())).not.toContain('[name] [--stay]');
+      });
+      unmount();
+    });
   });
 });
 
