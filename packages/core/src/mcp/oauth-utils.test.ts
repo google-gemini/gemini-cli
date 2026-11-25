@@ -208,6 +208,10 @@ describe('OAuthUtils', () => {
     });
 
     it('should handle URLs with path components correctly', async () => {
+      const pathScopedMetadata: OAuthAuthorizationServerMetadata = {
+        ...mockAuthServerMetadata,
+        issuer: 'https://auth.example.com/mcp',
+      };
       mockFetch
         .mockResolvedValueOnce({
           ok: false,
@@ -217,14 +221,14 @@ describe('OAuthUtils', () => {
         })
         .mockResolvedValueOnce({
           ok: true,
-          json: () => Promise.resolve(mockAuthServerMetadata),
+          json: () => Promise.resolve(pathScopedMetadata),
         });
 
       const result = await OAuthUtils.discoverAuthorizationServerMetadata(
         'https://auth.example.com/mcp',
       );
 
-      expect(result).toEqual(mockAuthServerMetadata);
+      expect(result).toEqual(pathScopedMetadata);
 
       expect(mockFetch).nthCalledWith(
         1,
@@ -238,6 +242,157 @@ describe('OAuthUtils', () => {
         3,
         'https://auth.example.com/mcp/.well-known/openid-configuration',
       );
+    });
+
+    it('should normalize trailing slashes on multi-tenant path issuer URLs without double slashes', async () => {
+      const realmMetadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://idp.example.com/realms/my-realm',
+        authorization_endpoint:
+          'https://idp.example.com/realms/my-realm/protocol/openid-connect/auth',
+        token_endpoint:
+          'https://idp.example.com/realms/my-realm/protocol/openid-connect/token',
+      };
+      mockFetch
+        .mockResolvedValueOnce({ ok: false })
+        .mockResolvedValueOnce({ ok: false })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(realmMetadata),
+        });
+
+      const result = await OAuthUtils.discoverAuthorizationServerMetadata(
+        'https://idp.example.com/realms/my-realm/',
+      );
+
+      expect(result).toEqual(realmMetadata);
+      expect(mockFetch).nthCalledWith(
+        3,
+        'https://idp.example.com/realms/my-realm/.well-known/openid-configuration',
+      );
+    });
+
+    it('should continue to openid-configuration when first candidate returns a non-OAuth 200 payload', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ status: 'ok' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      const result = await OAuthUtils.discoverAuthorizationServerMetadata(
+        'https://auth.example.com',
+      );
+
+      expect(result).toEqual(mockAuthServerMetadata);
+      expect(mockFetch).nthCalledWith(
+        1,
+        'https://auth.example.com/.well-known/oauth-authorization-server',
+      );
+      expect(mockFetch).nthCalledWith(
+        2,
+        'https://auth.example.com/.well-known/openid-configuration',
+      );
+    });
+
+    it('should reject metadata when issuer is missing or does not match authServerUrl (RFC 8414 Section 3.3)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            issuer: 'https://other-idp.example.com',
+            authorization_endpoint: 'https://other-idp.example.com/authorize',
+            token_endpoint: 'https://other-idp.example.com/token',
+          }),
+      });
+
+      await expect(
+        OAuthUtils.discoverAuthorizationServerMetadata(
+          'https://auth.example.com',
+        ),
+      ).rejects.toThrow(OAuthSecurityError);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            issuer: 'https://idp.example.com/realms/other-realm',
+            authorization_endpoint:
+              'https://idp.example.com/realms/other-realm/authorize',
+            token_endpoint: 'https://idp.example.com/realms/other-realm/token',
+          }),
+      });
+
+      await expect(
+        OAuthUtils.discoverAuthorizationServerMetadata(
+          'https://idp.example.com/realms/my-realm',
+        ),
+      ).rejects.toThrow(OAuthSecurityError);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            authorization_endpoint: 'https://auth.example.com/authorize',
+            token_endpoint: 'https://auth.example.com/token',
+          }),
+      });
+
+      await expect(
+        OAuthUtils.discoverAuthorizationServerMetadata(
+          'https://auth.example.com',
+        ),
+      ).rejects.toThrow(OAuthSecurityError);
+    });
+
+    it('should reject metadata when authorization_endpoint, token_endpoint, or registration_endpoint is cross-origin', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            issuer: 'https://auth.example.com',
+            authorization_endpoint: 'https://idp-other.example.org/authorize',
+            token_endpoint: 'https://auth.example.com/token',
+          }),
+      });
+      await expect(
+        OAuthUtils.discoverAuthorizationServerMetadata(
+          'https://auth.example.com',
+        ),
+      ).rejects.toThrow(OAuthSecurityError);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            issuer: 'https://auth.example.com',
+            authorization_endpoint: 'https://auth.example.com/authorize',
+            token_endpoint: 'https://collector.example.org/token',
+          }),
+      });
+      await expect(
+        OAuthUtils.discoverAuthorizationServerMetadata(
+          'https://auth.example.com',
+        ),
+      ).rejects.toThrow(OAuthSecurityError);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            issuer: 'https://auth.example.com',
+            authorization_endpoint: 'https://auth.example.com/authorize',
+            token_endpoint: 'https://auth.example.com/token',
+            registration_endpoint: 'https://registrar.example.org/register',
+          }),
+      });
+      await expect(
+        OAuthUtils.discoverAuthorizationServerMetadata(
+          'https://auth.example.com',
+        ),
+      ).rejects.toThrow(OAuthSecurityError);
     });
   });
 
@@ -323,6 +478,88 @@ describe('OAuthUtils', () => {
         scopes: ['read', 'write'],
         authorizationResponseIssParameterSupported: false,
       });
+    });
+
+    it('should support root authorization server metadata fallback when protected resource metadata returns 404 on a path-scoped MCP URL', async () => {
+      const rootMetadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://mcp.notion.com',
+        authorization_endpoint: 'https://mcp.notion.com/authorize',
+        token_endpoint: 'https://mcp.notion.com/token',
+        registration_endpoint: 'https://mcp.notion.com/register',
+      };
+      mockFetch
+        // path-based PRM -> 404
+        .mockResolvedValueOnce({ ok: false })
+        // root-based PRM -> 404
+        .mockResolvedValueOnce({ ok: false })
+        // path-based AS well-known (3 endpoints) -> 404
+        .mockResolvedValueOnce({ ok: false })
+        .mockResolvedValueOnce({ ok: false })
+        .mockResolvedValueOnce({ ok: false })
+        // root-based AS well-known -> 200 OK
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(rootMetadata),
+        });
+
+      const config = await OAuthUtils.discoverOAuthConfig(
+        'https://mcp.notion.com/mcp',
+      );
+
+      expect(config).toEqual({
+        authorizationUrl: 'https://mcp.notion.com/authorize',
+        issuer: 'https://mcp.notion.com',
+        tokenUrl: 'https://mcp.notion.com/token',
+        registrationUrl: 'https://mcp.notion.com/register',
+        scopes: [],
+        authorizationResponseIssParameterSupported: false,
+      });
+      expect(mockFetch).nthCalledWith(
+        1,
+        'https://mcp.notion.com/.well-known/oauth-protected-resource/mcp',
+      );
+      expect(mockFetch).nthCalledWith(
+        2,
+        'https://mcp.notion.com/.well-known/oauth-protected-resource',
+      );
+      expect(mockFetch).nthCalledWith(
+        3,
+        'https://mcp.notion.com/.well-known/oauth-authorization-server/mcp',
+      );
+      expect(mockFetch).nthCalledWith(
+        4,
+        'https://mcp.notion.com/.well-known/openid-configuration/mcp',
+      );
+      expect(mockFetch).nthCalledWith(
+        5,
+        'https://mcp.notion.com/mcp/.well-known/openid-configuration',
+      );
+      expect(mockFetch).nthCalledWith(
+        6,
+        'https://mcp.notion.com/.well-known/oauth-authorization-server',
+      );
+    });
+
+    it('should fail closed without fallback when delegated authorization server metadata has mismatched issuer', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResourceMetadata),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              issuer: 'https://wrong-issuer.example.com',
+              authorization_endpoint:
+                'https://wrong-issuer.example.com/authorize',
+              token_endpoint: 'https://wrong-issuer.example.com/token',
+            }),
+        });
+
+      await expect(
+        OAuthUtils.discoverOAuthConfig('https://example.com/mcp'),
+      ).rejects.toThrow(OAuthSecurityError);
     });
   });
 
@@ -415,6 +652,98 @@ describe('OAuthUtils', () => {
         ).toBe(false);
       },
     );
+
+    it('should reject metadataToOAuthConfig when endpoints do not match issuer origin', () => {
+      expect(() =>
+        OAuthUtils.metadataToOAuthConfig({
+          issuer: 'https://auth.example.com',
+          authorization_endpoint: 'https://other.example.com/authorize',
+          token_endpoint: 'https://auth.example.com/token',
+        }),
+      ).toThrow(OAuthSecurityError);
+
+      expect(() =>
+        OAuthUtils.metadataToOAuthConfig({
+          issuer: 'https://auth.example.com',
+          authorization_endpoint: 'https://auth.example.com/authorize',
+          token_endpoint: 'https://other.example.com/token',
+        }),
+      ).toThrow(OAuthSecurityError);
+
+      expect(() =>
+        OAuthUtils.metadataToOAuthConfig({
+          issuer: 'https://auth.example.com',
+          authorization_endpoint: 'https://auth.example.com/authorize',
+          token_endpoint: 'https://auth.example.com/token',
+          registration_endpoint: 'https://other.example.com/register',
+        }),
+      ).toThrow(OAuthSecurityError);
+    });
+
+    it('should treat null and empty registration_endpoint values as absent while rejecting non-string values', async () => {
+      const nullRegistrationMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+        registration_endpoint: null,
+      } as unknown as OAuthAuthorizationServerMetadata;
+
+      expect(
+        OAuthUtils.metadataToOAuthConfig(nullRegistrationMetadata)
+          .registrationUrl,
+      ).toBeUndefined();
+
+      const emptyRegistrationMetadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+        registration_endpoint: '   ',
+      };
+
+      expect(
+        OAuthUtils.metadataToOAuthConfig(emptyRegistrationMetadata)
+          .registrationUrl,
+      ).toBeUndefined();
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(nullRegistrationMetadata),
+      });
+      await expect(
+        OAuthUtils.discoverAuthorizationServerMetadata(
+          'https://auth.example.com',
+        ),
+      ).resolves.toEqual(nullRegistrationMetadata);
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              resource: 'https://example.com',
+              authorization_servers: ['https://auth.example.com'],
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(nullRegistrationMetadata),
+        });
+      const discoveredFromWWW =
+        await OAuthUtils.discoverOAuthFromWWWAuthenticate(
+          'Bearer resource_metadata="https://example.com/.well-known/oauth-protected-resource"',
+          'https://example.com',
+        );
+      expect(discoveredFromWWW?.registrationUrl).toBeUndefined();
+
+      expect(() =>
+        OAuthUtils.metadataToOAuthConfig({
+          issuer: 'https://auth.example.com',
+          authorization_endpoint: 'https://auth.example.com/authorize',
+          token_endpoint: 'https://auth.example.com/token',
+          registration_endpoint: 123,
+        } as unknown as OAuthAuthorizationServerMetadata),
+      ).toThrow(OAuthSecurityError);
+    });
   });
 
   describe('parseWWWAuthenticateHeader', () => {
@@ -471,6 +800,34 @@ describe('OAuthUtils', () => {
         scopes: ['read', 'write'],
         authorizationResponseIssParameterSupported: false,
       });
+    });
+
+    it('should reject WWW-Authenticate discovery when metadata has mismatched issuer or cross-origin token_endpoint', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              resource: 'https://example.com',
+              authorization_servers: ['https://auth.example.com'],
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              issuer: 'https://auth.example.com',
+              authorization_endpoint: 'https://auth.example.com/authorize',
+              token_endpoint: 'https://other.example.org/token',
+            }),
+        });
+
+      await expect(
+        OAuthUtils.discoverOAuthFromWWWAuthenticate(
+          'Bearer realm="example", resource_metadata="https://example.com/.well-known/oauth-protected-resource"',
+          'https://example.com/',
+        ),
+      ).rejects.toThrow(OAuthSecurityError);
     });
   });
 
@@ -683,6 +1040,15 @@ describe('OAuthUtils', () => {
         },
       );
       expect(validated).toBe('https://legit-mcp.com/metadata');
+    });
+
+    it('should reject OAuth endpoint URLs containing userinfo credentials', async () => {
+      await expect(
+        validateOAuthEndpointUrl(
+          'https://accounts.google.com@other-host.example.com/authorize',
+          { expectedOrigin: 'https://other-host.example.com' },
+        ),
+      ).rejects.toThrow(OAuthSecurityError);
     });
 
     it('should resolve and validate relative URLs with baseUri', async () => {
