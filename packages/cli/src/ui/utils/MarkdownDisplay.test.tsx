@@ -37,6 +37,92 @@ describe('<MarkdownDisplay />', () => {
     unmount();
   });
 
+  describe('fence boundaries', () => {
+    async function renderFrame(text: string) {
+      const { lastFrame, unmount } = await renderWithProviders(
+        <MarkdownDisplay {...baseProps} text={text} />,
+      );
+      try {
+        return lastFrame();
+      } finally {
+        unmount();
+      }
+    }
+
+    it.each([
+      'c++',
+      'cpp',
+      'c#',
+      'objective-c',
+      'javascript {title="demo.js"}',
+      'javascript title="a.js"',
+      '{r}',
+      'gemini-test-unregistered-language',
+    ])('preserves both code lines with info string %s', async (infoString) => {
+      const frame = await renderFrame(
+        [
+          '```' + infoString,
+          'const char* name = "*literal*";',
+          'int value = 42;',
+          '```',
+          '',
+          'AFTER',
+        ].join('\n'),
+      );
+      expect(frame).toContain('const char* name = "*literal*";');
+      expect(frame).toMatch(/\b1 +const char/);
+      expect(frame).toMatch(/\b2 +int value = 42;/);
+      expect(frame).not.toContain('`' + infoString);
+      expect(frame.split('\n')).toContain('AFTER');
+    });
+
+    it('keeps a fence with an info string inside the code block', async () => {
+      const frame = await renderFrame(
+        '```text\nBEFORE_IN_BLOCK\n```javascript\nAFTER_IN_BLOCK\n```\n\nAFTER_BLOCK',
+      );
+      expect(frame).toContain('```javascript');
+      expect(frame).toContain('AFTER_IN_BLOCK');
+      expect(frame.split('\n')).toContain('AFTER_BLOCK');
+    });
+
+    it.each([false, true])(
+      'renders a table before its following fence (blank line: %s)',
+      async (blankLine) => {
+        const table = '| Item | Size |\n| --- | --- |\n| FIRST_TABLE | 1 |';
+        const code = '```text\nSECOND_CODE\n```';
+        const frame = await renderFrame(
+          table + (blankLine ? '\n\n' : '\n') + code,
+        );
+        expect(frame).toContain('FIRST_TABLE');
+        expect(frame).toContain('SECOND_CODE');
+        expect(frame.indexOf('FIRST_TABLE')).toBeLessThan(
+          frame.indexOf('SECOND_CODE'),
+        );
+      },
+    );
+
+    it('preserves shorter fences inside a longer fence', async () => {
+      const frame = await renderFrame(
+        '````text\n```\nINNER_CODE\n```\n`````\t\nAFTER',
+      );
+      expect(frame.match(/```/g)).toHaveLength(2);
+      expect(frame).toContain('INNER_CODE');
+      expect(frame.split('\n')).toContain('AFTER');
+    });
+
+    it('requires the same marker when closing a tilde fence', async () => {
+      const frame = await renderFrame('~~~text\n```\nINNER_CODE\n~~~\nAFTER');
+      expect(frame).toContain('```');
+      expect(frame).toContain('INNER_CODE');
+      expect(frame.split('\n')).toContain('AFTER');
+    });
+
+    it('does not open a block for a line that starts with inline backticks', async () => {
+      const frame = await renderFrame('```inline code```\nAFTER');
+      expect(frame.split('\n')).toContain('AFTER');
+    });
+  });
+
   const lineEndings = [
     { name: 'Windows', eol: '\r\n' },
     { name: 'Unix', eol: '\n' },
