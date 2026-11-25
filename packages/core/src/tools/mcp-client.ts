@@ -48,7 +48,10 @@ import {
 } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
-import { DiscoveredMCPTool } from './mcp-tool.js';
+import {
+  DiscoveredMCPTool,
+  diffMcpToolDefinitions,
+} from './mcp-tool.js';
 import { McpComplianceTransport } from './mcp-compliance-transport.js';
 
 import type { CallableTool, FunctionCall, Part, Tool } from '@google/genai';
@@ -723,6 +726,16 @@ export class McpClient implements McpProgressReporter {
         const abortController = new AbortController();
         const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
+        // Definition changes detected during this refresh cycle, across
+        // registries. Reported once at the end (warning) instead of the
+        // usual "tools updated" info message.
+        const toolChanges: Array<{
+          serverName: string;
+          added: string[];
+          removed: string[];
+          redefined: string[];
+        }> = [];
+
         try {
           for (const registries of this.registeredRegistries) {
             let newTools = await this.discoverTools(
@@ -769,6 +782,22 @@ export class McpClient implements McpProgressReporter {
               );
             }
 
+                        // Compare definitions before replacing the registered tools,
+            // so redefined tools are visible: their previous approval no
+            // longer covers them and they will ask for confirmation again
+            // (see DiscoveredMCPToolInvocation).
+            const currentMcpTools = currentTools.filter(
+              (t): t is DiscoveredMCPTool => t instanceof DiscoveredMCPTool,
+            );
+            const changes = diffMcpToolDefinitions(currentMcpTools, newTools);
+            if (
+              changes.added.length > 0 ||
+              changes.removed.length > 0 ||
+              changes.redefined.length > 0
+            ) {
+              toolChanges.push({ serverName: this.serverName, ...changes });
+            }
+
             registries.toolRegistry.removeMcpToolsByServer(this.serverName);
 
             for (const tool of newTools) {
@@ -790,12 +819,38 @@ export class McpClient implements McpProgressReporter {
 
         clearTimeout(timeoutId);
 
-        this.cliConfig.emitMcpDiagnostic(
-          'info',
-          `Tools updated for server: ${this.serverName}`,
-          undefined,
-          this.serverName,
-        );
+        if (toolChanges.length > 0) {
+          const details = toolChanges
+            .map(({ serverName, added, removed, redefined }) => {
+              const parts: string[] = [];
+              if (added.length > 0) {
+                parts.push(`added: ${added.join(', ')}`);
+              }
+              if (removed.length > 0) {
+                parts.push(`removed: ${removed.join(', ')}`);
+              }
+              if (redefined.length > 0) {
+                parts.push(
+                  `redefined (will ask for confirmation again): ${redefined.join(', ')}`,
+                );
+              }
+              return `${serverName} (${parts.join('; ')})`;
+            })
+            .join('; ');
+          this.cliConfig.emitMcpDiagnostic(
+            'warning',
+            `MCP tools changed: ${details}`,
+            undefined,
+            this.serverName,
+          );
+        } else {
+          this.cliConfig.emitMcpDiagnostic(
+            'info',
+            `Tools updated for server: ${this.serverName}`,
+            undefined,
+            this.serverName,
+          );
+        }
       } while (this.pendingToolRefresh);
     } catch (error) {
       debugLogger.error(
