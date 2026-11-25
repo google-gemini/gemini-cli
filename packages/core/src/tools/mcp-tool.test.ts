@@ -17,6 +17,9 @@ import {
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import {
   DiscoveredMCPTool,
+  DiscoveredMCPToolInvocation,
+  computeMcpToolDefinitionHash,
+  diffMcpToolDefinitions,
   generateValidName,
   formatMcpToolName,
 } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
@@ -127,6 +130,19 @@ describe('DiscoveredMCPTool', () => {
   beforeEach(() => {
     mockCallTool.mockClear();
     mockToolMethod.mockClear();
+    // Clear all approval state BEFORE constructing the tool: the
+    // constructor registers the tool's definition, and grant snapshots
+    // are taken from that registry.
+    const Ctor = DiscoveredMCPToolInvocation as unknown as {
+      allowlist: Set<string>;
+      definitionsByServer: Map<string, Map<string, string>>;
+      serverApprovalSnapshots: Map<string, Map<string, string>>;
+      toolApprovalSnapshots: Map<string, string>;
+    };
+    Ctor.allowlist.clear();
+    Ctor.definitionsByServer.clear();
+    Ctor.serverApprovalSnapshots.clear();
+    Ctor.toolApprovalSnapshots.clear();
     const bus = createMockMessageBus();
     getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
     tool = new DiscoveredMCPTool(
@@ -137,9 +153,6 @@ describe('DiscoveredMCPTool', () => {
       inputSchema,
       bus,
     );
-    // Clear allowlist before each relevant test, especially for shouldConfirmExecute
-    const invocation = tool.build({ param: 'mock' }) as any;
-    invocation.constructor.allowlist.clear();
   });
 
   afterEach(() => {
@@ -949,20 +962,115 @@ describe('DiscoveredMCPTool', () => {
       ).toBe(false);
     });
 
-    it('should return false if server is allowlisted', async () => {
+    it('should return false if server is allowlisted for the same definition', async () => {
       const invocation = tool.build({ param: 'mock' }) as any;
-      invocation.constructor.allowlist.add(serverName);
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      await confirmation.onConfirm(ToolConfirmationOutcome.ProceedAlwaysServer);
+      // Same tool, same definition: covered by the server grant.
       expect(
-        await invocation.shouldConfirmExecute(new AbortController().signal),
+        await tool
+          .build({ param: 'mock' })
+          .shouldConfirmExecute(new AbortController().signal),
       ).toBe(false);
     });
 
-    it('should return false if tool is allowlisted', async () => {
-      const toolAllowlistKey = `${serverName}.${serverToolName}`;
+    it('should return false if tool is allowlisted for the same definition', async () => {
       const invocation = tool.build({ param: 'mock' }) as any;
-      invocation.constructor.allowlist.add(toolAllowlistKey);
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      await confirmation.onConfirm(ToolConfirmationOutcome.ProceedAlwaysTool);
       expect(
-        await invocation.shouldConfirmExecute(new AbortController().signal),
+        await tool
+          .build({ param: 'mock' })
+          .shouldConfirmExecute(new AbortController().signal),
+      ).toBe(false);
+    });
+
+    // Builds a tool with its own message bus (default decision: ask_user),
+    // as a fresh discovery (e.g. after a refresh) would.
+    const buildFreshTool = (
+      description: string,
+      toolName: string = serverToolName,
+      server: string = serverName,
+    ) => {
+      const bus = createMockMessageBus();
+      getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
+      return new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        server,
+        toolName,
+        description,
+        inputSchema,
+        bus,
+      );
+    };
+
+    it('should ask again if the tool was redefined after a server grant', async () => {
+      const invocation = tool.build({ param: 'mock' }) as any;
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      await confirmation.onConfirm(ToolConfirmationOutcome.ProceedAlwaysServer);
+      // Same names, different description: the server grant no longer covers it.
+      const redefined = buildFreshTool('A completely different description.');
+      expect(
+        await redefined
+          .build({ param: 'mock' })
+          .shouldConfirmExecute(new AbortController().signal),
+      ).not.toBe(false);
+    });
+
+    it('should ask again if the tool was redefined after a tool grant', async () => {
+      const invocation = tool.build({ param: 'mock' }) as any;
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      await confirmation.onConfirm(ToolConfirmationOutcome.ProceedAlwaysTool);
+      const redefined = buildFreshTool('A completely different description.');
+      expect(
+        await redefined
+          .build({ param: 'mock' })
+          .shouldConfirmExecute(new AbortController().signal),
+      ).not.toBe(false);
+    });
+
+    it('should NOT cover a tool added after a server grant', async () => {
+      const invocation = tool.build({ param: 'mock' }) as any;
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      await confirmation.onConfirm(ToolConfirmationOutcome.ProceedAlwaysServer);
+      // A new tool from the same server, added after the grant.
+      const added = buildFreshTool('A brand new tool.', 'a-new-tool-name');
+      expect(
+        await added
+          .build({ param: 'mock' })
+          .shouldConfirmExecute(new AbortController().signal),
+      ).not.toBe(false);
+    });
+
+    it('should NOT ask again for an unchanged tool re-discovered after a grant', async () => {
+      const invocation = tool.build({ param: 'mock' }) as any;
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      await confirmation.onConfirm(ToolConfirmationOutcome.ProceedAlwaysServer);
+      // Same names, same description and schema (as a refresh that changed
+      // nothing would re-discover): the grant still covers it.
+      const rediscovered = buildFreshTool(baseDescription);
+      expect(
+        await rediscovered
+          .build({ param: 'mock' })
+          .shouldConfirmExecute(new AbortController().signal),
       ).toBe(false);
     });
 
@@ -1003,7 +1111,13 @@ describe('DiscoveredMCPTool', () => {
         shouldAddTool: true,
       },
       {
-        outcome: ToolConfirmationOutcome.Cancel,
+        outcome: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+      description: 'add tool to allowlist on ProceedAlwaysAndSave',
+      shouldAddServer: false,
+      shouldAddTool: true,
+    },
+    {
+      outcome: ToolConfirmationOutcome.Cancel,
         description: 'handle Cancel confirmation outcome',
         shouldAddServer: false,
         shouldAddTool: false,
@@ -1037,6 +1151,35 @@ describe('DiscoveredMCPTool', () => {
           expect(invocation.constructor.allowlist.has(toolAllowlistKey)).toBe(
             shouldAddTool,
           );
+          // The grant must also record the definition snapshot it covers.
+          const hash = computeMcpToolDefinitionHash(
+            baseDescription,
+            inputSchema,
+          );
+          if (shouldAddServer) {
+            expect(
+              invocation.constructor.serverApprovalSnapshots
+                .get(serverName)
+                ?.get(serverToolName),
+            ).toBe(hash);
+          } else {
+            expect(
+              invocation.constructor.serverApprovalSnapshots.get(serverName),
+            ).toBeUndefined();
+          }
+          if (shouldAddTool) {
+            expect(
+              invocation.constructor.toolApprovalSnapshots.get(
+                toolAllowlistKey,
+              ),
+            ).toBe(hash);
+          } else {
+            expect(
+              invocation.constructor.toolApprovalSnapshots.has(
+                toolAllowlistKey,
+              ),
+            ).toBe(false);
+          }
         } else {
           throw new Error(
             'Confirmation details or onConfirm not in expected format',
@@ -1218,5 +1361,87 @@ describe('MCP Tool Naming Regression Fixes', () => {
       const qn = tool.getFullyQualifiedName();
       expect(qn).toBe('mcp_123-server_tool');
     });
+  });
+});
+
+describe('computeMcpToolDefinitionHash', () => {
+  const schema = {
+    type: 'object' as const,
+    properties: { param: { type: 'string' } },
+  };
+
+  it('should be stable for the same definition', () => {
+    expect(computeMcpToolDefinitionHash('desc', schema)).toBe(
+      computeMcpToolDefinitionHash('desc', schema),
+    );
+  });
+
+  it('should change when the description changes', () => {
+    expect(computeMcpToolDefinitionHash('desc', schema)).not.toBe(
+      computeMcpToolDefinitionHash('other desc', schema),
+    );
+  });
+
+  it('should change when the parameter schema changes', () => {
+    expect(computeMcpToolDefinitionHash('desc', schema)).not.toBe(
+      computeMcpToolDefinitionHash('desc', {
+        type: 'object' as const,
+        properties: { other: { type: 'number' } },
+      }),
+    );
+  });
+
+  it('should not depend on key order in the schema', () => {
+    expect(
+      computeMcpToolDefinitionHash('desc', {
+        type: 'object' as const,
+        properties: { a: { type: 'string' }, b: { type: 'number' } },
+      }),
+    ).toBe(
+      computeMcpToolDefinitionHash('desc', {
+        type: 'object' as const,
+        properties: { b: { type: 'number' }, a: { type: 'string' } },
+      }),
+    );
+  });
+});
+
+describe('diffMcpToolDefinitions', () => {
+  const bus = {} as never;
+  const makeTool = (toolName: string, description: string) =>
+    new DiscoveredMCPTool(
+      {} as never,
+      'srv',
+      toolName,
+      description,
+      { type: 'object' as const, properties: {} },
+      bus as never,
+    );
+
+  it('should report no changes for identical sets', () => {
+    expect(
+      diffMcpToolDefinitions(
+        [makeTool('a', 'desc a'), makeTool('b', 'desc b')],
+        [makeTool('a', 'desc a'), makeTool('b', 'desc b')],
+      ),
+    ).toEqual({ added: [], removed: [], redefined: [] });
+  });
+
+  it('should report added and removed tools', () => {
+    expect(
+      diffMcpToolDefinitions(
+        [makeTool('a', 'desc a'), makeTool('gone', 'desc gone')],
+        [makeTool('a', 'desc a'), makeTool('new', 'desc new')],
+      ),
+    ).toEqual({ added: ['new'], removed: ['gone'], redefined: [] });
+  });
+
+  it('should report a redefined tool (same name, different definition)', () => {
+    expect(
+      diffMcpToolDefinitions(
+        [makeTool('a', 'desc a')],
+        [makeTool('a', 'desc a CHANGED')],
+      ),
+    ).toEqual({ added: [], removed: [], redefined: ['a'] });
   });
 });

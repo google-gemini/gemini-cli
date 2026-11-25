@@ -1535,10 +1535,11 @@ describe('mcp-client', () => {
       // It should notify the manager
       expect(onContextUpdatedSpy).toHaveBeenCalled();
 
-      // It should emit feedback event
+      // It should emit feedback event: a tool was added, so the refresh
+      // reports the change as a warning instead of the plain "updated" info.
       expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
-        'info',
-        'Tools updated for server: test-server',
+        'warning',
+        'MCP tools changed: test-server (added: newTool)',
         undefined,
         'test-server',
       );

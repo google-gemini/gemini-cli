@@ -6,6 +6,8 @@
 
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { createHash } from 'node:crypto';
+import { stableStringify } from '../policy/stable-stringify.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -30,6 +32,55 @@ import { wrapUntrusted } from '../utils/textUtils.js';
  * e.g. "mcp_server_name_tool_name"
  */
 export const MCP_QUALIFIED_NAME_SEPARATOR = '_';
+
+/**
+ * Binds an MCP tool approval to exactly what the user was shown when they
+ * approved it: the tool's description and parameter schema. The confirmation
+ * dialog displays exactly those two fields, so a server that redefines a
+ * tool (different description or schema) after approval must ask again.
+ * `outputSchema` is deliberately NOT part of the hash: it is not shown in
+ * the approval dialog.
+ */
+export function computeMcpToolDefinitionHash(
+  description: string,
+  parameterSchema: unknown,
+): string {
+  return createHash('sha256')
+    .update(stableStringify({ description, parameterSchema }))
+    .digest('hex');
+}
+
+export interface McpToolDefinitionChange {
+  /** Tool names present in the new set but not the current set. */
+  added: string[];
+  /** Tool names present in the current set but not the new set. */
+  removed: string[];
+  /** Tool names present in both sets with a different definition hash. */
+  redefined: string[];
+}
+
+/**
+ * Compares the currently registered tools of one MCP server with a freshly
+ * discovered set, by server tool name and definition hash. Name-only
+ * comparison is not enough: a redefined tool keeps its name.
+ */
+export function diffMcpToolDefinitions(
+  currentTools: DiscoveredMCPTool[],
+  newTools: DiscoveredMCPTool[],
+): McpToolDefinitionChange {
+  const currentByName = new Map(
+    currentTools.map((t) => [t.serverToolName, t.definitionHash]),
+  );
+  const newByName = new Map(
+    newTools.map((t) => [t.serverToolName, t.definitionHash]),
+  );
+  const added = [...newByName.keys()].filter((n) => !currentByName.has(n));
+  const removed = [...currentByName.keys()].filter((n) => !newByName.has(n));
+  const redefined = [...newByName.keys()].filter(
+    (n) => currentByName.has(n) && currentByName.get(n) !== newByName.get(n),
+  );
+  return { added, removed, redefined };
+}
 
 /**
  * The strict prefix that all MCP tools must start with.
@@ -303,6 +354,49 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   ToolResult
 > {
   private static readonly allowlist: Set<string> = new Set();
+  /**
+   * Current known definitions, by server then tool name. Populated by the
+   * `DiscoveredMCPTool` constructor, so it tracks the latest discovered
+   * definition of every tool.
+   */
+  private static readonly definitionsByServer: Map<
+    string,
+    Map<string, string>
+  > = new Map();
+  /**
+   * Definition snapshots taken when a ProceedAlwaysServer grant is given:
+   * server name -> (tool name -> definition hash at grant time). A tool
+   * whose current hash does not match its snapshot entry — because it was
+   * redefined, or because it did not exist when the grant was given —
+   * asks for confirmation again.
+   */
+  private static readonly serverApprovalSnapshots: Map<
+    string,
+    Map<string, string>
+  > = new Map();
+  /**
+   * Definition snapshots taken when a ProceedAlwaysTool / ProceedAlwaysAndSave
+   * grant is given: tool key (`serverName.serverToolName`) -> hash.
+   */
+  private static readonly toolApprovalSnapshots: Map<string, string> =
+    new Map();
+
+  /** Records the latest discovered definition of one tool. */
+  static recordDefinition(
+    serverName: string,
+    serverToolName: string,
+    definitionHash: string,
+  ): void {
+    let byServer = this.definitionsByServer.get(serverName);
+    if (!byServer) {
+      byServer = new Map();
+      this.definitionsByServer.set(serverName, byServer);
+    }
+    byServer.set(serverToolName, definitionHash);
+  }
+
+  /** The definition hash of the tool this invocation is about to run. */
+  readonly definitionHash: string;
 
   constructor(
     private readonly mcpTool: CallableTool,
@@ -332,6 +426,10 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       generateValidName(serverName),
       toolAnnotationsData,
     );
+    this.definitionHash = computeMcpToolDefinitionHash(
+      toolDescription ?? '',
+      toolParameterSchema,
+    );
   }
 
   override getPolicyUpdateOptions(
@@ -353,11 +451,27 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       return false; // server is trusted, no confirmation needed
     }
 
-    if (
-      DiscoveredMCPToolInvocation.allowlist.has(serverAllowListKey) ||
-      DiscoveredMCPToolInvocation.allowlist.has(toolAllowListKey)
-    ) {
-      return false; // server and/or tool already allowlisted
+    // An allowlist entry only waives confirmation while the tool's
+    // definition still matches the one that was approved. A redefined
+    // tool, or a tool that did not exist when the grant was given, has
+    // no matching snapshot entry and asks again (fail closed).
+    if (DiscoveredMCPToolInvocation.allowlist.has(serverAllowListKey)) {
+      const snapshot =
+        DiscoveredMCPToolInvocation.serverApprovalSnapshots.get(
+          this.serverName,
+        );
+      if (snapshot?.get(this.serverToolName) === this.definitionHash) {
+        return false; // server grant still covers this exact definition
+      }
+    }
+    if (DiscoveredMCPToolInvocation.allowlist.has(toolAllowListKey)) {
+      if (
+        DiscoveredMCPToolInvocation.toolApprovalSnapshots.get(
+          toolAllowListKey,
+        ) === this.definitionHash
+      ) {
+        return false; // tool grant still covers this exact definition
+      }
     }
 
     const confirmationDetails: ToolMcpConfirmationDetails = {
@@ -372,10 +486,29 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
           DiscoveredMCPToolInvocation.allowlist.add(serverAllowListKey);
+          // Snapshot the definitions of all currently known tools of
+          // this server, so later redefinitions (or newly added tools)
+          // are not covered by this grant.
+          const byServer =
+            DiscoveredMCPToolInvocation.definitionsByServer.get(
+              this.serverName,
+            );
+          DiscoveredMCPToolInvocation.serverApprovalSnapshots.set(
+            this.serverName,
+            new Map(byServer),
+          );
         } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysTool) {
           DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
+          DiscoveredMCPToolInvocation.toolApprovalSnapshots.set(
+            toolAllowListKey,
+            this.definitionHash,
+          );
         } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
           DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
+          DiscoveredMCPToolInvocation.toolApprovalSnapshots.set(
+            toolAllowListKey,
+            this.definitionHash,
+          );
           // Persistent policy updates are now handled centrally by the scheduler
         }
       },
@@ -502,6 +635,14 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
   ToolParams,
   ToolResult
 > {
+  /**
+   * Hash of the description + parameter schema the server currently
+   * advertises for this tool. Used to detect redefinitions across
+   * `tools/list_changed` refreshes (see `diffMcpToolDefinitions` and
+   * `DiscoveredMCPToolInvocation`).
+   */
+  readonly definitionHash: string;
+
   constructor(
     private readonly mcpTool: CallableTool,
     readonly serverName: string,
@@ -533,6 +674,15 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       extensionId,
     );
     this._isReadOnly = isReadOnly;
+    this.definitionHash = computeMcpToolDefinitionHash(
+      description,
+      this.parameterSchema,
+    );
+    DiscoveredMCPToolInvocation.recordDefinition(
+      serverName,
+      serverToolName,
+      this.definitionHash,
+    );
   }
 
   private readonly _isReadOnly?: boolean;
