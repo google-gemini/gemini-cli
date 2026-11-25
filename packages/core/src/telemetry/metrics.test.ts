@@ -1616,6 +1616,25 @@ describe('Telemetry Metrics', () => {
           hook_name: 'check-secrets.sh', // Sanitized
           success: true,
         });
+
+        mockCounterAddFn.mockClear();
+
+        recordHookCallMetricsModule(
+          mockConfig,
+          'BeforeTool',
+          'AWS_SECRET_KEY=abc123 /opt/hooks/run.sh --flag=value',
+          150,
+          true,
+        );
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          hook_event_name: 'BeforeTool',
+          hook_name: 'run.sh',
+          success: true,
+        });
       });
 
       it('should track both success and failure', () => {
