@@ -11,6 +11,7 @@ import * as fs from 'node:fs';
 import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
 import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from './constants.js';
 import { homedir } from '../utils/paths.js';
+import { quoteCmdArg } from '../utils/editor.js';
 
 export interface IdeInstaller {
   install(): Promise<InstallResult>;
@@ -166,8 +167,10 @@ class VsCodeInstaller implements IdeInstaller {
     }
 
     try {
+      const executable =
+        this.platform === 'win32' ? quoteCmdArg(commandPath) : commandPath;
       const result = child_process.spawnSync(
-        commandPath,
+        executable,
         [
           '--install-extension',
           'google.gemini-cli-vscode-ide-companion',
@@ -216,8 +219,10 @@ class PositronInstaller implements IdeInstaller {
     }
 
     try {
+      const executable =
+        this.platform === 'win32' ? quoteCmdArg(commandPath) : commandPath;
       const result = child_process.spawnSync(
-        commandPath,
+        executable,
         [
           '--install-extension',
           'google.gemini-cli-vscode-ide-companion',
@@ -286,8 +291,10 @@ class AntigravityInstaller implements IdeInstaller {
     }
 
     try {
+      const executable =
+        this.platform === 'win32' ? quoteCmdArg(commandPath) : commandPath;
       const result = child_process.spawnSync(
-        commandPath,
+        executable,
         [
           '--install-extension',
           'google.gemini-cli-vscode-ide-companion',

@@ -2714,7 +2714,7 @@ describe('loggers', () => {
       );
 
       expect(mockLogger.emit).toHaveBeenCalledWith({
-        body: 'Hook call before-tool./path/to/script.sh succeeded in 150ms',
+        body: 'Hook call before-tool.script.sh succeeded in 150ms',
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
@@ -2737,6 +2737,30 @@ describe('loggers', () => {
         '/path/to/script.sh',
         150,
         true,
+      );
+    });
+
+    it('should sanitize env-prefixed hook command in OTEL log body and attributes', () => {
+      const event = new HookCallEvent(
+        'BeforeTool',
+        HookType.Command,
+        'API_TOKEN=test-value /opt/hooks/run.sh --flag',
+        { arg: 'val' },
+        120,
+        true,
+        { out: 'res' },
+        0,
+      );
+
+      logHookCall(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: 'Hook call BeforeTool.run.sh succeeded in 120ms',
+          attributes: expect.objectContaining({
+            hook_name: 'run.sh',
+          }),
+        }),
       );
     });
   });
