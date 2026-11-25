@@ -131,18 +131,28 @@ const DEFAULT_OUTPUT_TERMINATOR = `\n${REFERENCE_CONTENT_END}`;
  */
 export function isAssetExplicitlyRequested(
   include: string[],
-  relativePath: string,
+  relativePath: string | readonly string[],
   filePath: string,
   matcherCache?: LRUCache<string, (target: string) => boolean>,
 ): boolean {
-  const normalizedPath = relativePath.replace(/\\/g, '/').replace(/^\.\//, '');
+  const rawRelativePaths =
+    typeof relativePath === 'string' ? [relativePath] : relativePath;
   const normalizedFilePath = filePath.replace(/\\/g, '/');
+  const candidatePaths = Array.from(
+    new Set([
+      ...rawRelativePaths.map((p) =>
+        p.replace(/\\/g, '/').replace(/^\.\//, ''),
+      ),
+      normalizedFilePath,
+    ]),
+  ).filter(Boolean);
   const fileName = path.posix.basename(normalizedFilePath);
 
   return include.some((pattern) => {
     const normalizedPattern = pattern.replace(/\\/g, '/').replace(/^\.\//, '');
+    const normalizedPatternLower = normalizedPattern.toLowerCase();
 
-    // 1. Check if this pattern matches the file path
+    // 1. Check if this pattern matches any candidate path (relative to a workspace dir or absolute)
     let isMatchPath = matcherCache?.get(normalizedPattern);
     if (!isMatchPath) {
       isMatchPath = picomatch(normalizedPattern, {
@@ -152,9 +162,15 @@ export function isAssetExplicitlyRequested(
       matcherCache?.set(normalizedPattern, isMatchPath);
     }
 
-    let matches = isMatchPath(normalizedPath);
+    let matches = candidatePaths.some(
+      (candidate) =>
+        isMatchPath(candidate) ||
+        candidate.toLowerCase() === normalizedPatternLower,
+    );
     if (!matches && !normalizedPattern.includes('/')) {
-      matches = isMatchPath(fileName);
+      matches =
+        isMatchPath(fileName) ||
+        fileName.toLowerCase() === normalizedPatternLower;
     }
     if (!matches) {
       return false;
@@ -240,10 +256,10 @@ ${finalExclusionPatternsForDescription
     const effectiveExcludes = useDefaultExcludes
       ? [...getDefaultExcludes(this.config), ...exclude]
       : [...exclude];
+    const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
 
     try {
       const allEntries = new Set<string>();
-      const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
 
       for (const dir of workspaceDirs) {
         const processedPatterns = [];
@@ -352,9 +368,22 @@ ${finalExclusionPatternsForDescription
             fileType === 'pdf' ||
             fileType === 'audio'
           ) {
+            const candidateRelativePaths = [relativePathForDisplay];
+            for (const dir of workspaceDirs) {
+              const relToDir = path.relative(dir, filePath);
+              if (
+                relToDir &&
+                relToDir !== '..' &&
+                !relToDir.startsWith(`..${path.sep}`) &&
+                !path.isAbsolute(relToDir)
+              ) {
+                candidateRelativePaths.push(relToDir.replace(/\\/g, '/'));
+              }
+            }
+
             const requestedExplicitly = isAssetExplicitlyRequested(
               include,
-              relativePathForDisplay,
+              candidateRelativePaths,
               filePath,
               matcherCache,
             );
