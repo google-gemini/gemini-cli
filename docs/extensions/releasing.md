@@ -43,11 +43,12 @@ To check whether GitHub has indexed the manifest at the repository root, run the
 following command using the GitHub CLI:
 
 ```bash
-gh api 'search/code?q=repo:<owner>/<repo>+filename:gemini-extension.json+path:/' --jq .total_count
+gh api --paginate 'search/code?q=repo:<owner>/<repo>+filename:gemini-extension.json+path:/' \
+  --jq '.items[].path | select(. == "gemini-extension.json")'
 ```
 
-If the count is `0`, or if you don't use the GitHub CLI, trigger indexing
-manually in your web browser:
+If the command succeeds but prints no path, or if you don't use the GitHub CLI,
+trigger indexing manually in your web browser:
 
 1.  Sign in to GitHub.
 2.  Navigate to
