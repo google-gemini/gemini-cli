@@ -15,7 +15,7 @@ import {
   downloadFile,
   extractFile,
 } from './github.js';
-import { simpleGit, type SimpleGit } from 'simple-git';
+import { simpleGit, type SimpleGit, type SimpleGitOptions } from 'simple-git';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import * as os from 'node:os';
 import * as fs from 'node:fs';
@@ -105,6 +105,24 @@ describe('github.ts', () => {
     vi.restoreAllMocks();
   });
 
+  /**
+   * Rebuilds the simple-git instance exactly as github.ts configured it (same
+   * options and env), but with the real simple-git so its unsafe-option guard
+   * runs, then executes a harmless git command. Regression test for #30416.
+   */
+  async function runConfiguredGitForReal(
+    envMock: ReturnType<typeof vi.fn>,
+  ): Promise<string> {
+    const actual =
+      await vi.importActual<typeof import('simple-git')>('simple-git');
+    const [, options] = vi.mocked(simpleGit).mock.calls[0] as unknown as [
+      string,
+      Partial<SimpleGitOptions>,
+    ];
+    const [env] = envMock.mock.calls[0];
+    return actual.simpleGit(process.cwd(), options).env(env).raw(['--version']);
+  }
+
   describe('cloneFromGit', () => {
     let mockGit: {
       clone: ReturnType<typeof vi.fn>;
@@ -148,6 +166,19 @@ describe('github.ts', () => {
       );
       expect(mockGit.fetch).toHaveBeenCalledWith('origin', 'v1.0.0');
       expect(mockGit.checkout).toHaveBeenCalledWith('FETCH_HEAD');
+    });
+
+    it('should configure simple-git so the safe git env passes its guard', async () => {
+      mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
+
+      await cloneFromGit(
+        { type: 'git', source: 'https://github.com/owner/repo.git' },
+        '/dest',
+      );
+
+      await expect(runConfiguredGitForReal(mockGit.env)).resolves.toMatch(
+        /^git version/,
+      );
     });
 
     it('should throw if no remotes found', async () => {
@@ -351,6 +382,33 @@ describe('github.ts', () => {
         }),
       );
     });
+
+    it.each([
+      ['default environment', ''],
+      ['user-provided GIT_CONFIG_GLOBAL', '/home/user/.custom-gitconfig'],
+    ])(
+      'should configure simple-git so the safe git env passes its guard (%s)',
+      async (_label, gitConfigGlobal) => {
+        vi.stubEnv('GIT_CONFIG_GLOBAL', gitConfigGlobal);
+        mockGit.getRemotes.mockResolvedValue([
+          { name: 'origin', refs: { fetch: 'url' } },
+        ]);
+        mockGit.listRemote.mockResolvedValue('hash\tHEAD');
+        mockGit.revparse.mockResolvedValue('hash');
+
+        const ext = {
+          path: '/path',
+          installMetadata: { type: 'git', source: 'url' },
+        } as unknown as GeminiCLIExtension;
+        expect(await checkForExtensionUpdate(ext, mockExtensionManager)).toBe(
+          ExtensionUpdateState.UP_TO_DATE,
+        );
+
+        await expect(runConfiguredGitForReal(mockGit.env)).resolves.toMatch(
+          /^git version/,
+        );
+      },
+    );
 
     it('should return UP_TO_DATE if git remote hash matches', async () => {
       mockGit.getRemotes.mockResolvedValue([
