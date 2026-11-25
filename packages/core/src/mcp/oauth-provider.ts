@@ -17,6 +17,7 @@ import {
   areIssuersEqual,
   extractOAuthUrlOrigin,
   isLoopbackUrl,
+  isStoredTokenBoundToServerUrl,
   normalizeOptionalEndpointUrl,
   trimTrailingSlashes,
   validateOAuthEndpointUrl,
@@ -744,22 +745,101 @@ ${authUrl}
     return token;
   }
 
+    /**
+   * Verifies that a stored token is bound to the MCP server URL it is about
+   * to be sent to.
+   *
+   * A stored token records the server URL it was issued for
+   * (`credentials.mcpServerUrl`, saved by `authenticate()`). If the server's
+   * configured URL has since been repointed to a different origin, sending
+   * the token there would leak a credential issued for the original server
+   * to an unrelated (possibly attacker-controlled) server. In that case the
+   * token is withheld: this returns false and the caller must treat the
+   * server as unauthenticated so the user re-authenticates.
+   *
+   * A stored record with no recorded server URL is also withheld (fail
+   * closed): such a record predates URL binding, so there is nothing to
+   * check it against, and allowing it would silently replay an unbound
+   * token. The user re-authenticates once; the new record carries the URL.
+   *
+   * The token itself is NOT deleted: the user may have repointed the URL by
+   * mistake, and deleting would destroy a still-valid credential. A
+   * subsequent `authenticate()` for the (corrected) URL overwrites it.
+   *
+   * @param credentials The stored credentials for the server
+   * @param expectedServerUrl The server URL the token would be sent to, if
+   *   known by the caller. When unknown, no check is possible and the token
+   *   is returned as before.
+   * @returns True if the token may be used for `expectedServerUrl`
+   */
+  private isTokenBoundToServerUrl(
+    credentials: {
+      serverName: string;
+      mcpServerUrl?: string;
+    },
+    expectedServerUrl?: string,
+  ): boolean {
+    if (
+      isStoredTokenBoundToServerUrl(
+        credentials.mcpServerUrl,
+        expectedServerUrl,
+      )
+    ) {
+      return true;
+    }
+
+    if (!expectedServerUrl) {
+      // Unreachable: the helper allows the token when no URL is expected.
+      return true;
+    }
+
+    if (!credentials.mcpServerUrl) {
+      coreEvents.emitFeedback(
+        'error',
+        `Stored OAuth token for MCP server '${credentials.serverName}' has no recorded server URL; it will not be sent to '${expectedServerUrl}'. Re-authenticate using: /mcp auth ${credentials.serverName}`,
+      );
+      return false;
+    }
+
+    let storedOrigin = credentials.mcpServerUrl;
+    let expectedOrigin = expectedServerUrl;
+    try {
+      storedOrigin = new URL(credentials.mcpServerUrl).origin;
+      expectedOrigin = new URL(expectedServerUrl).origin;
+    } catch {
+      // Fall back to the raw values if either URL fails to parse.
+    }
+    coreEvents.emitFeedback(
+      'error',
+      `Stored OAuth token for MCP server '${credentials.serverName}' was issued for '${storedOrigin}' and will not be sent to '${expectedOrigin}'. The server URL may have changed. Re-authenticate using: /mcp auth ${credentials.serverName}`,
+    );
+    return false;
+  }
+
   /**
    * Get a valid access token for an MCP server, refreshing if necessary.
    *
    * @param serverName The name of the MCP server
    * @param config OAuth configuration
+   * @param expectedServerUrl The MCP server URL the token would be sent to.
+   *   When provided, a stored token recorded for a different origin is
+   *   withheld (returns null) instead of being replayed to the new URL.
    * @returns A valid access token or null if not authenticated
    */
   async getValidToken(
     serverName: string,
     config: MCPOAuthConfig,
+    expectedServerUrl?: string,
   ): Promise<string | null> {
     debugLogger.debug(`Getting valid token for server: ${serverName}`);
     const credentials = await this.tokenStorage.getCredentials(serverName);
 
     if (!credentials) {
       debugLogger.debug(`No credentials found for server: ${serverName}`);
+      return null;
+    }
+
+    if (!this.isTokenBoundToServerUrl(credentials, expectedServerUrl)) {
       return null;
     }
 
@@ -825,9 +905,21 @@ ${authUrl}
 
     return null;
   }
+  /**
+   * Get a valid access token for an MCP server with metadata, refreshing if
+   * necessary.
+   *
+   * @param serverName The name of the MCP server
+   * @param config OAuth configuration
+   * @param expectedServerUrl The MCP server URL the token would be sent to.
+   *   When provided, a stored token recorded for a different origin is
+   *   withheld (returns null) instead of being replayed to the new URL.
+   * @returns Token metadata or null if not authenticated
+   */
   async getValidTokenWithMetadata(
     serverName: string,
     config: MCPOAuthConfig,
+    expectedServerUrl?: string,
   ): Promise<{
     accessToken: string;
     tokenType: string;
@@ -837,6 +929,10 @@ ${authUrl}
   } | null> {
     const credentials = await this.tokenStorage.getCredentials(serverName);
     if (!credentials) return null;
+
+    if (!this.isTokenBoundToServerUrl(credentials, expectedServerUrl)) {
+      return null;
+    }
 
     let current = credentials.token;
 

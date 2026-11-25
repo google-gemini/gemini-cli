@@ -2252,6 +2252,186 @@ describe('MCPOAuthProvider', () => {
         'test-server',
       );
     });
+
+    describe('server URL binding', () => {
+      it('should withhold a token recorded for a different origin', async () => {
+        const repointedCredentials = {
+          serverName: 'test-server',
+          token: mockToken,
+          clientId: 'test-client-id',
+          tokenUrl: 'https://auth.example.com/token',
+          mcpServerUrl: 'https://good.example.com/mcp',
+          updatedAt: Date.now(),
+        };
+
+        const tokenStorage = new MCPOAuthTokenStorage();
+        vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+          repointedCredentials,
+        );
+        vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(false);
+
+        const authProvider = new MCPOAuthProvider();
+        const result = await authProvider.getValidToken(
+          'test-server',
+          mockConfig,
+          'https://evil.example.com/mcp',
+        );
+
+        expect(result).toBeNull();
+        expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+          'error',
+          expect.stringContaining('will not be sent to'),
+        );
+        // The token is withheld, not destroyed: the user may have
+        // repointed the URL by mistake.
+        expect(tokenStorage.deleteCredentials).not.toHaveBeenCalled();
+        expect(tokenStorage.saveToken).not.toHaveBeenCalled();
+      });
+
+      it('should not attempt a refresh for a token bound to another origin', async () => {
+        const expiredRepointedCredentials = {
+          serverName: 'test-server',
+          token: {
+            ...mockToken,
+            expiresAt: Date.now() - 3600000,
+          },
+          clientId: 'test-client-id',
+          tokenUrl: 'https://auth.example.com/token',
+          mcpServerUrl: 'https://good.example.com/mcp',
+          updatedAt: Date.now(),
+        };
+
+        const tokenStorage = new MCPOAuthTokenStorage();
+        vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+          expiredRepointedCredentials,
+        );
+        vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(true);
+
+        const authProvider = new MCPOAuthProvider();
+        const result = await authProvider.getValidToken(
+          'test-server',
+          mockConfig,
+          'https://evil.example.com/mcp',
+        );
+
+        expect(result).toBeNull();
+        expect(mockFetch).not.toHaveBeenCalled();
+        expect(tokenStorage.deleteCredentials).not.toHaveBeenCalled();
+      });
+
+      it('should return the token when the origin matches, even if the path changed', async () => {
+        const sameOriginCredentials = {
+          serverName: 'test-server',
+          token: mockToken,
+          clientId: 'test-client-id',
+          tokenUrl: 'https://auth.example.com/token',
+          mcpServerUrl: 'https://mcp.example.com/mcp',
+          updatedAt: Date.now(),
+        };
+
+        const tokenStorage = new MCPOAuthTokenStorage();
+        vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+          sameOriginCredentials,
+        );
+        vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(false);
+
+        const authProvider = new MCPOAuthProvider();
+        const result = await authProvider.getValidToken(
+          'test-server',
+          mockConfig,
+          'https://mcp.example.com/v2/endpoint',
+        );
+
+        expect(result).toBe('access_token_123');
+      });
+
+      it('should treat an explicitly spelled-out default port as the same origin', async () => {
+        const defaultPortCredentials = {
+          serverName: 'test-server',
+          token: mockToken,
+          clientId: 'test-client-id',
+          tokenUrl: 'https://auth.example.com/token',
+          mcpServerUrl: 'https://mcp.example.com:443/mcp',
+          updatedAt: Date.now(),
+        };
+
+        const tokenStorage = new MCPOAuthTokenStorage();
+        vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+          defaultPortCredentials,
+        );
+        vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(false);
+
+        const authProvider = new MCPOAuthProvider();
+        const result = await authProvider.getValidToken(
+          'test-server',
+          mockConfig,
+          'https://mcp.example.com/mcp',
+        );
+
+        expect(result).toBe('access_token_123');
+      });
+
+      it('should withhold the token for legacy credentials with no recorded server URL', async () => {
+        // A record with no recorded server URL predates URL binding, so
+        // there is nothing to check it against. It fails closed: the token
+        // is withheld (not deleted) and the user re-authenticates once.
+        const legacyCredentials = {
+          serverName: 'test-server',
+          token: mockToken,
+          clientId: 'test-client-id',
+          tokenUrl: 'https://auth.example.com/token',
+          updatedAt: Date.now(),
+        };
+
+        const tokenStorage = new MCPOAuthTokenStorage();
+        vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+          legacyCredentials,
+        );
+        vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(false);
+
+        const authProvider = new MCPOAuthProvider();
+        const result = await authProvider.getValidToken(
+          'test-server',
+          mockConfig,
+          'https://mcp.example.com/mcp',
+        );
+
+        expect(result).toBeNull();
+        expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+          'error',
+          expect.stringContaining('has no recorded server URL'),
+        );
+        expect(tokenStorage.deleteCredentials).not.toHaveBeenCalled();
+        expect(tokenStorage.saveToken).not.toHaveBeenCalled();
+      });
+
+      it('should return the token when no expected server URL is known', async () => {
+        // Without an expected URL there is nothing to check against; this
+        // only happens for direct callers that do not know the URL. Every
+        // connection path passes the configured URL.
+        const legacyCredentials = {
+          serverName: 'test-server',
+          token: mockToken,
+          clientId: 'test-client-id',
+          tokenUrl: 'https://auth.example.com/token',
+          updatedAt: Date.now(),
+        };
+
+        const tokenStorage = new MCPOAuthTokenStorage();
+        vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+          legacyCredentials,
+        );
+        vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(false);
+
+        const authProvider = new MCPOAuthProvider();
+        const result = await authProvider.getValidToken(
+          'test-server',
+          mockConfig,
+        );
+
+        expect(result).toBe('access_token_123');
+      });
+    });
   });
 
   describe('getValidTokenWithMetadata', () => {
@@ -2334,6 +2514,91 @@ describe('MCPOAuthProvider', () => {
       expect(result?.accessToken).toBe('access_token_123');
       expect(mockFetch.mock.calls[0][1].body).toContain(
         'client_id=configured-client-id',
+      );
+    });
+
+    it('should withhold token metadata recorded for a different origin', async () => {
+      const repointedCredentials = {
+        serverName: 'test-server',
+        token: mockToken,
+        clientId: 'test-client-id',
+        tokenUrl: 'https://auth.example.com/token',
+        mcpServerUrl: 'https://good.example.com/mcp',
+        updatedAt: Date.now(),
+      };
+
+      const tokenStorage = new MCPOAuthTokenStorage();
+      vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+        repointedCredentials,
+      );
+      vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(false);
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.getValidTokenWithMetadata(
+        'test-server',
+        {},
+        'https://evil.example.com/mcp',
+      );
+
+      expect(result).toBeNull();
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('will not be sent to'),
+      );
+    });
+
+    it('should return token metadata when the origin matches', async () => {
+      const sameOriginCredentials = {
+        serverName: 'test-server',
+        token: mockToken,
+        clientId: 'test-client-id',
+        tokenUrl: 'https://auth.example.com/token',
+        mcpServerUrl: 'https://mcp.example.com/mcp',
+        updatedAt: Date.now(),
+      };
+
+      const tokenStorage = new MCPOAuthTokenStorage();
+      vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+        sameOriginCredentials,
+      );
+      vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(false);
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.getValidTokenWithMetadata(
+        'test-server',
+        {},
+        'https://mcp.example.com/other',
+      );
+
+      expect(result?.accessToken).toBe('access_token_123');
+    });
+
+    it('should withhold token metadata for a record with no recorded server URL', async () => {
+      const legacyCredentials = {
+        serverName: 'test-server',
+        token: mockToken,
+        clientId: 'test-client-id',
+        tokenUrl: 'https://auth.example.com/token',
+        updatedAt: Date.now(),
+      };
+
+      const tokenStorage = new MCPOAuthTokenStorage();
+      vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+        legacyCredentials,
+      );
+      vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(false);
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.getValidTokenWithMetadata(
+        'test-server',
+        {},
+        'https://mcp.example.com/mcp',
+      );
+
+      expect(result).toBeNull();
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('has no recorded server URL'),
       );
     });
   });

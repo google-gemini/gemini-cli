@@ -147,6 +147,10 @@ export class MCPOAuthTokenStorage implements TokenStorage {
     const existing = await this.getCredentials(serverName);
     const mergedRefreshToken =
       token.refreshToken || existing?.token.refreshToken;
+    // Preserve the server-URL binding the same way: a re-save that does
+    // not carry a URL (e.g. the A2A agent provider's persistToken, which
+    // shares this storage) must not silently unbind the record.
+    const mergedMcpServerUrl = mcpServerUrl || existing?.mcpServerUrl;
 
     const mergedToken = {
       ...token,
@@ -158,7 +162,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
       token: mergedToken,
       clientId,
       tokenUrl,
-      mcpServerUrl,
+      mcpServerUrl: mergedMcpServerUrl,
       updatedAt: Date.now(),
     };
 

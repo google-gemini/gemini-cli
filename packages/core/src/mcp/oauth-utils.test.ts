@@ -13,6 +13,8 @@ import {
   OAuthSecurityError,
   validateOAuthEndpointUrl,
   isLoopbackUrl,
+  isSameOrigin,
+  isStoredTokenBoundToServerUrl,
   type OAuthAuthorizationServerMetadata,
   type OAuthProtectedResourceMetadata,
 } from './oauth-utils.js';
@@ -1069,6 +1071,113 @@ describe('OAuthUtils', () => {
       expect(isLoopbackUrl('http://[::1]:9000')).toBe(true);
       expect(isLoopbackUrl('https://example.com')).toBe(false);
       expect(isLoopbackUrl('http://10.0.0.1')).toBe(false);
+    });
+
+    describe('isSameOrigin', () => {
+      it('should return true for the same origin with a different path', () => {
+        expect(
+          isSameOrigin(
+            'https://mcp.example.com/mcp',
+            'https://mcp.example.com/other-path',
+          ),
+        ).toBe(true);
+      });
+
+      it('should return true when only the default port is spelled out', () => {
+        expect(
+          isSameOrigin(
+            'https://mcp.example.com:443/mcp',
+            'https://mcp.example.com/mcp',
+          ),
+        ).toBe(true);
+        expect(
+          isSameOrigin(
+            'http://localhost:80/mcp',
+            'http://localhost/mcp',
+          ),
+        ).toBe(true);
+      });
+
+      it('should return false for a different host', () => {
+        expect(
+          isSameOrigin(
+            'https://good.example.com/mcp',
+            'https://evil.example.com/mcp',
+          ),
+        ).toBe(false);
+      });
+
+      it('should return false for a different scheme', () => {
+        expect(
+          isSameOrigin(
+            'https://mcp.example.com/mcp',
+            'http://mcp.example.com/mcp',
+          ),
+        ).toBe(false);
+      });
+
+      it('should return false for a different port', () => {
+        expect(
+          isSameOrigin(
+            'https://mcp.example.com:8443/mcp',
+            'https://mcp.example.com/mcp',
+          ),
+        ).toBe(false);
+      });
+
+      it('should return false when either URL cannot be parsed', () => {
+        expect(isSameOrigin('not-a-url', 'https://mcp.example.com/mcp')).toBe(
+          false,
+        );
+        expect(isSameOrigin('https://mcp.example.com/mcp', '')).toBe(false);
+      });
+    });
+
+    describe('isStoredTokenBoundToServerUrl', () => {
+      it('should return true when the stored URL and expected URL share an origin', () => {
+        expect(
+          isStoredTokenBoundToServerUrl(
+            'https://mcp.example.com/mcp',
+            'https://mcp.example.com/other-path',
+          ),
+        ).toBe(true);
+      });
+
+      it('should return false when the expected URL is a different origin', () => {
+        expect(
+          isStoredTokenBoundToServerUrl(
+            'https://good.example.com/mcp',
+            'https://evil.example.com/mcp',
+          ),
+        ).toBe(false);
+        expect(
+          isStoredTokenBoundToServerUrl(
+            'https://mcp.example.com/mcp',
+            'http://mcp.example.com/mcp',
+          ),
+        ).toBe(false);
+      });
+
+      it('should return false when the stored record has no server URL (fail closed)', () => {
+        expect(
+          isStoredTokenBoundToServerUrl(
+            undefined,
+            'https://mcp.example.com/mcp',
+          ),
+        ).toBe(false);
+      });
+
+      it('should return true when no expected URL is known (no check possible)', () => {
+        expect(
+          isStoredTokenBoundToServerUrl(
+            'https://mcp.example.com/mcp',
+            undefined,
+          ),
+        ).toBe(true);
+        expect(isStoredTokenBoundToServerUrl(undefined, undefined)).toBe(
+          true,
+        );
+      });
     });
   });
 

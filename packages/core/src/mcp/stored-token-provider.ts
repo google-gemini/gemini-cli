@@ -57,9 +57,16 @@ export class DynamicStoredOAuthProvider implements OAuthClientProvider {
 
     const oauthConfig = this.serverConfig.oauth ?? {};
 
+    // Bind the stored token to the server URL currently configured for
+    // this server: if the URL was repointed to a different origin since
+    // the token was issued, the token is withheld instead of replayed.
+    const expectedServerUrl =
+      this.serverConfig.httpUrl || this.serverConfig.url;
+
     const tokenMeta = await this.oauthProvider.getValidTokenWithMetadata(
       this.serverName,
       oauthConfig,
+      expectedServerUrl,
     );
 
     if (!tokenMeta?.accessToken) {
