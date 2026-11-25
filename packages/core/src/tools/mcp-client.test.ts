@@ -1940,7 +1940,14 @@ describe('mcp-client', () => {
       );
     });
 
-    describe('should connect via httpUrl', () => {       beforeEach(() => {         // The binding gate is auto-mocked in this file; the tests below         // cover a token bound to the configured server URL.         vi.mocked(isStoredTokenBoundToServerUrl).mockReturnValue(true);       });        it('uses MCP SDK authProvider token() path for oauth-enabled servers', async () => {
+    describe('should connect via httpUrl', () => {
+      beforeEach(() => {
+        // The binding gate is auto-mocked in this file; the tests below
+        // cover a token bound to the configured server URL.
+        vi.mocked(isStoredTokenBoundToServerUrl).mockReturnValue(true);
+      });
+
+      it('uses MCP SDK authProvider token() path for oauth-enabled servers', async () => {
         const mockGetValidTokenWithMetadata = vi.fn().mockResolvedValue({
           accessToken: 'fresh-token',
           tokenType: 'Bearer',
