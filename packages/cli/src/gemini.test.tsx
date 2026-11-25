@@ -844,6 +844,92 @@ describe('gemini.tsx main function kitty protocol', () => {
     processExitSpy.mockRestore();
   });
 
+  describe('sandbox hop with piped stdin', () => {
+    beforeEach(() => {
+      vi.stubEnv('SANDBOX', '');
+      vi.stubEnv('GEMINI_API_KEY', 'test-key');
+      vi.mocked(start_sandbox).mockClear();
+      vi.spyOn(process, 'exit').mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+      vi.mocked(loadSettings).mockReturnValue(
+        createMockSettings({
+          merged: {
+            advanced: {},
+            security: { auth: { selectedType: 'google' } },
+            ui: {},
+          },
+          workspace: { settings: {} },
+          setValue: vi.fn(),
+          forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+        }),
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (process.stdin as any).isTTY = false;
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    const runSandboxHop = async (acpMode: boolean) => {
+      vi.mocked(parseArguments).mockResolvedValue({
+        acp: acpMode,
+        promptInteractive: false,
+      } as unknown as CliArgs);
+      const sandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'test-image',
+      });
+      vi.mocked(loadCliConfig).mockResolvedValue(
+        createMockConfig({
+          isInteractive: () => acpMode,
+          getAcpMode: () => acpMode,
+          getQuestion: () => '',
+          getSandbox: () => sandboxConfig,
+        }),
+      );
+      vi.mocked(loadSandboxConfig).mockResolvedValue(sandboxConfig);
+
+      try {
+        await main();
+      } catch (e) {
+        if (!(e instanceof MockProcessExitError)) throw e;
+      }
+
+      expect(process.exit).toHaveBeenCalledWith(0);
+      expect(start_sandbox).toHaveBeenCalledTimes(1);
+      const [, , , sandboxArgs] = vi.mocked(start_sandbox).mock.calls[0];
+      return sandboxArgs;
+    };
+
+    it('should not read stdin before the sandbox hop in ACP mode', async () => {
+      const readStdinSpy = vi
+        .spyOn(readStdinModule, 'readStdin')
+        .mockResolvedValue('{"jsonrpc":"2.0","id":0,"method":"initialize"}');
+
+      const sandboxArgs = await runSandboxHop(true);
+
+      expect(readStdinSpy).not.toHaveBeenCalled();
+      expect(sandboxArgs).toEqual(process.argv);
+    });
+
+    it('should forward piped stdin to the sandbox as --prompt outside ACP mode', async () => {
+      const readStdinSpy = vi
+        .spyOn(readStdinModule, 'readStdin')
+        .mockResolvedValue('piped prompt');
+
+      const sandboxArgs = await runSandboxHop(false);
+
+      expect(readStdinSpy).toHaveBeenCalledTimes(1);
+      expect(sandboxArgs).toEqual([
+        ...process.argv,
+        '--prompt',
+        'piped prompt',
+      ]);
+    });
+  });
+
   it('should log warning when theme is not found', async () => {
     const { themeManager } = await import('./ui/themes/theme-manager.js');
     const debugLoggerWarnSpy = vi
