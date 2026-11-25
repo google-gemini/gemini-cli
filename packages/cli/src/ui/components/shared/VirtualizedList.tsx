@@ -354,10 +354,22 @@ function VirtualizedList<T>(
       prevTotalHeight.current - prevContainerHeight.current - 1;
     const wasAtBottom = contentPreviouslyFit || wasScrolledToBottomPixels;
 
-    if (wasAtBottom && actualScrollTop >= prevScrollTop.current) {
-      if (!isStickingToBottom) {
-        setIsStickingToBottom(true);
-      }
+    // Latch "follow the tail" only when the list was scrollable and the user
+    // was pinned to its bottom. `contentPreviouslyFit` must not latch on its
+    // own: nothing could scroll yet, and re-arming the latch from it is what
+    // pulled the view back to the bottom while the user was reading earlier
+    // output after new content arrived (Ctrl+S, #5009).
+    //
+    // This guards the latch only. The one-shot auto-scroll below still keys
+    // off `wasAtBottom`, which includes `contentPreviouslyFit`, so a short
+    // conversation that grows past the container still snaps to the tail.
+    const wasPinnedToBottom =
+      !contentPreviouslyFit &&
+      wasScrolledToBottomPixels &&
+      actualScrollTop >= prevScrollTop.current;
+
+    if (wasPinnedToBottom && !isStickingToBottom) {
+      setIsStickingToBottom(true);
     }
 
     const listGrew = data.length > prevDataLength.current;
