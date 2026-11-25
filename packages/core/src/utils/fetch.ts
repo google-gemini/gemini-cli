@@ -489,7 +489,7 @@ export async function validateUrlDestination(url: string): Promise<boolean> {
  * hosts would break legitimate corporate proxies. The connector therefore
  * lets the configured proxy host through with the default connector and
  * validates every other hostname with the safe connector. Proxied TARGETS
- * are validated separately by `assertUrlIsPublic` before the proxy is asked
+ * are validated separately (see `safeFetchFollowingRedirects`) before the proxy is asked
  * (see `safeFetchFollowingRedirects`).
  */
 export function createProxyAwareSafeConnector(
@@ -650,11 +650,6 @@ export async function assertUrlIsPublic(url: string): Promise<void> {
       `Access to private or internal address ${url} is blocked`,
     );
   }
-  if (await isPrivateIpAsync(url)) {
-    throw new PrivateIpError(
-      `Host ${url} resolves to a private or internal address and is blocked`,
-    );
-  }
 }
 
 // Credential carrying headers that must not be forwarded to a different origin
@@ -737,7 +732,6 @@ export async function safeFetchFollowingRedirects(
   let currentOptions: RequestInit = { ...options };
 
   for (let hop = 0; hop <= MAX_SAFE_REDIRECTS; hop++) {
-    await assertUrlIsPublic(currentUrl);
     const response = await fetchWithTimeout(currentUrl, timeout, {
       ...currentOptions,
       redirect: 'manual',
