@@ -205,6 +205,30 @@ describe('browserAgentFactory', () => {
       expect(definition.promptConfig).toBeDefined();
     });
 
+    it('should preserve registry runConfig overrides such as maxTurns: 0', async () => {
+      const getDefinition = vi.fn().mockImplementation((name: string) => {
+        if (name === BROWSER_AGENT_NAME) {
+          return {
+            kind: 'local' as const,
+            name: BROWSER_AGENT_NAME,
+            runConfig: { maxTurns: 0 },
+          };
+        }
+        return undefined;
+      });
+      vi.spyOn(mockConfig, 'getAgentRegistry').mockReturnValue({
+        getDefinition,
+      } as unknown as ReturnType<Config['getAgentRegistry']>);
+
+      const { definition } = await createBrowserAgentDefinition(
+        mockConfig,
+        mockMessageBus,
+      );
+
+      expect(getDefinition).toHaveBeenCalledWith(BROWSER_AGENT_NAME);
+      expect(definition.runConfig.maxTurns).toBe(0);
+    });
+
     it('should exclude visual prompt section when visualModel is not configured', async () => {
       const { definition } = await createBrowserAgentDefinition(
         mockConfig,
