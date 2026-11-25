@@ -61,7 +61,8 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
 
   const lines = text.split(/\r?\n/);
   const headerRegex = /^ *(#{1,4}) +(.*)/;
-  const codeFenceRegex = /^ *(`{3,}|~{3,}) *(\w*?) *$/;
+  const openingCodeFenceRegex = /^ *(`{3,}|~{3,})(.*)$/;
+  const closingCodeFenceRegex = /^ *(`{3,}|~{3,})[ \t]*$/;
   const ulItemRegex = /^([ \t]*)([-*+]) +(.*)/;
   const olItemRegex = /^([ \t]*)(\d+)\. +(.*)/;
   const hrRegex = /^ *([-*_] *){3,} *$/;
@@ -85,11 +86,29 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
     }
   }
 
+  function flushTable() {
+    if (!inTable) return;
+
+    if (tableHeaders.length > 0 && tableRows.length > 0) {
+      addContentBlock(
+        <RenderTable
+          key={`table-${contentBlocks.length}`}
+          headers={tableHeaders}
+          rows={tableRows}
+          terminalWidth={terminalWidth}
+        />,
+      );
+    }
+    inTable = false;
+    tableRows = [];
+    tableHeaders = [];
+  }
+
   lines.forEach((line, index) => {
     const key = `line-${index}`;
 
     if (inCodeBlock) {
-      const fenceMatch = line.match(codeFenceRegex);
+      const fenceMatch = line.match(closingCodeFenceRegex);
       if (
         fenceMatch &&
         fenceMatch[1].startsWith(codeBlockFence[0]) &&
@@ -117,18 +136,27 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
       return;
     }
 
-    const codeFenceMatch = line.match(codeFenceRegex);
+    const tableRowMatch = line.match(tableRowRegex);
+    const tableSeparatorMatch = line.match(tableSeparatorRegex);
+    if (inTable && !tableRowMatch && !tableSeparatorMatch) {
+      flushTable();
+      // The blank line ending a table does not add a spacer.
+      if (!line.trim()) return;
+    }
+
+    const codeFenceMatch = line.match(openingCodeFenceRegex);
     const headerMatch = line.match(headerRegex);
     const ulMatch = line.match(ulItemRegex);
     const olMatch = line.match(olItemRegex);
     const hrMatch = line.match(hrRegex);
-    const tableRowMatch = line.match(tableRowRegex);
-    const tableSeparatorMatch = line.match(tableSeparatorRegex);
 
-    if (codeFenceMatch) {
+    if (
+      codeFenceMatch &&
+      (!codeFenceMatch[1].startsWith('`') || !codeFenceMatch[2].includes('`'))
+    ) {
       inCodeBlock = true;
       codeBlockFence = codeFenceMatch[1];
-      codeBlockLang = codeFenceMatch[2] || null;
+      codeBlockLang = codeFenceMatch[2].trim().split(/[ \t]+/, 1)[0] || null;
     } else if (tableRowMatch && !inTable) {
       // Potential table start - check if next line is separator
       if (
@@ -161,32 +189,6 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
         cells.length = tableHeaders.length;
       }
       tableRows.push(cells);
-    } else if (inTable && !tableRowMatch) {
-      // End of table
-      if (tableHeaders.length > 0 && tableRows.length > 0) {
-        addContentBlock(
-          <RenderTable
-            key={`table-${contentBlocks.length}`}
-            headers={tableHeaders}
-            rows={tableRows}
-            terminalWidth={terminalWidth}
-          />,
-        );
-      }
-      inTable = false;
-      tableRows = [];
-      tableHeaders = [];
-
-      // Process current line as normal
-      if (line.trim().length > 0) {
-        addContentBlock(
-          <Box key={key}>
-            <Text wrap="wrap" color={responseColor}>
-              <RenderInline text={line} defaultColor={responseColor} />
-            </Text>
-          </Box>,
-        );
-      }
     } else if (hrMatch) {
       addContentBlock(
         <Box key={key}>
@@ -299,17 +301,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
     );
   }
 
-  // Handle table at end of content
-  if (inTable && tableHeaders.length > 0 && tableRows.length > 0) {
-    addContentBlock(
-      <RenderTable
-        key={`table-${contentBlocks.length}`}
-        headers={tableHeaders}
-        rows={tableRows}
-        terminalWidth={terminalWidth}
-      />,
-    );
-  }
+  flushTable();
 
   return <>{contentBlocks}</>;
 };
