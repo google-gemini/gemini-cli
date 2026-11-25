@@ -93,6 +93,67 @@ describe('Task', () => {
       vi.clearAllMocks();
     });
 
+    describe('when the fire-and-forget schedule() call rejects', () => {
+      const makeTask = () =>
+        // @ts-expect-error - Calling private constructor for test purposes.
+        new Task('task-id', 'context-id', mockConfig as Config, mockEventBus);
+
+      const requests: ToolCallRequestInfo[] = [
+        {
+          callId: '1',
+          name: 'run_shell_command',
+          args: { command: 'ls' },
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-1',
+        },
+      ];
+
+      const flushPromises = () =>
+        new Promise<void>((resolve) => setImmediate(resolve));
+
+      it('should not surface an unhandled rejection when the task was aborted', async () => {
+        const task = makeTask();
+        const abortController = new AbortController();
+        abortController.abort();
+        // A rejection nobody handles terminates the whole server process, so
+        // assert that a handler gets attached to the promise schedule() returns.
+        const rejection = Promise.reject(new Error('Operation cancelled'));
+        const thenSpy = vi.spyOn(rejection, 'then');
+        // Plain function, not a vi.fn: vitest attaches its own handlers to promises
+        // returned by mocks, which would hide an unhandled rejection.
+        task['scheduler'].schedule = () => rejection;
+        const cancelSpy = vi.spyOn(task, 'cancelPendingTools');
+
+        await task.scheduleToolCalls(requests, abortController.signal);
+        await flushPromises();
+
+        expect(thenSpy).toHaveBeenCalled();
+        // The task's own cancellation flow owns cleanup for an aborted task.
+        expect(cancelSpy).not.toHaveBeenCalled();
+      });
+
+      it('should fail the pending tool calls instead of hanging on an unexpected error', async () => {
+        const task = makeTask();
+        const abortController = new AbortController();
+        const rejection = Promise.reject(new Error('boom'));
+        const thenSpy = vi.spyOn(rejection, 'then');
+        // Plain function, not a vi.fn: vitest attaches its own handlers to promises
+        // returned by mocks, which would hide an unhandled rejection.
+        task['scheduler'].schedule = () => rejection;
+
+        await task.scheduleToolCalls(requests, abortController.signal);
+        await flushPromises();
+
+        expect(thenSpy).toHaveBeenCalled();
+        // The pre-registered call must not stay pending forever, and waiting
+        // for tools must report the failure.
+        expect(task['pendingToolCalls'].size).toBe(0);
+        await expect(task.waitForPendingTools()).rejects.toThrow(
+          'Failed to schedule tool calls: boom',
+        );
+      });
+    });
+
     it('should not create a checkpoint if no restorable tools are called', async () => {
       // @ts-expect-error - Calling private constructor for test purposes.
       const task = new Task(
