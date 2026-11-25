@@ -224,6 +224,64 @@ describe('MCPOAuthTokenStorage', () => {
         expect(savedData[0].token.refreshToken).toBe('old-refresh-token'); // successfully merged
       });
 
+      it('should merge the existing server URL when a re-save does not carry one', async () => {
+        // A re-save that omits mcpServerUrl (e.g. the A2A agent provider's
+        // persistToken, which shares this storage) must not silently
+        // unbind the record.
+        const existingCredentials: OAuthCredentials = {
+          ...mockCredentials,
+          serverName: 'existing-server',
+          mcpServerUrl: 'https://mcp.example.com/mcp',
+        };
+        vi.mocked(fs.readFile).mockResolvedValue(
+          JSON.stringify([existingCredentials]),
+        );
+        vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+
+        const newToken: OAuthToken = {
+          ...mockToken,
+          accessToken: 'new_access_token',
+        };
+        await tokenStorage.saveToken('existing-server', newToken);
+
+        const writeCall = vi.mocked(fs.writeFile).mock.calls[0];
+        const savedData = JSON.parse(
+          writeCall[1] as string,
+        ) as OAuthCredentials[];
+
+        expect(savedData).toHaveLength(1);
+        expect(savedData[0].token.accessToken).toBe('new_access_token');
+        expect(savedData[0].mcpServerUrl).toBe('https://mcp.example.com/mcp');
+      });
+
+      it('should overwrite the server URL when a re-save carries a new one', async () => {
+        const existingCredentials: OAuthCredentials = {
+          ...mockCredentials,
+          serverName: 'existing-server',
+          mcpServerUrl: 'https://old.example.com/mcp',
+        };
+        vi.mocked(fs.readFile).mockResolvedValue(
+          JSON.stringify([existingCredentials]),
+        );
+        vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+
+        await tokenStorage.saveToken(
+          'existing-server',
+          mockToken,
+          'client-id',
+          'https://token.url',
+          'https://new.example.com/mcp',
+        );
+
+        const writeCall = vi.mocked(fs.writeFile).mock.calls[0];
+        const savedData = JSON.parse(
+          writeCall[1] as string,
+        ) as OAuthCredentials[];
+
+        expect(savedData).toHaveLength(1);
+        expect(savedData[0].mcpServerUrl).toBe('https://new.example.com/mcp');
+      });
+
       it('should handle write errors gracefully', async () => {
         vi.mocked(fs.readFile).mockRejectedValue({ code: 'ENOENT' });
         vi.mocked(fs.mkdir).mockResolvedValue(undefined);
