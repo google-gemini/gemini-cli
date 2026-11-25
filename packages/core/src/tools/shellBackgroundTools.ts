@@ -175,14 +175,35 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
 
       let content = '';
       let position = 0;
+      let startsOnLineBoundary = true;
       try {
         const stats = await fileHandle.stat();
         const readSize = Math.min(stats.size, MAX_BUFFER_LOAD_CAP_BYTES);
         position = Math.max(0, stats.size - readSize);
 
+        if (position > 0) {
+          const precedingByte = Buffer.alloc(1);
+          await fileHandle.read(precedingByte, 0, 1, position - 1);
+          startsOnLineBoundary = precedingByte[0] === 0x0a;
+        }
+
         const buffer = Buffer.alloc(readSize);
-        await fileHandle.read(buffer, 0, readSize, position);
-        content = buffer.toString('utf-8');
+        const { bytesRead } = await fileHandle.read(
+          buffer,
+          0,
+          readSize,
+          position,
+        );
+        let offset = 0;
+        // The capped tail may start inside a UTF-8 character.
+        while (
+          position > 0 &&
+          offset < bytesRead &&
+          (buffer[offset] & 0xc0) === 0x80
+        ) {
+          offset++;
+        }
+        content = buffer.subarray(offset, bytesRead).toString('utf-8');
       } finally {
         await fileHandle.close();
       }
@@ -199,8 +220,11 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
         logLines.pop();
       }
 
-      // Discard first line if we started reading from middle of file to avoid partial lines
-      if (position > 0 && logLines.length > 0) {
+      // Prefer complete trailing lines, but keep a fragment if the log contains
+      // one oversized line rather than returning no output at all.
+      const startsInsideLine = position > 0 && !startsOnLineBoundary;
+      const retainedPartialLine = startsInsideLine && logLines.length === 1;
+      if (startsInsideLine && logLines.length > 1) {
         logLines.shift();
       }
 
@@ -209,9 +233,11 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
       const output = tailLines.join('\n');
 
       const header =
-        requestedLinesCount < logLines.length
-          ? `Showing last ${requestedLinesCount} of ${logLines.length} lines:\n`
-          : 'Full Log Output:\n';
+        position > 0
+          ? `Truncated log tail (earlier output omitted${retainedPartialLine ? '; first line is partial' : ''}):\n`
+          : requestedLinesCount < logLines.length
+            ? `Showing last ${requestedLinesCount} of ${logLines.length} lines:\n`
+            : 'Full Log Output:\n';
 
       const responseContent = header + output;
 
