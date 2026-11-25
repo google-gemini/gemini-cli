@@ -33,6 +33,9 @@ gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release]
 - `--consent`: Acknowledge security risks and skip the confirmation prompt.
 - `--skip-settings`: Skip the configuration on install process.
 
+If you use `--consent`, Gemini CLI skips the confirmation prompt and doesn't
+show the details of what the extension adds.
+
 ### Uninstall an extension
 
 To uninstall one or more extensions, use the `uninstall` command:
@@ -78,6 +81,27 @@ To update all installed extensions at once:
 ```bash
 gemini extensions update --all
 ```
+
+When an update changes what the extension adds, Gemini CLI asks for your consent
+again before it installs the update. It asks again when any of these change:
+
+- Hooks
+- Context files, such as `GEMINI.md`, and the files that they import
+- Agent skills
+- Sub-agents
+- Custom commands
+- Policy files
+- MCP server entries
+- Settings and the plan directory in `gemini-extension.json`
+- Any other file in the extension folder, such as a script or a module that a
+  hook or MCP server loads
+
+Gemini CLI doesn't ask again when an update only changes the `version` in
+`gemini-extension.json`. It also ignores `.git` folders and the files that it
+writes in the extension folder: `.gemini-extension-install.json` and `.env`.
+
+The prompt names what changed since the installed version. If you decline, the
+installed version stays as it is.
 
 ### Create an extension from a template
 

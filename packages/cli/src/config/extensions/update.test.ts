@@ -23,7 +23,9 @@ import {
   type GeminiCLIExtension,
   type ExtensionInstallMetadata,
   IntegrityDataStatus,
+  debugLogger,
 } from '@google/gemini-cli-core';
+import { ExtensionConsentDeclinedError } from './extensionConsentErrors.js';
 
 vi.mock('./storage.js', () => ({
   ExtensionStorage: {
@@ -333,6 +335,42 @@ describe('Extension Update Logic', () => {
       expect(fs.promises.rm).toHaveBeenCalled();
     });
 
+    it('should keep the ERROR state and rethrow a declined update without rolling back', async () => {
+      const errorSpy = vi
+        .spyOn(debugLogger, 'error')
+        .mockImplementation(() => {});
+      const declined = new ExtensionConsentDeclinedError('test-extension');
+      vi.mocked(
+        mockExtensionManager.installOrUpdateExtension,
+      ).mockRejectedValue(declined);
+
+      await expect(
+        updateExtension(
+          mockExtension,
+          mockExtensionManager,
+          ExtensionUpdateState.UPDATE_AVAILABLE,
+          mockDispatch,
+        ),
+      ).rejects.toBe(declined);
+
+      expect(declined.message).toBe(
+        'Installation cancelled for "test-extension".',
+      );
+      expect(copyExtension).not.toHaveBeenCalled();
+      expect(errorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('rolling back'),
+      );
+      expect(mockDispatch).toHaveBeenLastCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: mockExtension.name,
+          state: ExtensionUpdateState.ERROR,
+        },
+      });
+      expect(fs.promises.rm).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+
     it('should not mask primary update error if tempDir cleanup fails in finally', async () => {
       vi.mocked(
         mockExtensionManager.installOrUpdateExtension,
@@ -462,6 +500,52 @@ describe('Extension Update Logic', () => {
       expect(
         mockExtensionManager.installOrUpdateExtension,
       ).toHaveBeenCalledTimes(2);
+    });
+
+    it('should finish every update and return the successful ones when one is declined', async () => {
+      const errorSpy = vi
+        .spyOn(debugLogger, 'error')
+        .mockImplementation(() => {});
+      const extensions: GeminiCLIExtension[] = [
+        { ...mockExtension, name: 'declined-ext', path: '/ext/declined-ext' },
+        { ...mockExtension, name: 'updated-ext', path: '/ext/updated-ext' },
+      ];
+      const extensionsState = new Map([
+        ['declined-ext', { status: ExtensionUpdateState.UPDATE_AVAILABLE }],
+        ['updated-ext', { status: ExtensionUpdateState.UPDATE_AVAILABLE }],
+      ]);
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockImplementation(
+        async (extensionDir) => ({
+          name: extensionDir.endsWith('declined-ext')
+            ? 'declined-ext'
+            : 'updated-ext',
+          version: '1.0.0',
+        }),
+      );
+      vi.mocked(
+        mockExtensionManager.installOrUpdateExtension,
+      ).mockImplementation(async (_metadata, previousConfig) => {
+        if (previousConfig?.name === 'declined-ext') {
+          throw new ExtensionConsentDeclinedError('declined-ext');
+        }
+        return { ...mockExtension, name: 'updated-ext', version: '1.1.0' };
+      });
+
+      const results = await updateAllUpdatableExtensions(
+        extensions,
+        extensionsState as Map<string, ExtensionUpdateStatus>,
+        mockExtensionManager,
+        mockDispatch,
+      );
+
+      expect(results.map((r) => r.name)).toEqual(['updated-ext']);
+      expect(
+        mockExtensionManager.installOrUpdateExtension,
+      ).toHaveBeenCalledTimes(2);
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Failed to update extension "declined-ext": Installation cancelled for "declined-ext".',
+      );
+      errorSpy.mockRestore();
     });
   });
 

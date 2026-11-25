@@ -64,6 +64,7 @@ import {
   HookType,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
+import { buildExtensionContentSummary } from './extensions/extensionContentSummary.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { ExtensionStorage } from './extensions/storage.js';
 import {
@@ -317,6 +318,14 @@ Would you like to attempt to install via "git clone" instead?`,
       let releaseLock: (() => Promise<void>) | undefined;
       try {
         newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
+        if (installMetadata.type === 'local') {
+          // The summary, the consent text, and the install all read this
+          // copy, so the installed files are the ones the user approved.
+          tempDir = await ExtensionStorage.createTmpDir();
+          await copyExtension(localSourcePath, tempDir);
+          localSourcePath = tempDir;
+          newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
+        }
 
         const newExtensionName = newExtensionConfig.name;
         const previousName = previousExtensionConfig?.name ?? newExtensionName;
@@ -343,15 +352,29 @@ Would you like to attempt to install via "git clone" instead?`,
           );
         }
 
-        const newHasHooks = fs.existsSync(
-          path.join(localSourcePath, 'hooks', 'hooks.json'),
-        );
-        const previousHasHooks = !!(
-          isUpdate &&
-          previous &&
-          previous.hooks &&
-          Object.keys(previous.hooks).length > 0
-        );
+        // Both sides are read from the raw files, so they compare the same way
+        // whatever the settings (hooks, for example, load only when enabled).
+        const contentSummaries = {
+          current: await buildExtensionContentSummary(localSourcePath, {
+            contextFilePaths: resolveContextFilePaths(
+              newExtensionConfig,
+              localSourcePath,
+            ),
+            includeAllFiles: installMetadata.type !== 'link',
+          }),
+          previous:
+            previous && previousExtensionConfig
+              ? await buildExtensionContentSummary(previous.path, {
+                  contextFilePaths: resolveContextFilePaths(
+                    previousExtensionConfig,
+                    previous.path,
+                  ),
+                  includeAllFiles: previous.installMetadata?.type !== 'link',
+                })
+              : undefined,
+        };
+        const newHasHooks = contentSummaries.current.hooks !== undefined;
+        const previousHasHooks = contentSummaries.previous?.hooks !== undefined;
 
         const newSkills = await loadSkillsFromDir(
           path.join(localSourcePath, 'skills'),
@@ -381,6 +404,7 @@ Would you like to attempt to install via "git clone" instead?`,
           previousLinkedSource
             ? getRealPath(path.resolve(this.workspaceDir, previousLinkedSource))
             : undefined,
+          contentSummaries,
         );
         const extensionId = getExtensionId(newExtensionConfig, installMetadata);
         const destinationPath = new ExtensionStorage(
@@ -1346,7 +1370,14 @@ export async function copyExtension(
   source: string,
   destination: string,
 ): Promise<void> {
-  await fs.promises.cp(source, destination, { recursive: true });
+  // Copy links as written. By default `fs.cp` turns a relative link into an
+  // absolute one that points back into `source`, so a link inside the
+  // extension would leave the copy, and would break once a temporary source
+  // is removed.
+  await fs.promises.cp(source, destination, {
+    recursive: true,
+    verbatimSymlinks: true,
+  });
   await makeWritableRecursive(destination);
 }
 
