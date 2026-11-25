@@ -3165,6 +3165,12 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         description:
           'Service account email to impersonate (name@project.iam.gserviceaccount.com).',
       },
+      allowedHosts: {
+        type: 'array',
+        description:
+          'Hostname allowlist for the Service Account Impersonation provider. Each entry is an exact hostname or a wildcard subdomain match (e.g. "*.example.com"). When omitted, only the default Google-operated hosts (*.googleapis.com, run.app) are allowed.',
+        items: { type: 'string' },
+      },
     },
   },
   RequiredMcpServerConfig: {
@@ -3241,6 +3247,12 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         type: 'string',
         description:
           'Service account email to impersonate (name@project.iam.gserviceaccount.com).',
+      },
+      allowedHosts: {
+        type: 'array',
+        description:
+          'Hostname allowlist for the Service Account Impersonation provider. Each entry is an exact hostname or a wildcard subdomain match (e.g. "*.example.com"). When omitted, only the default Google-operated hosts (*.googleapis.com, run.app) are allowed.',
+        items: { type: 'string' },
       },
     },
   },

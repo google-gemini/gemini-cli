@@ -376,6 +376,7 @@ export const RequiredMcpServerConfigSchema = z.object({
   oauth: RequiredMcpServerOAuthSchema.optional(),
   targetAudience: z.string().optional(),
   targetServiceAccount: z.string().optional(),
+  allowedHosts: z.array(z.string()).optional(),
   headers: z.record(z.string()).optional(),
 
   // Common

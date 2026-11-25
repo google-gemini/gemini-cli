@@ -522,6 +522,10 @@ export class MCPServerConfig {
     readonly targetAudience?: string,
     /* targetServiceAccount format: <service-account-name>@<project-num>.iam.gserviceaccount.com */
     readonly targetServiceAccount?: string,
+    /* Hostname allowlist for the Service Account Impersonation provider.
+     * Each entry is an exact hostname or a wildcard subdomain match (e.g. "*.example.com").
+     * When omitted, only the default Google-operated hosts are allowed. */
+    readonly allowedHosts?: string[],
   ) {}
 }
 

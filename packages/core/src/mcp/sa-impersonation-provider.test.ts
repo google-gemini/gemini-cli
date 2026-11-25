@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { GoogleAuth } from 'google-auth-library';
 import { ServiceAccountImpersonationProvider } from './sa-impersonation-provider.js';
 import type { MCPServerConfig } from '../config/config.js';
 
@@ -28,6 +29,9 @@ const defaultSAConfig: MCPServerConfig = {
   url: 'https://my-iap-service.run.app',
   targetAudience: 'my-audience',
   targetServiceAccount: 'my-sa',
+  oauth: {
+    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+  },
 };
 
 describe('ServiceAccountImpersonationProvider', () => {
@@ -60,6 +64,24 @@ describe('ServiceAccountImpersonationProvider', () => {
     expect(() => new ServiceAccountImpersonationProvider(config)).toThrow(
       'targetServiceAccount must be provided for the Service Account Impersonation provider',
     );
+  });
+
+  it('should throw an error if no scopes are provided', () => {
+    const config: MCPServerConfig = {
+      url: 'https://my-iap-service.run.app',
+      targetAudience: 'my-audience',
+      targetServiceAccount: 'my-sa',
+    };
+    expect(() => new ServiceAccountImpersonationProvider(config)).toThrow(
+      'Scopes must be provided in the oauth config for the Service Account Impersonation provider',
+    );
+  });
+
+  it('should use scopes from the config if provided', () => {
+    new ServiceAccountImpersonationProvider(defaultSAConfig);
+    expect(GoogleAuth).toHaveBeenCalledWith({
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    });
   });
 
   it('should correctly get tokens for a valid config', async () => {

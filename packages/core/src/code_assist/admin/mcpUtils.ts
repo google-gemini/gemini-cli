@@ -117,6 +117,7 @@ export function applyRequiredServers(
       requiredConfig.authProviderType, // authProviderType
       requiredConfig.targetAudience, // targetAudience
       requiredConfig.targetServiceAccount, // targetServiceAccount
+      requiredConfig.allowedHosts, // allowedHosts
     );
   }
 
