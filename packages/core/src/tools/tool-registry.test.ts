@@ -277,6 +277,39 @@ describe('ToolRegistry', () => {
       expect(toolRegistry.getTool('mock-tool')).toBe(tool);
     });
 
+    it('should refuse a different MCP tool that truncates to the same registry name', () => {
+      // Two long tool names whose middles differ but whose first/last 30
+      // chars (what generateValidName keeps) are identical, so both
+      // truncate to the same registry name.
+      const serverName = 's'.repeat(40);
+      const toolA = createMCPTool(
+        serverName,
+        'a'.repeat(35) + 'X' + 'b'.repeat(35),
+        'first tool',
+      );
+      const toolB = createMCPTool(
+        serverName,
+        'a'.repeat(35) + 'Y' + 'b'.repeat(35),
+        'second tool',
+      );
+      expect(toolA.name).toBe(toolB.name);
+
+      toolRegistry.registerTool(toolA);
+      toolRegistry.registerTool(toolB);
+
+      // The first registration is kept; the second is refused.
+      expect(toolRegistry.getTool(toolA.name)).toBe(toolA);
+      expect(toolRegistry.getAllToolNames()).toHaveLength(1);
+    });
+
+    it('should still overwrite when the SAME MCP tool is re-registered', () => {
+      const first = createMCPTool('srv', 'tool', 'desc');
+      const second = createMCPTool('srv', 'tool', 'desc');
+      toolRegistry.registerTool(first);
+      toolRegistry.registerTool(second);
+      expect(toolRegistry.getTool(first.name)).toBe(second);
+    });
+
     it('should pass modelId to getSchema when getting function declarations', () => {
       const tool = new MockTool({ name: 'mock-tool' });
       const getSchemaSpy = vi.spyOn(tool, 'getSchema');
