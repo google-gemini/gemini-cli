@@ -478,7 +478,61 @@ export async function validateUrlDestination(url: string): Promise<boolean> {
 }
 
 /**
- * Creates an undici EnvHttpProxyAgent that incorporates safe DNS lookup.
+ * Creates a connector for use with EnvHttpProxyAgent that validates direct
+ * (no_proxy) target connections with the safe DNS lookup, while allowing
+ * connections to the explicitly configured proxy host itself.
+ *
+ * EnvHttpProxyAgent passes the same `connect` function to both the direct
+ * agent (used for no_proxy targets) and the proxy agents (used to reach the
+ * proxy). The proxy resolves proxied targets itself, so on the proxy branch
+ * the connector only ever sees the proxy hostname — blocking private proxy
+ * hosts would break legitimate corporate proxies. The connector therefore
+ * lets the configured proxy host through with the default connector and
+ * validates every other hostname with the safe connector. Proxied TARGETS
+ * are validated separately by `assertUrlIsPublic` before the proxy is asked
+ * (see `safeFetchFollowingRedirects`).
+ */
+export function createProxyAwareSafeConnector(
+  proxyUrl: string,
+): undici.buildConnector.connector {
+  const buildConnectorFn = getBuildConnector();
+  if (!buildConnectorFn) {
+    throw new Error(
+      'Security initialization failed: undici.buildConnector is not available.',
+    );
+  }
+  let proxyHostname = '';
+  try {
+    proxyHostname = sanitizeHostname(new URL(proxyUrl).hostname);
+  } catch {
+    // Unparseable proxy URL: no host is exempted (fail closed).
+    proxyHostname = '';
+  }
+  const defaultConnector = buildConnectorFn({});
+  const safeConnect = createSafeConnector();
+  return function proxyAwareSafeConnect(
+    opts: undici.buildConnector.Options,
+    callback: undici.buildConnector.Callback,
+  ) {
+    if (
+      proxyHostname &&
+      sanitizeHostname(opts.hostname) === proxyHostname
+    ) {
+      // Connecting to the explicitly configured proxy itself.
+      defaultConnector(opts, callback);
+      return;
+    }
+    safeConnect(opts, callback);
+  };
+}
+
+/**
+ * Creates an undici EnvHttpProxyAgent whose direct (no_proxy) connections
+ * use the safe DNS lookup (see `createProxyAwareSafeConnector`). Note the
+ * proxy itself resolves proxied targets, so this does NOT validate proxied
+ * target addresses — callers fetching URLs influenced by untrusted content
+ * must use `safeFetchFollowingRedirects`, which validates every hop before
+ * the proxy is asked.
  */
 export function createSafeProxyAgent(
   proxyUrl: string,
@@ -495,6 +549,7 @@ export function createSafeProxyAgent(
     noProxy,
     headersTimeout: defaultHeadersTimeout,
     bodyTimeout: defaultBodyTimeout,
+    connect: createProxyAwareSafeConnector(trimmedProxy),
   });
 }
 
@@ -574,18 +629,141 @@ export function setGlobalProxy(proxy: string) {
     );
     return;
   }
-  const noProxy = (
-    process.env['NO_PROXY'] ??
-    process.env['no_proxy'] ??
-    ''
-  )?.trim();
-  undici.setGlobalDispatcher(
-    new undici.EnvHttpProxyAgent({
-      httpProxy: trimmedProxy,
-      httpsProxy: trimmedProxy,
-      noProxy,
-      headersTimeout: defaultHeadersTimeout,
-      bodyTimeout: defaultBodyTimeout,
-    }),
+  // Route the global dispatcher through the proxy-aware safe connector so
+  // direct (no_proxy) targets are validated while the configured proxy host
+  // itself stays reachable.
+  undici.setGlobalDispatcher(createSafeProxyAgent(currentProxy));
+}
+
+const MAX_SAFE_REDIRECTS = 5;
+
+/**
+ * Throws PrivateIpError if the url targets a private, loopback, link local, or
+ * otherwise non public address. It checks both the literal hostname and the
+ * address the hostname resolves to, so it stops IP literals such as
+ * 169.254.169.254 and hostnames such as metadata.google.internal that resolve
+ * to a private address.
+ */
+export async function assertUrlIsPublic(url: string): Promise<void> {
+  if (await isPrivateIp(url)) {
+    throw new PrivateIpError(
+      `Access to private or internal address ${url} is blocked`,
+    );
+  }
+  if (await isPrivateIpAsync(url)) {
+    throw new PrivateIpError(
+      `Host ${url} resolves to a private or internal address and is blocked`,
+    );
+  }
+}
+
+// Credential carrying headers that must not be forwarded to a different origin
+// during a redirect.
+const SENSITIVE_HEADERS = [
+  'authorization',
+  'cookie',
+  'cookie2',
+  'proxy-authorization',
+];
+
+/**
+ * Computes the next url and request options for a redirect hop. It rejects any
+ * redirect target that is not http or https, strips credential carrying headers
+ * when the redirect crosses to a different origin, and downgrades the method to
+ * GET while removing the body for 303 responses and for non GET or HEAD 301 and
+ * 302 responses, following RFC 9110.
+ */
+export function applyRedirect(
+  currentUrl: string,
+  status: number,
+  location: string,
+  options: RequestInit,
+): { nextUrl: string; nextOptions: RequestInit } {
+  const nextUrl = new URL(location, currentUrl);
+  if (nextUrl.protocol !== 'http:' && nextUrl.protocol !== 'https:') {
+    throw new FetchError(
+      `Unsupported redirect protocol ${nextUrl.protocol}`,
+      'EUNSUPPORTEDPROTOCOL',
+    );
+  }
+
+  let nextOptions: RequestInit = { ...options };
+
+  const currentUrlObj = new URL(currentUrl);
+  const isCrossOrigin =
+    currentUrlObj.protocol !== nextUrl.protocol ||
+    currentUrlObj.host !== nextUrl.host;
+  if (isCrossOrigin && nextOptions.headers) {
+    const headers = new Headers(nextOptions.headers);
+    for (const name of SENSITIVE_HEADERS) {
+      headers.delete(name);
+    }
+    nextOptions = { ...nextOptions, headers };
+  }
+
+  const method = (nextOptions.method ?? 'GET').toUpperCase();
+  if (
+    status === 303 ||
+    ((status === 301 || status === 302) &&
+      method !== 'GET' &&
+      method !== 'HEAD')
+  ) {
+    const headers = new Headers(nextOptions.headers ?? {});
+    headers.delete('content-type');
+    headers.delete('content-length');
+    nextOptions = {
+      ...nextOptions,
+      method: 'GET',
+      body: undefined,
+      headers,
+    };
+  }
+
+  return { nextUrl: nextUrl.toString(), nextOptions };
+}
+
+/**
+ * Fetches a url while enforcing the SSRF guard on the initial request and on
+ * every redirect hop. Redirects are followed manually so the resolved target
+ * of each hop is validated before the connection is made. Use this for any
+ * fetch whose url can be influenced by untrusted content.
+ */
+export async function safeFetchFollowingRedirects(
+  url: string,
+  timeout: number,
+  options?: RequestInit,
+): Promise<Response> {
+  let currentUrl = url;
+  let currentOptions: RequestInit = { ...options };
+
+  for (let hop = 0; hop <= MAX_SAFE_REDIRECTS; hop++) {
+    await assertUrlIsPublic(currentUrl);
+    const response = await fetchWithTimeout(currentUrl, timeout, {
+      ...currentOptions,
+      redirect: 'manual',
+    });
+
+    if (response.status < 300 || response.status >= 400) {
+      return response;
+    }
+
+    const location = response.headers.get('location');
+    if (!location) {
+      return response;
+    }
+
+    const next = applyRedirect(
+      currentUrl,
+      response.status,
+      location,
+      currentOptions,
+    );
+    currentUrl = next.nextUrl;
+    currentOptions = next.nextOptions;
+  }
+
+  throw new FetchError(
+    `Too many redirects while fetching ${url}`,
+    'ETOOMANYREDIRECTS',
   );
 }
