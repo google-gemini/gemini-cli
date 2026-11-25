@@ -37,18 +37,18 @@ describe('<MarkdownDisplay />', () => {
     unmount();
   });
 
-  describe('fence boundaries', () => {
-    async function renderFrame(text: string) {
-      const { lastFrame, unmount } = await renderWithProviders(
-        <MarkdownDisplay {...baseProps} text={text} />,
-      );
-      try {
-        return lastFrame();
-      } finally {
-        unmount();
-      }
+  async function renderFrame(text: string) {
+    const { lastFrame, unmount } = await renderWithProviders(
+      <MarkdownDisplay {...baseProps} text={text} />,
+    );
+    try {
+      return lastFrame();
+    } finally {
+      unmount();
     }
+  }
 
+  describe('fence boundaries', () => {
     it.each([
       'c++',
       'cpp',
@@ -121,6 +121,26 @@ describe('<MarkdownDisplay />', () => {
       const frame = await renderFrame('```inline code```\nAFTER');
       expect(frame.split('\n')).toContain('AFTER');
     });
+  });
+
+  describe('blocks after a table', () => {
+    it.each([
+      ['header', '## NEXT_HEADER', 'NEXT_HEADER'],
+      ['unordered list', '+   NEXT_BULLET', ' + NEXT_BULLET'],
+      ['ordered list', '7.   NEXT_ITEM', ' 7. NEXT_ITEM'],
+      ['horizontal rule', '***', '---'],
+      ['plain text', 'NEXT_TEXT', 'NEXT_TEXT'],
+      ['blank line then text', '\nNEXT_TEXT', 'NEXT_TEXT'],
+    ])(
+      'renders %s immediately after the table',
+      async (_kind, input, expected) => {
+        const table = '| A | B |\n| --- | --- |\n| 1 | 2 |';
+        const frame = await renderFrame(`${table}\n${input}`);
+        const [tableBottom, nextLine] = frame.trimEnd().split('\n').slice(-2);
+        expect(tableBottom).toMatch(/^└[─┴]+┘$/);
+        expect(nextLine).toBe(expected);
+      },
+    );
   });
 
   const lineEndings = [

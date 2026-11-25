@@ -136,19 +136,24 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
       return;
     }
 
+    const tableRowMatch = line.match(tableRowRegex);
+    const tableSeparatorMatch = line.match(tableSeparatorRegex);
+    if (inTable && !tableRowMatch && !tableSeparatorMatch) {
+      flushTable();
+      // The blank line ending a table does not add a spacer.
+      if (!line.trim()) return;
+    }
+
     const codeFenceMatch = line.match(openingCodeFenceRegex);
     const headerMatch = line.match(headerRegex);
     const ulMatch = line.match(ulItemRegex);
     const olMatch = line.match(olItemRegex);
     const hrMatch = line.match(hrRegex);
-    const tableRowMatch = line.match(tableRowRegex);
-    const tableSeparatorMatch = line.match(tableSeparatorRegex);
 
     if (
       codeFenceMatch &&
       (!codeFenceMatch[1].startsWith('`') || !codeFenceMatch[2].includes('`'))
     ) {
-      flushTable();
       inCodeBlock = true;
       codeBlockFence = codeFenceMatch[1];
       codeBlockLang = codeFenceMatch[2].trim().split(/[ \t]+/, 1)[0] || null;
@@ -184,19 +189,6 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
         cells.length = tableHeaders.length;
       }
       tableRows.push(cells);
-    } else if (inTable && !tableRowMatch) {
-      flushTable();
-
-      // Process current line as normal
-      if (line.trim().length > 0) {
-        addContentBlock(
-          <Box key={key}>
-            <Text wrap="wrap" color={responseColor}>
-              <RenderInline text={line} defaultColor={responseColor} />
-            </Text>
-          </Box>,
-        );
-      }
     } else if (hrMatch) {
       addContentBlock(
         <Box key={key}>
