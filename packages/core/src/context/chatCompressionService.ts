@@ -124,15 +124,32 @@ function calculateRetainedTurnByteSize(turn: Content): number {
     if (part.text) {
       bytes += Buffer.byteLength(part.text, 'utf8');
     }
-    if (part.functionResponse?.response) {
+    if (part.functionResponse) {
       const resp = part.functionResponse.response;
-      if (typeof resp === 'string') {
-        bytes += Buffer.byteLength(resp, 'utf8');
-      } else if (typeof resp === 'object' && resp !== null) {
-        try {
-          bytes += Buffer.byteLength(JSON.stringify(resp), 'utf8');
-        } catch {
-          // ignore JSON errors
+      if (resp) {
+        if (typeof resp === 'string') {
+          bytes += Buffer.byteLength(resp, 'utf8');
+        } else if (typeof resp === 'object') {
+          try {
+            bytes += Buffer.byteLength(JSON.stringify(resp), 'utf8');
+          } catch {
+            // ignore JSON errors
+          }
+        }
+      } else if (part.functionResponse.parts) {
+        for (const nestedPart of part.functionResponse.parts) {
+          if (nestedPart && typeof nestedPart === 'object') {
+            if (
+              'text' in nestedPart &&
+              typeof nestedPart.text === 'string' &&
+              nestedPart.text
+            ) {
+              bytes += Buffer.byteLength(nestedPart.text, 'utf8');
+            }
+            if (nestedPart.inlineData?.data) {
+              bytes += Buffer.byteLength(nestedPart.inlineData.data, 'utf8');
+            }
+          }
         }
       }
     }

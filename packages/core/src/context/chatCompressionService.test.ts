@@ -1443,5 +1443,55 @@ describe('ChatCompressionService', () => {
         }
       },
     );
+
+    it('counts retained nested functionResponse.parts against the exempt budget when response is absent', () => {
+      const textFile = 'export const A = "value";\n'.repeat(600); // ~15 KB
+      const largeBase64 = 'A'.repeat(MAX_EXEMPT_RETRIEVAL_HISTORY_BYTES + 1);
+
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'read_file',
+                response: { content: textFile },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'Read source file' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'read_file',
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: 'image/png',
+                      data: largeBase64,
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        ...createRecentToolTurns(3),
+      ];
+
+      const collapsed = collapseOlderFunctionResponses(history);
+
+      // Because response is absent, the nested parts are retained unmodified and exhaust the budget,
+      // so the earlier text read_file is collapsed.
+      expect(collapsed[2].parts![0].functionResponse?.parts).toHaveLength(1);
+      const earlierTextResp = collapsed[0].parts![0].functionResponse
+        ?.response as { content: string };
+      expect(earlierTextResp.content).toContain(
+        '[Tool output collapsed from previous turn:',
+      );
+    });
   });
 });
