@@ -18,14 +18,20 @@ import {
   ExtensionRegistryClient,
   type RegistryExtension,
 } from './extensionRegistryClient.js';
-import { fetchWithTimeout, resolveToRealPath } from '@google/gemini-cli-core';
+import {
+  safeFetchFollowingRedirects,
+  resolveToRealPath,
+} from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    fetchWithTimeout: vi.fn(),
+    safeFetchFollowingRedirects: vi.fn(),
+    // The registry URI is public; mock the DNS-backed check so the suite
+    // does not depend on the test environment's DNS resolver.
+    isPrivateIp: vi.fn().mockResolvedValue(false),
   };
 });
 
@@ -103,7 +109,7 @@ describe('ExtensionRegistryClient', () => {
   beforeEach(() => {
     ExtensionRegistryClient.resetCache();
     client = new ExtensionRegistryClient();
-    fetchMock = fetchWithTimeout as Mock;
+    fetchMock = safeFetchFollowingRedirects as Mock;
     fetchMock.mockReset();
   });
 
