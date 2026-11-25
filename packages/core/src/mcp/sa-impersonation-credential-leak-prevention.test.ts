@@ -118,6 +118,21 @@ describe('Credential Leak Prevention (SA Impersonation)', () => {
     expect(() => {
       new ServiceAccountImpersonationProvider(wildcardSubdomainConfig);
     }).not.toThrow();
+
+    // DNS hostnames are case-insensitive: mixed-case URL hostnames and
+    // mixed-case allowedHosts entries must match their lowercase spellings.
+    const mixedCaseConfig = {
+      url: 'https://Corp.Example.COM/mcp',
+      targetAudience: 'my-audience',
+      targetServiceAccount: 'my-sa',
+      oauth: {
+        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+      },
+      allowedHosts: ['corp.example.com', '*.INTERNAL.example.com'],
+    } as MCPServerConfig;
+    expect(() => {
+      new ServiceAccountImpersonationProvider(mixedCaseConfig);
+    }).not.toThrow();
   });
 
   it('should FAIL for hosts outside the user-configured allowedHosts list', () => {

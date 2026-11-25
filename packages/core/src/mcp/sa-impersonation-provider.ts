@@ -36,11 +36,14 @@ const DEFAULT_ALLOWED_HOSTS = [/^.+\.googleapis\.com$/, /^(.*\.)?run\.app$/];
  * subdomain match (e.g. `*.example.com`).
  */
 function isHostAllowed(hostname: string, allowedHost: string): boolean {
-  if (allowedHost.startsWith('*.')) {
-    const suffix = allowedHost.slice(1); // ".example.com"
-    return hostname.endsWith(suffix) && hostname.length > suffix.length;
+  // DNS hostnames are case-insensitive: normalize both sides before comparing.
+  const host = hostname.toLowerCase();
+  const allowed = allowedHost.toLowerCase();
+  if (allowed.startsWith('*.')) {
+    const suffix = allowed.slice(1); // ".example.com"
+    return host.endsWith(suffix) && host.length > suffix.length;
   }
-  return hostname === allowedHost;
+  return host === allowed;
 }
 
 export class ServiceAccountImpersonationProvider implements McpAuthProvider {
