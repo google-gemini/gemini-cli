@@ -186,6 +186,12 @@ Each server configuration supports the following properties:
 - **`targetServiceAccount`** (string): The email address of the Google Cloud
   Service Account to impersonate. Used with
   `authProviderType: 'service_account_impersonation'`.
+- **`allowedHosts`** (string[]): Hostname allowlist for the Service Account
+  Impersonation provider. Each entry is either an exact hostname (e.g.
+  `example.com`) or a wildcard subdomain match (e.g. `*.example.com`). When
+  omitted, only the default Google-operated hosts (`*.googleapis.com` and
+  `run.app`) are allowed. Used with
+  `authProviderType: 'service_account_impersonation'`.
 
 ### Environment variable expansion
 
@@ -492,6 +498,14 @@ following properties:
   IAP-protected application you are trying to access.
 - **`targetServiceAccount`** (string): The email address of the Google Cloud
   Service Account to impersonate.
+- **`oauth.scopes`** (string[]): Required. The scopes requested for the
+  credentials used to mint the impersonated service account ID token. This
+  ensures the credential is only issued with the access you intended.
+- **`allowedHosts`** (string[]): Optional. The hostnames the impersonated
+  service account ID token may be sent to. Each entry is either an exact
+  hostname (e.g. `example.com`) or a wildcard subdomain match (e.g.
+  `*.example.com`). When omitted, only the default Google-operated hosts
+  (`*.googleapis.com` and `run.app`) are allowed.
 
 The CLI will use your local Application Default Credentials (ADC) to generate an
 OIDC ID token for the specified service account and audience. This token will
@@ -636,7 +650,10 @@ then be used to authenticate with the MCP server.
       "url": "https://my-iap-service.run.app/sse",
       "authProviderType": "service_account_impersonation",
       "targetAudience": "YOUR_IAP_CLIENT_ID.apps.googleusercontent.com",
-      "targetServiceAccount": "your-sa@your-project.iam.gserviceaccount.com"
+      "targetServiceAccount": "your-sa@your-project.iam.gserviceaccount.com",
+      "oauth": {
+        "scopes": ["https://www.googleapis.com/auth/cloud-platform"]
+      }
     }
   }
 }

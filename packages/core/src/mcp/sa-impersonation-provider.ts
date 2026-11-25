@@ -22,6 +22,27 @@ function createIamApiUrl(targetSA: string): string {
   )}:generateIdToken`;
 }
 
+/**
+ * Default allowlist of hosts the impersonated service account ID token may be
+ * sent to. The provider was designed for IAP-protected services (notably
+ * Cloud Run), so the default only trusts Google-operated hosts. The allowlist
+ * can be extended or replaced via the `allowedHosts` config key.
+ */
+const DEFAULT_ALLOWED_HOSTS = [/^.+\.googleapis\.com$/, /^(.*\.)?run\.app$/];
+
+/**
+ * Checks a hostname against a user-configured `allowedHosts` entry.
+ * An entry is either an exact hostname (e.g. `example.com`) or a wildcard
+ * subdomain match (e.g. `*.example.com`).
+ */
+function isHostAllowed(hostname: string, allowedHost: string): boolean {
+  if (allowedHost.startsWith('*.')) {
+    const suffix = allowedHost.slice(1); // ".example.com"
+    return hostname.endsWith(suffix) && hostname.length > suffix.length;
+  }
+  return hostname === allowedHost;
+}
+
 export class ServiceAccountImpersonationProvider implements McpAuthProvider {
   private readonly targetServiceAccount: string;
   private readonly targetAudience: string; // OAuth Client Id
@@ -62,7 +83,40 @@ export class ServiceAccountImpersonationProvider implements McpAuthProvider {
     }
     this.targetServiceAccount = config.targetServiceAccount;
 
-    this.auth = new GoogleAuth();
+    // The minted ID token (includeEmail=true) is sent as a Bearer token to the
+    // configured URL. Restrict the recipients to a conservative allowlist so
+    // the credential cannot be exfiltrated to an arbitrary host.
+    const url = config.url || config.httpUrl;
+    if (!url) {
+      throw new Error(
+        'A url or httpUrl must be provided for the Service Account Impersonation provider',
+      );
+    }
+    const hostname = new URL(url).hostname;
+    const allowedHosts = config.allowedHosts;
+    const isAllowed =
+      allowedHosts && allowedHosts.length > 0
+        ? allowedHosts.some((allowedHost) =>
+            isHostAllowed(hostname, allowedHost),
+          )
+        : DEFAULT_ALLOWED_HOSTS.some((pattern) => pattern.test(hostname));
+    if (!isAllowed) {
+      throw new Error(
+        `Host "${hostname}" is not an allowed host for the Service Account Impersonation provider.`,
+      );
+    }
+
+    // Require explicit scopes so the impersonated credential is only minted
+    // with the access the operator intended (mirrors GoogleCredentialProvider).
+    const scopes = config.oauth?.scopes;
+    if (!scopes || scopes.length === 0) {
+      throw new Error(
+        'Scopes must be provided in the oauth config for the Service Account Impersonation provider',
+      );
+    }
+    this.auth = new GoogleAuth({
+      scopes,
+    });
   }
 
   clientInformation(): OAuthClientInformation | undefined {
