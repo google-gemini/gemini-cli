@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { reportError } from './errorReporting.js';
 import { debugLogger } from './debugLogger.js';
+import { Storage } from '../config/storage.js';
 
 // Use a type alias for SpyInstance as it's not directly exported
 type SpyInstance = ReturnType<typeof vi.spyOn>;
@@ -111,9 +112,12 @@ describe('reportError', () => {
     const baseMessage = 'Failed operation.';
     const context = ['some context'];
     const type = 'general';
-    const nonExistentDir = path.join(testDir, 'non-existent-dir');
+    // A regular file where the reporting directory should be makes the
+    // directory creation, and so the write, fail.
+    const notADir = path.join(testDir, 'not-a-dir');
+    await fs.writeFile(notADir, '');
 
-    await reportError(error, baseMessage, context, type, nonExistentDir);
+    await reportError(error, baseMessage, context, type, notADir);
 
     expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       `${baseMessage} Additionally, failed to write detailed error report:`,
@@ -201,4 +205,53 @@ describe('reportError', () => {
       error,
     );
   });
+
+  it('should write reports under the Gemini temp dir by default', async () => {
+    vi.spyOn(Storage, 'getGlobalTempDir').mockReturnValue(testDir);
+    const error = new Error('Default dir error');
+    const baseMessage = 'Default dir.';
+    const type = 'general';
+    const expectedReportPath = path.join(
+      testDir,
+      'error-reports',
+      `gemini-client-error-${type}-${MOCK_TIMESTAMP}.json`,
+    );
+
+    await reportError(error, baseMessage, { data: 'history' }, type);
+
+    const parsedReport = JSON.parse(
+      await fs.readFile(expectedReportPath, 'utf-8'),
+    );
+    expect(parsedReport.context).toEqual({ data: 'history' });
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+      `${baseMessage} Full report available at: ${expectedReportPath}`,
+      error,
+    );
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'should make the report readable only by the current user',
+    async () => {
+      const reportingDir = path.join(testDir, 'nested', 'error-reports');
+      const type = 'private';
+
+      await reportError(
+        new Error('Private error'),
+        'Private.',
+        { data: 'history' },
+        type,
+        reportingDir,
+      );
+
+      const reportStat = await fs.stat(
+        path.join(
+          reportingDir,
+          `gemini-client-error-${type}-${MOCK_TIMESTAMP}.json`,
+        ),
+      );
+      const dirStat = await fs.stat(reportingDir);
+      expect(reportStat.mode & 0o777).toBe(0o600);
+      expect(dirStat.mode & 0o777).toBe(0o700);
+    },
+  );
 });

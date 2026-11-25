@@ -100,7 +100,10 @@ import { createPolicyUpdater } from './config/policy.js';
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { runDeferredCommand } from './deferred.js';
 import { handleList as handleListModels } from './commands/models/list.js';
-import { cleanupBackgroundLogs } from './utils/logCleanup.js';
+import {
+  cleanupBackgroundLogs,
+  cleanupErrorReports,
+} from './utils/logCleanup.js';
 import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
 import { formatCliError } from './utils/formatError.js';
 
@@ -512,6 +515,7 @@ export async function main() {
     cleanupCheckpoints(),
     cleanupToolOutputFiles(settings.merged),
     cleanupBackgroundLogs(),
+    cleanupErrorReports(),
   ])
     .catch((e) => {
       debugLogger.error('Early cleanup failed:', e);
