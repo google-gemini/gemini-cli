@@ -49,6 +49,52 @@ export function isLoopbackUrl(urlStr: string): boolean {
 }
 
 /**
+ * Checks whether two URLs share the same origin (scheme, host, and port,
+ * with default ports normalized by `URL.origin`).
+ *
+ * Used to bind a stored OAuth token to the MCP server origin it was issued
+ * for: a token must only ever be sent to the origin recorded when it was
+ * obtained. A path change on the same origin is allowed — the token is a
+ * bearer credential for that origin — but a different host, scheme, or port
+ * is not. Returns false if either URL cannot be parsed.
+ */
+export function isSameOrigin(a: string, b: string): boolean {
+  try {
+    return new URL(a).origin === new URL(b).origin;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Checks whether a stored OAuth token may be sent to a given MCP server
+ * URL: the token is bound to the server URL recorded when it was issued
+ * (`mcpServerUrl` on the stored credentials).
+ *
+ * - When the expected URL is unknown, no check is possible and the token
+ *   is allowed (callers that know the URL must always pass it).
+ * - When the stored record carries no server URL (tokens minted before the
+ *   field existed, or written by a path that did not record it), the token
+ *   is NOT allowed: a missing binding fails closed, so the user
+ *   re-authenticates once instead of the token silently replaying to a
+ *   server it was never issued for.
+ * - Otherwise the recorded and expected URLs must share an origin
+ *   (scheme, host, port). A path change on the same origin is allowed.
+ */
+export function isStoredTokenBoundToServerUrl(
+  storedServerUrl: string | undefined,
+  expectedServerUrl: string | undefined,
+): boolean {
+  if (!expectedServerUrl) {
+    return true;
+  }
+  if (!storedServerUrl) {
+    return false;
+  }
+  return isSameOrigin(storedServerUrl, expectedServerUrl);
+}
+
+/**
  * Options for validating OAuth endpoint URLs.
  */
 export interface OAuthUrlValidationOptions {
