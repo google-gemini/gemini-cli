@@ -52,6 +52,7 @@ vi.mock('../utils/fetch.js', async (importOriginal) => {
   return {
     ...actual,
     fetchWithTimeout: vi.fn(),
+    safeFetchFollowingRedirects: vi.fn(),
     isPrivateIp: vi.fn(),
   };
 });
@@ -61,11 +62,11 @@ vi.mock('node:crypto', () => ({
 }));
 
 /**
- * Helper to mock fetchWithTimeout with URL matching.
+ * Helper to mock safeFetchFollowingRedirects with URL matching.
  */
 const mockFetch = (url: string, response: Partial<Response> | Error) =>
   vi
-    .spyOn(fetchUtils, 'fetchWithTimeout')
+    .spyOn(fetchUtils, 'safeFetchFollowingRedirects')
     .mockImplementation(async (actualUrl) => {
       if (actualUrl !== url) {
         throw new Error(
@@ -564,7 +565,7 @@ describe('WebFetchTool', () => {
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [],
       });
-      // Mock fetchWithTimeout to succeed so fallback proceeds
+      // Mock safeFetchFollowingRedirects to succeed so fallback proceeds
       mockFetch('https://public.ip/', {
         text: () => Promise.resolve('some content'),
       });
@@ -985,7 +986,7 @@ describe('WebFetchTool', () => {
         `<untrusted_context>\n${content}\n</untrusted_context>`,
       );
       expect(result.returnDisplay).toContain('Fetched text/plain content');
-      expect(fetchUtils.fetchWithTimeout).toHaveBeenCalledWith(
+      expect(fetchUtils.safeFetchFollowingRedirects).toHaveBeenCalledWith(
         'https://example.com/',
         expect.any(Number),
         expect.objectContaining({
