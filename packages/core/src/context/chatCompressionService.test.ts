@@ -10,6 +10,7 @@ import {
   findCompressSplitPoint,
   modelStringToModelConfigAlias,
   collapseOlderFunctionResponses,
+  MAX_EXEMPT_RETRIEVAL_HISTORY_BYTES,
   RECENT_TURNS_PROTECTED,
 } from './chatCompressionService.js';
 import type { Content, GenerateContentResponse, Part } from '@google/genai';
@@ -1357,5 +1358,90 @@ describe('ChatCompressionService', () => {
       expect(turn1Content).not.toContain('[Tool output collapsed');
       expect(turn2Content).not.toContain('[Tool output collapsed');
     });
+
+    it.each(['nested', 'sibling'] as const)(
+      'does not let evicted %s inlineData in an older image read_file exhaust the exempt retrieval budget',
+      (layout) => {
+        const textFile = 'export const A = "value";\n'.repeat(600); // ~15 KB
+        const largeBase64 = 'A'.repeat(MAX_EXEMPT_RETRIEVAL_HISTORY_BYTES + 1);
+        const imageTurnParts: Part[] =
+          layout === 'nested'
+            ? [
+                {
+                  functionResponse: {
+                    name: 'read_file',
+                    response: {
+                      output: 'Binary content provided (1 item(s)).',
+                    },
+                    parts: [
+                      {
+                        inlineData: {
+                          mimeType: 'image/png',
+                          data: largeBase64,
+                        },
+                      },
+                    ],
+                  },
+                },
+              ]
+            : [
+                {
+                  functionResponse: {
+                    name: 'read_file',
+                    response: {
+                      output: 'Binary content provided (1 item(s)).',
+                    },
+                  },
+                },
+                {
+                  inlineData: {
+                    mimeType: 'image/png',
+                    data: largeBase64,
+                  },
+                },
+              ];
+
+        const history: Content[] = [
+          {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  name: 'read_file',
+                  response: { content: textFile },
+                },
+              },
+            ],
+          },
+          { role: 'model', parts: [{ text: 'Read source file' }] },
+          {
+            role: 'user',
+            parts: imageTurnParts,
+          },
+          ...createRecentToolTurns(3),
+        ];
+
+        const collapsed = collapseOlderFunctionResponses(history);
+
+        // Earlier 15 KB text read_file must remain intact
+        const earlierTextResp = collapsed[0].parts![0].functionResponse
+          ?.response as { content: string };
+        expect(earlierTextResp.content).toBe(textFile);
+        expect(earlierTextResp.content).not.toContain('[Tool output collapsed');
+
+        // Image turn must still have its binary payload evicted
+        const imageTurn = collapsed[2];
+        expect(imageTurn.parts![0].functionResponse?.response).toEqual({
+          output: 'Binary content provided (1 item(s)).',
+        });
+        if (layout === 'nested') {
+          expect(imageTurn.parts![0].functionResponse?.parts).toBeUndefined();
+        } else {
+          expect(imageTurn.parts![1]).toEqual({
+            text: '[Binary content omitted from previous turn to conserve memory]',
+          });
+        }
+      },
+    );
   });
 });

@@ -102,6 +102,44 @@ export const COLLAPSE_HISTORY_BYTE_THRESHOLD = 256 * 1024; // 256 KB
 const OMITTED_BINARY_MESSAGE =
   '[Binary content omitted from previous turn to conserve memory]';
 
+const OMITTED_BINARY_MESSAGE_BYTES = Buffer.byteLength(
+  OMITTED_BINARY_MESSAGE,
+  'utf8',
+);
+
+/**
+ * Computes the retained byte size of an older turn after binary payloads
+ * (sibling inlineData and nested functionResponse.parts) are evicted.
+ */
+function calculateRetainedTurnByteSize(turn: Content): number {
+  let bytes = 0;
+  if (!turn.parts) {
+    return bytes;
+  }
+  for (const part of turn.parts) {
+    if (part.inlineData) {
+      bytes += OMITTED_BINARY_MESSAGE_BYTES;
+      continue;
+    }
+    if (part.text) {
+      bytes += Buffer.byteLength(part.text, 'utf8');
+    }
+    if (part.functionResponse?.response) {
+      const resp = part.functionResponse.response;
+      if (typeof resp === 'string') {
+        bytes += Buffer.byteLength(resp, 'utf8');
+      } else if (typeof resp === 'object' && resp !== null) {
+        try {
+          bytes += Buffer.byteLength(JSON.stringify(resp), 'utf8');
+        } catch {
+          // ignore JSON errors
+        }
+      }
+    }
+  }
+  return bytes;
+}
+
 /**
  * Computes the total byte size of text and payload content across all turns in history.
  */
@@ -219,7 +257,7 @@ export function collapseOlderFunctionResponses(
     if (!hasExemptPart) {
       continue;
     }
-    const turnBytes = calculateHistoryByteSize([turn]);
+    const turnBytes = calculateRetainedTurnByteSize(turn);
     if (turnBytes <= remainingExemptBytes) {
       preservedExemptTurns.add(i);
       remainingExemptBytes -= turnBytes;
