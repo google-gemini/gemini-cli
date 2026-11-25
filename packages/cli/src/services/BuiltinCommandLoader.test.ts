@@ -387,6 +387,7 @@ describe('BuiltinCommandLoader profile', () => {
 
   beforeEach(() => {
     vi.resetModules();
+    vi.mocked(restoreCommand).mockReturnValue(null);
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(false),
       isPlanEnabled: vi.fn().mockReturnValue(true),
