@@ -155,6 +155,7 @@ export function isAssetExplicitlyRequested(
 
   return include.some((pattern) => {
     const normalizedPattern = pattern.replace(/\\/g, '/').replace(/^\.\//, '');
+    // Precompute lowercase pattern for literal matching on paths with metacharacters (e.g. logo[1].png)
     const normalizedPatternLower = normalizedPattern.toLowerCase();
 
     // 1. Check if this pattern matches any candidate path (relative to a workspace dir or absolute)
@@ -376,6 +377,7 @@ ${finalExclusionPatternsForDescription
             const realFilePath = resolveToRealPath(filePath);
             const targetPaths =
               realFilePath !== filePath ? [filePath, realFilePath] : [filePath];
+            // Compute candidate relative paths across all active workspace roots for include matching (#30242)
             const candidateRelativePaths = [relativePathForDisplay];
             for (const dir of workspaceDirs) {
               for (const targetPath of targetPaths) {
@@ -391,6 +393,7 @@ ${finalExclusionPatternsForDescription
               }
             }
             if (realFilePath !== filePath) {
+              // Also include the canonical real absolute path so symlinked targets match explicit real-path includes
               candidateRelativePaths.push(realFilePath);
             }
 
