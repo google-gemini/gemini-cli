@@ -1261,4 +1261,68 @@ describe('detectCommandSubstitution & extractWrappedShellCommands (wrapper bypas
       { command: 'dir', shell: 'cmd' },
     ]);
   });
+
+  it('should detect command substitution behind quoted env assignments, multi-o flags, escaped backslashes, locale quotes, prefix-flag clusters, xargs, env -S escapes, clobber redirects, and Windows/PowerShell edge cases', () => {
+    const hardenedPayloads = [
+      // Quoted env assignments & +=
+      `FOO="bar" sh -c '$(whoami)'`,
+      `FOO='' sh -c '$(whoami)'`,
+      `env FOO="bar" sh -c '$(whoami)'`,
+      `env "FOO=bar" sh -c '$(whoami)'`,
+      `sudo FOO="bar" sh -c '$(whoami)'`,
+      `FOO+=bar bash -c '$(whoami)'`,
+      // Multiple / non-final -o/-O flags
+      `bash -oc pipefail '$(whoami)'`,
+      `bash -oo pipefail noglob -c '$(whoami)'`,
+      // POSIX unquoted escaped literal backslash followed by shell metacharacters
+      'sh -e -c true\\ a\\\\b\\;\\$\\(whoami\\)',
+      // Bash locale-translated double quotes ($"...")
+      `sh -$"c" '$(whoami)'`,
+      `$"sh" -c '$(whoami)'`,
+      // Prefix utility edge cases
+      `env --default-signal sh -c '$(whoami)'`,
+      `env --block-signal=PIPE sh -c '$(whoami)'`,
+      `timeout -fs KILL 5 sh -c '$(whoami)'`,
+      `sudo -Eu root sh -c '$(whoami)'`,
+      `watch -xn 1 sh -c '$(whoami)'`,
+      `echo x | xargs sh -c '$(whoami)'`,
+      `echo x | xargs -0 -I {} sh -c '$(whoami)'`,
+      'env -S "sh\\_-c\\_\'\\$(whoami)\'"',
+      // Clobber redirection >|
+      `sh -c >| /dev/null '$(whoami)'`,
+      `sh -c >|/dev/null '$(whoami)'`,
+      // Windows / PowerShell / .exe / fish edge cases
+      `pwsh -c 'Write-Host' '$(Get-Process)'`,
+      `pwsh -c '' '$(Get-Process)'`,
+      `pwsh -c \u2018$(Get-Process)\u2019`,
+      `powershell.exe /c '$(Get-Process)'`,
+      `powershell.exe '$(Get-Process)'`,
+      `powershell.exe -NoProfile '$(Get-Process)'`,
+      'pwsh -enc "JAAoAHcA\n aABvAGEAbQBpACkA"',
+      `pwsh -enc ${'A'.repeat(70_000)}`,
+      `bash.exe -c '$(whoami)'`,
+      `sh.exe -c '$(whoami)'`,
+      `fish -c '$(whoami)'`,
+      `fish -C '$(whoami)'`,
+    ];
+
+    for (const cmd of hardenedPayloads) {
+      expect(
+        detectCommandSubstitution(cmd),
+        `detectCommandSubstitution(${cmd.slice(0, 80)})`,
+      ).toBe(true);
+      expect(
+        detectCommandSubstitution(stripShellWrapper(cmd)),
+        `detectCommandSubstitution(stripShellWrapper(${cmd.slice(0, 80)}))`,
+      ).toBe(true);
+    }
+
+    // PowerShell -File and single .ps1 path should not be flagged as substitution.
+    expect(detectCommandSubstitution('powershell.exe -File ./script.ps1')).toBe(
+      false,
+    );
+    expect(detectCommandSubstitution('powershell.exe ./script.ps1')).toBe(
+      false,
+    );
+  });
 });

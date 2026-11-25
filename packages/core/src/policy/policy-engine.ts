@@ -639,7 +639,16 @@ export class PolicyEngine {
       if (typeof extractWrappedShellCommands !== 'function') {
         return null;
       }
-      const extraPayloads = extractWrappedShellCommands(sourceCommand)
+      const extracted = extractWrappedShellCommands(sourceCommand);
+      if (extracted.some((payload) => payload.uninspectable)) {
+        allSubCommandsExplicitlyAllowed = false;
+        if (aggregateDecision === PolicyDecision.ALLOW) {
+          aggregateDecision = PolicyDecision.ASK_USER;
+          responsibleRule = undefined;
+        }
+      }
+      const extraPayloads = extracted
+        .filter((payload) => !payload.uninspectable)
         .map((payload) => payload.command.trim())
         .filter(
           (payload) =>
@@ -649,14 +658,6 @@ export class PolicyEngine {
             !checkedWrappedPayloads.has(payload),
         );
       if (extraPayloads.length === 0) {
-        return null;
-      }
-      if (wrapperDepth >= MAX_POLICY_WRAPPER_DEPTH) {
-        allSubCommandsExplicitlyAllowed = false;
-        if (aggregateDecision === PolicyDecision.ALLOW) {
-          aggregateDecision = PolicyDecision.ASK_USER;
-          responsibleRule = undefined;
-        }
         return null;
       }
       for (const wrappedPayload of new Set(extraPayloads)) {

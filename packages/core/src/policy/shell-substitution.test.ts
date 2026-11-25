@@ -112,6 +112,16 @@ describe('PolicyEngine Command Substitution Validation', () => {
       "sh -c 'dangerous_cmd' _ arg1",
       "sh -c >/dev/null 'dangerous_cmd'",
       "env >/dev/null sh -c 'dangerous_cmd'",
+      "FOO='' sh -c 'dangerous_cmd'",
+      'sudo FOO="bar" sh -c \'dangerous_cmd\'',
+      "sh -oc noglob 'dangerous_cmd'",
+      'sh -e -c true\\ a\\\\b\\;dangerous_cmd',
+      'bash -c $"dangerous_cmd"',
+      "watch -xn 1 sh -c 'dangerous_cmd'",
+      "echo x | xargs sh -c 'dangerous_cmd'",
+      "pwsh -c 'Write-Host;' 'dangerous_cmd'",
+      'cmd.exe /c "echo" "& dangerous_cmd"',
+      "sh -c >| /dev/null 'dangerous_cmd'",
     ];
 
     for (const command of wrappedDangerous) {
@@ -183,6 +193,11 @@ describe('PolicyEngine Command Substitution Validation', () => {
       "pwsh -ExecutionPolicy Bypass -Command '$(Get-Process)'",
       "cmd.exe /k '$(whoami)'",
       "cmd.exe /q /c '$(whoami)'",
+      "env --default-signal sh -c '$(whoami)'",
+      "timeout -fs KILL 5 sh -c '$(whoami)'",
+      "bash -oc pipefail '$(whoami)'",
+      `pwsh -c \u2018$(Get-Process)\u2019`,
+      `pwsh -enc ${'A'.repeat(70_000)}`,
     ];
 
     for (const command of bypassPayloads) {
