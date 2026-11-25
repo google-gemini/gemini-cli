@@ -549,6 +549,21 @@ export class Session {
               stopReason = 'max_tokens';
               break;
 
+            case GeminiEventType.AgentExecutionStopped: {
+              const reason =
+                event.value.systemMessage?.trim() ||
+                event.value.reason.trim() ||
+                'unknown reason';
+              await this.sendUpdate({
+                sessionUpdate: 'agent_message_chunk',
+                content: {
+                  type: 'text',
+                  text: `Agent execution stopped: ${reason}`,
+                },
+              });
+              break;
+            }
+
             case GeminiEventType.Error: {
               const parseResult = StructuredErrorSchema.safeParse(
                 event.value.error,
