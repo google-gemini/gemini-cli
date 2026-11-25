@@ -23,6 +23,7 @@ import { glob, escape } from 'glob';
 import picomatch from 'picomatch';
 import { LRUCache } from 'mnemonist';
 import { buildParamArgsPattern } from '../policy/utils.js';
+import { resolveToRealPath } from '../utils/paths.js';
 import {
   detectFileType,
   processSingleFileContent,
@@ -131,18 +132,33 @@ const DEFAULT_OUTPUT_TERMINATOR = `\n${REFERENCE_CONTENT_END}`;
  */
 export function isAssetExplicitlyRequested(
   include: string[],
-  relativePath: string,
+  relativePath: string | readonly string[],
   filePath: string,
   matcherCache?: LRUCache<string, (target: string) => boolean>,
 ): boolean {
-  const normalizedPath = relativePath.replace(/\\/g, '/').replace(/^\.\//, '');
+  const rawRelativePaths =
+    typeof relativePath === 'string'
+      ? [relativePath]
+      : Array.isArray(relativePath)
+        ? relativePath
+        : [];
   const normalizedFilePath = filePath.replace(/\\/g, '/');
+  const candidatePaths = Array.from(
+    new Set([
+      ...rawRelativePaths.map((p) =>
+        typeof p === 'string' ? p.replace(/\\/g, '/').replace(/^\.\//, '') : '',
+      ),
+      normalizedFilePath,
+    ]),
+  ).filter(Boolean);
   const fileName = path.posix.basename(normalizedFilePath);
 
   return include.some((pattern) => {
     const normalizedPattern = pattern.replace(/\\/g, '/').replace(/^\.\//, '');
+    // Precompute lowercase pattern for literal matching on paths with metacharacters (e.g. logo[1].png)
+    const normalizedPatternLower = normalizedPattern.toLowerCase();
 
-    // 1. Check if this pattern matches the file path
+    // 1. Check if this pattern matches any candidate path (relative to a workspace dir or absolute)
     let isMatchPath = matcherCache?.get(normalizedPattern);
     if (!isMatchPath) {
       isMatchPath = picomatch(normalizedPattern, {
@@ -152,9 +168,15 @@ export function isAssetExplicitlyRequested(
       matcherCache?.set(normalizedPattern, isMatchPath);
     }
 
-    let matches = isMatchPath(normalizedPath);
+    let matches = candidatePaths.some(
+      (candidate) =>
+        isMatchPath(candidate) ||
+        candidate.toLowerCase() === normalizedPatternLower,
+    );
     if (!matches && !normalizedPattern.includes('/')) {
-      matches = isMatchPath(fileName);
+      matches =
+        isMatchPath(fileName) ||
+        fileName.toLowerCase() === normalizedPatternLower;
     }
     if (!matches) {
       return false;
@@ -240,10 +262,10 @@ ${finalExclusionPatternsForDescription
     const effectiveExcludes = useDefaultExcludes
       ? [...getDefaultExcludes(this.config), ...exclude]
       : [...exclude];
+    const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
 
     try {
       const allEntries = new Set<string>();
-      const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
 
       for (const dir of workspaceDirs) {
         const processedPatterns = [];
@@ -352,9 +374,32 @@ ${finalExclusionPatternsForDescription
             fileType === 'pdf' ||
             fileType === 'audio'
           ) {
+            const realFilePath = resolveToRealPath(filePath);
+            const targetPaths =
+              realFilePath !== filePath ? [filePath, realFilePath] : [filePath];
+            // Compute candidate relative paths across all active workspace roots for include matching (#30242)
+            const candidateRelativePaths = [relativePathForDisplay];
+            for (const dir of workspaceDirs) {
+              for (const targetPath of targetPaths) {
+                const relToDir = path.relative(dir, targetPath);
+                if (
+                  relToDir &&
+                  relToDir !== '..' &&
+                  !relToDir.startsWith(`..${path.sep}`) &&
+                  !path.isAbsolute(relToDir)
+                ) {
+                  candidateRelativePaths.push(relToDir.replace(/\\/g, '/'));
+                }
+              }
+            }
+            if (realFilePath !== filePath) {
+              // Also include the canonical real absolute path so symlinked targets match explicit real-path includes
+              candidateRelativePaths.push(realFilePath);
+            }
+
             const requestedExplicitly = isAssetExplicitlyRequested(
               include,
-              relativePathForDisplay,
+              candidateRelativePaths,
               filePath,
               matcherCache,
             );

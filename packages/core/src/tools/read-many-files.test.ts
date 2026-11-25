@@ -38,6 +38,7 @@ import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import type { ReadManyFilesResult } from './tools.js';
 
 vi.mock('glob', { spy: true });
+vi.mock('../utils/paths.js', { spy: true });
 
 vi.mock('mime', () => {
   const getType = (filename: string) => {
@@ -713,6 +714,252 @@ describe('ReadManyFilesTool', () => {
       fs.rmSync(tempDir2, { recursive: true, force: true });
     });
 
+    const createMultiWorkspaceTool = (tempDir1: string, tempDir2: string) => {
+      const fileService = new FileDiscoveryService(tempDir1);
+      const mockConfig = {
+        getFileService: () => fileService,
+        getFileSystemService: () => new StandardFileSystemService(),
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+          customIgnoreFilePaths: [],
+        }),
+        getWorkspaceContext: () => new WorkspaceContext(tempDir1, [tempDir2]),
+        getTargetDir: () => tempDir1,
+        getFileExclusions: () => ({
+          getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,
+          getDefaultExcludePatterns: () => [],
+          getGlobExcludes: () => COMMON_IGNORE_PATTERNS,
+          buildExcludePatterns: () => [],
+          getReadManyFilesExcludes: () => [],
+        }),
+        isInteractive: () => false,
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
+        },
+        validatePathAccess(this: Config, absolutePath: string): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
+      } as unknown as Config;
+      return new ReadManyFilesTool(mockConfig, createMockMessageBus());
+    };
+
+    it('should include explicitly requested binary assets from added workspace directories (issue #30242)', async () => {
+      const tempDir1 = resolveToRealPath(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'multi-asset-1-')),
+      );
+      const tempDir2 = resolveToRealPath(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'multi-asset-2-')),
+      );
+      try {
+        const multiTool = createMultiWorkspaceTool(tempDir1, tempDir2);
+        fs.mkdirSync(path.join(tempDir2, 'assets'), { recursive: true });
+        fs.mkdirSync(path.join(tempDir2, 'docs'), { recursive: true });
+        fs.writeFileSync(
+          path.join(tempDir2, 'assets', 'logo.png'),
+          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        );
+        fs.writeFileSync(
+          path.join(tempDir2, 'assets', 'Logo2.PNG'),
+          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        );
+        fs.writeFileSync(
+          path.join(tempDir2, 'docs', 'manual.pdf'),
+          Buffer.from('%PDF-1.4...'),
+        );
+
+        const invocation = multiTool.build({
+          include: ['assets/logo.png', 'docs/*.pdf', 'assets/Logo2.*'],
+        });
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
+
+        const inlinedParts = Array.isArray(result.llmContent)
+          ? result.llmContent.filter(
+              (c) => typeof c !== 'string' && 'inlineData' in c,
+            )
+          : [];
+        expect(inlinedParts).toHaveLength(3);
+        expect((result.returnDisplay as ReadManyFilesResult).skipped).toEqual(
+          [],
+        );
+      } finally {
+        fs.rmSync(tempDir1, { recursive: true, force: true });
+        fs.rmSync(tempDir2, { recursive: true, force: true });
+      }
+    });
+
+    it('should include binary asset explicitly requested by exact absolute path from added workspace directory (issue #30242)', async () => {
+      const tempDir1 = resolveToRealPath(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'multi-abs-1-')),
+      );
+      const tempDir2 = resolveToRealPath(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'multi-abs-2-')),
+      );
+      try {
+        const multiTool = createMultiWorkspaceTool(tempDir1, tempDir2);
+        const logoPath = path.join(tempDir2, 'assets', 'logo.png');
+        fs.mkdirSync(path.dirname(logoPath), { recursive: true });
+        fs.writeFileSync(
+          logoPath,
+          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        );
+
+        const invocation = multiTool.build({
+          include: [logoPath],
+        });
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
+
+        const inlinedParts = Array.isArray(result.llmContent)
+          ? result.llmContent.filter(
+              (c) => typeof c !== 'string' && 'inlineData' in c,
+            )
+          : [];
+        expect(inlinedParts).toHaveLength(1);
+        expect(
+          (inlinedParts[0] as { inlineData: { mimeType: string } }).inlineData
+            .mimeType,
+        ).toBe('image/png');
+      } finally {
+        fs.rmSync(tempDir1, { recursive: true, force: true });
+        fs.rmSync(tempDir2, { recursive: true, force: true });
+      }
+    });
+
+    it('should still skip unrequested binary assets in added workspace directories when matched by broad globs or unrelated patterns (issue #30242)', async () => {
+      const tempDir1 = resolveToRealPath(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'multi-skip-1-')),
+      );
+      const tempDir2 = resolveToRealPath(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'multi-skip-2-')),
+      );
+      try {
+        const multiTool = createMultiWorkspaceTool(tempDir1, tempDir2);
+        fs.mkdirSync(path.join(tempDir2, 'assets'), { recursive: true });
+        fs.mkdirSync(path.join(tempDir2, 'reports'), { recursive: true });
+        fs.mkdirSync(path.join(tempDir2, 'src'), { recursive: true });
+        fs.writeFileSync(
+          path.join(tempDir2, 'assets', 'logo.png'),
+          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        );
+        fs.writeFileSync(
+          path.join(tempDir2, 'reports', 'report.png'),
+          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        );
+        fs.writeFileSync(
+          path.join(tempDir2, 'src', 'diagram.png'),
+          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        );
+
+        const invocation = multiTool.build({
+          include: ['assets/logo.png', 'reports/**', 'src/**'],
+          useDefaultExcludes: false,
+        });
+        const result = await invocation.execute({
+          abortSignal: new AbortController().signal,
+        });
+
+        const inlinedParts = Array.isArray(result.llmContent)
+          ? result.llmContent.filter(
+              (c) => typeof c !== 'string' && 'inlineData' in c,
+            )
+          : [];
+        expect(inlinedParts).toHaveLength(1);
+        const display = result.returnDisplay as ReadManyFilesResult;
+        expect(display.skipped).toHaveLength(2);
+        expect(display.skipped?.map((s) => s.path)).toEqual(
+          expect.arrayContaining([
+            expect.stringContaining('reports/report.png'),
+            expect.stringContaining('src/diagram.png'),
+          ]),
+        );
+      } finally {
+        fs.rmSync(tempDir1, { recursive: true, force: true });
+        fs.rmSync(tempDir2, { recursive: true, force: true });
+      }
+    });
+
+    it('should resolve real filePath when workspace directory is canonically resolved from a symlink (issue #30242)', async () => {
+      const tempDir1 = resolveToRealPath(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'multi-sym-1-')),
+      );
+      const tempDir2Real = resolveToRealPath(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'multi-sym-2-real-')),
+      );
+      const tempDir2Alias = resolveToRealPath(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'multi-sym-2-alias-')),
+      );
+      try {
+        const aliasLogo = path.join(tempDir2Alias, 'assets', 'logo.png');
+        const realLogo = path.join(tempDir2Real, 'assets', 'logo.png');
+        fs.mkdirSync(path.dirname(aliasLogo), { recursive: true });
+        fs.writeFileSync(
+          aliasLogo,
+          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        );
+
+        const actualPaths =
+          await vi.importActual<typeof import('../utils/paths.js')>(
+            '../utils/paths.js',
+          );
+        const multiTool = createMultiWorkspaceTool(tempDir1, tempDir2Real);
+        // Simulate glob returning a symlinked path (under tempDir2Alias) while workspaceDirs holds tempDir2Real.
+        vi.mocked(glob.glob)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([aliasLogo]);
+        const resolveSpy = vi
+          .mocked(resolveToRealPath)
+          .mockImplementation((p: string) =>
+            p === aliasLogo ? realLogo : actualPaths.resolveToRealPath(p),
+          );
+        const isAllowedSpy = vi
+          .spyOn(WorkspaceContext.prototype, 'isPathWithinWorkspace')
+          .mockReturnValue(true);
+
+        try {
+          const invocation = multiTool.build({
+            include: ['assets/logo.png'],
+          });
+          const result = await invocation.execute({
+            abortSignal: new AbortController().signal,
+          });
+
+          const inlinedParts = Array.isArray(result.llmContent)
+            ? result.llmContent.filter(
+                (c) => typeof c !== 'string' && 'inlineData' in c,
+              )
+            : [];
+          expect(inlinedParts).toHaveLength(1);
+        } finally {
+          vi.mocked(glob.glob).mockReset();
+          resolveSpy.mockRestore();
+          isAllowedSpy.mockRestore();
+        }
+      } finally {
+        fs.rmSync(tempDir1, { recursive: true, force: true });
+        fs.rmSync(tempDir2Real, { recursive: true, force: true });
+        fs.rmSync(tempDir2Alias, { recursive: true, force: true });
+      }
+    });
+
     it('should add a warning for truncated files', async () => {
       createFile('file1.txt', 'Content1');
       // Create a file that will be "truncated" by making it long
@@ -1329,6 +1576,137 @@ Content of file[1]
       expect(res2).toBe(false);
       // Size remains 1 because pattern was already compiled and cached
       expect(cache.size).toBe(1);
+    });
+
+    it('should match candidate relative paths from added workspace directories and reject broad globs (issue #30242)', () => {
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/logo.png'],
+          ['../ws2/assets/logo.png', 'assets/logo.png'],
+          '/ws2/assets/logo.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['docs/*.pdf'],
+          ['../ws2/docs/manual.pdf', 'docs/manual.pdf'],
+          '/ws2/docs/manual.pdf',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['reports/**'],
+          ['../ws2/reports/report.png', 'reports/report.png'],
+          '/ws2/reports/report.png',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['**/*'],
+          ['../ws2/assets/logo.png', 'assets/logo.png'],
+          '/ws2/assets/logo.png',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['*.*'],
+          ['../ws2/assets/logo.png', 'assets/logo.png'],
+          '/ws2/assets/logo.png',
+        ),
+      ).toBe(false);
+    });
+
+    it('should match exact absolute paths and absolute extension globs across POSIX and Windows paths (issue #30242)', () => {
+      expect(
+        isAssetExplicitlyRequested(
+          ['/workspace2/assets/logo.png'],
+          '../ws2/assets/logo.png',
+          '/workspace2/assets/logo.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['/workspace2/docs/*.pdf'],
+          '../ws2/docs/manual.pdf',
+          '/workspace2/docs/manual.pdf',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['D:\\ws2\\assets\\logo.png'],
+          'D:\\ws2\\assets\\logo.png',
+          'd:\\ws2\\assets\\logo.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['D:\\ws2\\docs\\*.pdf'],
+          'D:\\ws2\\docs\\manual.pdf',
+          'D:\\ws2\\docs\\manual.pdf',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['D:\\ws2\\reports\\**'],
+          'D:\\ws2\\reports\\report.png',
+          'D:\\ws2\\reports\\report.png',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['/workspace2/reports/**'],
+          '../ws2/reports/report.png',
+          '/workspace2/reports/report.png',
+        ),
+      ).toBe(false);
+    });
+
+    it('should match explicit asset paths containing glob metacharacters and preserve cross-pattern isolation (issue #30242)', () => {
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/logo[1].png'],
+          ['../ws2/assets/logo[1].png', 'assets/logo[1].png'],
+          '/ws2/assets/logo[1].png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['/workspace2/assets/logo[1].png'],
+          '../ws2/assets/logo[1].png',
+          '/workspace2/assets/logo[1].png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/logo.png', 'src/**'],
+          ['../ws2/src/diagram.png', 'src/diagram.png'],
+          '/ws2/src/diagram.png',
+        ),
+      ).toBe(false);
+    });
+
+    it('should handle nullish or unexpected relativePath values defensively at runtime (issue #30242)', () => {
+      expect(
+        isAssetExplicitlyRequested(
+          ['/ws2/assets/logo.png'],
+          null as unknown as string,
+          '/ws2/assets/logo.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/logo.png'],
+          undefined as unknown as string,
+          '/ws2/assets/logo.png',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['logo.png'],
+          123 as unknown as string,
+          '/ws2/assets/logo.png',
+        ),
+      ).toBe(true);
     });
   });
 });
