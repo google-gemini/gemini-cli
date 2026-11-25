@@ -23,6 +23,7 @@ import { glob, escape } from 'glob';
 import picomatch from 'picomatch';
 import { LRUCache } from 'mnemonist';
 import { buildParamArgsPattern } from '../policy/utils.js';
+import { resolveToRealPath } from '../utils/paths.js';
 import {
   detectFileType,
   processSingleFileContent,
@@ -136,12 +137,16 @@ export function isAssetExplicitlyRequested(
   matcherCache?: LRUCache<string, (target: string) => boolean>,
 ): boolean {
   const rawRelativePaths =
-    typeof relativePath === 'string' ? [relativePath] : relativePath;
+    typeof relativePath === 'string'
+      ? [relativePath]
+      : Array.isArray(relativePath)
+        ? relativePath
+        : [];
   const normalizedFilePath = filePath.replace(/\\/g, '/');
   const candidatePaths = Array.from(
     new Set([
       ...rawRelativePaths.map((p) =>
-        p.replace(/\\/g, '/').replace(/^\.\//, ''),
+        typeof p === 'string' ? p.replace(/\\/g, '/').replace(/^\.\//, '') : '',
       ),
       normalizedFilePath,
     ]),
@@ -368,17 +373,25 @@ ${finalExclusionPatternsForDescription
             fileType === 'pdf' ||
             fileType === 'audio'
           ) {
+            const realFilePath = resolveToRealPath(filePath);
+            const targetPaths =
+              realFilePath !== filePath ? [filePath, realFilePath] : [filePath];
             const candidateRelativePaths = [relativePathForDisplay];
             for (const dir of workspaceDirs) {
-              const relToDir = path.relative(dir, filePath);
-              if (
-                relToDir &&
-                relToDir !== '..' &&
-                !relToDir.startsWith(`..${path.sep}`) &&
-                !path.isAbsolute(relToDir)
-              ) {
-                candidateRelativePaths.push(relToDir.replace(/\\/g, '/'));
+              for (const targetPath of targetPaths) {
+                const relToDir = path.relative(dir, targetPath);
+                if (
+                  relToDir &&
+                  relToDir !== '..' &&
+                  !relToDir.startsWith(`..${path.sep}`) &&
+                  !path.isAbsolute(relToDir)
+                ) {
+                  candidateRelativePaths.push(relToDir.replace(/\\/g, '/'));
+                }
               }
+            }
+            if (realFilePath !== filePath) {
+              candidateRelativePaths.push(realFilePath);
             }
 
             const requestedExplicitly = isAssetExplicitlyRequested(

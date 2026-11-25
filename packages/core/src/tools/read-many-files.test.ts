@@ -38,6 +38,7 @@ import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import type { ReadManyFilesResult } from './tools.js';
 
 vi.mock('glob', { spy: true });
+vi.mock('../utils/paths.js', { spy: true });
 
 vi.mock('mime', () => {
   const getType = (filename: string) => {
@@ -896,6 +897,69 @@ describe('ReadManyFilesTool', () => {
       }
     });
 
+    it('should resolve real filePath when workspace directory is canonically resolved from a symlink (issue #30242)', async () => {
+      const tempDir1 = resolveToRealPath(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'multi-sym-1-')),
+      );
+      const tempDir2Real = resolveToRealPath(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'multi-sym-2-real-')),
+      );
+      const tempDir2Alias = resolveToRealPath(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'multi-sym-2-alias-')),
+      );
+      try {
+        const aliasLogo = path.join(tempDir2Alias, 'assets', 'logo.png');
+        const realLogo = path.join(tempDir2Real, 'assets', 'logo.png');
+        fs.mkdirSync(path.dirname(aliasLogo), { recursive: true });
+        fs.writeFileSync(
+          aliasLogo,
+          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        );
+
+        const actualPaths =
+          await vi.importActual<typeof import('../utils/paths.js')>(
+            '../utils/paths.js',
+          );
+        const multiTool = createMultiWorkspaceTool(tempDir1, tempDir2Real);
+        // Simulate glob returning a symlinked path (under tempDir2Alias) while workspaceDirs holds tempDir2Real.
+        vi.mocked(glob.glob)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([aliasLogo]);
+        const resolveSpy = vi
+          .mocked(resolveToRealPath)
+          .mockImplementation((p: string) =>
+            p === aliasLogo ? realLogo : actualPaths.resolveToRealPath(p),
+          );
+        const isAllowedSpy = vi
+          .spyOn(WorkspaceContext.prototype, 'isPathWithinWorkspace')
+          .mockReturnValue(true);
+
+        try {
+          const invocation = multiTool.build({
+            include: ['assets/logo.png'],
+          });
+          const result = await invocation.execute({
+            abortSignal: new AbortController().signal,
+          });
+
+          const inlinedParts = Array.isArray(result.llmContent)
+            ? result.llmContent.filter(
+                (c) => typeof c !== 'string' && 'inlineData' in c,
+              )
+            : [];
+          expect(inlinedParts).toHaveLength(1);
+        } finally {
+          vi.mocked(glob.glob).mockReset();
+          resolveSpy.mockRestore();
+          isAllowedSpy.mockRestore();
+        }
+      } finally {
+        fs.rmSync(tempDir1, { recursive: true, force: true });
+        fs.rmSync(tempDir2Real, { recursive: true, force: true });
+        fs.rmSync(tempDir2Alias, { recursive: true, force: true });
+      }
+    });
+
     it('should add a warning for truncated files', async () => {
       createFile('file1.txt', 'Content1');
       // Create a file that will be "truncated" by making it long
@@ -1619,6 +1683,30 @@ Content of file[1]
           '/ws2/src/diagram.png',
         ),
       ).toBe(false);
+    });
+
+    it('should handle nullish or unexpected relativePath values defensively at runtime (issue #30242)', () => {
+      expect(
+        isAssetExplicitlyRequested(
+          ['/ws2/assets/logo.png'],
+          null as unknown as string,
+          '/ws2/assets/logo.png',
+        ),
+      ).toBe(true);
+      expect(
+        isAssetExplicitlyRequested(
+          ['assets/logo.png'],
+          undefined as unknown as string,
+          '/ws2/assets/logo.png',
+        ),
+      ).toBe(false);
+      expect(
+        isAssetExplicitlyRequested(
+          ['logo.png'],
+          123 as unknown as string,
+          '/ws2/assets/logo.png',
+        ),
+      ).toBe(true);
     });
   });
 });
