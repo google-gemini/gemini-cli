@@ -114,6 +114,15 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         model: 'gemini-2.5-flash-lite',
       },
     },
+    'gemini-2.5-flash-image': {
+      extends: 'base',
+      modelConfig: {
+        model: 'gemini-2.5-flash-image',
+        generateContentConfig: {
+          responseModalities: ['TEXT', 'IMAGE'],
+        },
+      },
+    },
     'gemini-3.1-flash-lite': {
       extends: 'chat-base-3',
       modelConfig: {
@@ -419,6 +428,13 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       isVisible: true,
       features: { thinking: false, multimodalToolUse: false },
     },
+    'gemini-2.5-flash-image': {
+      tier: 'flash',
+      family: 'gemini-2.5',
+      isPreview: false,
+      isVisible: true,
+      features: { thinking: false, multimodalToolUse: false },
+    },
     'gemma-4-31b-it': {
       displayName: 'gemma-4-31b-it',
       tier: 'custom',
@@ -532,6 +548,9 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     'gemini-2.5-flash': {
       default: 'gemini-2.5-flash',
+    },
+    'gemini-2.5-flash-image': {
+      default: 'gemini-2.5-flash-image',
     },
     'gemini-3-pro-preview': {
       default: 'gemini-3-pro-preview',

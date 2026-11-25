@@ -107,6 +107,8 @@ export const PREVIEW_GEMINI_FLASH_LITE_MODEL = 'none';
 export const GEMMA_4_31B_IT_MODEL = 'gemma-4-31b-it';
 export const GEMMA_4_26B_A4B_IT_MODEL = 'gemma-4-26b-a4b-it';
 
+export const GEMINI_2_5_FLASH_IMAGE_MODEL = 'gemini-2.5-flash-image';
+
 export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
@@ -126,6 +128,8 @@ export const VALID_GEMINI_MODELS = new Set([
 
   GEMMA_4_31B_IT_MODEL,
   GEMMA_4_26B_A4B_IT_MODEL,
+
+  GEMINI_2_5_FLASH_IMAGE_MODEL,
 ]);
 
 export interface BackendMappingContext {
