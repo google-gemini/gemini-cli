@@ -2559,4 +2559,257 @@ describe('ChatRecordingService', () => {
       ]);
     });
   });
+
+  describe('forkAsync', () => {
+    it('returns null when service is not initialized', async () => {
+      const result = await chatRecordingService.forkAsync();
+      expect(result).toBeNull();
+    });
+
+    it('returns null when conversation has no resumable content', async () => {
+      await chatRecordingService.initialize();
+      const result = await chatRecordingService.forkAsync();
+      expect(result).toBeNull();
+    });
+
+    it('forks the full conversation into an independent JSONL file with default (fork) summary', async () => {
+      await chatRecordingService.initialize();
+      const originalFile = chatRecordingService.getConversationFilePath()!;
+
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Help me debug authentication',
+        model: 'gemini-pro',
+      });
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'Sure, let us inspect auth.ts.',
+        model: 'gemini-pro',
+      });
+      chatRecordingService.recordDirectories(['/workspace/a', '/workspace/b']);
+
+      const originalBefore = await loadConversationRecord(originalFile);
+
+      const forked = await chatRecordingService.forkAsync();
+      expect(forked).not.toBeNull();
+      expect(forked!.sessionId).not.toBe(originalBefore!.sessionId);
+      expect(forked!.sourceSessionId).toBe(originalBefore!.sessionId);
+      expect(forked!.filePath).not.toBe(originalFile);
+      expect(fs.existsSync(forked!.filePath)).toBe(true);
+      expect(forked!.conversation.forkedFrom).toBe(originalBefore!.sessionId);
+      expect(forked!.conversation.summary).toBe(
+        'Help me debug authentication (fork)',
+      );
+      expect(forked!.conversation.directories).toEqual([
+        '/workspace/a',
+        '/workspace/b',
+      ]);
+      expect(forked!.conversation.messages).toHaveLength(2);
+
+      // Verify persisted JSONL file reloads cleanly
+      const reloadedFork = await loadConversationRecord(forked!.filePath);
+      expect(reloadedFork).not.toBeNull();
+      expect(reloadedFork!.sessionId).toBe(forked!.sessionId);
+      expect(reloadedFork!.forkedFrom).toBe(originalBefore!.sessionId);
+      expect(reloadedFork!.summary).toBe('Help me debug authentication (fork)');
+      expect(reloadedFork!.messages).toHaveLength(2);
+
+      // Verify original session file was untouched
+      const originalAfter = await loadConversationRecord(originalFile);
+      expect(originalAfter!.messages).toEqual(originalBefore!.messages);
+      expect(originalAfter!.sessionId).toBe(originalBefore!.sessionId);
+    });
+
+    it('uses custom summary verbatim without appending (fork)', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Optimize database queries',
+        model: 'gemini-pro',
+      });
+
+      const forked = await chatRecordingService.forkAsync({
+        summary: '  try-redis-cache  ',
+      });
+      expect(forked).not.toBeNull();
+      expect(forked!.conversation.summary).toBe('try-redis-cache');
+
+      const reloaded = await loadConversationRecord(forked!.filePath);
+      expect(reloaded!.summary).toBe('try-redis-cache');
+    });
+
+    it('derives default summary from source summary without stacking (fork) suffix', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Original question',
+        model: 'gemini-pro',
+      });
+      chatRecordingService.saveSummary('Auth refactor (fork)');
+
+      const forked = await chatRecordingService.forkAsync();
+      expect(forked).not.toBeNull();
+      expect(forked!.conversation.summary).toBe('Auth refactor (fork)');
+    });
+
+    it('preserves all messages when conversation exceeds MAX_HISTORY_MESSAGES', async () => {
+      await chatRecordingService.initialize();
+      const totalMessages = MAX_HISTORY_MESSAGES + 12;
+
+      for (let i = 0; i < totalMessages; i++) {
+        chatRecordingService.recordMessage({
+          type: i % 2 === 0 ? 'user' : 'gemini',
+          content: `Message ${i}`,
+          model: 'gemini-pro',
+        });
+      }
+
+      const forked = await chatRecordingService.forkAsync();
+      expect(forked).not.toBeNull();
+      expect(forked!.conversation.messages).toHaveLength(totalMessages);
+
+      const reloaded = await loadConversationRecord(forked!.filePath);
+      expect(reloaded!.messages).toHaveLength(totalMessages);
+      expect(reloaded!.messages[0].content).toBe('Message 0');
+      expect(reloaded!.messages[totalMessages - 1].content).toBe(
+        `Message ${totalMessages - 1}`,
+      );
+    });
+
+    it('forks up to a specific messageId (exclusive) and leaves original intact', async () => {
+      await chatRecordingService.initialize();
+      const id1 = chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Turn 1',
+        model: 'gemini-pro',
+      });
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'Reply 1',
+        model: 'gemini-pro',
+      });
+      const id3 = chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Turn 2',
+        model: 'gemini-pro',
+      });
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'Reply 2',
+        model: 'gemini-pro',
+      });
+
+      const forked = await chatRecordingService.forkAsync({
+        upToMessageId: id3,
+      });
+      expect(forked).not.toBeNull();
+      expect(forked!.conversation.messages).toHaveLength(2);
+      expect(forked!.conversation.messages.map((m) => m.content)).toEqual([
+        'Turn 1',
+        'Reply 1',
+      ]);
+
+      // Forking before the very first message creates an empty fork
+      const emptyFork = await chatRecordingService.forkAsync({
+        upToMessageId: id1,
+      });
+      expect(emptyFork).not.toBeNull();
+      expect(emptyFork!.conversation.messages).toHaveLength(0);
+
+      // Original conversation still has all 4 messages
+      const original = await chatRecordingService.getConversationAsync();
+      expect(original!.messages).toHaveLength(4);
+    });
+
+    it('returns null when upToMessageId is not found', async () => {
+      await chatRecordingService.initialize();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Turn 1',
+        model: 'gemini-pro',
+      });
+
+      const forked = await chatRecordingService.forkAsync({
+        upToMessageId: 'non-existent-id',
+      });
+      expect(forked).toBeNull();
+    });
+
+    it('returns null gracefully on ENOSPC without disabling current session', async () => {
+      await chatRecordingService.initialize();
+      const originalFile = chatRecordingService.getConversationFilePath();
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Turn 1',
+        model: 'gemini-pro',
+      });
+
+      const enospcError = Object.assign(new Error('No space left on device'), {
+        code: 'ENOSPC',
+      });
+      vi.mocked(fs.promises.writeFile).mockRejectedValueOnce(enospcError);
+
+      const forked = await chatRecordingService.forkAsync();
+      expect(forked).toBeNull();
+      expect(chatRecordingService.getConversationFilePath()).toBe(originalFile);
+    });
+
+    it('preserves memoryScratchpad on full fork and clears it on upToMessageId fork', async () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      await fs.promises.mkdir(chatsDir, { recursive: true });
+      const sourcePath = path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2026-11-24T20-00-source01.jsonl`,
+      );
+      const scratchpad = {
+        version: 1 as const,
+        workflowSummary: 'Implemented cache layer',
+        toolSequence: ['read_file', 'replace'],
+      };
+      const lines = [
+        JSON.stringify({
+          sessionId: 'source01-1111-4111-8111-111111111111',
+          projectHash: 'mocked-hash',
+          startTime: '2026-11-24T20:00:00.000Z',
+          lastUpdated: '2026-11-24T20:01:00.000Z',
+        }),
+        JSON.stringify({
+          id: 'm1',
+          timestamp: '2026-11-24T20:00:10.000Z',
+          type: 'user',
+          content: 'Turn 1',
+        }),
+        JSON.stringify({
+          id: 'm2',
+          timestamp: '2026-11-24T20:00:20.000Z',
+          type: 'user',
+          content: 'Turn 2',
+        }),
+        JSON.stringify({ $set: { memoryScratchpad: scratchpad } }),
+      ];
+      await fs.promises.writeFile(sourcePath, `${lines.join('\n')}\n`, 'utf8');
+
+      const loaded = await loadConversationRecord(sourcePath);
+      await chatRecordingService.initialize({
+        conversation: loaded!,
+        filePath: sourcePath,
+      });
+
+      const fullFork = await chatRecordingService.forkAsync();
+      expect(fullFork).not.toBeNull();
+      expect(fullFork!.conversation.memoryScratchpad).toEqual(scratchpad);
+      const reloadedFull = await loadConversationRecord(fullFork!.filePath);
+      expect(reloadedFull!.memoryScratchpad).toEqual(scratchpad);
+
+      const truncatedFork = await chatRecordingService.forkAsync({
+        upToMessageId: 'm2',
+      });
+      expect(truncatedFork).not.toBeNull();
+      expect(truncatedFork!.conversation.memoryScratchpad).toBeUndefined();
+      const reloadedTruncated = await loadConversationRecord(
+        truncatedFork!.filePath,
+      );
+      expect(reloadedTruncated!.memoryScratchpad).toBeUndefined();
+    });
+  });
 });

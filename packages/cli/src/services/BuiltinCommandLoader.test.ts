@@ -253,6 +253,10 @@ describe('BuiltinCommandLoader', () => {
 
     const mcpCmd = commands.find((c) => c.name === 'mcp');
     expect(mcpCmd).toBeDefined();
+
+    const forkCmd = commands.find((c) => c.name === 'fork');
+    expect(forkCmd).toBeDefined();
+    expect(forkCmd?.kind).toBe(CommandKind.BUILT_IN);
   });
 
   it('should include permissions command when folder trust is enabled', async () => {

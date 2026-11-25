@@ -1430,18 +1430,33 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     buffer.visualCursor;
 
   const getGhostTextLines = useCallback(() => {
-    if (
-      inputWidth <= 0 ||
-      !completion.promptCompletion.text ||
-      !buffer.text ||
-      !completion.promptCompletion.text.startsWith(buffer.text)
-    ) {
+    if (inputWidth <= 0 || !buffer.text) {
       return { inlineGhost: '', additionalLines: [] };
     }
 
-    const ghostSuffix = completion.promptCompletion.text.slice(
-      buffer.text.length,
-    );
+    let ghostSuffix = '';
+    if (
+      completion.promptCompletion.text &&
+      completion.promptCompletion.text.startsWith(buffer.text)
+    ) {
+      ghostSuffix = completion.promptCompletion.text.slice(buffer.text.length);
+    } else if (
+      !shellModeActive &&
+      buffer.lines.length === 1 &&
+      buffer.text.startsWith('/') &&
+      buffer.text.endsWith(' ') &&
+      buffer.cursor[0] === 0 &&
+      buffer.cursor[1] === cpLen(buffer.text)
+    ) {
+      const { commandToExecute, args } = parseSlashCommand(
+        buffer.text,
+        slashCommands,
+      );
+      if (commandToExecute?.argumentHint && !args) {
+        ghostSuffix = commandToExecute.argumentHint;
+      }
+    }
+
     if (!ghostSuffix) {
       return { inlineGhost: '', additionalLines: [] };
     }
@@ -1543,6 +1558,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     buffer.lines,
     buffer.cursor,
     inputWidth,
+    shellModeActive,
+    slashCommands,
   ]);
 
   const { inlineGhost, additionalLines } = getGhostTextLines();

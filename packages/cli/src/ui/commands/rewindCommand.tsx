@@ -21,7 +21,9 @@ import {
   debugLogger,
   logRewind,
   RewindEvent,
+  uiTelemetryService,
   type ChatRecordingService,
+  type Config,
   type GeminiClient,
   convertSessionToClientHistory,
 } from '@google/gemini-cli-core';
@@ -97,6 +99,74 @@ async function rewindConversation(
     coreEvents.emitFeedback(
       'error',
       error instanceof Error ? error.message : 'Unknown error during rewind',
+    );
+  }
+}
+
+/**
+ * Forks the conversation from the state right BEFORE the specified message ID
+ * into a new independent session, leaving the original session untouched on disk
+ * and switching the active client and UI into the forked session.
+ */
+async function forkFromRewind(
+  context: CommandContext,
+  config: Config,
+  client: GeminiClient,
+  recordingService: ChatRecordingService,
+  messageId: string,
+  newText: string,
+) {
+  try {
+    const forkResult = await recordingService.forkAsync({
+      upToMessageId: messageId,
+    });
+    if (!forkResult) {
+      const errorMsg = 'Could not fork conversation from selected message';
+      debugLogger.error(errorMsg);
+      context.ui.removeComponent();
+      coreEvents.emitFeedback('error', errorMsg);
+      return;
+    }
+
+    const messages = forkResult.conversation.messages ?? [];
+    const { uiHistory } = convertSessionToHistoryFormats(messages);
+    const clientHistory = convertSessionToClientHistory(messages);
+
+    await client.resumeChat(clientHistory, {
+      conversation: forkResult.conversation,
+      filePath: forkResult.filePath,
+    });
+    config.setSessionId(forkResult.sessionId);
+    uiTelemetryService.hydrate(forkResult.conversation);
+
+    client.clearCurrentSequenceModel?.();
+    config.getModelAvailabilityService?.()?.reset();
+    const configuredModel = config.getModel?.();
+    if (configuredModel) {
+      config.setActiveModel?.(configuredModel);
+    }
+    await config.getMemoryContextManager()?.refresh();
+
+    const startId = 1;
+    const historyWithIds = uiHistory.map(
+      (item, idx) =>
+        ({
+          ...item,
+          id: startId + idx,
+        }) as HistoryItem,
+    );
+
+    context.ui.removeComponent();
+    context.ui.loadHistory(historyWithIds, newText);
+    coreEvents.emitFeedback(
+      'info',
+      `Forked to new session ${forkResult.sessionId}. Original session preserved: gemini --resume ${forkResult.sourceSessionId}`,
+    );
+  } catch (error) {
+    context.ui.removeComponent();
+    coreEvents.emitFeedback(
+      'error',
+      error instanceof Error ? error.message : 'Unknown error during fork',
     );
   }
 }
@@ -193,6 +263,17 @@ export const rewindCommand: SlashCommand = {
                 case RewindOutcome.RewindOnly:
                   await rewindConversation(
                     context,
+                    client,
+                    recordingService,
+                    messageId,
+                    newText,
+                  );
+                  return;
+
+                case RewindOutcome.Fork:
+                  await forkFromRewind(
+                    context,
+                    config,
                     client,
                     recordingService,
                     messageId,

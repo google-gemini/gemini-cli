@@ -34,6 +34,7 @@ describe('RewindConfirmation', () => {
 
     expect(lastFrame()).toMatchSnapshot();
     expect(lastFrame()).toContain('Revert code changes');
+    expect(lastFrame()).toContain('Fork conversation from here');
     unmount();
   });
 
@@ -51,6 +52,7 @@ describe('RewindConfirmation', () => {
     expect(lastFrame()).toMatchSnapshot();
     expect(lastFrame()).not.toContain('Revert code changes');
     expect(lastFrame()).toContain('Rewind conversation');
+    expect(lastFrame()).toContain('Fork conversation from here');
     unmount();
   });
 

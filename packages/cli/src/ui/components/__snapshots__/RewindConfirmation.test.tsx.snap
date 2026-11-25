@@ -16,8 +16,9 @@ exports[`RewindConfirmation > renders correctly with stats 1`] = `
 │                                                                              │
 │ ● 1. Rewind conversation and revert code changes                             │
 │   2. Rewind conversation                                                     │
-│   3. Revert code changes                                                     │
-│   4. Do nothing (esc)                                                        │
+│   3. Fork conversation from here                                             │
+│   4. Revert code changes                                                     │
+│   5. Do nothing (esc)                                                        │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 "
@@ -33,7 +34,8 @@ exports[`RewindConfirmation > renders correctly without stats 1`] = `
 │ Select an action:                                                            │
 │                                                                              │
 │ ● 1. Rewind conversation                                                     │
-│   2. Do nothing (esc)                                                        │
+│   2. Fork conversation from here                                             │
+│   3. Do nothing (esc)                                                        │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 "
@@ -49,7 +51,8 @@ exports[`RewindConfirmation > renders timestamp when provided 1`] = `
 │ Select an action:                                                            │
 │                                                                              │
 │ ● 1. Rewind conversation                                                     │
-│   2. Do nothing (esc)                                                        │
+│   2. Fork conversation from here                                             │
+│   3. Do nothing (esc)                                                        │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 "

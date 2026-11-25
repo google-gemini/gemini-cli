@@ -816,6 +816,44 @@ describe('SessionSelector', () => {
     expect(sessions[0].displayName).toBe('修复登录问题');
   });
 
+  it('should expose forkedFrom metadata from JSONL session files', async () => {
+    const parentSessionId = randomUUID();
+    const forkedSessionId = randomUUID();
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const metadata = {
+      sessionId: forkedSessionId,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:01:00.000Z',
+      summary: 'Auth exploration (fork)',
+      forkedFrom: parentSessionId,
+    };
+    const userMessage = {
+      type: 'user',
+      content: 'Explore auth options',
+      id: 'msg1',
+      timestamp: '2024-01-01T10:00:30.000Z',
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${forkedSessionId.slice(0, 8)}.jsonl`,
+      ),
+      `${JSON.stringify(metadata)}\n${JSON.stringify(userMessage)}\n`,
+    );
+
+    const sessionSelector = new SessionSelector(storage);
+    const sessions = await sessionSelector.listSessions();
+
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].id).toBe(forkedSessionId);
+    expect(sessions[0].forkedFrom).toBe(parentSessionId);
+    expect(sessions[0].displayName).toBe('Auth exploration (fork)');
+  });
+
   it('should list session with gemini message even without user message', async () => {
     const sessionIdGeminiOnly = randomUUID();
 
