@@ -10,6 +10,7 @@ import {
   MAX_GREP_OUTPUT_CHARS,
   type GrepMatch,
 } from './grep-utils.js';
+import { MAX_STORED_TOOL_OUTPUT_BYTES } from '../utils/constants.js';
 
 function makeMatches(
   fileCount: number,
@@ -146,5 +147,59 @@ describe('formatGrepResults output budget', () => {
     expect(llmContent).toContain('Narrow the search');
     expect(llmContent).not.toContain("set 'names_only'");
     expect(returnDisplay.summary).toBe('Found 5000 files (limited)');
+  });
+
+  it('stays under the executor byte limit when the text is not ASCII', async () => {
+    // Japanese characters are 3 bytes each in UTF-8, so 40K characters of them
+    // is about 120 KB. The tool executor cuts anything over 64 KB from the
+    // end, which would take the notice below with it.
+    const matches: GrepMatch[] = [];
+    for (let l = 1; l <= 2000; l++) {
+      matches.push({
+        filePath: 'docs/ja/guide.md',
+        absolutePath: '/repo/docs/ja/guide.md',
+        lineNumber: l,
+        line: `Gmail 同期 ${l} ` + 'ログ'.repeat(100),
+      });
+    }
+
+    const { llmContent } = await formatGrepResults(
+      matches,
+      { pattern: 'Gmail' },
+      'in path "."',
+      10000,
+    );
+
+    expect(Buffer.byteLength(llmContent, 'utf8')).toBeLessThanOrEqual(
+      MAX_STORED_TOOL_OUTPUT_BYTES,
+    );
+    expect(llmContent).toMatch(/showing \d+ of 2000 matches/);
+    expect(llmContent).toContain('Narrow the search');
+    const shown = Number(/showing (\d+) of/.exec(llmContent)?.[1]);
+    expect(shown).toBe(
+      llmContent.split('\n').filter((l) => /^L\d+: /.test(l)).length,
+    );
+  });
+
+  it('applies the byte limit to names_only results', async () => {
+    const matches: GrepMatch[] = Array.from({ length: 5000 }, (_, i) => ({
+      filePath: `ドキュメント/ガイド/セクション/ページ-${i}.md`,
+      absolutePath: `/repo/ドキュメント/ガイド/セクション/ページ-${i}.md`,
+      lineNumber: 1,
+      line: 'Gmail',
+    }));
+
+    const { llmContent } = await formatGrepResults(
+      matches,
+      { pattern: 'Gmail', names_only: true },
+      'in path "."',
+      10000,
+    );
+
+    expect(Buffer.byteLength(llmContent, 'utf8')).toBeLessThanOrEqual(
+      MAX_STORED_TOOL_OUTPUT_BYTES,
+    );
+    expect(llmContent).toMatch(/showing \d+ of 5000 files/);
+    expect(llmContent).toContain('Narrow the search');
   });
 });
