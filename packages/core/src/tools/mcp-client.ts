@@ -67,6 +67,7 @@ import {
   OAuthSecurityError,
   areIssuersEqual,
   extractOAuthUrlOrigin,
+  isStoredTokenBoundToServerUrl,
   normalizeOptionalEndpointUrl,
 } from '../mcp/oauth-utils.js';
 
@@ -1808,22 +1809,31 @@ export function hasNetworkTransport(config: MCPServerConfig): boolean {
  * Handles token validation and refresh automatically.
  *
  * @param serverName The name of the MCP server
+ * @param oauthConfig Optional OAuth configuration for the server
+ * @param expectedServerUrl The MCP server URL the token would be sent to.
+ *   When provided, a stored token recorded for a different origin is
+ *   withheld (returns null) instead of being replayed to the new URL.
  * @returns The valid access token, or null if no token is stored
  */
 async function getStoredOAuthToken(
   serverName: string,
   oauthConfig?: MCPOAuthConfig,
+  expectedServerUrl?: string,
 ): Promise<string | null> {
   const tokenStorage = new MCPOAuthTokenStorage();
   const credentials = await tokenStorage.getCredentials(serverName);
   if (!credentials) return null;
 
   const authProvider = new MCPOAuthProvider(tokenStorage);
-  return authProvider.getValidToken(serverName, {
-    ...oauthConfig,
-    // Pass client ID if available
-    clientId: oauthConfig?.clientId ?? credentials.clientId,
-  });
+  return authProvider.getValidToken(
+    serverName,
+    {
+      ...oauthConfig,
+      // Pass client ID if available
+      clientId: oauthConfig?.clientId ?? credentials.clientId,
+    },
+    expectedServerUrl,
+  );
 }
 
 /**
@@ -1873,16 +1883,22 @@ async function connectWithSSETransport(
  * Checks if there's a stored token that was rejected (requires re-auth).
  *
  * @param serverName The name of the MCP server
+ * @param mcpServerUrl The MCP server URL the token would be sent to. When
+ *   provided, a stored token recorded for a different origin does not count
+ *   as a rejected token, so the message reports that authentication is
+ *   required rather than that a stored token was rejected.
  * @throws Always throws an error with authentication instructions
  */
 async function showAuthRequiredMessage(
   serverName: string,
   cliConfig: McpContext,
   oauthConfig?: MCPOAuthConfig,
+  mcpServerUrl?: string,
 ): Promise<never> {
   const hasRejectedToken = !!(await getStoredOAuthToken(
     serverName,
     oauthConfig,
+    mcpServerUrl,
   ));
 
   const message = hasRejectedToken
@@ -2115,7 +2131,11 @@ export async function connectToMcpServer(
         await connectWithSSETransport(
           mcpClient,
           mcpServerConfig,
-          await getStoredOAuthToken(mcpServerName, mcpServerConfig.oauth),
+          await getStoredOAuthToken(
+            mcpServerName,
+            mcpServerConfig.oauth,
+            mcpServerConfig.httpUrl || mcpServerConfig.url,
+          ),
         );
 
         debugLogger.log(
@@ -2157,6 +2177,7 @@ export async function connectToMcpServer(
           mcpServerName,
           cliConfig,
           mcpServerConfig.oauth,
+          mcpServerConfig.httpUrl || mcpServerConfig.url,
         );
       }
 
@@ -2230,6 +2251,7 @@ export async function connectToMcpServer(
           const accessToken = await getStoredOAuthToken(
             mcpServerName,
             mcpServerConfig.oauth,
+            mcpServerConfig.httpUrl || mcpServerConfig.url,
           );
           if (!accessToken) {
             throw new Error(
@@ -2261,6 +2283,7 @@ export async function connectToMcpServer(
             mcpServerName,
             cliConfig,
             mcpServerConfig.oauth,
+            mcpServerConfig.httpUrl || mcpServerConfig.url,
           );
         }
 
@@ -2326,6 +2349,7 @@ export async function connectToMcpServer(
             const accessToken = await getStoredOAuthToken(
               mcpServerName,
               mcpServerConfig.oauth,
+              mcpServerConfig.httpUrl || mcpServerConfig.url,
             );
             if (!accessToken) {
               throw new Error(
@@ -2488,7 +2512,17 @@ export async function createTransport(
     if (authProvider === undefined) {
       const tokenStorage = new MCPOAuthTokenStorage();
       const credentials = await tokenStorage.getCredentials(mcpServerName);
-      const shouldUseDynamicOAuthProvider = !!credentials;
+            // Install the dynamic stored-token provider only for a token bound
+      // to this server's URL. On a repoint (or a record with no recorded
+      // URL) the provider stays uninstalled, so the request goes out
+      // unauthenticated, gets a 401, and the re-consent flow runs instead
+      // of the stored token being replayed to the new server.
+      const shouldUseDynamicOAuthProvider =
+        !!credentials &&
+        isStoredTokenBoundToServerUrl(
+          credentials.mcpServerUrl,
+          mcpServerConfig.httpUrl || mcpServerConfig.url,
+        );
 
       if (!shouldUseDynamicOAuthProvider && mcpServerConfig.oauth?.enabled) {
         cliConfig.emitMcpDiagnostic(
