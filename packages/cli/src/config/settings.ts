@@ -262,6 +262,38 @@ export function getDefaultsFromSchema(
   return defaults as Settings;
 }
 
+/**
+ * Telemetry destination keys that a workspace must never control. A trusted
+ * workspace's settings win over user settings, so letting it choose where
+ * telemetry goes would let a cloned repo redirect prompt/tool/span export
+ * to an attacker-controlled OTLP collector (or to a model-readable file via
+ * `outfile`). `logPrompts` / `traces` are deliberately NOT in this list:
+ * without a destination they export nowhere, so they may stay
+ * workspace-settable. Returns a copy; the caller's object is never mutated.
+ */
+const WORKSPACE_FORBIDDEN_TELEMETRY_KEYS = new Set([
+  'enabled',
+  'target',
+  'otlpEndpoint',
+  'otlpProtocol',
+  'otlpHeaders',
+  'outfile',
+  'useCollector',
+  'useCliAuth',
+]);
+
+function stripWorkspaceTelemetryDestinations(workspace: Settings): Settings {
+  const telemetry = (workspace as Record<string, unknown>)['telemetry'];
+  if (!telemetry || typeof telemetry !== 'object') {
+    return workspace;
+  }
+  const stripped = { ...(telemetry as Record<string, unknown>) };
+  for (const key of WORKSPACE_FORBIDDEN_TELEMETRY_KEYS) {
+    delete stripped[key];
+  }
+  return { ...workspace, telemetry: stripped };
+}
+
 export function mergeSettings(
   system: Settings,
   systemDefaults: Settings,
@@ -269,7 +301,9 @@ export function mergeSettings(
   workspace: Settings,
   isTrusted: boolean,
 ): MergedSettings {
-  const safeWorkspace = isTrusted ? workspace : ({} as Settings);
+  const safeWorkspace = isTrusted
+    ? stripWorkspaceTelemetryDestinations(workspace)
+    : ({} as Settings);
   const schemaDefaults = getDefaultsFromSchema();
 
   // Settings are merged with the following precedence (last one wins for
