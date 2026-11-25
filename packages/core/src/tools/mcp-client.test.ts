@@ -17,7 +17,7 @@ import { AuthProviderType, type Config } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
-import { OAuthUtils } from '../mcp/oauth-utils.js';
+import { OAuthUtils, isStoredTokenBoundToServerUrl } from '../mcp/oauth-utils.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import {
   ErrorCode,
@@ -91,6 +91,11 @@ vi.mock('../mcp/oauth-utils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../mcp/oauth-utils.js')>();
   return {
     ...actual,
+    // Mocked so the binding gate in createTransport can be driven per-test
+    // (the old base's bare vi.mock() auto-mocked every export; the new
+    // base's factory only overrides OAuthUtils, so this export needs an
+    // explicit mock or the beforeEach's mockReturnValue throws).
+    isStoredTokenBoundToServerUrl: vi.fn(),
     OAuthUtils: {
       buildWellKnownUrls: vi.fn(),
       fetchProtectedResourceMetadata: vi.fn(),
@@ -1935,8 +1940,7 @@ describe('mcp-client', () => {
       );
     });
 
-    describe('should connect via httpUrl', () => {
-      it('uses MCP SDK authProvider token() path for oauth-enabled servers', async () => {
+    describe('should connect via httpUrl', () => {       beforeEach(() => {         // The binding gate is auto-mocked in this file; the tests below         // cover a token bound to the configured server URL.         vi.mocked(isStoredTokenBoundToServerUrl).mockReturnValue(true);       });        it('uses MCP SDK authProvider token() path for oauth-enabled servers', async () => {
         const mockGetValidTokenWithMetadata = vi.fn().mockResolvedValue({
           accessToken: 'fresh-token',
           tokenType: 'Bearer',
@@ -1949,6 +1953,7 @@ describe('mcp-client', () => {
         vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
           getCredentials: vi.fn().mockResolvedValue({
             clientId: 'cid',
+            mcpServerUrl: 'http://test-server',
             token: {
               accessToken: 'fresh-token',
               tokenType: 'Bearer',
@@ -1989,6 +1994,7 @@ describe('mcp-client', () => {
         });
         const mockGetCredentials = vi.fn().mockImplementation(async () => ({
           clientId: 'cid',
+          mcpServerUrl: 'http://test-server',
           token: {
             accessToken: 'fresh-token',
             tokenType: 'Bearer',
@@ -2045,6 +2051,7 @@ describe('mcp-client', () => {
         vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
           getCredentials: vi.fn().mockResolvedValue({
             clientId: 'cid',
+            mcpServerUrl: 'http://test-server',
             token: {
               accessToken: 'stored-fresh-token',
               tokenType: 'Bearer',
@@ -2081,6 +2088,7 @@ describe('mcp-client', () => {
         });
         const mockGetCredentials = vi.fn().mockResolvedValue({
           clientId: 'cid',
+          mcpServerUrl: 'http://test-server',
           token: {
             accessToken: 'cached-token',
             tokenType: 'Bearer',
@@ -2134,6 +2142,7 @@ describe('mcp-client', () => {
 
         const mockGetCredentials = vi.fn().mockResolvedValue({
           clientId: 'cid',
+          mcpServerUrl: 'http://test-server',
           token: {
             accessToken: 'no-exp-token',
             tokenType: 'Bearer',
@@ -2179,6 +2188,101 @@ describe('mcp-client', () => {
 
         // no-expiry tokens should not be long-cached in memory
         expect(mockGetValidTokenWithMetadata).toHaveBeenCalledTimes(2);
+      });
+
+      it('does not install the dynamic auth provider when the stored token belongs to another origin', async () => {
+        // Mirror the real binding rule for this wiring test: same origin
+        // passes, anything else (including a missing stored URL) fails.
+        vi.mocked(isStoredTokenBoundToServerUrl).mockImplementation(
+          (stored, expected) => {
+            if (!stored || !expected) return false;
+            try {
+              return new URL(stored).origin === new URL(expected).origin;
+            } catch {
+              return false;
+            }
+          },
+        );
+        vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
+          getCredentials: vi.fn().mockResolvedValue({
+            clientId: 'cid',
+            mcpServerUrl: 'http://other-server',
+            token: {
+              accessToken: 'stored-fresh-token',
+              tokenType: 'Bearer',
+              expiresAt: Date.now() + 10 * 60 * 1000,
+            },
+          }),
+        } as unknown as MCPOAuthTokenStorage);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+            type: 'http',
+            oauth: { enabled: true },
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const testableTransport = unwrap(transport) as unknown as {
+          _authProvider?: unknown;
+        };
+
+        expect(testableTransport._authProvider).toBeUndefined();
+        expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
+          'info',
+          `MCP server 'test-server' requires authentication using: /mcp auth test-server`,
+          undefined,
+          'test-server',
+        );
+      });
+
+      it('does not install the dynamic auth provider when the stored record has no server URL', async () => {
+        vi.mocked(isStoredTokenBoundToServerUrl).mockImplementation(
+          (stored, expected) => {
+            if (!stored || !expected) return false;
+            try {
+              return new URL(stored).origin === new URL(expected).origin;
+            } catch {
+              return false;
+            }
+          },
+        );
+        vi.mocked(MCPOAuthTokenStorage).mockReturnValue({
+          getCredentials: vi.fn().mockResolvedValue({
+            clientId: 'cid',
+            token: {
+              accessToken: 'stored-fresh-token',
+              tokenType: 'Bearer',
+              expiresAt: Date.now() + 10 * 60 * 1000,
+            },
+          }),
+        } as unknown as MCPOAuthTokenStorage);
+
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test-server',
+            type: 'http',
+            oauth: { enabled: true },
+          },
+          false,
+          MOCK_CONTEXT,
+        );
+
+        const testableTransport = unwrap(transport) as unknown as {
+          _authProvider?: unknown;
+        };
+
+        expect(testableTransport._authProvider).toBeUndefined();
+        expect(MOCK_CONTEXT.emitMcpDiagnostic).toHaveBeenCalledWith(
+          'info',
+          `MCP server 'test-server' requires authentication using: /mcp auth test-server`,
+          undefined,
+          'test-server',
+        );
       });
 
       it('wraps fetch to convert GET 404 to 405 for POST-only servers (e.g. n8n)', async () => {
