@@ -106,6 +106,45 @@ describe('Background Tools', () => {
     );
   });
 
+  it('list_background_processes should omit exit code when it is null', async () => {
+    const killedPid = 98990;
+    const successPid = 98991;
+    const history = new Map();
+    history.set(killedPid, {
+      command: 'killed command',
+      status: 'exited',
+      exitCode: null,
+      signal: 15,
+      startTime: Date.now(),
+    });
+    history.set(successPid, {
+      command: 'ok command',
+      status: 'exited',
+      exitCode: 0,
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    const invocation = listTool.build({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute({
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.llmContent).not.toContain('Exit Code: null');
+    expect(result.llmContent).toContain(
+      `- [PID ${killedPid}] EXITED: \`killed command\` (Signal: 15)`,
+    );
+    expect(result.llmContent).toContain(
+      `- [PID ${successPid}] EXITED: \`ok command\` (Exit Code: 0)`,
+    );
+  });
+
   it('read_background_output should return error if log file does not exist', async () => {
     const pid = 12345 + Math.floor(Math.random() * 1000);
     const history = new Map();

@@ -56,7 +56,7 @@ class ListBackgroundProcessesInvocation extends BaseToolInvocation<
     const lines = processes.map(
       (p) =>
         `- [PID ${p.pid}] ${p.status.toUpperCase()}: \`${p.command}\`${
-          p.exitCode !== undefined ? ` (Exit Code: ${p.exitCode})` : ''
+          typeof p.exitCode === 'number' ? ` (Exit Code: ${p.exitCode})` : ''
         }${p.signal ? ` (Signal: ${p.signal})` : ''}`,
     );
 
