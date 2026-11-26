@@ -36,6 +36,7 @@
     "eval:inventory": "tsx ./scripts/eval-inventory-cli.ts",
     "eval:inventory:json": "tsx ./scripts/eval-inventory-cli.ts --json",
     "eval:report": "tsx ./scripts/eval-report-cli.ts",
+    "eval:from-log": "tsx ./scripts/eval-from-log-cli.ts",
     "eval:coverage": "tsx ./scripts/eval-coverage-cli.ts",
     "build": "node scripts/build.js",
     "build-and-start": "npm run build && npm run start --",
