@@ -382,7 +382,7 @@ describe('useToolScheduler', () => {
     expect(toolCalls2.every((t) => t.responseSubmittedToGemini)).toBe(true);
   });
 
-  it('ignores TOOL_CALLS_UPDATE from non-root schedulers when no tools await approval', async () => {
+  it('shows executing tool calls from non-root schedulers for subagent visibility', async () => {
     const { result } = await renderHook(() =>
       useToolScheduler(
         vi.fn().mockResolvedValue(undefined),
@@ -409,6 +409,42 @@ describe('useToolScheduler', () => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
         toolCalls: [subagentCall],
+        schedulerId: 'subagent-1',
+      } as ToolCallsUpdateMessage);
+    });
+
+    expect(result.current[0]).toHaveLength(1);
+    expect(result.current[0][0].request.callId).toBe('call-sub');
+    expect(result.current[0][0].status).toBe(CoreToolCallStatus.Executing);
+  });
+
+  it('ignores TOOL_CALLS_UPDATE from non-root schedulers when tools are Scheduled or Validating without approval', async () => {
+    const { result } = await renderHook(() =>
+      useToolScheduler(
+        vi.fn().mockResolvedValue(undefined),
+        mockConfig,
+        () => undefined,
+      ),
+    );
+
+    const scheduledCall = {
+      status: CoreToolCallStatus.Scheduled as const,
+      request: {
+        callId: 'call-sched',
+        name: 'test',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      tool: createMockTool(),
+      invocation: createMockInvocation(),
+      schedulerId: 'subagent-1',
+    };
+
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [scheduledCall],
         schedulerId: 'subagent-1',
       } as ToolCallsUpdateMessage);
     });
@@ -504,7 +540,7 @@ describe('useToolScheduler', () => {
     expect(result.current[0]).toHaveLength(1);
     expect(result.current[0][0].status).toBe(CoreToolCallStatus.Executing);
 
-    // Background tool should not be shown
+    // Executing subagent tool call is visible so task tree and UI reflect activity
     const backgroundTool = {
       status: CoreToolCallStatus.Executing as const,
       request: {
@@ -527,9 +563,10 @@ describe('useToolScheduler', () => {
       } as ToolCallsUpdateMessage);
     });
 
-    // The subagent list should now be empty because the previously approved tool
-    // is gone from the current list, and the new tool doesn't need approval.
-    expect(result.current[0]).toHaveLength(0);
+    // The executing background tool is shown for subagent visibility
+    expect(result.current[0]).toHaveLength(1);
+    expect(result.current[0][0].request.callId).toBe('call-background');
+    expect(result.current[0][0].status).toBe(CoreToolCallStatus.Executing);
   });
 
   it('adapts success/error status to executing when a tail call is present', async () => {
