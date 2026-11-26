@@ -62,6 +62,7 @@ import {
 } from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
+import { coerceCommaSeparated } from '../utils/commaSeparated.js';
 import { resolvePath } from '../utils/resolvePath.js';
 import { isRecord } from '../utils/settingsUtils.js';
 import { RESUME_LATEST } from '../utils/sessionUtils.js';
@@ -117,21 +118,6 @@ export interface CliArgs {
   skipTrust: boolean | undefined;
   isCommand: boolean | undefined;
 }
-
-/**
- * Helper to coerce comma-separated or multiple flag values into a flat array.
- */
-const coerceCommaSeparated = (values: string[]): string[] => {
-  if (values.length === 1 && values[0] === '') {
-    return [''];
-  }
-  return values.flatMap((v) =>
-    v
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean),
-  );
-};
 
 /**
  * Pre-parses the command line arguments to find the worktree flag.
