@@ -24,7 +24,7 @@ project-specific behavior or create a customized persona.
 
 You can set the environment variable temporarily in your shell, or persist it
 via a `.gemini/.env` file. See
-[Persisting Environment Variables](../get-started/authentication.mdx#persisting-environment-variables).
+[Persisting Environment Variables](../get-started/authentication.mdx#persisting-vars).
 
 - Use the project default path (`.gemini/system.md`):
 
