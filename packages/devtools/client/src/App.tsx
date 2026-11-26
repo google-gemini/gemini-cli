@@ -484,6 +484,7 @@ export default function App() {
               width: '32px',
             }}
             title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {isDark ? '🌙' : '☀️'}
           </button>
@@ -1072,6 +1073,7 @@ function NetworkView({
               padding: '0 8px',
             }}
             title="Group by Domain"
+            aria-label="Group by domain"
           >
             📂
           </button>
@@ -1433,6 +1435,15 @@ function BodyView({
   t: ThemeColors;
 }) {
   const [mode, setMode] = useState<'json' | 'raw'>('json');
+  const [copied, setCopied] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
+
   const hasChunks = chunks && chunks.length > 0;
   const safeContent = hasChunks
     ? chunks.map((c) => c.data).join('')
@@ -1446,9 +1457,19 @@ function BodyView({
   };
 
   const copyJson = () => {
-    navigator.clipboard.writeText(getFormattedJson()).catch(() => {
-      // Clipboard API unavailable — silently ignore
-    });
+    navigator.clipboard
+      .writeText(getFormattedJson())
+      .then(() => {
+        setCopied(true);
+        if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+        copyTimeoutRef.current = setTimeout(() => {
+          setCopied(false);
+          copyTimeoutRef.current = null;
+        }, 2000);
+      })
+      .catch(() => {
+        // Clipboard API unavailable — silently ignore
+      });
   };
 
   const downloadJson = () => {
@@ -1513,13 +1534,32 @@ function BodyView({
           </button>
         ))}
         <div style={{ flex: 1 }} />
-        <button onClick={copyJson} style={iconBtn} title="Copy JSON">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25z" />
-            <path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z" />
-          </svg>
+        <button
+          onClick={copyJson}
+          style={{
+            ...iconBtn,
+            color: copied ? '#81c995' : t.textSecondary,
+          }}
+          title={copied ? 'Copied!' : 'Copy JSON'}
+          aria-label={copied ? 'Copied to clipboard' : 'Copy JSON to clipboard'}
+        >
+          {copied ? (
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z" />
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25z" />
+              <path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z" />
+            </svg>
+          )}
         </button>
-        <button onClick={downloadJson} style={iconBtn} title="Download JSON">
+        <button
+          onClick={downloadJson}
+          style={iconBtn}
+          title="Download JSON"
+          aria-label="Download JSON"
+        >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
             <path d="M2.75 14A1.75 1.75 0 011 12.25v-2.5a.75.75 0 011.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 00.25-.25v-2.5a.75.75 0 011.5 0v2.5A1.75 1.75 0 0113.25 14z" />
             <path d="M7.25 7.689V2a.75.75 0 011.5 0v5.689l1.97-1.969a.749.749 0 111.06 1.06l-3.25 3.25a.749.749 0 01-1.06 0L4.22 6.78a.749.749 0 111.06-1.06z" />
