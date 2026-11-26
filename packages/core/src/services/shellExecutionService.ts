@@ -41,6 +41,7 @@ import {
 import type { SandboxConfig } from '../config/config.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 import { isNodeError } from '../utils/errors.js';
+import { getGitSshCommand } from '../utils/gitUtils.js';
 import {
   ExecutionLifecycleService,
   type ExecutionHandle,
@@ -635,7 +636,10 @@ export class ShellExecutionService {
       ['credential.helper', ''],
       ['core.fsmonitor', ''],
       ['core.hooksPath', ''],
-      ['core.sshCommand', ''],
+      // An empty core.sshCommand makes Git try to execute an empty command
+      // ("fatal: unable to fork"). Use BatchMode ssh so pushes over SSH still
+      // work while remaining non-interactive.
+      ['core.sshCommand', getGitSshCommand(baseEnv)],
       ['core.pager', 'cat'],
       ['core.editor', ''],
       ['sequence.editor', ''],

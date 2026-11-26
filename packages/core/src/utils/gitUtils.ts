@@ -8,23 +8,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawnAsync } from './shell-utils.js';
 
-export function getSafeGitEnv(
-  baseEnv: Record<string, string | undefined> = process.env,
-): Record<string, string | undefined> {
-  const devNullPath = process.platform === 'win32' ? 'NUL' : '/dev/null';
-
-  // Strip pre-existing GIT_CONFIG_* and GIT_CONFIG_PARAMETERS variables to prevent environment pollution
-  // (non-empty GIT_CONFIG_GLOBAL is explicitly restored below).
-  const cleanedEnv: Record<string, string | undefined> = {};
-  for (const [key, value] of Object.entries(baseEnv)) {
-    if (!key.startsWith('GIT_CONFIG_') && key !== 'GIT_CONFIG_PARAMETERS') {
-      cleanedEnv[key] = value;
-    }
-  }
-
-  let baseSshCommand = cleanedEnv['GIT_SSH_COMMAND'];
-  if (!baseSshCommand && cleanedEnv['GIT_SSH']) {
-    const gitSsh = cleanedEnv['GIT_SSH'];
+export function getGitSshCommand(
+  env: Record<string, string | undefined>,
+): string {
+  let baseSshCommand = env['GIT_SSH_COMMAND'];
+  if (!baseSshCommand && env['GIT_SSH']) {
+    const gitSsh = env['GIT_SSH'];
     baseSshCommand =
       gitSsh.includes(' ') && !gitSsh.startsWith('"') && !gitSsh.startsWith("'")
         ? '"' + gitSsh + '"'
@@ -55,6 +44,24 @@ export function getSafeGitEnv(
       batchFlag +
       baseSshCommand.slice(execLength);
   }
+  return gitSshCommand;
+}
+
+export function getSafeGitEnv(
+  baseEnv: Record<string, string | undefined> = process.env,
+): Record<string, string | undefined> {
+  const devNullPath = process.platform === 'win32' ? 'NUL' : '/dev/null';
+
+  // Strip pre-existing GIT_CONFIG_* and GIT_CONFIG_PARAMETERS variables to prevent environment pollution
+  // (non-empty GIT_CONFIG_GLOBAL is explicitly restored below).
+  const cleanedEnv: Record<string, string | undefined> = {};
+  for (const [key, value] of Object.entries(baseEnv)) {
+    if (!key.startsWith('GIT_CONFIG_') && key !== 'GIT_CONFIG_PARAMETERS') {
+      cleanedEnv[key] = value;
+    }
+  }
+
+  const gitSshCommand = getGitSshCommand(cleanedEnv);
 
   return {
     ...cleanedEnv,
@@ -77,7 +84,11 @@ export function getSafeGitEnv(
     GIT_CONFIG_KEY_2: 'core.hooksPath',
     GIT_CONFIG_VALUE_2: '',
     GIT_CONFIG_KEY_3: 'core.sshCommand',
-    GIT_CONFIG_VALUE_3: '',
+    // Git executes core.sshCommand, so an empty override fails with
+    // "cannot run : No such file or directory" / "fatal: unable to fork".
+    // Pin it to the same BatchMode command as GIT_SSH_COMMAND instead, which
+    // also keeps it ahead of any core.sshCommand in the user's gitconfig.
+    GIT_CONFIG_VALUE_3: gitSshCommand,
     GIT_CONFIG_KEY_4: 'core.pager',
     GIT_CONFIG_VALUE_4: 'cat',
     GIT_CONFIG_KEY_5: 'core.editor',
