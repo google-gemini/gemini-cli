@@ -183,12 +183,15 @@ The manifest file defines the extension's behavior and configuration.
   extension. This will be used to load the context from the extension directory.
   If this property is not used but a `GEMINI.md` file is present in your
   extension directory, then that file will be loaded.
-- `excludeTools`: An array of tool names to exclude from the model. You can also
-  specify command-specific restrictions for tools that support it, like the
-  `run_shell_command` tool. For example,
-  `"excludeTools": ["run_shell_command(rm -rf)"]` will block the `rm -rf`
-  command. Note that this differs from the MCP server `excludeTools`
-  functionality, which can be listed in the MCP server config.
+- `excludeTools`: An array of tool names to exclude from the model. Each entry
+  is matched against a tool's whole name, so it must name the tool on its own,
+  as in `"excludeTools": ["run_shell_command"]`. The `toolName(args)` form that
+  [`tools.allowed`](../reference/configuration.md) accepts is not matched here:
+  `"excludeTools": ["run_shell_command(rm -rf)"]` excludes nothing and leaves
+  the tool enabled. To block individual commands, contribute a
+  [policy rule](#policy-engine) with a `commandPrefix` and a `deny` decision.
+  Note that this differs from the MCP server `excludeTools` functionality, which
+  can be listed in the MCP server config.
 - `plan`: Planning features configuration.
   - `directory`: The directory where planning artifacts are stored. This serves
     as a fallback if the user hasn't specified a plan directory in their
