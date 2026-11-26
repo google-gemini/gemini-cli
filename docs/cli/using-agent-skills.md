@@ -34,6 +34,9 @@ available expertise.
   - `/skills enable <name>`: Re-enables a disabled skill.
 - **Link local skills**: `/skills link <path> [--scope user|workspace]` to
   immediately use a skill you are developing.
+- **Activate a skill manually**: `/<skill-name> [task]` activates a skill
+  directly instead of waiting for Gemini to choose it. See
+  [Activating a skill manually](./skills.md#activating-a-skill-manually).
 
 ## Terminal utilities
 
