@@ -13,7 +13,8 @@ import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
 
 interface DisableArgs {
-  name: string;
+  names?: string[];
+  all?: boolean;
   scope?: string;
 }
 
@@ -27,32 +28,60 @@ export async function handleDisable(args: DisableArgs) {
   });
   await extensionManager.loadExtensions();
 
-  try {
-    if (args.scope?.toLowerCase() === 'workspace') {
-      await extensionManager.disableExtension(
-        args.name,
-        SettingScope.Workspace,
-      );
-    } else {
-      await extensionManager.disableExtension(args.name, SettingScope.User);
+  const scope =
+    args.scope?.toLowerCase() === 'workspace'
+      ? SettingScope.Workspace
+      : SettingScope.User;
+
+  let namesToDisable: string[] = [];
+  if (args.all) {
+    namesToDisable = extensionManager.getExtensions().map((ext) => ext.name);
+  } else if (args.names) {
+    namesToDisable = [...new Set(args.names)];
+  }
+
+  if (namesToDisable.length === 0) {
+    if (args.all) {
+      debugLogger.log('No extensions currently installed.');
     }
-    debugLogger.log(
-      `Extension "${args.name}" successfully disabled for scope "${args.scope}".`,
-    );
-  } catch (error) {
-    debugLogger.error(getErrorMessage(error));
-    process.exit(1);
+    return;
+  }
+
+  const errors: Array<{ name: string; error: string }> = [];
+
+  for (const name of namesToDisable) {
+    try {
+      await extensionManager.disableExtension(name, scope);
+      debugLogger.log(
+        `Extension "${name}" successfully disabled for scope "${args.scope}".`,
+      );
+    } catch (error) {
+      errors.push({ name, error: getErrorMessage(error) });
+    }
+  }
+
+  if (errors.length > 0) {
+    for (const { name, error } of errors) {
+      debugLogger.error(`Failed to disable "${name}": ${error}`);
+    }
+    await exitCli(1);
   }
 }
 
 export const disableCommand: CommandModule = {
-  command: 'disable [--scope] <name>',
-  describe: 'Disables an extension.',
+  command: 'disable [names..]',
+  describe: 'Disables one or more extensions.',
   builder: (yargs) =>
     yargs
-      .positional('name', {
-        describe: 'The name of the extension to disable.',
+      .positional('names', {
+        describe: 'The name(s) of the extension(s) to disable.',
         type: 'string',
+        array: true,
+      })
+      .option('all', {
+        type: 'boolean',
+        describe: 'Disable all installed extensions.',
+        default: false,
       })
       .option('scope', {
         describe: 'The scope to disable the extension in.',
@@ -60,6 +89,11 @@ export const disableCommand: CommandModule = {
         default: SettingScope.User,
       })
       .check((argv) => {
+        if (!argv.all && (!argv.names || argv.names.length === 0)) {
+          throw new Error(
+            'Please include at least one extension name to disable as a positional argument, or use the --all flag.',
+          );
+        }
         if (
           argv.scope &&
           !Object.values(SettingScope)
@@ -77,9 +111,18 @@ export const disableCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
+    const rawNames = argv['names'];
+    const names =
+      rawNames === undefined
+        ? undefined
+        : Array.isArray(rawNames)
+          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (rawNames as string[])
+          : [String(rawNames)];
     await handleDisable({
+      names,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      name: argv['name'] as string,
+      all: argv['all'] as boolean,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       scope: argv['scope'] as string,
     });
