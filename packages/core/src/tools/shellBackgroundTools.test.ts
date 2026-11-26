@@ -335,4 +335,33 @@ describe('Background Tools', () => {
 
     fs.unlinkSync(logPath);
   });
+  it('read_background_output should stop waiting when cancelled during delay_ms', async () => {
+    const listSpy = vi.spyOn(ShellExecutionService, 'listBackgroundProcesses');
+    const controller = new AbortController();
+
+    const invocation = readTool.build({ pid: 66666, delay_ms: 60_000 });
+    const pending = invocation.execute({ abortSignal: controller.signal });
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(listSpy).not.toHaveBeenCalled();
+  }, 2000);
+
+  it.each([[{}], [{ delay_ms: 0 }], [{ delay_ms: 60_000 }]])(
+    'read_background_output should reject without reading when the signal is already aborted (%o)',
+    async (delayParams) => {
+      const listSpy = vi.spyOn(
+        ShellExecutionService,
+        'listBackgroundProcesses',
+      );
+
+      const invocation = readTool.build({ pid: 66666, ...delayParams });
+
+      await expect(
+        invocation.execute({ abortSignal: AbortSignal.abort() }),
+      ).rejects.toMatchObject({ name: 'AbortError' });
+      expect(listSpy).not.toHaveBeenCalled();
+    },
+    2000,
+  );
 });
