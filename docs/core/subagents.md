@@ -577,14 +577,14 @@ that your subagent was called with a specific prompt and the given description.
 Gemini CLI can also delegate tasks to remote subagents using the Agent-to-Agent
 (A2A) protocol.
 
-See the [Remote Subagents documentation](remote-agents) for detailed
+See the [Remote Subagents documentation](remote-agents.md) for detailed
 configuration, authentication, and usage instructions.
 
 ## Extension subagents
 
 Extensions can bundle and distribute subagents. See the
-[Extensions documentation](../extensions/index.md#subagents) for details on how
-to package agents within an extension.
+[Extensions documentation](../extensions/reference.md#sub-agents) for details on
+how to package agents within an extension.
 
 ## Disabling subagents
 
