@@ -41,6 +41,50 @@ export function isParallelizable(request: ToolCallRequestInfo): boolean {
 }
 
 /**
+ * Partitions an array of tool call requests into execution waves.
+ * Requests that can be executed in parallel are grouped into a single wave,
+ * while non-parallelizable requests (e.g. topic changes, edits, or tools with
+ * wait_for_previous: true) are isolated into single-item sequential waves.
+ * UPDATE_TOPIC_TOOL_NAME is always sorted to the first position.
+ */
+export function partitionToolCallRequestsIntoWaves(
+  requests: readonly ToolCallRequestInfo[],
+): ToolCallRequestInfo[][] {
+  if (requests.length === 0) {
+    return [];
+  }
+
+  // Sort requests to ensure Topic changes happen before actions in the same batch.
+  const sortedRequests = [...requests].sort((a, b) => {
+    if (a.name === b.name) return 0;
+    if (a.name === UPDATE_TOPIC_TOOL_NAME) return -1;
+    if (b.name === UPDATE_TOPIC_TOOL_NAME) return 1;
+    return 0;
+  });
+
+  const waves: ToolCallRequestInfo[][] = [];
+  let currentWave: ToolCallRequestInfo[] = [];
+
+  for (const request of sortedRequests) {
+    if (isParallelizable(request)) {
+      currentWave.push(request);
+    } else {
+      if (currentWave.length > 0) {
+        waves.push(currentWave);
+        currentWave = [];
+      }
+      waves.push([request]);
+    }
+  }
+
+  if (currentWave.length > 0) {
+    waves.push(currentWave);
+  }
+
+  return waves;
+}
+
+/**
  * Validates if an object is a ToolCallResponseInfo.
  */
 export function isToolCallResponseInfo(

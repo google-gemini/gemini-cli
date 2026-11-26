@@ -1824,6 +1824,282 @@ describe('Session', () => {
     },
   );
 
+  describe('Parallel tool execution', () => {
+    it('executes independent parallelizable tool calls concurrently in a wave', async () => {
+      let activeConcurrent = 0;
+      let maxConcurrent = 0;
+
+      mockTool.build.mockImplementation((args: Record<string, unknown>) => ({
+        getDescription: () => 'Test Tool',
+        toolLocations: () => [],
+        shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+        execute: vi.fn(async () => {
+          activeConcurrent++;
+          maxConcurrent = Math.max(maxConcurrent, activeConcurrent);
+          await new Promise((resolve) => setTimeout(resolve, 30));
+          activeConcurrent--;
+          return { llmContent: `Result for ${args['file'] ?? 'call'}` };
+        }),
+      }));
+
+      const stream1 = createMockStream([
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'call-1',
+            name: 'read_file',
+            args: { file: 'a.txt' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        },
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'call-2',
+            name: 'read_file',
+            args: { file: 'b.txt' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        },
+      ]);
+      const stream2 = createMockStream([
+        {
+          type: GeminiEventType.Content,
+          value: '',
+        },
+      ]);
+
+      mockSendMessageStream
+        .mockReturnValueOnce(stream1)
+        .mockReturnValueOnce(stream2);
+
+      await session.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Read files' }],
+      });
+
+      // Both read_file calls should execute concurrently
+      expect(maxConcurrent).toBe(2);
+      expect(mockChat.recordCompletedToolCalls).toHaveBeenCalledWith(
+        'gemini-pro',
+        expect.arrayContaining([
+          expect.objectContaining({
+            request: expect.objectContaining({ callId: 'call-1' }),
+          }),
+          expect.objectContaining({
+            request: expect.objectContaining({ callId: 'call-2' }),
+          }),
+        ]),
+      );
+    });
+
+    it('preserves sequential execution order for non-parallelizable edit operations', async () => {
+      const executionOrder: string[] = [];
+
+      mockToolRegistry.getTool.mockImplementation((name: string) => ({
+        kind: 'native',
+        build: (args: Record<string, unknown>) => ({
+          getDescription: () => name,
+          toolLocations: () => [],
+          shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+          execute: vi.fn(async () => {
+            executionOrder.push(`${name}:${args['id']}`);
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            return { llmContent: 'done' };
+          }),
+        }),
+      }));
+
+      const stream1 = createMockStream([
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'c1',
+            name: 'read_file',
+            args: { id: '1' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        },
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'c2',
+            name: 'write_file',
+            args: { id: '2' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        },
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'c3',
+            name: 'read_file',
+            args: { id: '3' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        },
+      ]);
+      const stream2 = createMockStream([
+        {
+          type: GeminiEventType.Content,
+          value: '',
+        },
+      ]);
+
+      mockSendMessageStream
+        .mockReturnValueOnce(stream1)
+        .mockReturnValueOnce(stream2);
+
+      await session.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Execute sequence' }],
+      });
+
+      expect(executionOrder).toEqual([
+        'read_file:1',
+        'write_file:2',
+        'read_file:3',
+      ]);
+    });
+
+    it('sorts update_topic to execute before subsequent tools', async () => {
+      const executionOrder: string[] = [];
+
+      mockToolRegistry.getTool.mockImplementation((name: string) => ({
+        kind: 'native',
+        build: () => ({
+          getDescription: () => name,
+          toolLocations: () => [],
+          shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+          execute: vi.fn(async () => {
+            executionOrder.push(name);
+            return { llmContent: 'done' };
+          }),
+        }),
+      }));
+
+      const stream1 = createMockStream([
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'c1',
+            name: 'read_file',
+            args: {},
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        },
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'c2',
+            name: 'update_topic',
+            args: {},
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        },
+      ]);
+      const stream2 = createMockStream([
+        {
+          type: GeminiEventType.Content,
+          value: '',
+        },
+      ]);
+
+      mockSendMessageStream
+        .mockReturnValueOnce(stream1)
+        .mockReturnValueOnce(stream2);
+
+      await session.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Update and read' }],
+      });
+
+      expect(executionOrder).toEqual(['update_topic', 'read_file']);
+    });
+
+    it('preserves response parts ordering in the turn when tools execute in parallel', async () => {
+      mockToolRegistry.getTool.mockImplementation((name: string) => ({
+        kind: 'native',
+        build: (args: Record<string, unknown>) => ({
+          getDescription: () => name,
+          toolLocations: () => [],
+          shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+          execute: vi.fn(async () => {
+            // First call finishes slower, second finishes faster
+            const delay = args['id'] === '1' ? 40 : 10;
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            return { llmContent: `Content-${args['id']}` };
+          }),
+        }),
+      }));
+
+      const stream1 = createMockStream([
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'c1',
+            name: 'read_file',
+            args: { id: '1' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        },
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'c2',
+            name: 'read_file',
+            args: { id: '2' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-1',
+          },
+        },
+      ]);
+      const stream2 = createMockStream([
+        {
+          type: GeminiEventType.Content,
+          value: '',
+        },
+      ]);
+
+      mockSendMessageStream
+        .mockReturnValueOnce(stream1)
+        .mockReturnValueOnce(stream2);
+
+      await session.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Parallel read' }],
+      });
+
+      expect(mockSendMessageStream).toHaveBeenNthCalledWith(
+        2,
+        expect.arrayContaining([
+          expect.objectContaining({
+            functionResponse: expect.objectContaining({ id: 'c1' }),
+          }),
+          expect.objectContaining({
+            functionResponse: expect.objectContaining({ id: 'c2' }),
+          }),
+        ]),
+        expect.any(AbortSignal),
+        expect.any(String),
+      );
+
+      const secondCallParts = mockSendMessageStream.mock.calls[1][0];
+      const functionResponseIds = secondCallParts
+        .map((p: Part) => p.functionResponse?.id)
+        .filter(Boolean);
+      expect(functionResponseIds).toEqual(['c1', 'c2']);
+    });
+  });
+
   describe('dispose', () => {
     it('should safely dispose without throwing when config.dispose is undefined', async () => {
       delete (mockConfig as { dispose?: unknown }).dispose;

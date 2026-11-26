@@ -41,6 +41,7 @@ import {
   resolveAtCommandPath,
   type ResolvedAtCommandPath,
   tokenLimit,
+  partitionToolCallRequestsIntoWaves,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import type { Part, FunctionCall } from '@google/genai';
@@ -633,16 +634,39 @@ export class Session {
         break;
       }
 
+      const waves = partitionToolCallRequestsIntoWaves(toolCallRequests);
       const toolResponseParts: Part[] = [];
-      for (const tReq of toolCallRequests) {
-        const fc: FunctionCall = {
-          id: tReq.callId,
-          name: tReq.name,
-          args: tReq.args,
-        };
 
-        const response = await this.runTool(pendingSend.signal, promptId, fc);
-        toolResponseParts.push(...response);
+      for (const wave of waves) {
+        if (pendingSend.signal.aborted) {
+          break;
+        }
+
+        if (wave.length === 1) {
+          const tReq = wave[0];
+          const fc: FunctionCall = {
+            id: tReq.callId,
+            name: tReq.name,
+            args: tReq.args,
+          };
+
+          const response = await this.runTool(pendingSend.signal, promptId, fc);
+          toolResponseParts.push(...response);
+        } else {
+          const waveResults = await Promise.all(
+            wave.map((tReq) => {
+              const fc: FunctionCall = {
+                id: tReq.callId,
+                name: tReq.name,
+                args: tReq.args,
+              };
+              return this.runTool(pendingSend.signal, promptId, fc);
+            }),
+          );
+          for (const res of waveResults) {
+            toolResponseParts.push(...res);
+          }
+        }
       }
 
       currentParts = toolResponseParts;
