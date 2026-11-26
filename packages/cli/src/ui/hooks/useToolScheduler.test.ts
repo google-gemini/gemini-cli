@@ -22,6 +22,8 @@ import {
   CoreToolCallStatus,
   type WaitingToolCall,
   SubagentState,
+  Kind,
+  AGENT_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 
@@ -530,6 +532,58 @@ describe('useToolScheduler', () => {
     // The subagent list should now be empty because the previously approved tool
     // is gone from the current list, and the new tool doesn't need approval.
     expect(result.current[0]).toHaveLength(0);
+  });
+
+  it('preserves executing subagent tool calls in the UI when they are subagents', async () => {
+    const { result } = await renderHook(() =>
+      useToolScheduler(
+        vi.fn().mockResolvedValue(undefined),
+        mockConfig,
+        () => undefined,
+      ),
+    );
+
+    // 1. Tool call with AGENT_TOOL_NAME
+    const agentNameCall = {
+      status: CoreToolCallStatus.Executing as const,
+      request: {
+        callId: 'call-agent-name',
+        name: AGENT_TOOL_NAME,
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      tool: createMockTool({ name: AGENT_TOOL_NAME }),
+      invocation: createMockInvocation(),
+      schedulerId: 'subagent-1',
+    } as ExecutingToolCall;
+
+    // 2. Tool call with Kind.Agent
+    const agentKindCall = {
+      status: CoreToolCallStatus.Executing as const,
+      request: {
+        callId: 'call-agent-kind',
+        name: 'custom_agent',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      tool: createMockTool({ name: 'custom_agent', kind: Kind.Agent }),
+      invocation: createMockInvocation(),
+      schedulerId: 'subagent-1',
+    } as ExecutingToolCall;
+
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [agentNameCall, agentKindCall],
+        schedulerId: 'subagent-1',
+      } as ToolCallsUpdateMessage);
+    });
+
+    expect(result.current[0]).toHaveLength(2);
+    expect(result.current[0][0].request.callId).toBe('call-agent-name');
+    expect(result.current[0][1].request.callId).toBe('call-agent-kind');
   });
 
   it('adapts success/error status to executing when a tail call is present', async () => {
