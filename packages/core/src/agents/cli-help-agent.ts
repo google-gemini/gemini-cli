@@ -8,6 +8,7 @@ import type { AgentDefinition } from './types.js';
 import { GEMINI_MODEL_ALIAS_FLASH } from '../config/models.js';
 import { z } from 'zod';
 import { GetInternalDocsTool } from '../tools/get-internal-docs.js';
+import { GetCliReferenceTool } from '../tools/get-cli-reference.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 const CliHelpReportSchema = z.object({
@@ -16,12 +17,12 @@ const CliHelpReportSchema = z.object({
     .describe('The detailed answer to the user question about Gemini CLI.'),
   sources: z
     .array(z.string())
-    .describe('The documentation files used to answer the question.'),
+    .describe('The documentation files or reference categories used to answer the question.'),
 });
 
 /**
  * An agent specialized in answering questions about Gemini CLI itself,
- * using its own documentation and runtime state.
+ * using its own documentation, runtime state, and authoritative reference data.
  */
 export const CliHelpAgent = (
   context: AgentLoopContext,
@@ -30,7 +31,7 @@ export const CliHelpAgent = (
   kind: 'local',
   displayName: 'CLI Help Agent',
   description:
-    'Specialized agent for answering questions about the Gemini CLI application. Invoke this agent for questions regarding CLI features, configuration schemas (e.g., policies), or instructions on how to create custom subagents. It queries internal documentation to provide accurate usage guidance.',
+    'Specialized agent for answering questions about the Gemini CLI application. Invoke this agent for questions regarding CLI flags, keyboard shortcuts, slash commands, configuration schemas (e.g., policies), approval modes, self-execution patterns, or instructions on how to create custom subagents. It queries internal documentation and a structured reference tool to provide accurate, grounded usage guidance.',
   inputConfig: {
     inputSchema: {
       type: 'object',
@@ -86,7 +87,10 @@ export const CliHelpAgent = (
   },
 
   toolConfig: {
-    tools: [new GetInternalDocsTool(context.messageBus)],
+    tools: [
+      new GetCliReferenceTool(context.messageBus),
+      new GetInternalDocsTool(context.messageBus),
+    ],
   },
 
   promptConfig: {
@@ -102,10 +106,16 @@ export const CliHelpAgent = (
       '- **Active Model:** ${activeModel}\n' +
       "- **Today's Date:** ${today}\n\n" +
       '### Instructions\n' +
-      "1. **Explore Documentation**: Use the `get_internal_docs` tool to find answers. If you don't know where to start, call `get_internal_docs()` without arguments to see the full list of available documentation files.\n" +
-      '2. **Be Precise**: Use the provided runtime context and documentation to give exact answers.\n' +
-      '3. **Cite Sources**: Always include the specific documentation files you used in your final report.\n' +
-      '4. **Non-Interactive**: You operate in a loop and cannot ask the user for more info. If the question is ambiguous, answer as best as you can with the information available.\n\n' +
+      '1. **Ground Your Answers in Reference Data**: For questions about CLI flags, keyboard shortcuts, slash commands, or how to invoke Gemini from the terminal, **always** call `get_cli_reference` first. This tool returns authoritative data derived from the runtime source of truth. Do not guess or recall flags from memory, the reference is definitive.\n' +
+      '   - Use `category: "flags"` for CLI flag and invocation questions.\n' +
+      '   - Use `category: "hotkeys"` for keyboard shortcut questions.\n' +
+      '   - Use `category: "commands"` for slash command questions.\n' +
+      '   - Use `category: "all"` when the question spans multiple categories.\n' +
+      '2. **Explore Documentation for Deeper Topics**: For questions about configuration schemas, policies, GEMINI.md, subagent creation, extensions, hooks, or advanced topics not covered by the reference tool, use `get_internal_docs` to find the relevant documentation file. If unsure where to start, call `get_internal_docs()` without arguments to see available files.\n' +
+      '3. **Deprecation Awareness**: The `--yolo` flag is deprecated. The correct flag is `--approval-mode=yolo`. Always recommend the current form.\n' +
+      '4. **Be Precise About Self-Execution**: When a user asks how to run Gemini for specific workflows, construct the exact command using only flags confirmed by the reference tool. Example: `gemini -p "Fix the bug in auth.ts" --sandbox --approval-mode=auto_edit --output-format json`.\n' +
+      '5. **Cite Sources**: Always include the specific reference categories or documentation files you used in your final report.\n' +
+      '6. **Non-Interactive**: You operate in a loop and cannot ask the user for more info. If the question is ambiguous, answer as best as you can with the information available.\n\n' +
       'You MUST call `complete_task` with a JSON report containing your `answer` and the `sources` you used.',
   },
 });
