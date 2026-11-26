@@ -1055,6 +1055,93 @@ describe('Session', () => {
     expect(result.stopReason).toBe('max_turn_requests');
   });
 
+  it('should handle GeminiEventType.AgentExecutionStopped and surface reason to ACP client', async () => {
+    const stream = createMockStream([
+      {
+        type: GeminiEventType.AgentExecutionStopped,
+        value: { reason: 'Prompt denied by BeforeAgent hook' },
+      },
+    ]);
+    mockSendMessageStream.mockReturnValue(stream);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Blocked prompt' }],
+    });
+
+    expect(result.stopReason).toBe('end_turn');
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'agent_message_chunk',
+        content: {
+          type: 'text',
+          text: 'Agent execution stopped: Prompt denied by BeforeAgent hook',
+        },
+      },
+    });
+  });
+
+  it('should handle GeminiEventType.AgentExecutionBlocked with systemMessage and contextCleared', async () => {
+    const stream = createMockStream([
+      {
+        type: GeminiEventType.AgentExecutionBlocked,
+        value: {
+          reason: 'Blocked by policy',
+          systemMessage: 'Custom hook denial message',
+          contextCleared: true,
+        },
+      },
+    ]);
+    mockSendMessageStream.mockReturnValue(stream);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Blocked prompt' }],
+    });
+
+    expect(result.stopReason).toBe('end_turn');
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'agent_message_chunk',
+        content: {
+          type: 'text',
+          text: 'Agent execution blocked: Custom hook denial message\nConversation context has been cleared.',
+        },
+      },
+    });
+  });
+
+  it('should handle AgentExecutionStopped when message already contains prefix', async () => {
+    const stream = createMockStream([
+      {
+        type: GeminiEventType.AgentExecutionStopped,
+        value: {
+          reason: 'Agent execution stopped: Pre-formatted reason',
+        },
+      },
+    ]);
+    mockSendMessageStream.mockReturnValue(stream);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Prompt' }],
+    });
+
+    expect(result.stopReason).toBe('end_turn');
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'agent_message_chunk',
+        content: {
+          type: 'text',
+          text: 'Agent execution stopped: Pre-formatted reason',
+        },
+      },
+    });
+  });
+
   it('should send sessionUpdate when approval mode changes', async () => {
     const { coreEvents, CoreEvent, ApprovalMode } = await import(
       '@google/gemini-cli-core'
