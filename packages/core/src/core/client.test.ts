@@ -3424,6 +3424,58 @@ ${JSON.stringify(
       }
     });
 
+    it('should stop retrying when the abort signal fires during a retry wait', async () => {
+      vi.useFakeTimers();
+      const contents = [{ role: 'user', parts: [{ text: 'test abort' }] }];
+      const error503 = Object.assign(new Error('Service Unavailable'), {
+        status: 503,
+      });
+      mockGenerateContentFn.mockImplementation(async () => {
+        throw error503;
+      });
+      const abortController = new AbortController();
+
+      try {
+        const promise = client.generateContent(
+          { model: 'test-model' },
+          contents,
+          abortController.signal,
+          LlmRole.UTILITY_TOOL,
+        );
+
+        // The first attempt fails and the wait before the retry begins.
+        await vi.advanceTimersByTimeAsync(0);
+        expect(mockGenerateContentFn).toHaveBeenCalledTimes(1);
+
+        abortController.abort();
+
+        await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+        expect(vi.getTimerCount()).toBe(0);
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(mockGenerateContentFn).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('should reject immediately without calling the API when the abort signal is already aborted', async () => {
+      const contents = [
+        { role: 'user', parts: [{ text: 'test pre-aborted' }] },
+      ];
+      const abortController = new AbortController();
+      abortController.abort();
+
+      await expect(
+        client.generateContent(
+          { model: 'test-model' },
+          contents,
+          abortController.signal,
+          LlmRole.UTILITY_TOOL,
+        ),
+      ).rejects.toMatchObject({ name: 'AbortError' });
+      expect(mockGenerateContentFn).not.toHaveBeenCalled();
+    });
+
     describe('Hook System', () => {
       let mockMessageBus: { publish: Mock; subscribe: Mock };
 
