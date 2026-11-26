@@ -1493,5 +1493,62 @@ describe('ChatCompressionService', () => {
         '[Tool output collapsed from previous turn:',
       );
     });
+
+    it('does not charge a co-located non-exempt tool output in the same turn against the exempt retrieval budget', () => {
+      const textFile = 'export const A = "value";\n'.repeat(600); // ~15 KB
+      const largeShellOutput = 'log line\n'.repeat(8000); // ~72 KB (> 64 KB)
+
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'read_file',
+                response: { content: textFile },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'Read source file' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'read_file',
+                response: { content: 'small' },
+              },
+            },
+            {
+              functionResponse: {
+                name: 'run_shell_command',
+                response: { output: largeShellOutput },
+              },
+            },
+          ],
+        },
+        ...createRecentToolTurns(3),
+      ];
+
+      const collapsed = collapseOlderFunctionResponses(history);
+
+      // Earlier 15 KB text read_file stays intact
+      const earlierTextResp = collapsed[0].parts![0].functionResponse
+        ?.response as { content: string };
+      expect(earlierTextResp.content).toBe(textFile);
+
+      // Co-located small read_file stays intact while 72 KB shell output is collapsed
+      const mixedTurn = collapsed[2];
+      expect(mixedTurn.parts![0].functionResponse?.response).toEqual({
+        content: 'small',
+      });
+      const shellResp = mixedTurn.parts![1].functionResponse?.response as {
+        output: string;
+      };
+      expect(shellResp.output).toContain(
+        '[Tool output collapsed from previous turn:',
+      );
+    });
   });
 });

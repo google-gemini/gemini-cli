@@ -111,7 +111,10 @@ const OMITTED_BINARY_MESSAGE_BYTES = Buffer.byteLength(
  * Computes the retained byte size of an older turn after binary payloads
  * (sibling inlineData and nested functionResponse.parts) are evicted.
  */
-function calculateRetainedTurnByteSize(turn: Content): number {
+function calculateRetainedTurnByteSize(
+  turn: Content,
+  exemptTools: ReadonlySet<string>,
+): number {
   let bytes = 0;
   if (!turn.parts) {
     return bytes;
@@ -124,7 +127,10 @@ function calculateRetainedTurnByteSize(turn: Content): number {
     if (part.text) {
       bytes += Buffer.byteLength(part.text, 'utf8');
     }
-    if (part.functionResponse) {
+    if (
+      part.functionResponse &&
+      isExemptRetrievalTool(part.functionResponse.name, exemptTools)
+    ) {
       const resp = part.functionResponse.response;
       if (resp) {
         if (typeof resp === 'string') {
@@ -274,7 +280,7 @@ export function collapseOlderFunctionResponses(
     if (!hasExemptPart) {
       continue;
     }
-    const turnBytes = calculateRetainedTurnByteSize(turn);
+    const turnBytes = calculateRetainedTurnByteSize(turn, exemptTools);
     if (turnBytes <= remainingExemptBytes) {
       preservedExemptTurns.add(i);
       remainingExemptBytes -= turnBytes;
