@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Text } from 'ink';
+import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -19,6 +20,12 @@ import {
 import type { ConfirmationRequest } from '../../ui/types.js';
 import type { ExtensionConfig } from '../extension.js';
 import { debugLogger, type SkillDefinition } from '@google/gemini-cli-core';
+import { ContentMarker } from './contentSignature.js';
+import type {
+  ExtensionContentSummary,
+  HooksSummary,
+  McpServerSummary,
+} from './extensionContentSummary.js';
 
 const mockReadline = vi.hoisted(() => ({
   createInterface: vi.fn().mockReturnValue({
@@ -151,6 +158,36 @@ describe('consent', () => {
       expect(debugLogger.log).toHaveBeenCalledWith('Test consent');
       expect(consent).toBe(false);
     });
+
+    it('should ask concurrent consent requests one at a time', async () => {
+      const answers: Array<(answer: string) => void> = [];
+      const questionMock = vi
+        .fn()
+        .mockImplementation(
+          (_prompt: string, callback: (answer: string) => void) => {
+            answers.push(callback);
+          },
+        );
+      mockReadline.createInterface.mockReturnValue({
+        question: questionMock,
+        close: vi.fn(),
+      });
+
+      const first = requestConsentNonInteractive('First consent');
+      const second = requestConsentNonInteractive('Second consent');
+
+      await vi.waitFor(() => expect(questionMock).toHaveBeenCalledTimes(1));
+      expect(debugLogger.log).toHaveBeenCalledWith('First consent');
+      expect(debugLogger.log).not.toHaveBeenCalledWith('Second consent');
+
+      answers[0]('y');
+      await expect(first).resolves.toBe(true);
+      await vi.waitFor(() => expect(questionMock).toHaveBeenCalledTimes(2));
+      expect(debugLogger.log).toHaveBeenCalledWith('Second consent');
+
+      answers[1]('n');
+      await expect(second).resolves.toBe(false);
+    });
   });
 
   describe('requestConsentInteractive', () => {
@@ -206,6 +243,27 @@ describe('consent', () => {
       expect(steps).toEqual(['prompted', 'cleared', 'confirmed']);
       await expect(consentPromise).resolves.toBe(true);
       expect(steps).toEqual(['prompted', 'cleared', 'confirmed', 'resolved']);
+    });
+
+    it('passes defaultToNo to the confirmation request when asked to', async () => {
+      const addExtensionUpdateConfirmationRequest = vi
+        .fn()
+        .mockImplementation((request: ConfirmationRequest) => {
+          request.onConfirm(false);
+        });
+
+      await requestConsentInteractive(
+        'Install it?',
+        addExtensionUpdateConfirmationRequest,
+        undefined,
+        { defaultToNo: true },
+      );
+
+      expect(addExtensionUpdateConfirmationRequest).toHaveBeenCalledWith({
+        prompt: 'Install it?\n\nDo you want to continue?',
+        defaultToNo: true,
+        onConfirm: expect.any(Function),
+      });
     });
   });
 
@@ -612,6 +670,795 @@ describe('consent', () => {
         let consentString = requestConsent.mock.calls[0][0] as string;
         consentString = normalizePathsForSnapshot(consentString, tempDir);
         await expectConsentSnapshot(consentString);
+      });
+    });
+
+    describe('content summaries', () => {
+      const signature = 'a'.repeat(64);
+      const otherSignature = 'b'.repeat(64);
+
+      function hooksSummary(
+        overrides: Partial<HooksSummary> = {},
+      ): HooksSummary {
+        return {
+          hooks: [{ eventName: 'SessionStart', command: 'echo v1', env: [] }],
+          files: [],
+          referencedPaths: [],
+          signature,
+          ...overrides,
+        };
+      }
+
+      async function consentTextFor(
+        current: ExtensionContentSummary,
+        previous?: ExtensionContentSummary,
+      ): Promise<string | undefined> {
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          baseConfig,
+          requestConsent,
+          false,
+          previous ? baseConfig : undefined,
+          false,
+          [],
+          [],
+          false,
+          undefined,
+          undefined,
+          { current, previous },
+        );
+        return requestConsent.mock.calls[0]?.[0] as string | undefined;
+      }
+
+      it('lists each hook with its details, the paths it uses, and a signature', async () => {
+        const text = await consentTextFor({
+          hooks: hooksSummary({
+            hooks: [
+              {
+                eventName: 'BeforeTool',
+                matcher: 'run_shell_command',
+                command: 'node ${extensionPath}/scripts/check.js',
+                env: [
+                  ['API_TOKEN', 'abc'],
+                  ['LOG_LEVEL', 'debug'],
+                ],
+              },
+              {
+                eventName: 'SessionStart',
+                name: 'greeting',
+                command: 'echo `id`',
+                env: [],
+              },
+              { eventName: 'SessionEnd', type: 'runtime', env: [] },
+            ],
+            referencedPaths: [
+              { path: '.', marker: ContentMarker.Root, signature },
+              {
+                path: '../shared.sh',
+                marker: ContentMarker.Outside,
+                signature,
+              },
+              { path: 'scripts/check.js', signature },
+              {
+                path: 'scripts/gone.js',
+                marker: ContentMarker.Missing,
+                signature,
+              },
+            ],
+          }),
+        });
+
+        expect(text).toContain(
+          [
+            '⚠️  This extension contains Hooks which can automatically execute commands:',
+            '  * BeforeTool (matcher: `run_shell_command`): `node ${extensionPath}/scripts/check.js`',
+            '      Environment variables:',
+            '        - API_TOKEN: ********',
+            '        - LOG_LEVEL: `debug`',
+            '  * SessionStart (name: `greeting`): `` echo `id` ``',
+            '  * SessionEnd: no command, type `runtime`',
+            '  Files used by hooks: `.` (the extension folder), `../shared.sh` (outside the extension folder), `scripts/check.js`, `scripts/gone.js` (not found)',
+            `  Hooks signature: ${signature}`,
+          ].join('\n'),
+        );
+      });
+
+      it('escapes control characters in hook values', async () => {
+        const text = await consentTextFor({
+          hooks: hooksSummary({
+            hooks: [
+              {
+                eventName: 'Session\u202eStart',
+                command: 'echo hi\n\u001b[2J\r',
+                env: [['MODE', 'a\tb']],
+              },
+            ],
+          }),
+        });
+
+        expect(text).toContain(
+          '  * Session\\u202eStart: `echo hi\\n\\u001b[2J\\r`',
+        );
+        expect(text).toContain('        - MODE: `a\\tb`');
+      });
+
+      it('says when hooks.json is not a valid hooks file', async () => {
+        const text = await consentTextFor({
+          hooks: hooksSummary({ hooks: undefined }),
+        });
+
+        expect(text).toContain(
+          "  * `hooks/hooks.json` isn't a valid hooks file, so its hooks can't be listed.",
+        );
+        expect(text).toContain(`  Hooks signature: ${signature}`);
+      });
+
+      it('prints no hooks section when the summary has no hooks', async () => {
+        const text = await consentTextFor({});
+
+        expect(text).not.toContain('Hooks');
+      });
+
+      it('does not ask for consent when both summaries match', async () => {
+        const text = await consentTextFor(
+          { hooks: hooksSummary() },
+          { hooks: hooksSummary() },
+        );
+
+        expect(text).toBeUndefined();
+      });
+
+      it('asks for consent when only the hooks signature changes', async () => {
+        const text = await consentTextFor(
+          { hooks: hooksSummary({ signature: otherSignature }) },
+          { hooks: hooksSummary() },
+        );
+
+        expect(text).toContain(`  Hooks signature: ${otherSignature}`);
+      });
+
+      it('shows the changes after the warnings without comparing them', async () => {
+        const current = {
+          hooks: hooksSummary({
+            hooks: [{ eventName: 'SessionStart', command: 'echo v2', env: [] }],
+            signature: otherSignature,
+          }),
+        };
+        const installText = await consentTextFor(current);
+
+        const updateText = await consentTextFor(current, {
+          hooks: hooksSummary(),
+        });
+
+        expect(updateText).toBe(
+          [
+            installText,
+            '',
+            'Changes since the installed version:',
+            '  * Hooks: new or changed `SessionStart: echo v2`',
+          ].join('\n'),
+        );
+      });
+
+      it('names the files and referenced paths that were added, changed, or removed', async () => {
+        const text = await consentTextFor(
+          {
+            hooks: hooksSummary({
+              files: [
+                { path: 'hooks/a.sh', type: 'file', value: otherSignature },
+                { path: 'hooks/new.sh', type: 'file', value: signature },
+              ],
+              referencedPaths: [{ path: 'scripts/run.js', signature }],
+              signature: otherSignature,
+            }),
+          },
+          {
+            hooks: hooksSummary({
+              files: [
+                { path: 'hooks/a.sh', type: 'file', value: signature },
+                { path: 'hooks/old.sh', type: 'file', value: signature },
+              ],
+            }),
+          },
+        );
+
+        expect(text).toContain(
+          [
+            'Changes since the installed version:',
+            '  * Hooks: `hooks/a.sh` changed',
+            '  * Hooks: `hooks/new.sh` added',
+            '  * Hooks: `hooks/old.sh` removed',
+            '  * Hooks: `scripts/run.js` added',
+          ].join('\n'),
+        );
+      });
+
+      it('adds the imported files and a signature to the context file line', async () => {
+        const text = await consentTextFor({
+          contextFiles: {
+            paths: ['GEMINI.md'],
+            importedPaths: ['docs/rules.md'],
+            files: [],
+            signature,
+          },
+        });
+
+        expect(text).toContain(
+          [
+            'This extension will append info to your gemini.md context using GEMINI.md',
+            '  Imported files: `docs/rules.md`',
+            `  Context files signature: ${signature}`,
+          ].join('\n'),
+        );
+      });
+
+      it('keeps the context file line without a signature when the declared file is missing', async () => {
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          { ...baseConfig, contextFileName: 'CONTEXT.md' },
+          requestConsent,
+          false,
+          undefined,
+          false,
+          [],
+          [],
+          false,
+          undefined,
+          undefined,
+          { current: {} },
+        );
+
+        const text = requestConsent.mock.calls[0][0] as string;
+        expect(text).toContain(
+          'This extension will append info to your gemini.md context using CONTEXT.md\n',
+        );
+        expect(text).not.toContain('Context files signature');
+      });
+
+      it('names the context files that changed', async () => {
+        const contextFiles = {
+          paths: ['GEMINI.md'],
+          importedPaths: [],
+          signature,
+        };
+
+        const text = await consentTextFor(
+          {
+            contextFiles: {
+              ...contextFiles,
+              files: [{ path: 'GEMINI.md', type: 'file', value: 'v2' }],
+              signature: otherSignature,
+            },
+          },
+          {
+            contextFiles: {
+              ...contextFiles,
+              files: [{ path: 'GEMINI.md', type: 'file', value: 'v1' }],
+            },
+          },
+        );
+
+        expect(text).toMatch(
+          /Changes since the installed version:\n {2}\* Context files: `GEMINI\.md` changed$/,
+        );
+      });
+
+      it('lists skills with paths relative to the extension folder and a signature', async () => {
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          baseConfig,
+          requestConsent,
+          false,
+          undefined,
+          false,
+          [],
+          [],
+          false,
+          undefined,
+          undefined,
+          {
+            current: {
+              skills: {
+                skills: [
+                  {
+                    name: 'demo',
+                    description: 'Demo skill',
+                    location: 'skills/demo/SKILL.md',
+                    itemCount: 2,
+                    signature,
+                  },
+                  {
+                    name: 'other',
+                    description: 'Other\u202e skill',
+                    location: 'skills/other/SKILL.md',
+                    signature,
+                  },
+                ],
+                files: [],
+                signature: otherSignature,
+              },
+            },
+          },
+        );
+
+        const text = stripAnsi(requestConsent.mock.calls[0][0] as string);
+        expect(text).toContain(
+          [
+            'This extension will install the following agent skills:',
+            '',
+            '  * demo: Demo skill',
+            '    (Source: skills/demo/SKILL.md) (2 items in directory)',
+            '',
+            '  * other: Other\\u202e skill',
+            '    (Source: skills/other/SKILL.md) ⚠️ (Could not count items in directory)',
+            '',
+            `  Skills signature: ${otherSignature}`,
+          ].join('\n'),
+        );
+      });
+
+      it('names the skills that changed', async () => {
+        const skill = {
+          name: 'demo',
+          description: 'Demo skill',
+          location: 'skills/demo/SKILL.md',
+          itemCount: 1,
+        };
+
+        const text = await consentTextFor(
+          {
+            skills: {
+              skills: [{ ...skill, signature: otherSignature }],
+              files: [],
+              signature: otherSignature,
+            },
+          },
+          {
+            skills: { skills: [{ ...skill, signature }], files: [], signature },
+          },
+        );
+
+        expect(text).toMatch(
+          /Changes since the installed version:\n {2}\* Skills: `skills\/demo` changed$/,
+        );
+      });
+
+      it('lists sub-agents with their MCP servers, the files they use, and a signature', async () => {
+        const text = await consentTextFor({
+          agents: {
+            agents: [
+              { path: 'agents/broken.md', mcpServers: [] },
+              {
+                path: 'agents/release-helper.md',
+                name: 'release-helper',
+                mcpServers: [
+                  [
+                    'tracker',
+                    {
+                      command: 'node',
+                      args: ['${extensionPath}/servers/tracker.js'],
+                      env: { API_TOKEN: 'abc', LOG_LEVEL: 'debug' },
+                      trust: true,
+                    },
+                  ],
+                ],
+              },
+              {
+                path: 'agents/remote.md',
+                name: 'remote-helper',
+                agentCardUrl: 'https://example.com/card.json',
+                mcpServers: [],
+              },
+            ],
+            referencedPaths: [{ path: 'servers/tracker.js', signature }],
+            files: [],
+            signature,
+          },
+        });
+
+        expect(text).toContain(
+          [
+            'This extension will add the following sub-agents:',
+            "  * `agents/broken.md` isn't a valid sub-agent file.",
+            '  * `release-helper` (`agents/release-helper.md`)',
+            '      MCP server `tracker` (local): `node ${extensionPath}/servers/tracker.js`',
+            '      Environment variables:',
+            '        - API_TOKEN: ********',
+            '        - LOG_LEVEL: `debug`',
+            '      Trust: true',
+            '  * `remote-helper` (`agents/remote.md`)',
+            '      Agent card URL: `https://example.com/card.json`',
+            '  Files used by MCP servers: `servers/tracker.js`',
+            `  Agents signature: ${signature}`,
+          ].join('\n'),
+        );
+      });
+
+      it('escapes control characters in the timeout and trust of sub-agent MCP servers', async () => {
+        // The agent loader reads these as a number and a boolean; the consent
+        // text escapes them anyway, like the manifest MCP servers.
+        const text = await consentTextFor({
+          agents: {
+            agents: [
+              {
+                path: 'agents/helper.md',
+                name: 'helper',
+                mcpServers: [
+                  [
+                    'tracker',
+                    {
+                      command: 'node',
+                      timeout: '30\u001b[2J' as unknown as number,
+                      trust: 'true\nTrust: false' as unknown as boolean,
+                    },
+                  ],
+                ],
+              },
+            ],
+            referencedPaths: [],
+            files: [],
+            signature,
+          },
+        });
+
+        expect(text).toContain(
+          [
+            '      MCP server `tracker` (local): `node`',
+            '      Timeout: 30\\u001b[2J',
+            '      Trust: true\\nTrust: false',
+          ].join('\n'),
+        );
+      });
+
+      it('lists custom commands and policy files with a signature each', async () => {
+        const text = await consentTextFor({
+          commands: {
+            files: [
+              {
+                path: 'commands/release/notes.toml',
+                type: 'file',
+                value: signature,
+              },
+              {
+                path: 'commands/shared',
+                type: 'link',
+                value: ContentMarker.Outside,
+              },
+            ],
+            signature,
+          },
+          policies: {
+            files: [
+              { path: 'policies/release.toml', type: 'file', value: signature },
+            ],
+            signature: otherSignature,
+          },
+        });
+
+        expect(text).toContain(
+          [
+            'This extension will add the following custom commands:',
+            '  * `commands/release/notes.toml`',
+            '  * `commands/shared` (outside the extension folder)',
+            `  Commands signature: ${signature}`,
+            'This extension will add the following policy files:',
+            '  * `policies/release.toml`',
+            `  Policies signature: ${otherSignature}`,
+          ].join('\n'),
+        );
+      });
+
+      it('names the sub-agents, custom commands, and policy files that changed', async () => {
+        const agents = { agents: [], referencedPaths: [] };
+
+        const text = await consentTextFor(
+          {
+            agents: {
+              ...agents,
+              files: [{ path: 'agents/triage.md', type: 'file', value: 'v2' }],
+              signature: otherSignature,
+            },
+            commands: {
+              files: [{ path: 'commands/tag.toml', type: 'file', value: 'v1' }],
+              signature,
+            },
+          },
+          {
+            agents: {
+              ...agents,
+              files: [{ path: 'agents/triage.md', type: 'file', value: 'v1' }],
+              signature,
+            },
+            policies: {
+              files: [{ path: 'policies/old.toml', type: 'file', value: 'v1' }],
+              signature,
+            },
+          },
+        );
+
+        expect(text).toContain(
+          [
+            'Changes since the installed version:',
+            '  * Sub-agents: `agents/triage.md` changed',
+            '  * Custom commands: `commands/tag.toml` added',
+            '  * Policies: `policies/old.toml` removed',
+          ].join('\n'),
+        );
+      });
+
+      it('shows MCP servers with their values as written and the files they use', async () => {
+        const text = await consentTextFor({
+          mcpServers: [
+            [
+              'nodeServer',
+              {
+                config: {
+                  command: 'node',
+                  args: ['${extensionPath}/example.js'],
+                  cwd: '${extensionPath}',
+                },
+                referencedPaths: [{ path: 'example.js', signature }],
+                filesSignature: otherSignature,
+              },
+            ],
+          ],
+        });
+
+        expect(text).toMatch(
+          new RegExp(
+            [
+              'This extension will run the following MCP servers:',
+              '  \\* nodeServer \\(local\\): node \\$\\{extensionPath\\}/example\\.js',
+              '    Working directory: \\$\\{extensionPath\\}',
+              '    Config signature: [0-9a-f]{64}',
+              '    Files used: `example\\.js`',
+              `    Files signature: ${otherSignature}`,
+            ].join('\\n'),
+          ),
+        );
+      });
+
+      it('shows the loaded MCP servers when the summary has none', async () => {
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          {
+            ...baseConfig,
+            mcpServers: { server1: { command: 'npm', args: ['start'] } },
+          },
+          requestConsent,
+          false,
+          undefined,
+          false,
+          [],
+          [],
+          false,
+          undefined,
+          undefined,
+          { current: {} },
+        );
+
+        expect(requestConsent.mock.calls[0][0]).toContain(
+          '  * server1 (local): npm start',
+        );
+      });
+
+      it('names the MCP servers and the files they use that changed', async () => {
+        const server = (
+          args: string[],
+          fileSignature: string,
+        ): McpServerSummary => ({
+          config: { command: 'node', args },
+          referencedPaths: [{ path: 'example.js', signature: fileSignature }],
+          filesSignature: fileSignature,
+        });
+
+        const text = await consentTextFor(
+          {
+            mcpServers: [
+              [
+                'nodeServer',
+                server(
+                  ['${extensionPath}/example.js', '--verbose'],
+                  otherSignature,
+                ),
+              ],
+            ],
+          },
+          {
+            mcpServers: [
+              [
+                'nodeServer',
+                server(['${extensionPath}/example.js'], signature),
+              ],
+            ],
+          },
+        );
+
+        expect(text).toContain(
+          [
+            'Changes since the installed version:',
+            '  * MCP servers: `nodeServer` changed',
+            '  * MCP servers: `example.js` changed',
+          ].join('\n'),
+        );
+      });
+
+      it('lists the settings and the plan directory, and names the ones that changed', async () => {
+        const text = await consentTextFor(
+          {
+            settings: [
+              { name: 'API key', envVar: 'API_KEY', sensitive: true },
+              { name: 'Region', envVar: 'AWS_REGION', sensitive: false },
+            ],
+            planDirectory: '${extensionPath}/plans',
+          },
+          {
+            settings: [{ name: 'Region', envVar: 'REGION', sensitive: false }],
+          },
+        );
+
+        expect(text).toContain(
+          [
+            'This extension will receive these settings in environment variables:',
+            '  * `API key`: `API_KEY` (sensitive)',
+            '  * `Region`: `AWS_REGION`',
+            'This extension will store plans in `${extensionPath}/plans`',
+          ].join('\n'),
+        );
+        expect(text).toContain(
+          [
+            '  * Settings: `API key` added',
+            '  * Settings: `Region` changed',
+            '  * Plan directory: `${extensionPath}/plans` added',
+          ].join('\n'),
+        );
+      });
+
+      it('shows the extension files signature and names the changed files that no other line covers', async () => {
+        const hookFile = (value: string) => ({
+          path: 'hooks/run.sh',
+          type: 'file' as const,
+          value,
+        });
+        const text = await consentTextFor(
+          {
+            hooks: hooksSummary({
+              files: [hookFile(otherSignature)],
+              signature: otherSignature,
+            }),
+            extensionFiles: {
+              files: [
+                hookFile(otherSignature),
+                { path: 'lib/helper.js', type: 'file', value: otherSignature },
+                { path: 'lib/new.js', type: 'file', value: signature },
+              ],
+              signature: otherSignature,
+            },
+          },
+          {
+            hooks: hooksSummary({ files: [hookFile(signature)] }),
+            extensionFiles: {
+              files: [
+                hookFile(signature),
+                { path: 'lib/helper.js', type: 'file', value: signature },
+                { path: 'lib/old.js', type: 'file', value: signature },
+              ],
+              signature,
+            },
+          },
+        );
+
+        expect(text).toContain(`Extension files signature: ${otherSignature}`);
+        expect(text).toContain(
+          [
+            '  * Hooks: `hooks/run.sh` changed',
+            '  * Files: `lib/helper.js` changed',
+            '  * Files: `lib/new.js` added',
+            '  * Files: `lib/old.js` removed',
+          ].join('\n'),
+        );
+        expect(text).not.toContain('Files: `hooks/run.sh`');
+      });
+
+      it('names at most 20 other changed files', async () => {
+        const files = (value: string) =>
+          Array.from({ length: 25 }, (_, index) => ({
+            path: `data/file-${String(index).padStart(2, '0')}.txt`,
+            type: 'file' as const,
+            value,
+          }));
+
+        const text = await consentTextFor(
+          { extensionFiles: { files: files(otherSignature), signature } },
+          { extensionFiles: { files: files(signature), signature: '' } },
+        );
+
+        expect(text?.match(/^ {2}\* Files: `data\//gm)).toHaveLength(20);
+        expect(text).toContain('  * Files: 5 more added, changed, or removed');
+      });
+
+      it('lists the links under skills/ that leave the extension folder', async () => {
+        const text = stripAnsi(
+          (await consentTextFor({
+            skills: {
+              skills: [],
+              files: [
+                { path: 'skills', type: 'link', value: ContentMarker.Outside },
+              ],
+              signature,
+            },
+          })) ?? '',
+        );
+
+        expect(text).toContain(
+          [
+            '  * `skills` (outside the extension folder)',
+            '',
+            `  Skills signature: ${signature}`,
+          ].join('\n'),
+        );
+      });
+
+      it('escapes control characters in manifest MCP servers, context file names, and excluded tools', async () => {
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          {
+            ...baseConfig,
+            mcpServers: {
+              'srv\u202e': {
+                command: 'node\r',
+                args: ['a\nb'],
+                cwd: 'dir\u2028x',
+                description: 'desc\tx',
+              },
+            },
+            contextFileName: ['ctx\r.md', 'b.md'],
+            excludeTools: ['tool\u202e'],
+          },
+          requestConsent,
+          false,
+          undefined,
+        );
+
+        const text = requestConsent.mock.calls[0][0] as string;
+        expect(text).toContain('  * srv\\u202e (local): node\\r a\\nb');
+        expect(text).toContain('    Working directory: dir\\u2028x');
+        expect(text).toContain('    Description: desc\\tx');
+        expect(text).toContain('context using ctx\\r.md,b.md');
+        expect(text).toContain('core tools: tool\\u202e');
+      });
+
+      it('prints manifest MCP server values of other JSON types as text', async () => {
+        // gemini-extension.json isn't checked against a schema, so a value can
+        // have another JSON type than the one that MCPServerConfig declares.
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          {
+            ...baseConfig,
+            mcpServers: {
+              srv: {
+                command: 'node',
+                cwd: ['dir\u202e'] as unknown as string,
+                env: {
+                  LIST: ['a', 'b'] as unknown as string,
+                  RETRIES: 3 as unknown as string,
+                },
+                description: 42 as unknown as string,
+                includeTools: ['x', 7] as unknown as string[],
+              },
+            },
+          },
+          requestConsent,
+          false,
+          undefined,
+        );
+
+        const text = requestConsent.mock.calls[0][0] as string;
+        expect(text).toContain('    Working directory: dir\\u202e');
+        expect(text).toContain('      - LIST: a,b');
+        expect(text).toContain('      - RETRIES: 3');
+        expect(text).toContain('    Description: 42');
+        expect(text).toContain('    Include tools: x, 7');
       });
     });
   });

@@ -35,10 +35,25 @@ import type { ExtensionConfig } from '../extension.js';
 import type { ExtensionManager } from '../extension-manager.js';
 import { EXTENSIONS_CONFIG_FILENAME } from './variables.js';
 
+/**
+ * simple-git 4 refuses to run a command whose environment sets certain git
+ * variables or settings, whatever their values are, unless the matching
+ * `unsafe` option is enabled. `getSafeGitEnv()` sets GIT_ASKPASS,
+ * SSH_ASKPASS, GIT_SSH_COMMAND, GIT_CONFIG_SYSTEM (and GIT_CONFIG_GLOBAL when
+ * the user sets it), and GIT_CONFIG_COUNT entries that override
+ * `credential.helper`, `core.fsmonitor`, `core.hooksPath`, `core.sshCommand`,
+ * `core.pager`, `core.editor`, and `sequence.editor`, so git installs and
+ * update checks need every option below.
+ */
 const GIT_EXTENSION_OPTIONS: Partial<SimpleGitOptions> = {
   unsafe: {
     allowUnsafeAskPass: true,
+    allowUnsafeConfigEnvCount: true,
+    allowUnsafeConfigPaths: true,
+    allowUnsafeCredentialHelper: true,
     allowUnsafeEditor: true,
+    allowUnsafeFsMonitor: true,
+    allowUnsafeHooksPath: true,
     allowUnsafePager: true,
     allowUnsafeSshCommand: true,
   },

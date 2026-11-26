@@ -87,7 +87,26 @@ vi.mock('undici', () => ({
 }));
 vi.mock('../mcp/oauth-provider.js');
 vi.mock('../mcp/oauth-token-storage.js');
-vi.mock('../mcp/oauth-utils.js');
+vi.mock('../mcp/oauth-utils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../mcp/oauth-utils.js')>();
+  return {
+    ...actual,
+    OAuthUtils: {
+      buildWellKnownUrls: vi.fn(),
+      fetchProtectedResourceMetadata: vi.fn(),
+      fetchAuthorizationServerMetadata: vi.fn(),
+      metadataToOAuthConfig: vi.fn(),
+      discoverAuthorizationServerMetadata: vi.fn(),
+      discoverOAuthConfig: vi.fn(),
+      parseWWWAuthenticateHeader: vi.fn(),
+      discoverOAuthFromWWWAuthenticate: vi.fn(),
+      extractBaseUrl: vi.fn(),
+      isSSEEndpoint: vi.fn(),
+      buildResourceParameter: vi.fn(),
+      parseTokenExpiry: vi.fn(),
+    },
+  };
+});
 vi.mock('google-auth-library');
 import { GoogleAuth } from 'google-auth-library';
 
@@ -3314,6 +3333,96 @@ describe('connectToMcpServer with OAuth', () => {
       'test-server',
       expect.objectContaining({
         authorizationResponseIssParameterSupported: false,
+      }),
+      serverUrl,
+    );
+  });
+
+  it('should reject automatic 401 OAuth when pre-configured authorizationUrl origin mismatches discovered metadata', async () => {
+    const serverUrl = 'https://mcp.example.com/mcp';
+    const wwwAuthHeader =
+      'Bearer realm="test", resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource"';
+
+    vi.mocked(mockedClient.connect).mockRejectedValueOnce(
+      new StreamableHTTPError(
+        401,
+        `Unauthorized\nwww-authenticate: ${wwwAuthHeader}`,
+      ),
+    );
+
+    vi.mocked(OAuthUtils.discoverOAuthFromWWWAuthenticate).mockResolvedValue({
+      authorizationUrl: 'https://other-auth.example.org/authorize',
+      issuer: 'https://other-auth.example.org',
+      tokenUrl: 'https://other-auth.example.org/token',
+      scopes: ['read'],
+    });
+
+    await expect(
+      connectToMcpServer(
+        '0.0.1',
+        'test-server',
+        {
+          httpUrl: serverUrl,
+          oauth: {
+            enabled: true,
+            clientId: 'static-client-id',
+            authorizationUrl: 'https://trusted-auth.example.com/authorize',
+          },
+        },
+        false,
+        workspaceContext,
+        MOCK_CONTEXT,
+      ),
+    ).rejects.toThrow(
+      "Failed to handle automatic OAuth for server 'test-server'",
+    );
+
+    expect(mockAuthProvider.authenticate).not.toHaveBeenCalled();
+  });
+
+  it('should use complete explicit multi-origin endpoints directly on 401 without running .well-known discovery', async () => {
+    const serverUrl = 'https://workspace-mcp.example.com/mcp';
+    const wwwAuthHeader = 'Bearer realm="workspace"';
+
+    vi.mocked(mockedClient.connect)
+      .mockRejectedValueOnce(
+        new StreamableHTTPError(
+          401,
+          `Unauthorized\nwww-authenticate: ${wwwAuthHeader}`,
+        ),
+      )
+      .mockResolvedValueOnce(undefined);
+
+    await connectToMcpServer(
+      '0.0.1',
+      'workspace-server',
+      {
+        httpUrl: serverUrl,
+        oauth: {
+          enabled: true,
+          clientId: 'workspace-client.apps.googleusercontent.com',
+          clientSecret: 'workspace-secret',
+          authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+          tokenUrl: 'https://oauth2.googleapis.com/token',
+          scopes: ['openid', 'email'],
+        },
+      },
+      false,
+      workspaceContext,
+      MOCK_CONTEXT,
+    );
+
+    expect(OAuthUtils.discoverOAuthFromWWWAuthenticate).not.toHaveBeenCalled();
+    expect(OAuthUtils.discoverOAuthConfig).not.toHaveBeenCalled();
+    expect(mockAuthProvider.authenticate).toHaveBeenCalledWith(
+      'workspace-server',
+      expect.objectContaining({
+        enabled: true,
+        clientId: 'workspace-client.apps.googleusercontent.com',
+        clientSecret: 'workspace-secret',
+        authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+        scopes: ['openid', 'email'],
       }),
       serverUrl,
     );

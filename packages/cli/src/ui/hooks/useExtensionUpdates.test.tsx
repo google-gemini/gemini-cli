@@ -5,17 +5,21 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { act } from 'react';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { createExtension } from '../../test-utils/createExtension.js';
-import { useExtensionUpdates } from './useExtensionUpdates.js';
+import {
+  useConfirmUpdateRequests,
+  useExtensionUpdates,
+} from './useExtensionUpdates.js';
 import {
   GEMINI_DIR,
   loadAgentsFromDirectory,
   loadSkillsFromDir,
 } from '@google/gemini-cli-core';
-import { render } from '../../test-utils/render.js';
+import { render, renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { MessageType } from '../types.js';
 import {
@@ -24,6 +28,7 @@ import {
 } from '../../config/extensions/update.js';
 import { ExtensionUpdateState } from '../state/extensions.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
+import { ExtensionConsentDeclinedError } from '../../config/extensions/extensionConsentErrors.js';
 import {
   loadSettings,
   resetSettingsCacheForTesting,
@@ -279,6 +284,79 @@ describe('useExtensionUpdates', () => {
     );
   });
 
+  it('should ask only once when an automatic update is declined', async () => {
+    createExtension({
+      extensionsDir: userExtensionsDir,
+      name: 'test-extension',
+      version: '1.0.0',
+      installMetadata: {
+        source: 'https://some.git/repo',
+        type: 'git',
+        autoUpdate: true,
+      },
+    });
+    await extensionManager.loadExtensions();
+    const addItem = vi.fn();
+    const requestConsent = vi.fn().mockResolvedValue(false);
+
+    vi.mocked(checkForAllExtensionUpdates).mockImplementation(
+      async (_extensions, _extensionManager, dispatch) => {
+        dispatch({
+          type: 'SET_STATE',
+          payload: {
+            name: 'test-extension',
+            state: ExtensionUpdateState.UPDATE_AVAILABLE,
+          },
+        });
+      },
+    );
+    // Mirrors updateExtension when the user declines: the state becomes ERROR
+    // and the update is rejected.
+    vi.mocked(updateExtension).mockImplementation(
+      (extension, _extensionManager, _currentState, dispatch) => {
+        dispatch({
+          type: 'SET_STATE',
+          payload: {
+            name: extension.name,
+            state: ExtensionUpdateState.UPDATING,
+          },
+        });
+        void requestConsent('Update consent');
+        dispatch({
+          type: 'SET_STATE',
+          payload: { name: extension.name, state: ExtensionUpdateState.ERROR },
+        });
+        return Promise.reject(
+          new ExtensionConsentDeclinedError(extension.name),
+        );
+      },
+    );
+
+    function TestComponent() {
+      useExtensionUpdates(extensionManager, addItem, false);
+      return null;
+    }
+
+    await render(<TestComponent />);
+
+    await waitFor(() => {
+      expect(addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.ERROR,
+          text: 'Installation cancelled for "test-extension".',
+        },
+        expect.any(Number),
+      );
+    });
+    // Give the effects time to run again; a prompt loop would ask twice.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+    expect(requestConsent).toHaveBeenCalledTimes(1);
+    expect(updateExtension).toHaveBeenCalledTimes(1);
+    expect(checkForAllExtensionUpdates).toHaveBeenCalledTimes(1);
+  });
+
   it('should batch update notifications for multiple extensions with autoUpdate: false', async () => {
     vi.spyOn(extensionManager, 'getExtensions').mockReturnValue([
       {
@@ -350,5 +428,32 @@ describe('useExtensionUpdates', () => {
         expect.any(Number),
       );
     });
+  });
+});
+
+describe('useConfirmUpdateRequests', () => {
+  it('keeps defaultToNo only on the requests that set it', async () => {
+    const { result, unmount } = await renderHook(() =>
+      useConfirmUpdateRequests(),
+    );
+
+    act(() => {
+      result.current.addConfirmUpdateExtensionRequest({
+        prompt: 'Install this extension?',
+        onConfirm: vi.fn(),
+        defaultToNo: true,
+      });
+      result.current.addConfirmUpdateExtensionRequest({
+        prompt: 'Set up Shift+Enter?',
+        onConfirm: vi.fn(),
+      });
+    });
+
+    expect(
+      result.current.confirmUpdateExtensionRequests.map(
+        (request) => request.defaultToNo,
+      ),
+    ).toEqual([true, undefined]);
+    unmount();
   });
 });
