@@ -382,7 +382,12 @@ export class Session {
           },
           _meta: {
             quota: {
-              token_count: { input_tokens: 0, output_tokens: 0 },
+              token_count: {
+                input_tokens: 0,
+                output_tokens: 0,
+                cached_tokens: 0,
+                thought_tokens: 0,
+              },
               model_usage: [],
             },
           },
@@ -394,7 +399,10 @@ export class Session {
     let totalOutputTokens = 0;
     let totalCachedTokens = 0;
     let totalThoughtTokens = 0;
-    const modelUsageMap = new Map<string, { input: number; output: number }>();
+    const modelUsageMap = new Map<
+      string,
+      { input: number; output: number; cached: number; thought: number }
+    >();
 
     const buildPromptResponse = (
       stopReason: acp.StopReason,
@@ -412,6 +420,8 @@ export class Session {
           token_count: {
             input_tokens: totalInputTokens,
             output_tokens: totalOutputTokens,
+            cached_tokens: totalCachedTokens,
+            thought_tokens: totalThoughtTokens,
           },
           model_usage: Array.from(modelUsageMap.entries()).map(
             ([modelName, counts]) => ({
@@ -419,6 +429,8 @@ export class Session {
               token_count: {
                 input_tokens: counts.input,
                 output_tokens: counts.output,
+                cached_tokens: counts.cached,
+                thought_tokens: counts.thought,
               },
             }),
           ),
@@ -438,7 +450,7 @@ export class Session {
       }
 
       if (pendingSend.signal.aborted) {
-        return { stopReason: 'cancelled' };
+        return buildPromptResponse('cancelled');
       }
 
       const toolCallRequests: ToolCallRequestInfo[] = [];
@@ -449,6 +461,37 @@ export class Session {
       let turnCachedTokens = 0;
       let turnThoughtTokens = 0;
 
+      const recordTurnUsage = () => {
+        totalInputTokens += turnInputTokens;
+        totalOutputTokens += turnOutputTokens;
+        totalCachedTokens += turnCachedTokens;
+        totalThoughtTokens += turnThoughtTokens;
+
+        if (
+          turnInputTokens > 0 ||
+          turnOutputTokens > 0 ||
+          turnCachedTokens > 0 ||
+          turnThoughtTokens > 0
+        ) {
+          const existing = modelUsageMap.get(turnModelId) ?? {
+            input: 0,
+            output: 0,
+            cached: 0,
+            thought: 0,
+          };
+          existing.input += turnInputTokens;
+          existing.output += turnOutputTokens;
+          existing.cached += turnCachedTokens;
+          existing.thought += turnThoughtTokens;
+          modelUsageMap.set(turnModelId, existing);
+        }
+
+        turnInputTokens = 0;
+        turnOutputTokens = 0;
+        turnCachedTokens = 0;
+        turnThoughtTokens = 0;
+      };
+
       try {
         const responseStream = this.context.geminiClient.sendMessageStream(
           currentParts,
@@ -458,7 +501,8 @@ export class Session {
 
         for await (const event of responseStream) {
           if (pendingSend.signal.aborted) {
-            return { stopReason: 'cancelled' };
+            recordTurnUsage();
+            return buildPromptResponse('cancelled');
           }
 
           switch (event.type) {
@@ -577,7 +621,8 @@ export class Session {
           pendingSend.signal.aborted ||
           (error instanceof Error && error.name === 'AbortError')
         ) {
-          return { stopReason: 'cancelled' };
+          recordTurnUsage();
+          return buildPromptResponse('cancelled');
         }
 
         if (error instanceof acp.RequestError) {
@@ -601,6 +646,7 @@ export class Session {
         ) {
           // The stream ended with an empty response or malformed tool call.
           // Treat this as a graceful end to the model's turn rather than a crash.
+          recordTurnUsage();
           return buildPromptResponse('end_turn');
         }
 
@@ -610,20 +656,7 @@ export class Session {
         );
       }
 
-      totalInputTokens += turnInputTokens;
-      totalOutputTokens += turnOutputTokens;
-      totalCachedTokens += turnCachedTokens;
-      totalThoughtTokens += turnThoughtTokens;
-
-      if (turnInputTokens > 0 || turnOutputTokens > 0) {
-        const existing = modelUsageMap.get(turnModelId) ?? {
-          input: 0,
-          output: 0,
-        };
-        existing.input += turnInputTokens;
-        existing.output += turnOutputTokens;
-        modelUsageMap.set(turnModelId, existing);
-      }
+      recordTurnUsage();
 
       if (stopReason !== 'end_turn') {
         return buildPromptResponse(stopReason);
@@ -635,6 +668,9 @@ export class Session {
 
       const toolResponseParts: Part[] = [];
       for (const tReq of toolCallRequests) {
+        if (pendingSend.signal.aborted) {
+          return buildPromptResponse('cancelled');
+        }
         const fc: FunctionCall = {
           id: tReq.callId,
           name: tReq.name,
@@ -643,6 +679,10 @@ export class Session {
 
         const response = await this.runTool(pendingSend.signal, promptId, fc);
         toolResponseParts.push(...response);
+      }
+
+      if (pendingSend.signal.aborted) {
+        return buildPromptResponse('cancelled');
       }
 
       currentParts = toolResponseParts;
