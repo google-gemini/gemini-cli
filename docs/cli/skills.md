@@ -96,6 +96,25 @@ Use the `/skills` slash command to view and manage available expertise:
 - `/skills reload` (or `/skills refresh`): Refreshes the list of discovered
   skills from all tiers.
 
+### Activate a skill manually
+
+Every enabled skill, except built-in skills, is also available as a slash
+command named after the skill. Type `/` to see your skills in the command menu,
+where they are marked with a `[Skill]` tag.
+
+- `/<skill-name>`: Activates the skill and asks the agent to use it.
+- `/<skill-name> <prompt>`: Activates the skill and sends your prompt as the
+  task, for example `/code-reviewer review the changes in src/`.
+
+Manual activation also works in non-interactive mode:
+
+```bash
+gemini -p "/code-reviewer review the changes in src/"
+```
+
+Skills that you add with `/skills link` are available as slash commands right
+away, without restarting the CLI.
+
 ### From the terminal
 
 The `gemini skills` command provides management utilities:
