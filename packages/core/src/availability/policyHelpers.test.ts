@@ -471,6 +471,102 @@ describe('policyHelpers', () => {
       expect(config.setActiveModel).toHaveBeenCalledWith('gemini-pro');
       expect(result.maxAttempts).toBe(1);
     });
+
+    it('preserves generation configuration for custom model aliases resolving a tier (e.g. flash-lite)', () => {
+      const config = createExtendedMockConfig();
+      mockModelConfigService.getResolvedConfig.mockReturnValue({
+        model: 'flash-lite',
+        generateContentConfig: { temperature: 0.2, maxOutputTokens: 256 },
+      });
+      mockAvailabilityService.selectFirstAvailable.mockReturnValue({
+        selectedModel: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      });
+
+      const result = applyModelSelection(config, {
+        model: 'my-custom-alias',
+        isChatModel: true,
+      });
+
+      expect(result.model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
+      expect(result.config).toEqual({
+        temperature: 0.2,
+        maxOutputTokens: 256,
+      });
+      expect(mockModelConfigService.getResolvedConfig).toHaveBeenCalledTimes(1);
+      expect(mockModelConfigService.getResolvedConfig).toHaveBeenCalledWith({
+        model: 'my-custom-alias',
+        isChatModel: true,
+      });
+      expect(config.setActiveModel).toHaveBeenCalledWith(
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      );
+    });
+
+    it('preserves generation configuration for alias resolving to flash tier without triggering fallback', () => {
+      const config = createExtendedMockConfig();
+      mockModelConfigService.getResolvedConfig.mockReturnValue({
+        model: 'flash',
+        generateContentConfig: { temperature: 0.3, topP: 0.8 },
+      });
+      mockAvailabilityService.selectFirstAvailable.mockReturnValue({
+        selectedModel: BASE_GEMINI_FLASH_MODEL,
+      });
+
+      const result = applyModelSelection(config, {
+        model: 'my-fast-alias',
+        isChatModel: true,
+      });
+
+      expect(result.model).toBe(BASE_GEMINI_FLASH_MODEL);
+      expect(result.config).toEqual({
+        temperature: 0.3,
+        topP: 0.8,
+      });
+      expect(mockModelConfigService.getResolvedConfig).toHaveBeenCalledTimes(1);
+    });
+
+    it('switches to fallback config when genuine fallback occurs for a custom model alias', () => {
+      const config = createExtendedMockConfig();
+      mockModelConfigService.getResolvedConfig
+        .mockReturnValueOnce({
+          model: 'flash-lite',
+          generateContentConfig: { temperature: 0.2, maxOutputTokens: 256 },
+        })
+        .mockReturnValueOnce({
+          model: 'gemini-flash',
+          generateContentConfig: { temperature: 0.7, topP: 1 },
+        });
+      mockAvailabilityService.selectFirstAvailable.mockReturnValue({
+        selectedModel: 'gemini-flash',
+      });
+
+      const result = applyModelSelection(config, {
+        model: 'my-custom-alias',
+        isChatModel: true,
+      });
+
+      expect(result.model).toBe('gemini-flash');
+      expect(result.config).toEqual({
+        temperature: 0.7,
+        topP: 1,
+      });
+      expect(mockModelConfigService.getResolvedConfig).toHaveBeenCalledTimes(2);
+      expect(mockModelConfigService.getResolvedConfig).toHaveBeenNthCalledWith(
+        1,
+        {
+          model: 'my-custom-alias',
+          isChatModel: true,
+        },
+      );
+      expect(mockModelConfigService.getResolvedConfig).toHaveBeenNthCalledWith(
+        2,
+        {
+          model: 'gemini-flash',
+          isChatModel: true,
+        },
+      );
+      expect(config.setActiveModel).toHaveBeenCalledWith('gemini-flash');
+    });
   });
 
   describe('applyAvailabilityTransition', () => {
