@@ -382,7 +382,7 @@ describe('useToolScheduler', () => {
     expect(toolCalls2.every((t) => t.responseSubmittedToGemini)).toBe(true);
   });
 
-  it('ignores TOOL_CALLS_UPDATE from non-root schedulers when no tools await approval', async () => {
+  it('shows executing tool calls from non-root schedulers even if they never awaited approval', async () => {
     const { result } = await renderHook(() =>
       useToolScheduler(
         vi.fn().mockResolvedValue(undefined),
@@ -413,6 +413,121 @@ describe('useToolScheduler', () => {
       } as ToolCallsUpdateMessage);
     });
 
+    // First-seen executing calls must reach UI state, otherwise the task
+    // tree has nothing to attach them to and the subagent looks idle.
+    expect(result.current[0]).toHaveLength(1);
+    expect(result.current[0][0].request.callId).toBe('call-sub');
+    expect(result.current[0][0].status).toBe(CoreToolCallStatus.Executing);
+  });
+
+  it('shows subagent tool calls whose first update is already a terminal state', async () => {
+    const { result } = await renderHook(() =>
+      useToolScheduler(
+        vi.fn().mockResolvedValue(undefined),
+        mockConfig,
+        () => undefined,
+      ),
+    );
+
+    // A very fast tool, or batched updates, can mean the first update the
+    // hook sees is already Success. A validation failure goes straight to
+    // Error without passing through Executing. Neither was ever shown
+    // before, but both must reach state or the subagent's work — and its
+    // failures — stay invisible.
+    const finishedCalls = [
+      {
+        status: CoreToolCallStatus.Success as const,
+        request: {
+          callId: 'call-fast',
+          name: 'test',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+        tool: createMockTool(),
+        invocation: createMockInvocation(),
+        schedulerId: 'subagent-1',
+        response: {
+          callId: 'call-fast',
+          resultDisplay: 'OK',
+          responseParts: [],
+          error: undefined,
+          errorType: undefined,
+        },
+      },
+      {
+        status: CoreToolCallStatus.Error as const,
+        request: {
+          callId: 'call-invalid',
+          name: 'test',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+        tool: createMockTool(),
+        invocation: createMockInvocation(),
+        schedulerId: 'subagent-1',
+        response: {
+          callId: 'call-invalid',
+          resultDisplay: 'Invalid arguments',
+          responseParts: [],
+          error: new Error('Invalid arguments'),
+          errorType: undefined,
+        },
+      },
+    ];
+
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: finishedCalls,
+        schedulerId: 'subagent-1',
+      } as unknown as ToolCallsUpdateMessage);
+    });
+
+    expect(result.current[0]).toHaveLength(2);
+    expect(result.current[0].map((t) => t.request.callId)).toEqual([
+      'call-fast',
+      'call-invalid',
+    ]);
+  });
+
+  it('keeps scheduled and validating tool calls from non-root schedulers hidden', async () => {
+    const { result } = await renderHook(() =>
+      useToolScheduler(
+        vi.fn().mockResolvedValue(undefined),
+        mockConfig,
+        () => undefined,
+      ),
+    );
+
+    const notStartedCalls = [
+      CoreToolCallStatus.Scheduled,
+      CoreToolCallStatus.Validating,
+    ].map((status, index) => ({
+      status,
+      request: {
+        callId: `call-not-started-${index}`,
+        name: 'test',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      tool: createMockTool(),
+      invocation: createMockInvocation(),
+      schedulerId: 'subagent-1',
+    }));
+
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: notStartedCalls,
+        schedulerId: 'subagent-1',
+      } as ToolCallsUpdateMessage);
+    });
+
+    // Calls that have not started executing stay out of state so transient
+    // subagent work does not flicker in the UI.
     expect(result.current[0]).toHaveLength(0);
   });
 
@@ -504,7 +619,9 @@ describe('useToolScheduler', () => {
     expect(result.current[0]).toHaveLength(1);
     expect(result.current[0][0].status).toBe(CoreToolCallStatus.Executing);
 
-    // Background tool should not be shown
+    // A different tool from the same subagent starts executing. It never
+    // awaited approval, but executing calls are shown so the task tree can
+    // display the subagent's current work.
     const backgroundTool = {
       status: CoreToolCallStatus.Executing as const,
       request: {
@@ -527,9 +644,11 @@ describe('useToolScheduler', () => {
       } as ToolCallsUpdateMessage);
     });
 
-    // The subagent list should now be empty because the previously approved tool
-    // is gone from the current list, and the new tool doesn't need approval.
-    expect(result.current[0]).toHaveLength(0);
+    // The previously approved tool is gone from the current list, so it
+    // drops out of state. The newly executing tool takes its place.
+    expect(result.current[0]).toHaveLength(1);
+    expect(result.current[0][0].request.callId).toBe('call-background');
+    expect(result.current[0][0].status).toBe(CoreToolCallStatus.Executing);
   });
 
   it('adapts success/error status to executing when a tail call is present', async () => {
