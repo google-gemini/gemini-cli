@@ -14,7 +14,11 @@ import {
   OAuthUtils,
   ResourceMismatchError,
   OAuthSecurityError,
+  areIssuersEqual,
+  extractOAuthUrlOrigin,
   isLoopbackUrl,
+  normalizeOptionalEndpointUrl,
+  trimTrailingSlashes,
   validateOAuthEndpointUrl,
 } from './oauth-utils.js';
 import { coreEvents } from '../utils/events.js';
@@ -107,6 +111,7 @@ export class MCPOAuthProvider {
     config: MCPOAuthConfig,
     redirectPort: number,
     mcpServerUrl?: string,
+    expectedOrigin?: string,
   ): Promise<OAuthClientRegistrationResponse> {
     const allowLoopback = mcpServerUrl
       ? isLoopbackUrl(mcpServerUrl)
@@ -116,6 +121,7 @@ export class MCPOAuthProvider {
       {
         allowLoopback,
         allowPrivateNetwork: config.allowPrivateNetwork,
+        expectedOrigin,
       },
     );
 
@@ -190,7 +196,7 @@ export class MCPOAuthProvider {
       '/authorize',
     ];
 
-    let pathname = authUrl.pathname.replace(/\/$/, ''); // Trim trailing slash
+    let pathname = trimTrailingSlashes(authUrl.pathname);
     for (const pattern of oidcPatterns) {
       if (pathname.endsWith(pattern)) {
         pathname = pathname.slice(0, -pattern.length);
@@ -199,8 +205,6 @@ export class MCPOAuthProvider {
     }
 
     const issuerCandidates = new Set<string>();
-    issuerCandidates.add(authUrl.origin);
-
     if (pathname) {
       issuerCandidates.add(`${authUrl.origin}${pathname}`);
 
@@ -216,6 +220,7 @@ export class MCPOAuthProvider {
         }
       }
     }
+    issuerCandidates.add(authUrl.origin);
 
     const attemptedIssuers = Array.from(issuerCandidates);
     let selectedIssuer = attemptedIssuers[0];
@@ -245,6 +250,22 @@ export class MCPOAuthProvider {
       throw new Error(
         `Failed to fetch authorization server metadata for client registration (attempted issuers: ${attemptedIssuers.join(', ')})`,
       );
+    }
+
+    const discoveredRegistrationEndpoint = normalizeOptionalEndpointUrl(
+      discoveredMetadata.registration_endpoint,
+      'registration_endpoint',
+    );
+    if (discoveredRegistrationEndpoint !== undefined) {
+      const registrationOrigin = extractOAuthUrlOrigin(
+        discoveredRegistrationEndpoint,
+        'registration_endpoint',
+      );
+      if (registrationOrigin !== authUrl.origin) {
+        throw new OAuthSecurityError(
+          `OAuth registration_endpoint origin "${registrationOrigin}" does not match expected origin "${authUrl.origin}".`,
+        );
+      }
     }
 
     debugLogger.debug(`   Selected issuer URL: ${selectedIssuer}`);
@@ -289,6 +310,12 @@ export class MCPOAuthProvider {
       throw new Error('Missing required clientId for token refresh');
     }
 
+    const pinnedRefreshUrl =
+      config.tokenUrl ?? config.issuer ?? config.authorizationUrl;
+    const expectedOrigin = pinnedRefreshUrl
+      ? extractOAuthUrlOrigin(pinnedRefreshUrl, 'token_endpoint')
+      : undefined;
+
     return refreshAccessTokenShared(
       {
         clientId: config.clientId,
@@ -299,7 +326,10 @@ export class MCPOAuthProvider {
       refreshToken,
       tokenUrl,
       this.buildResourceParam(mcpServerUrl),
-      { allowPrivateNetwork: config.allowPrivateNetwork },
+      {
+        allowPrivateNetwork: config.allowPrivateNetwork,
+        expectedOrigin,
+      },
     );
   }
 
@@ -322,12 +352,58 @@ export class MCPOAuthProvider {
       coreEvents.emitFeedback('info', message);
     };
 
-    // If no authorization URL is provided, try to discover OAuth configuration
-    if (!config.authorizationUrl && mcpServerUrl) {
+    const hadExplicitAuthUrl = Boolean(config.authorizationUrl);
+    const hadExplicitTokenUrl = Boolean(config.tokenUrl);
+    const hadExplicitClientId = Boolean(config.clientId);
+    let usedDiscovery = false;
+
+    const mergeDiscoveredConfig = (
+      current: MCPOAuthConfig,
+      discovered: MCPOAuthConfig,
+    ): MCPOAuthConfig => {
+      if (
+        current.issuer &&
+        (!discovered.issuer ||
+          !areIssuersEqual(discovered.issuer, current.issuer))
+      ) {
+        throw new OAuthSecurityError(
+          `Discovered OAuth issuer "${discovered.issuer ?? ''}" does not match configured issuer "${current.issuer}".`,
+        );
+      }
+      const mergedRegistrationUrl =
+        normalizeOptionalEndpointUrl(
+          current.registrationUrl,
+          'registration_endpoint',
+        ) ??
+        normalizeOptionalEndpointUrl(
+          discovered.registrationUrl,
+          'registration_endpoint',
+        );
+      return {
+        ...current,
+        authorizationUrl:
+          current.authorizationUrl || discovered.authorizationUrl,
+        issuer: current.issuer || discovered.issuer,
+        tokenUrl: current.tokenUrl || discovered.tokenUrl,
+        scopes: current.scopes || discovered.scopes || [],
+        registrationUrl: mergedRegistrationUrl,
+        authorizationResponseIssParameterSupported:
+          current.authorizationResponseIssParameterSupported ??
+          discovered.authorizationResponseIssParameterSupported,
+        // Preserve existing client credentials
+        clientId: current.clientId,
+        clientSecret: current.clientSecret,
+      };
+    };
+
+    // If authorization URL or token URL is missing, try to discover OAuth configuration
+    if ((!config.authorizationUrl || !config.tokenUrl) && mcpServerUrl) {
+      usedDiscovery = true;
       debugLogger.debug(`Starting OAuth for MCP server "${serverName}"…
-✓ No authorization URL; using OAuth discovery`);
+✓ Incomplete OAuth endpoints; using OAuth discovery`);
 
       // First check if the server requires authentication via WWW-Authenticate header
+      let discoveredViaWWWAuth = false;
       try {
         const headers: HeadersInit = OAuthUtils.isSSEEndpoint(mcpServerUrl)
           ? { Accept: 'text/event-stream' }
@@ -349,20 +425,8 @@ export class MCPOAuthProvider {
                 { allowPrivateNetwork: config.allowPrivateNetwork },
               );
             if (discoveredConfig) {
-              // Merge discovered config with existing config, preserving clientId and clientSecret
-              config = {
-                ...config,
-                authorizationUrl: discoveredConfig.authorizationUrl,
-                issuer: discoveredConfig.issuer,
-                tokenUrl: discoveredConfig.tokenUrl,
-                scopes: config.scopes || discoveredConfig.scopes || [],
-                authorizationResponseIssParameterSupported:
-                  config.authorizationResponseIssParameterSupported ??
-                  discoveredConfig.authorizationResponseIssParameterSupported,
-                // Preserve existing client credentials
-                clientId: config.clientId,
-                clientSecret: config.clientSecret,
-              };
+              config = mergeDiscoveredConfig(config, discoveredConfig);
+              discoveredViaWWWAuth = true;
             }
           }
         }
@@ -380,28 +444,17 @@ export class MCPOAuthProvider {
         );
       }
 
-      // If we still don't have OAuth config, try the standard discovery
-      if (!config.authorizationUrl) {
+      // If we still don't have full OAuth config, try the standard discovery
+      if (
+        !discoveredViaWWWAuth &&
+        (!config.authorizationUrl || !config.tokenUrl)
+      ) {
         const discoveredConfig = await this.discoverOAuthFromMCPServer(
           mcpServerUrl,
           { allowPrivateNetwork: config.allowPrivateNetwork },
         );
         if (discoveredConfig) {
-          // Merge discovered config with existing config, preserving clientId and clientSecret
-          config = {
-            ...config,
-            authorizationUrl: discoveredConfig.authorizationUrl,
-            tokenUrl: discoveredConfig.tokenUrl,
-            issuer: discoveredConfig.issuer,
-            scopes: config.scopes || discoveredConfig.scopes || [],
-            registrationUrl: discoveredConfig.registrationUrl,
-            authorizationResponseIssParameterSupported:
-              config.authorizationResponseIssParameterSupported ??
-              discoveredConfig.authorizationResponseIssParameterSupported,
-            // Preserve existing client credentials
-            clientId: config.clientId,
-            clientSecret: config.clientSecret,
-          };
+          config = mergeDiscoveredConfig(config, discoveredConfig);
         } else {
           throw new Error(
             'Failed to discover OAuth configuration from MCP server',
@@ -410,24 +463,79 @@ export class MCPOAuthProvider {
       }
     }
 
-    // Validate authorization and token endpoint URLs before starting the local callback server
+    // Validate authorization, token, and registration endpoint URLs and enforce
+    // origin pinning before requesting user consent or starting local listeners
+    if (!config.authorizationUrl || !config.tokenUrl) {
+      throw new Error(
+        'Missing required OAuth configuration after discovery and registration',
+      );
+    }
+
     const allowLoopback = mcpServerUrl
       ? isLoopbackUrl(mcpServerUrl)
-      : (config.authorizationUrl
-          ? isLoopbackUrl(config.authorizationUrl)
-          : false) ||
-        (config.tokenUrl ? isLoopbackUrl(config.tokenUrl) : false);
-    if (config.authorizationUrl) {
-      await validateOAuthEndpointUrl(config.authorizationUrl, {
+      : isLoopbackUrl(config.authorizationUrl) ||
+        isLoopbackUrl(config.tokenUrl);
+
+    const issuerOrigin = config.issuer
+      ? extractOAuthUrlOrigin(config.issuer, 'issuer')
+      : undefined;
+
+    // Explicit manual multi-origin configurations (e.g., Google OAuth where
+    // authorizationUrl is accounts.google.com and tokenUrl is oauth2.googleapis.com)
+    // are permitted only when authorizationUrl, tokenUrl, and clientId were all
+    // explicitly provided upfront without remote discovery. Even then, if an
+    // explicit issuer is configured, authorizationUrl must still match issuerOrigin.
+    const allowExplicitCrossOriginTokenUrl =
+      !usedDiscovery &&
+      hadExplicitAuthUrl &&
+      hadExplicitTokenUrl &&
+      hadExplicitClientId;
+
+    const validatedAuthUrl = await validateOAuthEndpointUrl(
+      config.authorizationUrl,
+      {
         allowLoopback,
         allowPrivateNetwork: config.allowPrivateNetwork,
+        expectedOrigin: issuerOrigin,
+      },
+    );
+    const authOrigin = new URL(validatedAuthUrl).origin;
+
+    const expectedTokenOrigin = allowExplicitCrossOriginTokenUrl
+      ? undefined
+      : (issuerOrigin ?? authOrigin);
+    const validatedTokenUrl = await validateOAuthEndpointUrl(config.tokenUrl, {
+      allowLoopback,
+      allowPrivateNetwork: config.allowPrivateNetwork,
+      expectedOrigin: expectedTokenOrigin,
+    });
+    const tokenOrigin = new URL(validatedTokenUrl).origin;
+
+    const pinnedRegistrationOrigin = issuerOrigin ?? authOrigin;
+    const configuredRegistrationUrl = normalizeOptionalEndpointUrl(
+      config.registrationUrl,
+      'registration_endpoint',
+    );
+    config = { ...config, registrationUrl: configuredRegistrationUrl };
+    if (configuredRegistrationUrl !== undefined) {
+      await validateOAuthEndpointUrl(configuredRegistrationUrl, {
+        allowLoopback,
+        allowPrivateNetwork: config.allowPrivateNetwork,
+        expectedOrigin: pinnedRegistrationOrigin,
       });
     }
-    if (config.tokenUrl) {
-      await validateOAuthEndpointUrl(config.tokenUrl, {
-        allowLoopback,
-        allowPrivateNetwork: config.allowPrivateNetwork,
-      });
+
+    // Obtain user consent displaying target origin(s) strictly BEFORE starting
+    // the callback server or performing Dynamic Client Registration
+    const originDetails =
+      tokenOrigin !== authOrigin
+        ? `Authorization origin: ${authOrigin}, Token origin: ${tokenOrigin}`
+        : `Authorization origin: ${authOrigin}`;
+    const userConsent = await getConsentForOauth(
+      `Authentication required for MCP Server: '${serverName}' (${originDetails}).`,
+    );
+    if (!userConsent) {
+      throw new FatalCancellationError('Authentication cancelled by user.');
     }
 
     // Generate PKCE parameters
@@ -486,7 +594,10 @@ export class MCPOAuthProvider {
               mcpServerUrl,
               { allowPrivateNetwork: config.allowPrivateNetwork },
             );
-          registrationUrl = authServerMetadata.registration_endpoint;
+          registrationUrl = normalizeOptionalEndpointUrl(
+            authServerMetadata.registration_endpoint,
+            'registration_endpoint',
+          );
         }
 
         // Register client if registration endpoint is available
@@ -496,6 +607,7 @@ export class MCPOAuthProvider {
             config,
             redirectPort,
             mcpServerUrl,
+            pinnedRegistrationOrigin,
           );
 
           config.clientId = clientRegistration.client_id;
@@ -538,13 +650,6 @@ export class MCPOAuthProvider {
         resource,
       );
 
-      const userConsent = await getConsentForOauth(
-        `Authentication required for MCP Server: '${serverName}.'`,
-      );
-      if (!userConsent) {
-        throw new FatalCancellationError('Authentication cancelled by user.');
-      }
-
       displayMessage(`→ Opening your browser for OAuth sign-in...
 
 If the browser does not open, copy and paste this URL into your browser:
@@ -581,7 +686,10 @@ ${authUrl}
       pkceParams.codeVerifier,
       redirectPort,
       resource,
-      { allowPrivateNetwork: config.allowPrivateNetwork },
+      {
+        allowPrivateNetwork: config.allowPrivateNetwork,
+        expectedOrigin: tokenOrigin,
+      },
     );
 
     // Convert to our token format

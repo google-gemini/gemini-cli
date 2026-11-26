@@ -1,0 +1,918 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import {
+  loadAgentsFromDirectory,
+  loadSkillFromFile,
+  processImports,
+  type MCPServerConfig,
+} from '@google/gemini-cli-core';
+import {
+  asContentMarker,
+  collectContentEntries,
+  compareCodeUnits,
+  computeContentSignature,
+  ContentMarker,
+  sha256,
+  type ContentEntry,
+} from './contentSignature.js';
+import {
+  EXTENSION_SETTINGS_FILENAME,
+  INSTALL_METADATA_FILENAME,
+} from './variables.js';
+
+/** A path that a command or variable references through `${extensionPath}`. */
+export interface ReferencedPath {
+  /**
+   * Path relative to the extension folder, with `/` separators. `.` is the
+   * folder itself, and a path outside it keeps its relative form (`../x`).
+   */
+  path: string;
+  /** Set when the path isn't read, for example because it's missing. */
+  marker?: ContentMarker;
+  /** Signature of the referenced file or folder. */
+  signature: string;
+}
+
+/** One hook from `hooks/hooks.json`, with its values as written. */
+export interface HookSummary {
+  eventName: string;
+  matcher?: string;
+  name?: string;
+  /** The command of a `command` hook. */
+  command?: string;
+  /** The hook type, for a hook without a command. */
+  type?: string;
+  /** Environment variables, sorted by name. */
+  env: Array<[string, string]>;
+}
+
+/** The hooks that `hooks/hooks.json` declares and the files they use. */
+export interface HooksSummary {
+  /** Hooks in display order, or `undefined` if `hooks/hooks.json` isn't valid. */
+  hooks?: HookSummary[];
+  /** Every file under `hooks/`. */
+  files: ContentEntry[];
+  /** Paths that hook commands and environment variables reference. */
+  referencedPaths: ReferencedPath[];
+  /** Signature of the files under `hooks/` and the referenced paths. */
+  signature: string;
+}
+
+/**
+ * The context files that an extension adds to the model context, and the
+ * files that they import.
+ */
+export interface ContextFilesSummary {
+  /** Context files that exist, relative to the extension folder. */
+  paths: string[];
+  /** Files that the context files import with `@`, relative to the folder. */
+  importedPaths: string[];
+  /** Entries of the context files and the imported files. */
+  files: ContentEntry[];
+  signature: string;
+}
+
+/**
+ * What an extension folder adds to the CLI, read from the raw files on disk
+ * without resolving variables, so two folders with the same files have the same
+ * summary.
+ */
+export interface ExtensionContentSummary {
+  hooks?: HooksSummary;
+  contextFiles?: ContextFilesSummary;
+  skills?: SkillsSummary;
+  agents?: AgentsSummary;
+  commands?: FilesSummary;
+  policies?: FilesSummary;
+  /** MCP servers of `gemini-extension.json`, in file order. */
+  mcpServers?: Array<[string, McpServerSummary]>;
+  /** Settings of `gemini-extension.json`, in file order. */
+  settings?: SettingSummary[];
+  /** `plan.directory` of `gemini-extension.json`, as written. */
+  planDirectory?: string;
+  /**
+   * Every file in the folder, so a change to any of them shows. `.git` folders
+   * and the files that Gemini CLI writes there are left out, and
+   * `gemini-extension.json` is hashed without its `version`.
+   */
+  extensionFiles?: FilesSummary;
+}
+
+/** One setting from `gemini-extension.json`, with its values as written. */
+export interface SettingSummary {
+  name: string;
+  /** The environment variable that the setting's value is passed in. */
+  envVar: string;
+  sensitive: boolean;
+}
+
+/** One MCP server from `gemini-extension.json`. */
+export interface McpServerSummary {
+  /**
+   * The values as written. Only `${/}` and `${pathSeparator}` are resolved, to
+   * `/`, so the values don't depend on where the folder is.
+   */
+  config: MCPServerConfig;
+  /** Paths that the command, args, cwd, and env values reference. */
+  referencedPaths: ReferencedPath[];
+  /** Signature of the referenced paths, when there are any. */
+  filesSignature?: string;
+}
+
+/** One sub-agent from `agents/`, with its values as written. */
+export interface AgentSummary {
+  /** The agent file, relative to the extension folder. */
+  path: string;
+  /** The agent name, or `undefined` if the file can't be loaded. */
+  name?: string;
+  /** The agent card URL of a remote agent. */
+  agentCardUrl?: string;
+  /** MCP servers of a local agent, sorted by name. */
+  mcpServers: Array<[string, MCPServerConfig]>;
+}
+
+/** The sub-agents under `agents/` and the files that they use. */
+export interface AgentsSummary {
+  /** Agents sorted by file and name. */
+  agents: AgentSummary[];
+  /** Paths that the MCP servers of the agents reference. */
+  referencedPaths: ReferencedPath[];
+  /** The files that the agent loader reads. */
+  files: ContentEntry[];
+  signature: string;
+}
+
+/** Files of one kind, such as custom commands or policy files. */
+export interface FilesSummary {
+  files: ContentEntry[];
+  signature: string;
+}
+
+/** One agent skill from the `skills/` folder. */
+export interface SkillSummary {
+  name: string;
+  description: string;
+  /** The `SKILL.md` file of the skill, relative to the extension folder. */
+  location: string;
+  /** Number of items in the skill folder, or `undefined` if it can't be read. */
+  itemCount?: number;
+  /** Signature of the files in the skill folder. */
+  signature: string;
+}
+
+/** The agent skills under `skills/`. */
+export interface SkillsSummary {
+  /** Skills sorted by location. */
+  skills: SkillSummary[];
+  /** Every file under `skills/`. */
+  files: ContentEntry[];
+  signature: string;
+}
+
+/** Inputs that the extension manager resolves for a folder. */
+export interface ExtensionContentSources {
+  /** Context files that exist, as returned by `resolveContextFilePaths`. */
+  contextFilePaths?: readonly string[];
+  /**
+   * Whether to summarize every file of the folder (default `true`). Linked
+   * extensions skip it: they run their source folder as it is and never
+   * update, and that folder can be large.
+   */
+  includeAllFiles?: boolean;
+}
+
+const EXTENSION_PATH_VARIABLE = '${extensionPath}';
+const PATH_SEPARATOR_VARIABLES = /\$\{(?:\/|pathSeparator)\}/g;
+const PATH_END = /[\s"'`;|&<>(),:$]/;
+/** Ends a path that follows a quote, along with the matching quote. */
+const QUOTED_PATH_END = /[\r\n`;,:$]/;
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+const HOOKS_FILE = 'hooks/hooks.json';
+const MANIFEST_FILE = 'gemini-extension.json';
+const SKILL_FILE = 'SKILL.md';
+/** Files that Gemini CLI writes in an installed extension folder. */
+const CLI_FILES: ReadonlySet<string> = new Set([
+  INSTALL_METADATA_FILENAME,
+  EXTENSION_SETTINGS_FILENAME,
+]);
+/** Platforms where the skill loader's glob matches names in any case. */
+const CASE_INSENSITIVE_GLOB =
+  process.platform === 'darwin' || process.platform === 'win32';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function toRelativePath(rootDir: string, filePath: string): string {
+  return path.relative(rootDir, filePath).split(path.sep).join('/');
+}
+
+function isInFolder(entry: ContentEntry, folder: string): boolean {
+  return entry.path === folder || entry.path.startsWith(`${folder}/`);
+}
+
+function toArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+/** Returns a value read from JSON as text, or `undefined` if it's missing. */
+function asText(value: unknown): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  return typeof value === 'string' ? value : JSON.stringify(value);
+}
+
+/** Returns true for a link that leaves the extension folder or is broken. */
+export function isUnresolvedLink(entry: ContentEntry): boolean {
+  return (
+    entry.type === 'link' &&
+    (entry.value === ContentMarker.Outside ||
+      entry.value === ContentMarker.Dangling)
+  );
+}
+
+/**
+ * Keeps the regular files directly in `folder` whose names pass `accept`, like
+ * loaders that list a folder and skip links, plus the entry of the folder
+ * itself when it's a link.
+ */
+function topLevelFiles(
+  entries: readonly ContentEntry[],
+  folder: string,
+  accept: (name: string) => boolean,
+): ContentEntry[] {
+  return entries.filter((entry) => {
+    if (entry.path === folder) {
+      return entry.type === 'link';
+    }
+    const name = entry.path.slice(folder.length + 1);
+    return !name.includes('/') && entry.type === 'file' && accept(name);
+  });
+}
+
+/** Returns true if `files` has more than the link entry of a folder. */
+function hasListedFiles(files: readonly ContentEntry[]): boolean {
+  return files.some((entry) => entry.value !== ContentMarker.Directory);
+}
+
+/**
+ * Values of an MCP server that can reference files: command, args, the working
+ * directory, and env.
+ */
+export function mcpServerValues(server: {
+  command?: unknown;
+  args?: unknown;
+  cwd?: unknown;
+  env?: unknown;
+}): string[] {
+  const values: unknown[] = [
+    server.command,
+    ...toArray(server.args),
+    server.cwd,
+    ...(isRecord(server.env) ? Object.values(server.env) : []),
+  ];
+  return values.filter((value): value is string => typeof value === 'string');
+}
+
+/** Resolves `${/}` and `${pathSeparator}` to `/` in every string of `value`. */
+function resolvePathSeparators(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return value.replace(PATH_SEPARATOR_VARIABLES, '/');
+  }
+  if (Array.isArray(value)) {
+    return value.map(resolvePathSeparators);
+  }
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        resolvePathSeparators(item),
+      ]),
+    );
+  }
+  return value;
+}
+
+function isMcpServerRecord(
+  value: unknown,
+): value is Record<string, MCPServerConfig> {
+  return isRecord(value) && Object.values(value).every(isRecord);
+}
+
+function toReferencedPath(suffix: string): Omit<ReferencedPath, 'signature'> {
+  const posixSuffix = suffix.replaceAll('\\', '/');
+  if (posixSuffix !== '' && !posixSuffix.startsWith('/')) {
+    // For example `${extensionPath}-data/x`, a sibling of the extension folder.
+    return {
+      path: `${EXTENSION_PATH_VARIABLE}${posixSuffix}`,
+      marker: ContentMarker.Outside,
+    };
+  }
+  const relativePath = path.posix
+    .normalize(`.${posixSuffix}`)
+    .replace(/\/+$/, '');
+  if (relativePath === '' || relativePath === '.') {
+    return { path: '.', marker: ContentMarker.Root };
+  }
+  if (relativePath === '..' || relativePath.startsWith('../')) {
+    return { path: relativePath, marker: ContentMarker.Outside };
+  }
+  return { path: relativePath };
+}
+
+/**
+ * Finds the paths that `values` reference through `${extensionPath}`, sorted
+ * by UTF-16 code units. `${/}` and `${pathSeparator}` count as `/`, and each
+ * path ends at whitespace, a quote, or a shell operator. A path that follows a
+ * quote ends at the matching quote instead, so it can contain spaces and shell
+ * operators. Every path ends at a line break, `$`, a backtick, or a list
+ * separator (`:`, `;`, `,`).
+ */
+export function findReferencedPaths(
+  values: readonly string[],
+): Array<Omit<ReferencedPath, 'signature'>> {
+  const found = new Map<string, Omit<ReferencedPath, 'signature'>>();
+  for (const value of values) {
+    const text = value.replace(PATH_SEPARATOR_VARIABLES, '/');
+    let start = text.indexOf(EXTENSION_PATH_VARIABLE);
+    while (start !== -1) {
+      const before = text.charAt(start - 1);
+      const quote = before === '"' || before === "'" ? before : undefined;
+      const pathEnd = quote ? QUOTED_PATH_END : PATH_END;
+      let end = start + EXTENSION_PATH_VARIABLE.length;
+      while (
+        end < text.length &&
+        text[end] !== quote &&
+        !pathEnd.test(text[end])
+      ) {
+        end++;
+      }
+      const reference = toReferencedPath(
+        text.slice(start + EXTENSION_PATH_VARIABLE.length, end),
+      );
+      found.set(reference.path, reference);
+      start = text.indexOf(EXTENSION_PATH_VARIABLE, end);
+    }
+  }
+  return [...found.values()].sort((a, b) => compareCodeUnits(a.path, b.path));
+}
+
+/**
+ * Hashes the referenced paths inside `rootDir`. A path that is the folder
+ * itself, leaves it, or doesn't exist is recorded with a marker and isn't read.
+ */
+export async function collectReferencedPaths(
+  rootDir: string,
+  references: ReadonlyArray<Omit<ReferencedPath, 'signature'>>,
+): Promise<{ referencedPaths: ReferencedPath[]; entries: ContentEntry[] }> {
+  const referencedPaths: ReferencedPath[] = [];
+  const entries: ContentEntry[] = [];
+  for (const reference of references) {
+    let found = reference.marker
+      ? undefined
+      : await collectContentEntries(rootDir, reference.path);
+    let marker = reference.marker;
+    if (!found) {
+      marker ??= ContentMarker.Missing;
+      found = [{ path: reference.path, type: 'reference', value: marker }];
+    } else if (found.length === 1 && found[0].path === reference.path) {
+      // For example a link that leaves the folder.
+      const entryMarker = asContentMarker(found[0].value);
+      if (entryMarker && entryMarker !== ContentMarker.Directory) {
+        marker = entryMarker;
+      }
+    }
+    referencedPaths.push({
+      path: reference.path,
+      ...(marker ? { marker } : {}),
+      signature: computeContentSignature(found),
+    });
+    entries.push(...found);
+  }
+  return { referencedPaths, entries };
+}
+
+/** Returns true if `entries` has a hash (not a marker) for `relativePath`. */
+export function hasReadableFile(
+  entries: readonly ContentEntry[],
+  relativePath: string,
+): boolean {
+  return entries.some(
+    (entry) => entry.path === relativePath && SHA256_PATTERN.test(entry.value),
+  );
+}
+
+/** Reads a text file inside `rootDir`, or returns `undefined` on failure. */
+export async function readTextFile(
+  rootDir: string,
+  relativePath: string,
+): Promise<string | undefined> {
+  try {
+    return await fs.readFile(
+      path.join(rootDir, ...relativePath.split('/')),
+      'utf-8',
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+function parseEnv(value: unknown): Array<[string, string]> {
+  if (!isRecord(value)) {
+    return [];
+  }
+  return Object.keys(value)
+    .sort(compareCodeUnits)
+    .map((name) => [name, asText(value[name]) ?? '']);
+}
+
+/**
+ * Lists the hooks of a `hooks/hooks.json` file: events sorted by name, and the
+ * hooks of each event in file order. Returns `undefined` if the file isn't
+ * valid JSON or `hooks` isn't an object.
+ */
+export function parseHooksFile(content: string): HookSummary[] | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(parsed) || !isRecord(parsed['hooks'])) {
+    return undefined;
+  }
+  const hooksByEvent = parsed['hooks'];
+  const hooks: HookSummary[] = [];
+  for (const eventName of Object.keys(hooksByEvent).sort(compareCodeUnits)) {
+    for (const definition of toArray(hooksByEvent[eventName])) {
+      if (!isRecord(definition)) {
+        continue;
+      }
+      const matcher = asText(definition['matcher']);
+      for (const hook of toArray(definition['hooks'])) {
+        if (!isRecord(hook)) {
+          continue;
+        }
+        const name = asText(hook['name']);
+        const command = asText(hook['command']);
+        hooks.push({
+          eventName,
+          ...(matcher !== undefined ? { matcher } : {}),
+          ...(name !== undefined ? { name } : {}),
+          ...(command !== undefined
+            ? { command }
+            : { type: asText(hook['type']) ?? '' }),
+          env: parseEnv(hook['env']),
+        });
+      }
+    }
+  }
+  return hooks;
+}
+
+async function summarizeHooks(
+  rootDir: string,
+): Promise<HooksSummary | undefined> {
+  try {
+    await fs.stat(path.join(rootDir, 'hooks', 'hooks.json'));
+  } catch {
+    return undefined;
+  }
+  const files = (await collectContentEntries(rootDir, 'hooks')) ?? [];
+  let hooks: HookSummary[] | undefined;
+  if (hasReadableFile(files, HOOKS_FILE)) {
+    const content = await readTextFile(rootDir, HOOKS_FILE);
+    hooks = content === undefined ? undefined : parseHooksFile(content);
+  }
+  const { referencedPaths, entries } = await collectReferencedPaths(
+    rootDir,
+    findReferencedPaths(
+      (hooks ?? []).flatMap((hook) => [
+        hook.command ?? '',
+        ...hook.env.map(([, value]) => value),
+      ]),
+    ),
+  );
+  return {
+    ...(hooks ? { hooks } : {}),
+    files,
+    referencedPaths,
+    signature: computeContentSignature([...files, ...entries]),
+  };
+}
+
+/**
+ * Summarizes the context files and the files they import with `@`. Imports
+ * that resolve outside the extension folder aren't read.
+ */
+async function summarizeContextFiles(
+  rootDir: string,
+  contextFilePaths: readonly string[],
+): Promise<ContextFilesSummary | undefined> {
+  if (contextFilePaths.length === 0) {
+    return undefined;
+  }
+  const toRelative = (filePath: string) => toRelativePath(rootDir, filePath);
+  const paths = [...new Set(contextFilePaths.map(toRelative))];
+  const files: ContentEntry[] = [];
+  const imported = new Set<string>();
+  for (const relativePath of paths) {
+    const entries = (await collectContentEntries(rootDir, relativePath)) ?? [
+      { path: relativePath, type: 'reference', value: ContentMarker.Missing },
+    ];
+    files.push(...entries);
+    const content = hasReadableFile(entries, relativePath)
+      ? await readTextFile(rootDir, relativePath)
+      : undefined;
+    if (content === undefined) {
+      continue;
+    }
+    const filePath = path.join(rootDir, ...relativePath.split('/'));
+    const { importTree } = await processImports(
+      content,
+      path.dirname(filePath),
+      false,
+      undefined,
+      rootDir,
+      'tree',
+    );
+    // processImports returns a finite tree: it stops at depth 5, skips files
+    // that are already in the current import chain, and creates a new node
+    // for each import, so this loop ends after visiting each node once. A
+    // file can appear more than once, for example as a leaf where the depth
+    // limit cuts a chain and again with its own imports, so skipping paths
+    // that were already seen would drop those imports.
+    const pending = [...(importTree.imports ?? [])];
+    for (let node = pending.pop(); node; node = pending.pop()) {
+      imported.add(toRelative(node.path));
+      pending.push(...(node.imports ?? []));
+    }
+  }
+  const importedPaths = [...imported]
+    .filter((importedPath) => !paths.includes(importedPath))
+    .sort(compareCodeUnits);
+  for (const importedPath of importedPaths) {
+    files.push(...((await collectContentEntries(rootDir, importedPath)) ?? []));
+  }
+  return {
+    paths,
+    importedPaths,
+    files,
+    signature: computeContentSignature(files),
+  };
+}
+
+/**
+ * Returns true for the files that `loadSkillsFromDir` loads from `skills/`:
+ * `SKILL.md` and `<folder>/SKILL.md`, where its glob skips hidden folders and
+ * `node_modules`.
+ */
+function isSkillFile(relativePath: string): boolean {
+  const parts = relativePath.split('/');
+  if (parts[0] !== 'skills' || parts.length < 2 || parts.length > 3) {
+    return false;
+  }
+  const fileName = parts[parts.length - 1];
+  const isSkillName = CASE_INSENSITIVE_GLOB
+    ? fileName.toLowerCase() === SKILL_FILE.toLowerCase()
+    : fileName === SKILL_FILE;
+  const folder = parts.length === 3 ? parts[1] : '';
+  return isSkillName && !folder.startsWith('.') && folder !== 'node_modules';
+}
+
+/**
+ * Summarizes the skills that `loadSkillsFromDir` finds under `skills/`, with
+ * paths relative to the extension folder and a signature over every file of
+ * that folder. The loader follows links, so the skills are read here only from
+ * the `SKILL.md` files that were hashed inside the extension folder; links that
+ * leave it or are broken stay in `files` with a marker and aren't read.
+ */
+async function summarizeSkills(
+  rootDir: string,
+): Promise<SkillsSummary | undefined> {
+  const files = (await collectContentEntries(rootDir, 'skills')) ?? [];
+  const skills: SkillSummary[] = [];
+  for (const entry of files) {
+    if (!isSkillFile(entry.path) || !SHA256_PATTERN.test(entry.value)) {
+      continue;
+    }
+    const definition = await loadSkillFromFile(
+      path.join(rootDir, ...entry.path.split('/')),
+    );
+    if (!definition) {
+      continue;
+    }
+    const folder = path.posix.dirname(entry.path);
+    let itemCount: number | undefined;
+    try {
+      itemCount = (await fs.readdir(path.join(rootDir, ...folder.split('/'))))
+        .length;
+    } catch {
+      // The consent text says that the items can't be counted.
+    }
+    skills.push({
+      name: definition.name,
+      description: definition.description,
+      location: entry.path,
+      ...(itemCount !== undefined ? { itemCount } : {}),
+      signature: computeContentSignature(
+        files.filter((item) => isInFolder(item, folder)),
+      ),
+    });
+  }
+  if (skills.length === 0 && !files.some(isUnresolvedLink)) {
+    return undefined;
+  }
+  skills.sort((a, b) => compareCodeUnits(a.location, b.location));
+  return { skills, files, signature: computeContentSignature(files) };
+}
+
+/**
+ * Summarizes the sub-agents that `loadAgentsFromDirectory` reads: the `.md`
+ * files directly in `agents/` whose names don't start with `_`. The agents
+ * aren't loaded when `agents/` is a link that leaves the extension folder.
+ */
+async function summarizeAgents(
+  rootDir: string,
+): Promise<AgentsSummary | undefined> {
+  const entries = (await collectContentEntries(rootDir, 'agents')) ?? [];
+  const files = topLevelFiles(
+    entries,
+    'agents',
+    (name) => name.endsWith('.md') && !name.startsWith('_'),
+  );
+  if (!hasListedFiles(files)) {
+    return undefined;
+  }
+  const agents: AgentSummary[] = [];
+  if (!files.some(isUnresolvedLink)) {
+    const loaded = await loadAgentsFromDirectory(path.join(rootDir, 'agents'));
+    for (const agent of loaded?.agents ?? []) {
+      const filePath = agent.metadata?.filePath;
+      agents.push({
+        path: filePath ? toRelativePath(rootDir, filePath) : 'agents',
+        name: agent.name,
+        ...(agent.kind === 'remote' && agent.agentCardUrl
+          ? { agentCardUrl: agent.agentCardUrl }
+          : {}),
+        mcpServers:
+          agent.kind === 'local'
+            ? Object.entries(agent.mcpServers ?? {}).sort(([a], [b]) =>
+                compareCodeUnits(a, b),
+              )
+            : [],
+      });
+    }
+    for (const error of loaded?.errors ?? []) {
+      agents.push({
+        path: error.filePath
+          ? toRelativePath(rootDir, error.filePath)
+          : 'agents',
+        mcpServers: [],
+      });
+    }
+  }
+  agents.sort(
+    (a, b) =>
+      compareCodeUnits(a.path, b.path) ||
+      compareCodeUnits(a.name ?? '', b.name ?? ''),
+  );
+  const { referencedPaths, entries: referencedEntries } =
+    await collectReferencedPaths(
+      rootDir,
+      findReferencedPaths(
+        agents.flatMap((agent) =>
+          agent.mcpServers.flatMap(([, server]) => mcpServerValues(server)),
+        ),
+      ),
+    );
+  return {
+    agents,
+    referencedPaths,
+    files,
+    signature: computeContentSignature([...files, ...referencedEntries]),
+  };
+}
+
+/**
+ * Summarizes the `.toml` files under `commands/`, like the `**\/*.toml` glob
+ * of the command loader, which includes hidden folders and follows links.
+ */
+async function summarizeCommands(
+  rootDir: string,
+): Promise<FilesSummary | undefined> {
+  const entries = (await collectContentEntries(rootDir, 'commands')) ?? [];
+  const files = entries.filter(
+    (entry) =>
+      entry.type !== 'dir' &&
+      entry.value !== ContentMarker.Directory &&
+      (entry.path.endsWith('.toml') || isUnresolvedLink(entry)),
+  );
+  return files.length > 0
+    ? { files, signature: computeContentSignature(files) }
+    : undefined;
+}
+
+/**
+ * Summarizes the policy files that the policy loader reads: the `.toml` files
+ * directly in `policies/`.
+ */
+async function summarizePolicies(
+  rootDir: string,
+): Promise<FilesSummary | undefined> {
+  const entries = (await collectContentEntries(rootDir, 'policies')) ?? [];
+  const files = topLevelFiles(entries, 'policies', (name) =>
+    name.endsWith('.toml'),
+  );
+  return hasListedFiles(files)
+    ? { files, signature: computeContentSignature(files) }
+    : undefined;
+}
+
+/**
+ * Reads the raw `gemini-extension.json`, or returns `undefined` when it can't
+ * be read or isn't a JSON object, so callers can use the loaded values.
+ */
+async function readManifest(
+  rootDir: string,
+): Promise<Record<string, unknown> | undefined> {
+  const entries = (await collectContentEntries(rootDir, MANIFEST_FILE)) ?? [];
+  const content = hasReadableFile(entries, MANIFEST_FILE)
+    ? await readTextFile(rootDir, MANIFEST_FILE)
+    : undefined;
+  if (content === undefined) {
+    return undefined;
+  }
+  try {
+    const manifest: unknown = JSON.parse(content);
+    return isRecord(manifest) ? manifest : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Summarizes the MCP servers of the raw manifest, keeping `${extensionPath}`
+ * and `${workspacePath}` as written.
+ */
+async function summarizeMcpServers(
+  rootDir: string,
+  manifest: Record<string, unknown>,
+): Promise<Array<[string, McpServerSummary]> | undefined> {
+  const rawServers = resolvePathSeparators(manifest['mcpServers'] ?? {});
+  if (!isMcpServerRecord(rawServers)) {
+    return undefined;
+  }
+  const servers: Array<[string, McpServerSummary]> = [];
+  for (const [name, config] of Object.entries(rawServers)) {
+    const { referencedPaths, entries: referencedEntries } =
+      await collectReferencedPaths(
+        rootDir,
+        findReferencedPaths(mcpServerValues(config)),
+      );
+    servers.push([
+      name,
+      {
+        config,
+        referencedPaths,
+        ...(referencedPaths.length > 0
+          ? { filesSignature: computeContentSignature(referencedEntries) }
+          : {}),
+      },
+    ]);
+  }
+  return servers;
+}
+
+/**
+ * Lists the settings of the raw manifest. The extension receives each value in
+ * the setting's environment variable, in its hooks and MCP servers.
+ */
+function summarizeSettings(
+  manifest: Record<string, unknown>,
+): SettingSummary[] | undefined {
+  const settings = toArray(manifest['settings'])
+    .filter(isRecord)
+    .map((setting) => ({
+      name: asText(setting['name']) ?? '',
+      envVar: asText(setting['envVar']) ?? '',
+      sensitive: setting['sensitive'] === true,
+    }));
+  return settings.length > 0 ? settings : undefined;
+}
+
+/** Returns `plan.directory` of the raw manifest, as written. */
+function readPlanDirectory(
+  manifest: Record<string, unknown>,
+): string | undefined {
+  const plan = manifest['plan'];
+  return isRecord(plan) ? asText(plan['directory']) : undefined;
+}
+
+/** Returns the JSON of `value` with object keys sorted by code units. */
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) =>
+    isRecord(item)
+      ? Object.fromEntries(
+          Object.keys(item)
+            .sort(compareCodeUnits)
+            .map((key) => [key, item[key]]),
+        )
+      : item,
+  );
+}
+
+/**
+ * Summarizes every file in the extension folder, so an update that changes a
+ * file asks again even when nothing declares it, for example a module that a
+ * hook script imports. `.git` folders, `.gemini-extension-install.json`, and
+ * `.env` (the settings that Gemini CLI stores there) are left out. When
+ * `gemini-extension.json` is valid JSON, its entry is the hash of its content
+ * without `version`, with sorted keys, so an update that only changes the
+ * version doesn't ask again.
+ */
+async function summarizeExtensionFiles(
+  rootDir: string,
+  manifest: Record<string, unknown> | undefined,
+): Promise<FilesSummary | undefined> {
+  let names: string[];
+  try {
+    names = (await fs.readdir(rootDir)).sort(compareCodeUnits);
+  } catch {
+    return undefined;
+  }
+  const files: ContentEntry[] = [];
+  for (const name of names) {
+    if (name === '.git' || CLI_FILES.has(name)) {
+      continue;
+    }
+    for (const entry of (await collectContentEntries(rootDir, name)) ?? []) {
+      if (entry.path.split('/').includes('.git')) {
+        continue;
+      }
+      if (
+        entry.path === MANIFEST_FILE &&
+        manifest &&
+        SHA256_PATTERN.test(entry.value)
+      ) {
+        const withoutVersion = { ...manifest };
+        delete withoutVersion['version'];
+        files.push({ ...entry, value: sha256(canonicalJson(withoutVersion)) });
+      } else {
+        files.push(entry);
+      }
+    }
+  }
+  return files.length > 0
+    ? { files, signature: computeContentSignature(files) }
+    : undefined;
+}
+
+/**
+ * Builds the summary of an extension folder from its raw files. Variables such
+ * as `${extensionPath}` stay as written, and nothing outside the folder is
+ * read.
+ */
+export async function buildExtensionContentSummary(
+  extensionDir: string,
+  sources: ExtensionContentSources = {},
+): Promise<ExtensionContentSummary> {
+  const manifest = await readManifest(extensionDir);
+  const hooks = await summarizeHooks(extensionDir);
+  const contextFiles = await summarizeContextFiles(
+    extensionDir,
+    sources.contextFilePaths ?? [],
+  );
+  const skills = await summarizeSkills(extensionDir);
+  const agents = await summarizeAgents(extensionDir);
+  const commands = await summarizeCommands(extensionDir);
+  const policies = await summarizePolicies(extensionDir);
+  const mcpServers = manifest
+    ? await summarizeMcpServers(extensionDir, manifest)
+    : undefined;
+  const settings = manifest ? summarizeSettings(manifest) : undefined;
+  const planDirectory = manifest ? readPlanDirectory(manifest) : undefined;
+  const extensionFiles =
+    sources.includeAllFiles === false
+      ? undefined
+      : await summarizeExtensionFiles(extensionDir, manifest);
+  return {
+    ...(hooks ? { hooks } : {}),
+    ...(contextFiles ? { contextFiles } : {}),
+    ...(skills ? { skills } : {}),
+    ...(agents ? { agents } : {}),
+    ...(commands ? { commands } : {}),
+    ...(policies ? { policies } : {}),
+    ...(mcpServers ? { mcpServers } : {}),
+    ...(settings ? { settings } : {}),
+    ...(planDirectory !== undefined ? { planDirectory } : {}),
+    ...(extensionFiles ? { extensionFiles } : {}),
+  };
+}

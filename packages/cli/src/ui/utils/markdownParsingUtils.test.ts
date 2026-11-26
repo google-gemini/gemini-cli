@@ -128,6 +128,36 @@ describe('parsingUtils', () => {
       );
     });
 
+    it('should handle inline code that contains backticks inside a longer fence', () => {
+      const input = 'Run ``echo `id` now`` today';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('Run ')}${accent('echo `id` now')}${primary(' today')}`,
+      );
+    });
+
+    it('should remove one space of padding from each side of inline code', () => {
+      const input = 'Run `` `id` `` today';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('Run ')}${accent('`id`')}${primary(' today')}`,
+      );
+    });
+
+    it('should keep inline code that only contains spaces', () => {
+      const input = 'Space `   ` here';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('Space ')}${accent('   ')}${primary(' here')}`,
+      );
+    });
+
+    it('should leave backtick runs without a matching closing run as text', () => {
+      const input = 'Odd ``a` text';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(primary('Odd ``a` text'));
+    });
+
     it('should handle links', () => {
       const input = 'Check [this link](https://example.com)';
       const output = parseMarkdownToANSI(input);
@@ -244,6 +274,14 @@ describe('parsingUtils', () => {
         const output = parseMarkdownToANSI(input);
         expect(output).toBe(
           `${primary('use ')}${accent('$\\to$')}${primary(' for an arrow')}`,
+        );
+      });
+
+      it('preserves LaTeX inside inline code with a longer fence', () => {
+        const input = 'use ``a`b $\\to$`` here';
+        const output = parseMarkdownToANSI(input);
+        expect(output).toBe(
+          `${primary('use ')}${accent('a`b $\\to$')}${primary(' here')}`,
         );
       });
 

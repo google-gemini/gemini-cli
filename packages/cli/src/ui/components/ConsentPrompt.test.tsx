@@ -128,4 +128,43 @@ describe('ConsentPrompt', () => {
     );
     unmount();
   });
+
+  it('selects "Yes" first by default', async () => {
+    const { unmount } = await render(
+      <ConsentPrompt
+        prompt="Are you sure?"
+        onConfirm={onConfirm}
+        terminalWidth={terminalWidth}
+      />,
+    );
+
+    expect(MockedRadioButtonSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ initialIndex: 0 }),
+      undefined,
+    );
+    unmount();
+  });
+
+  it('selects "No" first when defaultToNo is set, so Enter declines', async () => {
+    const { waitUntilReady, unmount } = await render(
+      <ConsentPrompt
+        prompt="Install this extension?"
+        onConfirm={onConfirm}
+        terminalWidth={terminalWidth}
+        defaultToNo
+      />,
+    );
+
+    const { items, initialIndex, onSelect } =
+      MockedRadioButtonSelect.mock.calls[0][0];
+    expect(initialIndex).toBe(1);
+    // Enter selects the highlighted item.
+    await act(async () => {
+      onSelect(items[initialIndex ?? 0].value);
+    });
+    await waitUntilReady();
+
+    expect(onConfirm).toHaveBeenCalledWith(false);
+    unmount();
+  });
 });
