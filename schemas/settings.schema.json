@@ -22,6 +22,43 @@
         "$ref": "#/$defs/MCPServerConfig"
       }
     },
+    "routing": {
+      "title": "Routing",
+      "description": "Configure numerical complexity score routing.",
+      "markdownDescription": "Configure numerical complexity score routing.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "numericalRules": {
+          "title": "Numerical Routing Rules",
+          "description": "Score bands matched in ascending maxScore order. Each maxScore is inclusive. Scores above all configured bands use the model in the final band.",
+          "markdownDescription": "Score bands matched in ascending maxScore order. Each maxScore is inclusive. Scores above all configured bands use the model in the final band.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "maxScore": {
+                "title": "Maximum Score",
+                "description": "Maximum score for this routing rule.",
+                "markdownDescription": "Maximum score for this routing rule.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `100`",
+                "default": 100,
+                "type": "number"
+              },
+              "model": {
+                "title": "Model ID",
+                "description": "Model alias or ID to route to.",
+                "markdownDescription": "Model alias or ID to route to.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: ``",
+                "default": "",
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "policyPaths": {
       "title": "Policy Paths",
       "description": "Additional policy files or directories to load.",
