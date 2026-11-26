@@ -407,11 +407,6 @@ Slash commands provide meta-level control over the CLI itself.
   them as desired. Changes to some settings are applied immediately, while
   others require a restart.
 
-### `/shells` (or `/bashes`)
-
-- **Description:** Toggle the background shells view. This lets you view and
-  manage long-running processes that you've sent to the background.
-
 ### `/setup-github`
 
 - **Description:** Set up GitHub Actions to triage issues and review PRs with
