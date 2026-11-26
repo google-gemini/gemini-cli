@@ -209,9 +209,11 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
       const output = tailLines.join('\n');
 
       const header =
-        requestedLinesCount < logLines.length
-          ? `Showing last ${requestedLinesCount} of ${logLines.length} lines:\n`
-          : 'Full Log Output:\n';
+        position > 0
+          ? `Showing last ${tailLines.length} lines (earlier output truncated):\n`
+          : requestedLinesCount < logLines.length
+            ? `Showing last ${requestedLinesCount} of ${logLines.length} lines:\n`
+            : 'Full Log Output:\n';
 
       const responseContent = header + output;
 
