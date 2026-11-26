@@ -538,6 +538,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           Date.now() - recoveryStartTime,
           success,
           turnCounter,
+          success, // salvaged: recovery output was captured but not promoted to GOAL
         ),
       );
     }
@@ -765,6 +766,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         terminateReason !== AgentTerminateMode.ABORTED &&
         terminateReason !== AgentTerminateMode.GOAL
       ) {
+        const originalTerminateReason = terminateReason;
         const recoveryResult = await this.executeFinalWarningTurn(
           chat,
           turnCounter, // Use current turnCounter for the recovery attempt
@@ -774,9 +776,23 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         );
 
         if (recoveryResult !== null) {
-          // Recovery Succeeded
-          terminateReason = AgentTerminateMode.GOAL;
+          // Recovery captured partial output, but the agent did NOT
+          // complete its task normally, it was interrupted by the
+          // budget limit.  Preserve the original terminate reason so
+          // the parent can distinguish "completed via GOAL" from
+          // "budget-exhausted with a salvaged summary".
+          // Fixes: https://github.com/google-gemini/gemini-cli/issues/22323
+          terminateReason = originalTerminateReason;
           finalResult = recoveryResult;
+
+          // Save session summary with the salvaged output so it is
+          // not lost even though terminate_reason is not GOAL.
+          try {
+            const summary = this.getTruncatedSummary(finalResult);
+            chat?.getChatRecordingService()?.saveSummary(summary);
+          } catch (error) {
+            debugLogger.warn('Failed to save subagent session summary.', error);
+          }
         } else {
           // Recovery Failed. Set the final error message based on the *original* reason.
           if (terminateReason === AgentTerminateMode.TIMEOUT) {
@@ -809,17 +825,17 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
       }
 
-      if (terminateReason === AgentTerminateMode.GOAL) {
-        // Save the session summary upon completion
-        if (finalResult && chat) {
-          try {
-            const summary = this.getTruncatedSummary(finalResult);
-            chat.getChatRecordingService()?.saveSummary(summary);
-          } catch (error) {
-            debugLogger.warn('Failed to save subagent session summary.', error);
-          }
+      // Save the session summary upon genuine GOAL completion.
+      if (terminateReason === AgentTerminateMode.GOAL && finalResult && chat) {
+        try {
+          const summary = this.getTruncatedSummary(finalResult);
+          chat.getChatRecordingService()?.saveSummary(summary);
+        } catch (error) {
+          debugLogger.warn('Failed to save subagent session summary.', error);
         }
+      }
 
+      if (terminateReason === AgentTerminateMode.GOAL) {
         return {
           result: finalResult || 'Task completed.',
           terminate_reason: terminateReason,
@@ -856,11 +872,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           );
 
           if (recoveryResult !== null) {
-            // Recovery Succeeded
-            terminateReason = AgentTerminateMode.GOAL;
+            // Recovery captured partial output, but keep TIMEOUT as
+            // the terminate reason — the agent did not truly finish.
             finalResult = recoveryResult;
 
-            // Save the session summary upon successful recovery
+            // Save the session summary with the recovered output
             try {
               const summary = this.getTruncatedSummary(finalResult);
               chat.getChatRecordingService()?.saveSummary(summary);
