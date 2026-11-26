@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ToolExecutor } from './tool-executor.js';
+import { STOPPED_CALL_MESSAGE, ToolExecutor } from './tool-executor.js';
 import {
   type Config,
   type ToolResult,
@@ -249,7 +249,54 @@ describe('ToolExecutor', () => {
     if (result.status === CoreToolCallStatus.Cancelled) {
       const response = result.response.responseParts[0]?.functionResponse
         ?.response as Record<string, unknown>;
-      expect(response['error']).toContain('Operation cancelled.');
+      expect(response['error']).toBe(STOPPED_CALL_MESSAGE);
+    }
+  });
+
+  it('tells the model that a stopped call may already have taken effect', async () => {
+    // A call that had started may have run, and a remote (MCP) call may have completed on its server: the result
+    // must not read as "did not happen", or the model runs the call again.
+    const mockTool = new MockTool({
+      name: 'appendLine',
+      description: 'Mock remote tool',
+    });
+    const invocation = mockTool.build({});
+
+    const abortErr = new Error('The user aborted a request.');
+    abortErr.name = 'AbortError';
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockRejectedValue(
+      abortErr,
+    );
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-stopped',
+        name: 'appendLine',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-stopped',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    expect(result.status).toBe(CoreToolCallStatus.Cancelled);
+    if (result.status === CoreToolCallStatus.Cancelled) {
+      const response = result.response.responseParts[0]?.functionResponse
+        ?.response as Record<string, unknown>;
+      expect(response['error']).not.toContain('[Operation Cancelled]');
+      expect(response['error']).toContain('may have taken effect');
+      expect(response['error']).toContain(
+        'Check whether it took effect before running it again.',
+      );
     }
   });
 
@@ -289,7 +336,7 @@ describe('ToolExecutor', () => {
     if (result.status === CoreToolCallStatus.Cancelled) {
       const response = result.response.responseParts[0]?.functionResponse
         ?.response as Record<string, unknown>;
-      expect(response['error']).toContain('User cancelled tool execution.');
+      expect(response['error']).toBe(STOPPED_CALL_MESSAGE);
     }
   });
 
@@ -749,7 +796,7 @@ describe('ToolExecutor', () => {
       const response = result.response.responseParts[0]?.functionResponse
         ?.response as Record<string, unknown>;
       expect(response).toEqual({
-        error: '[Operation Cancelled] User cancelled tool execution.',
+        error: STOPPED_CALL_MESSAGE,
         output: partialOutput,
       });
       expect(result.response.resultDisplay).toBe(
