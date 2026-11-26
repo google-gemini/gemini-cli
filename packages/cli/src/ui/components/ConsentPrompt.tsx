@@ -16,10 +16,12 @@ type ConsentPromptProps = {
   prompt: ReactNode;
   onConfirm: (value: boolean) => void;
   terminalWidth: number;
+  /** Selects "No" first, so pressing Enter declines. */
+  defaultToNo?: boolean;
 };
 
 export const ConsentPrompt = (props: ConsentPromptProps) => {
-  const { prompt, onConfirm, terminalWidth } = props;
+  const { prompt, onConfirm, terminalWidth, defaultToNo = false } = props;
 
   return (
     <Box
@@ -44,6 +46,7 @@ export const ConsentPrompt = (props: ConsentPromptProps) => {
             { label: 'Yes', value: true, key: 'Yes' },
             { label: 'No', value: false, key: 'No' },
           ]}
+          initialIndex={defaultToNo ? 1 : 0}
           onSelect={onConfirm}
         />
         <DialogFooter

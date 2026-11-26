@@ -21,6 +21,7 @@ import {
   parseCommandDetails,
   splitCommands,
   stripShellWrapper,
+  extractWrappedShellCommands,
   normalizeCommand,
   hasRedirection,
   hasUnresolvedShellExpansion,
@@ -1070,5 +1071,258 @@ describe('isInteractiveGeminiCommand', () => {
     expect(isInteractiveGeminiCommand('command -V gemini')).toBe(false);
     expect(isInteractiveGeminiCommand('gemini\\ config')).toBe(false);
     expect(isInteractiveGeminiCommand('git status')).toBe(false);
+  });
+});
+
+describe('detectCommandSubstitution & extractWrappedShellCommands (wrapper bypass hardening)', () => {
+  beforeEach(() => {
+    mockPlatform.mockReturnValue('linux');
+  });
+
+  it('should detect command substitution behind prefix utilities and chained wrappers', () => {
+    const wrappedPayloads = [
+      "env sh -c '$(whoami > ./bypass-proof)'",
+      "/usr/bin/env sh -c '$(whoami)'",
+      "env -i FOO=bar sh -c '$(whoami)'",
+      "env - sh -c '$(whoami)'",
+      "env -u HOME -C /tmp /bin/sh -c '$(whoami)'",
+      'env -S "sh -c \'\\$(whoami)\'"',
+      "env -S 'sh -c' '$(whoami)'",
+      "nice sh -c '$(whoami)'",
+      "nice -n 10 sh -c '$(whoami)'",
+      "nice -10 sh -c '$(whoami)'",
+      "timeout 10 sh -c '$(whoami)'",
+      "timeout -s KILL 5s sh -c '$(whoami)'",
+      "nohup sh -c '$(whoami)'",
+      "setsid sh -c '$(whoami)'",
+      "setsid -f sh -c '$(whoami)'",
+      "sudo -u root sh -c '$(whoami)'",
+      "command sh -c '$(whoami)'",
+      "exec -a custom sh -c '$(whoami)'",
+      "busybox sh -c '$(whoami)'",
+      "FOO=1 env BAR=2 nice -n 5 timeout 10 nohup setsid /bin/sh -e -c '$(whoami)'",
+      "env sh -c '`whoami`'",
+      "env sh -c 'cat <(whoami)'",
+      "env sh -c 'tee >(whoami)'",
+      "eval '$(whoami)'",
+    ];
+
+    for (const cmd of wrappedPayloads) {
+      expect(
+        detectCommandSubstitution(cmd),
+        `detectCommandSubstitution(${cmd})`,
+      ).toBe(true);
+      expect(
+        detectCommandSubstitution(stripShellWrapper(cmd)),
+        `detectCommandSubstitution(stripShellWrapper(${cmd}))`,
+      ).toBe(true);
+    }
+  });
+
+  it('should detect command substitution behind POSIX shell flags, quoting tricks, and trailing characters', () => {
+    const shapedPayloads = [
+      "sh -e -c '$(whoami)'",
+      "bash -lc '$(whoami)'",
+      "bash -ce '$(whoami)'",
+      "bash -c -e '$(whoami)'",
+      "bash -o pipefail -c '$(whoami)'",
+      "bash +xc '$(whoami)'",
+      "bash -c -- '$(whoami)'",
+      "bash -c -o pipefail '$(whoami)'",
+      "sh -c >/tmp/x '$(whoami)'",
+      "sh -c 2>/dev/null '$(whoami)'",
+      'sh -c >"/tmp/a b" \'$(whoami)\'',
+      "env >/tmp/x sh -c '$(whoami)' | cat",
+      "sh -c echo\\ '$(whoami)'",
+      "sh -c a'$(whoami)'",
+      "'sh' -c '$(whoami)'",
+      "\\sh -c '$(whoami)'",
+      "bash -c $'$(whoami)'",
+      "bash -c $'\\x24(whoami)'",
+      'env sh -c "echo \\$(whoami)"',
+      "sh -c '$(whoami)' &",
+      "sh -c '$(whoami)' ;",
+      "sh -c '$(whoami)' >/tmp/x",
+      "sh -c '$(whoami)' # comment",
+      "sh -c '$(whoami)' ''",
+      "sh -c '$(whoami)' _ 'arg1'",
+      "sh -c '$(whoami)' && true",
+      "echo hi && env sh -c '$(whoami)'",
+      "env sh -c '$(whoami)' | cat",
+      "(env sh -c '$(whoami)')",
+      ">/tmp/x sh -c '$(whoami)'",
+      "sh >/tmp/x -c '$(whoami)'",
+      "env sh -c 'bash -c '\\''$(whoami)'\\'''",
+    ];
+
+    for (const cmd of shapedPayloads) {
+      expect(
+        detectCommandSubstitution(cmd),
+        `detectCommandSubstitution(${cmd})`,
+      ).toBe(true);
+      expect(
+        detectCommandSubstitution(stripShellWrapper(cmd)),
+        `detectCommandSubstitution(stripShellWrapper(${cmd}))`,
+      ).toBe(true);
+    }
+
+    // stripShellWrapper should preserve trailing operators/redirections rather
+    // than stripping `sh -c` and leaving a broken quoted string.
+    expect(stripShellWrapper("sh -c 'echo ok' &")).toBe("sh -c 'echo ok' &");
+    expect(stripShellWrapper("sh -c 'echo ok' >/tmp/x")).toBe(
+      "sh -c 'echo ok' >/tmp/x",
+    );
+    expect(stripShellWrapper("sh -c 'echo ok' # comment")).toBe(
+      "sh -c 'echo ok' # comment",
+    );
+    // Unquoted argv-joined `sh -c` commands without hidden substitution (e.g.
+    // from sandbox managers) should still strip cleanly.
+    expect(stripShellWrapper('sh -c echo test > "/tmp/x"')).toBe(
+      'echo test > "/tmp/x"',
+    );
+  });
+
+  it('should detect command substitution behind Windows PowerShell and cmd.exe wrapper variants', () => {
+    const winWrappedPayloads = [
+      "pwsh -c '$(Get-Process)'",
+      "powershell -c '$(Get-Process)'",
+      "pwsh -com '$(Get-Process)'",
+      "pwsh -ExecutionPolicy Bypass -Command '$(Get-Process)'",
+      "pwsh -NoLogo -ep Bypass -c '@(Get-Process)'",
+      "pwsh -c '$(Get-Process)' ;",
+      "env pwsh -c '$(Get-Process)'",
+      // UTF-16LE base64 of `$(whoami)`
+      'pwsh -enc JAAoAHcAaABvAGEAbQBpACkA',
+      "cmd.exe /k '$(whoami)'",
+      'cmd.exe /k "$(whoami)"',
+      "cmd.exe /q /c '$(whoami)'",
+      "cmd.exe /r '$(whoami)'",
+      'cmd.exe /k "echo ok & powershell -c \'@(whoami)\'"',
+    ];
+
+    for (const cmd of winWrappedPayloads) {
+      expect(
+        detectCommandSubstitution(cmd),
+        `detectCommandSubstitution(${cmd})`,
+      ).toBe(true);
+      expect(
+        detectCommandSubstitution(stripShellWrapper(cmd)),
+        `detectCommandSubstitution(stripShellWrapper(${cmd}))`,
+      ).toBe(true);
+    }
+  });
+
+  it('should fail closed when nested shell wrappers exceed the max recursion depth', () => {
+    const deepNested =
+      'env sh -c "bash -c \\"sh -c \\\\\\"bash -c \\\\\\\\\\\\\\"sh -c \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"bash -c \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"echo safe\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"\\\\\\\\\\\\\\"\\\\\\"\\""';
+    expect(detectCommandSubstitution(deepNested)).toBe(true);
+  });
+
+  it('should not falsely flag safe wrapped commands or literal single-quoted text', () => {
+    const safeCommands = [
+      "env sh -c 'echo hello'",
+      "nice -n 10 bash -lc 'npm run build'",
+      "timeout 30 sh -c 'pytest tests/'",
+      "env FOO=bar echo 'literal $(text)'",
+      'command -v sh',
+      "sh script.sh '$(literal)'",
+      "bash -c 'echo '\\''$(literal)'\\'''",
+      'env sh -c "echo \\\\\\$(literal)"',
+      "pwsh -ExecutionPolicy Bypass -c 'Write-Host ok'",
+      'cmd.exe /c "dir C:\\Program Files (x86)\\Git"',
+      "git commit -m 'fix $(foo)'",
+      "sh -c 'echo ok' &",
+      "sh -c 'echo ok' ''",
+    ];
+
+    for (const cmd of safeCommands) {
+      expect(
+        detectCommandSubstitution(cmd),
+        `detectCommandSubstitution(${cmd})`,
+      ).toBe(false);
+      expect(
+        detectCommandSubstitution(stripShellWrapper(cmd)),
+        `detectCommandSubstitution(stripShellWrapper(${cmd}))`,
+      ).toBe(false);
+    }
+  });
+
+  it('should extract inner payloads via extractWrappedShellCommands', () => {
+    expect(extractWrappedShellCommands("env sh -c 'echo $(whoami)'")).toEqual([
+      { command: 'echo $(whoami)', shell: 'bash' },
+    ]);
+    expect(extractWrappedShellCommands("timeout 10 sh -e -c 'id' ''")).toEqual([
+      { command: 'id', shell: 'bash' },
+    ]);
+    expect(extractWrappedShellCommands("pwsh -com '$(Get-Process)'")).toEqual([
+      { command: '$(Get-Process)', shell: 'powershell' },
+    ]);
+    expect(extractWrappedShellCommands("cmd.exe /k 'dir'")).toEqual([
+      { command: 'dir', shell: 'cmd' },
+    ]);
+  });
+
+  it('should detect command substitution behind quoted env assignments, multi-o flags, escaped backslashes, locale quotes, prefix-flag clusters, xargs, env -S escapes, clobber redirects, and Windows/PowerShell edge cases', () => {
+    const hardenedPayloads = [
+      // Quoted env assignments & +=
+      `FOO="bar" sh -c '$(whoami)'`,
+      `FOO='' sh -c '$(whoami)'`,
+      `env FOO="bar" sh -c '$(whoami)'`,
+      `env "FOO=bar" sh -c '$(whoami)'`,
+      `sudo FOO="bar" sh -c '$(whoami)'`,
+      `FOO+=bar bash -c '$(whoami)'`,
+      // Multiple / non-final -o/-O flags
+      `bash -oc pipefail '$(whoami)'`,
+      `bash -oo pipefail noglob -c '$(whoami)'`,
+      // POSIX unquoted escaped literal backslash followed by shell metacharacters
+      'sh -e -c true\\ a\\\\b\\;\\$\\(whoami\\)',
+      // Bash locale-translated double quotes ($"...")
+      `sh -$"c" '$(whoami)'`,
+      `$"sh" -c '$(whoami)'`,
+      // Prefix utility edge cases
+      `env --default-signal sh -c '$(whoami)'`,
+      `env --block-signal=PIPE sh -c '$(whoami)'`,
+      `timeout -fs KILL 5 sh -c '$(whoami)'`,
+      `sudo -Eu root sh -c '$(whoami)'`,
+      `watch -xn 1 sh -c '$(whoami)'`,
+      `echo x | xargs sh -c '$(whoami)'`,
+      `echo x | xargs -0 -I {} sh -c '$(whoami)'`,
+      'env -S "sh\\_-c\\_\'\\$(whoami)\'"',
+      // Clobber redirection >|
+      `sh -c >| /dev/null '$(whoami)'`,
+      `sh -c >|/dev/null '$(whoami)'`,
+      // Windows / PowerShell / .exe / fish edge cases
+      `pwsh -c 'Write-Host' '$(Get-Process)'`,
+      `pwsh -c '' '$(Get-Process)'`,
+      `pwsh -c \u2018$(Get-Process)\u2019`,
+      `powershell.exe /c '$(Get-Process)'`,
+      `powershell.exe '$(Get-Process)'`,
+      `powershell.exe -NoProfile '$(Get-Process)'`,
+      'pwsh -enc "JAAoAHcA\n aABvAGEAbQBpACkA"',
+      `pwsh -enc ${'A'.repeat(70_000)}`,
+      `bash.exe -c '$(whoami)'`,
+      `sh.exe -c '$(whoami)'`,
+      `fish -c '$(whoami)'`,
+      `fish -C '$(whoami)'`,
+    ];
+
+    for (const cmd of hardenedPayloads) {
+      expect(
+        detectCommandSubstitution(cmd),
+        `detectCommandSubstitution(${cmd.slice(0, 80)})`,
+      ).toBe(true);
+      expect(
+        detectCommandSubstitution(stripShellWrapper(cmd)),
+        `detectCommandSubstitution(stripShellWrapper(${cmd.slice(0, 80)}))`,
+      ).toBe(true);
+    }
+
+    // PowerShell -File and single .ps1 path should not be flagged as substitution.
+    expect(detectCommandSubstitution('powershell.exe -File ./script.ps1')).toBe(
+      false,
+    );
+    expect(detectCommandSubstitution('powershell.exe ./script.ps1')).toBe(
+      false,
+    );
   });
 });

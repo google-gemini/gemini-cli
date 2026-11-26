@@ -74,6 +74,7 @@ import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import {
   OAuthUtils,
+  OAuthSecurityError,
   type OAuthAuthorizationServerMetadata,
   type OAuthProtectedResourceMetadata,
 } from './oauth-utils.js';
@@ -295,6 +296,7 @@ describe('MCPOAuthProvider', () => {
       };
       delete configWithoutAuth.authorizationUrl;
       delete configWithoutAuth.tokenUrl;
+      delete configWithoutAuth.issuer;
 
       const mockResourceMetadata = {
         resource: 'https://api.example.com/',
@@ -302,6 +304,7 @@ describe('MCPOAuthProvider', () => {
       };
 
       const mockAuthServerMetadata = {
+        issuer: 'https://discovered.auth.com',
         authorization_endpoint: 'https://discovered.auth.com/authorize',
         token_endpoint: 'https://discovered.auth.com/token',
         scopes_supported: ['read', 'write'],
@@ -1301,6 +1304,35 @@ describe('MCPOAuthProvider', () => {
       expect(result).toBeNull();
     });
 
+    it('should enforce expectedOrigin on stored tokenUrl during refresh when config pins issuer or authorizationUrl without tokenUrl', async () => {
+      const mismatchedStoredCredentials = {
+        serverName: 'test-server',
+        token: { ...mockToken, expiresAt: Date.now() - 3600000 },
+        clientId: 'test-client-id',
+        tokenUrl: 'https://other-token-host.example.org/token',
+        updatedAt: Date.now(),
+      };
+
+      const tokenStorage = new MCPOAuthTokenStorage();
+      vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+        mismatchedStoredCredentials,
+      );
+      vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(true);
+      vi.mocked(tokenStorage.deleteCredentials).mockResolvedValue(undefined);
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.getValidToken('test-server', {
+        enabled: true,
+        issuer: 'https://auth.example.com',
+      });
+
+      expect(result).toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(tokenStorage.deleteCredentials).toHaveBeenCalledWith(
+        'test-server',
+      );
+    });
+
     it('should handle callback timeout', async () => {
       vi.useFakeTimers();
       try {
@@ -1580,6 +1612,305 @@ describe('MCPOAuthProvider', () => {
       expect(mockOpenBrowserSecurely).not.toHaveBeenCalled();
       vi.useRealTimers();
     });
+
+    it('should include authorization_endpoint origin in getConsentForOauth prompt', async () => {
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((_port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      await authProvider.authenticate('production-server', mockConfig);
+
+      expect(getConsentForOauth).toHaveBeenCalledWith(
+        "Authentication required for MCP Server: 'production-server' (Authorization origin: https://auth.example.com).",
+      );
+    });
+
+    it('should allow explicit manual multi-origin config (e.g. Google Workspace MCP) and display both origins in consent prompt', async () => {
+      const manualMultiOriginConfig: MCPOAuthConfig = {
+        enabled: true,
+        clientId: 'workspace-client.apps.googleusercontent.com',
+        clientSecret: 'workspace-secret',
+        authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+        scopes: ['openid', 'email'],
+        redirectUri: 'http://localhost:7777/oauth/callback',
+      };
+
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((_port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=google_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.authenticate(
+        'workspace-server',
+        manualMultiOriginConfig,
+        'https://workspace-mcp.example.com/mcp',
+      );
+
+      expect(result.accessToken).toBe('access_token_123');
+      expect(getConsentForOauth).toHaveBeenCalledWith(
+        "Authentication required for MCP Server: 'workspace-server' (Authorization origin: https://accounts.google.com, Token origin: https://oauth2.googleapis.com).",
+      );
+
+      // When an explicit manual config also specifies issuer, authorizationUrl must still match issuerOrigin
+      const mismatchedManualIssuerConfig: MCPOAuthConfig = {
+        ...manualMultiOriginConfig,
+        issuer: 'https://accounts.google.com',
+        authorizationUrl: 'https://other-idp.example.org/authorize',
+      };
+      await expect(
+        authProvider.authenticate(
+          'workspace-server',
+          mismatchedManualIssuerConfig,
+          'https://workspace-mcp.example.com/mcp',
+        ),
+      ).rejects.toThrow(OAuthSecurityError);
+    });
+
+    it('should reject dynamically discovered config when token_endpoint or registration_endpoint is cross-origin', async () => {
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse({ ok: true, status: 200 }))
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            json: {
+              resource: 'https://api.example.com/',
+              authorization_servers: ['https://discovered.auth.com'],
+            },
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            json: {
+              issuer: 'https://discovered.auth.com',
+              authorization_endpoint: 'https://discovered.auth.com/authorize',
+              token_endpoint: 'https://other-collector.example.org/token',
+            },
+          }),
+        );
+
+      const authProvider = new MCPOAuthProvider();
+      await expect(
+        authProvider.authenticate(
+          'test-server',
+          { enabled: true, clientId: 'test-client-id' },
+          'https://api.example.com',
+        ),
+      ).rejects.toThrow(OAuthSecurityError);
+
+      expect(getConsentForOauth).not.toHaveBeenCalled();
+      expect(mockOpenBrowserSecurely).not.toHaveBeenCalled();
+
+      // Also reject cross-origin registrationUrl before consent
+      const crossOriginRegistrationConfig: MCPOAuthConfig = {
+        ...mockConfig,
+        clientId: undefined,
+        registrationUrl: 'https://other-registrar.example.org/register',
+      };
+      await expect(
+        authProvider.authenticate('test-server', crossOriginRegistrationConfig),
+      ).rejects.toThrow(OAuthSecurityError);
+
+      expect(getConsentForOauth).not.toHaveBeenCalled();
+    });
+
+    it('should reject cross-origin tampering during partial config merge', async () => {
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse({ ok: true, status: 200 }))
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            json: {
+              resource: 'https://api.example.com/',
+              authorization_servers: ['https://other-auth.example.org'],
+            },
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            json: {
+              issuer: 'https://other-auth.example.org',
+              authorization_endpoint:
+                'https://other-auth.example.org/authorize',
+              token_endpoint: 'https://other-auth.example.org/token',
+            },
+          }),
+        );
+
+      const partialConfig: MCPOAuthConfig = {
+        enabled: true,
+        clientId: 'test-client-id',
+        authorizationUrl: 'https://trusted-auth.example.com/authorize',
+      };
+
+      const authProvider = new MCPOAuthProvider();
+      await expect(
+        authProvider.authenticate(
+          'test-server',
+          partialConfig,
+          'https://api.example.com',
+        ),
+      ).rejects.toThrow(OAuthSecurityError);
+
+      expect(getConsentForOauth).not.toHaveBeenCalled();
+    });
+
+    it('should call getConsentForOauth strictly before registerClient and never call registerClient when consent is declined', async () => {
+      const dcrConfig: MCPOAuthConfig = {
+        ...mockConfig,
+        registrationUrl: 'https://auth.example.com/register',
+      };
+      delete dcrConfig.clientId;
+
+      // Part 1: Consent declined -> registerClient POST and callback server must NOT execute
+      vi.mocked(getConsentForOauth).mockResolvedValueOnce(false);
+      const authProvider = new MCPOAuthProvider();
+
+      await expect(
+        authProvider.authenticate('dcr-server', { ...dcrConfig }),
+      ).rejects.toThrow(FatalCancellationError);
+
+      expect(getConsentForOauth).toHaveBeenCalledTimes(1);
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(vi.mocked(http.createServer)).not.toHaveBeenCalled();
+      expect(mockOpenBrowserSecurely).not.toHaveBeenCalled();
+
+      // Part 2: Consent granted -> execution order is strictly consent -> listen -> register -> browser -> token
+      const callOrder: string[] = [];
+      vi.mocked(getConsentForOauth).mockImplementationOnce(async () => {
+        callOrder.push('consent');
+        return true;
+      });
+
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((_port, callback) => {
+        callOrder.push('listen');
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw&iss=https://auth.example.com',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      mockOpenBrowserSecurely.mockImplementationOnce(async () => {
+        callOrder.push('browser');
+      });
+
+      const mockRegistrationResponse: OAuthClientRegistrationResponse = {
+        client_id: 'dynamic_client_id',
+        redirect_uris: ['http://localhost:7777/oauth/callback'],
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none',
+      };
+
+      mockFetch
+        .mockImplementationOnce(async () => {
+          callOrder.push('register');
+          return createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockRegistrationResponse),
+            json: mockRegistrationResponse,
+          });
+        })
+        .mockImplementationOnce(async () => {
+          callOrder.push('token');
+          return createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockTokenResponse),
+            json: mockTokenResponse,
+          });
+        });
+
+      await authProvider.authenticate('dcr-server', { ...dcrConfig });
+
+      expect(callOrder).toEqual([
+        'consent',
+        'listen',
+        'register',
+        'browser',
+        'token',
+      ]);
+    });
   });
 
   describe('refreshAccessToken', () => {
@@ -1794,6 +2125,35 @@ describe('MCPOAuthProvider', () => {
       expect(result).toBeNull();
     });
 
+    it('should enforce expectedOrigin on stored tokenUrl during refresh when config pins issuer without tokenUrl', async () => {
+      const mismatchedStoredCredentials = {
+        serverName: 'test-server',
+        token: { ...mockToken, expiresAt: Date.now() - 3600000 },
+        clientId: 'test-client-id',
+        tokenUrl: 'https://other-token-host.example.org/token',
+        updatedAt: Date.now(),
+      };
+
+      const tokenStorage = new MCPOAuthTokenStorage();
+      vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+        mismatchedStoredCredentials,
+      );
+      vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(true);
+      vi.mocked(tokenStorage.deleteCredentials).mockResolvedValue(undefined);
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.getValidToken('test-server', {
+        enabled: true,
+        issuer: 'https://auth.example.com',
+      });
+
+      expect(result).toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(tokenStorage.deleteCredentials).toHaveBeenCalledWith(
+        'test-server',
+      );
+    });
+
     it('should handle refresh failure and remove invalid token', async () => {
       const expiredCredentials = {
         serverName: 'test-server',
@@ -1862,6 +2222,35 @@ describe('MCPOAuthProvider', () => {
       );
 
       expect(result).toBeNull();
+    });
+
+    it('should enforce expectedOrigin on stored tokenUrl during refresh when config pins authorizationUrl without tokenUrl', async () => {
+      const mismatchedStoredCredentials = {
+        serverName: 'test-server',
+        token: { ...mockToken, expiresAt: Date.now() - 3600000 },
+        clientId: 'test-client-id',
+        tokenUrl: 'https://other-token-host.example.org/token',
+        updatedAt: Date.now(),
+      };
+
+      const tokenStorage = new MCPOAuthTokenStorage();
+      vi.mocked(tokenStorage.getCredentials).mockResolvedValue(
+        mismatchedStoredCredentials,
+      );
+      vi.mocked(tokenStorage.isTokenExpired).mockReturnValue(true);
+      vi.mocked(tokenStorage.deleteCredentials).mockResolvedValue(undefined);
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.getValidToken('test-server', {
+        enabled: true,
+        authorizationUrl: 'https://auth.example.com/authorize',
+      });
+
+      expect(result).toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(tokenStorage.deleteCredentials).toHaveBeenCalledWith(
+        'test-server',
+      );
     });
   });
 
@@ -2175,6 +2564,7 @@ describe('MCPOAuthProvider', () => {
       };
       delete configWithUserScopes.authorizationUrl;
       delete configWithUserScopes.tokenUrl;
+      delete configWithUserScopes.issuer;
 
       const mockResourceMetadata = {
         resource: 'https://api.example.com/',
@@ -2182,6 +2572,7 @@ describe('MCPOAuthProvider', () => {
       };
 
       const mockAuthServerMetadata = {
+        issuer: 'https://discovered.auth.com',
         authorization_endpoint: 'https://discovered.auth.com/authorize',
         token_endpoint: 'https://discovered.auth.com/token',
         scopes_supported: ['discovered-scope'],
@@ -2264,6 +2655,7 @@ describe('MCPOAuthProvider', () => {
       delete configWithoutScopes.scopes;
       delete configWithoutScopes.authorizationUrl;
       delete configWithoutScopes.tokenUrl;
+      delete configWithoutScopes.issuer;
 
       const mockResourceMetadata = {
         resource: 'https://api.example.com/',
@@ -2271,6 +2663,7 @@ describe('MCPOAuthProvider', () => {
       };
 
       const mockAuthServerMetadata = {
+        issuer: 'https://discovered.auth.com',
         authorization_endpoint: 'https://discovered.auth.com/authorize',
         token_endpoint: 'https://discovered.auth.com/token',
         scopes_supported: ['discovered-scope-1', 'discovered-scope-2'],
@@ -2352,7 +2745,7 @@ describe('MCPOAuthProvider', () => {
         'http://localhost:8888/realms/my-realm/clients-registrations/openid-connect',
     };
 
-    it('falls back to path-based issuer when origin discovery fails', async () => {
+    it('prioritizes path-based issuer before falling back to root origin', async () => {
       const authProvider = new MCPOAuthProvider();
       const providerWithAccess = authProvider as unknown as {
         discoverAuthServerMetadataForRegistration: (
@@ -2367,6 +2760,11 @@ describe('MCPOAuthProvider', () => {
         OAuthUtils,
         'discoverAuthorizationServerMetadata',
       ).mockImplementation(async (issuer) => {
+        if (issuer === 'http://localhost:8888') {
+          throw new OAuthSecurityError(
+            'Root default-realm metadata mismatch should not be reached first',
+          );
+        }
         if (issuer === 'http://localhost:8888/realms/my-realm') {
           return registrationMetadata;
         }
@@ -2381,14 +2779,56 @@ describe('MCPOAuthProvider', () => {
       expect(
         vi.mocked(OAuthUtils.discoverAuthorizationServerMetadata).mock.calls,
       ).toEqual([
-        ['http://localhost:8888', { allowLoopback: true }],
         ['http://localhost:8888/realms/my-realm', { allowLoopback: true }],
       ]);
       expect(result.issuerUrl).toBe('http://localhost:8888/realms/my-realm');
       expect(result.metadata).toBe(registrationMetadata);
     });
 
-    it('trims versioned segments from authorization endpoints', async () => {
+    it('falls back to root origin when path-based issuer candidates return null', async () => {
+      const authProvider = new MCPOAuthProvider();
+      const providerWithAccess = authProvider as unknown as {
+        discoverAuthServerMetadataForRegistration: (
+          authorizationUrl: string,
+        ) => Promise<{
+          issuerUrl: string;
+          metadata: OAuthAuthorizationServerMetadata;
+        }>;
+      };
+
+      const rootMetadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'http://localhost:8888',
+        authorization_endpoint: 'http://localhost:8888/custom/login',
+        token_endpoint: 'http://localhost:8888/oauth/token',
+        registration_endpoint: 'http://localhost:8888/oauth/register',
+      };
+
+      vi.spyOn(
+        OAuthUtils,
+        'discoverAuthorizationServerMetadata',
+      ).mockImplementation(async (issuer) => {
+        if (issuer === 'http://localhost:8888') {
+          return rootMetadata;
+        }
+        return null;
+      });
+
+      const result =
+        await providerWithAccess.discoverAuthServerMetadataForRegistration(
+          'http://localhost:8888/custom/login',
+        );
+
+      expect(
+        vi.mocked(OAuthUtils.discoverAuthorizationServerMetadata).mock.calls,
+      ).toEqual([
+        ['http://localhost:8888/custom/login', { allowLoopback: true }],
+        ['http://localhost:8888', { allowLoopback: true }],
+      ]);
+      expect(result.issuerUrl).toBe('http://localhost:8888');
+      expect(result.metadata).toBe(rootMetadata);
+    });
+
+    it('trims versioned segments from authorization endpoints before falling back to origin', async () => {
       const authProvider = new MCPOAuthProvider();
       const providerWithAccess = authProvider as unknown as {
         discoverAuthServerMetadataForRegistration: (
@@ -2426,7 +2866,6 @@ describe('MCPOAuthProvider', () => {
         );
 
       expect(attempts).toEqual([
-        'https://auth.okta.local',
         'https://auth.okta.local/oauth2/default/v1',
         'https://auth.okta.local/oauth2/default',
       ]);
@@ -2482,6 +2921,33 @@ describe('MCPOAuthProvider', () => {
       expect(spy).toHaveBeenCalledWith('https://remote-auth.example.com', {
         allowLoopback: false,
       });
+    });
+
+    it('rejects cross-origin registration_endpoint in discoverAuthServerMetadataForRegistration', async () => {
+      const authProvider = new MCPOAuthProvider();
+      const providerWithAccess = authProvider as unknown as {
+        discoverAuthServerMetadataForRegistration: (
+          issuer: string,
+          mcpServerUrl?: string,
+        ) => Promise<unknown>;
+      };
+
+      vi.spyOn(
+        OAuthUtils,
+        'discoverAuthorizationServerMetadata',
+      ).mockResolvedValueOnce({
+        issuer: 'https://remote-auth.example.com',
+        authorization_endpoint: 'https://remote-auth.example.com/authorize',
+        token_endpoint: 'https://remote-auth.example.com/token',
+        registration_endpoint: 'https://other-registrar.example.org/register',
+      });
+
+      await expect(
+        providerWithAccess.discoverAuthServerMetadataForRegistration(
+          'https://remote-auth.example.com',
+          'https://remote-mcp.example.com',
+        ),
+      ).rejects.toThrow(OAuthSecurityError);
     });
   });
 });

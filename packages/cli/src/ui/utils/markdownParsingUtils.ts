@@ -89,10 +89,13 @@ const convertLatexPreservingSpans = (text: string): string => {
   const preserved: string[] = [];
   // Match inline code spans (with matched backtick counts) and bare URLs.
   // Order matters: code spans first so they win over a URL inside a span.
-  const masked = text.replace(/(`+)([^`\n]+?)\1|https?:\/\/\S+/g, (match) => {
-    const index = preserved.push(match) - 1;
-    return `${MASK_SENTINEL}${index}${MASK_SENTINEL}`;
-  });
+  const masked = text.replace(
+    /(?<!`)(`+)(?!`)([^\n]+?)(?<!`)\1(?!`)|https?:\/\/\S+/g,
+    (match) => {
+      const index = preserved.push(match) - 1;
+      return `${MASK_SENTINEL}${index}${MASK_SENTINEL}`;
+    },
+  );
   const converted = convertLatexToUnicode(masked);
   return converted.replace(
     MASK_PATTERN,
@@ -102,6 +105,16 @@ const convertLatexPreservingSpans = (text: string): string => {
     (match, i: string) => preserved[Number(i)] ?? match,
   );
 };
+
+/**
+ * Removes one space from each side of inline code when both sides have one and
+ * the code isn't only spaces, as Markdown does. This lets a code span show code
+ * that starts or ends with a backtick.
+ */
+const stripCodeSpanPadding = (code: string): string =>
+  code.startsWith(' ') && code.endsWith(' ') && /[^ ]/.test(code)
+    ? code.slice(1, -1)
+    : code;
 
 export const parseMarkdownToANSI = (
   rawText: string,
@@ -123,7 +136,7 @@ export const parseMarkdownToANSI = (
 
   let result = '';
   const inlineRegex =
-    /(\*\*\*.*?\*\*\*|\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
+    /(\*\*\*.*?\*\*\*|\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|(?<!`)(?<fence>`+)(?!`).+?(?<!`)\k<fence>(?!`)|<u>.*?<\/u>|https?:\/\/\S+)/g;
   let lastIndex = 0;
   let match;
 
@@ -203,7 +216,10 @@ export const parseMarkdownToANSI = (
       ) {
         const codeMatch = fullMatch.match(/^(`+)(.+?)\1$/s);
         if (codeMatch && codeMatch[2]) {
-          styledPart = ansiColorize(codeMatch[2], theme.text.accent);
+          styledPart = ansiColorize(
+            stripCodeSpanPadding(codeMatch[2]),
+            theme.text.accent,
+          );
         }
       } else if (
         fullMatch.startsWith('[') &&

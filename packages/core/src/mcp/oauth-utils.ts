@@ -63,6 +63,110 @@ const PRIVATE_NETWORK_REMEDIATION_HINT =
   'Set "oauth.allowPrivateNetwork": true in settings.json for this MCP server if it is on a trusted private network.';
 
 /**
+ * Strips trailing forward slashes in a single linear pass without regex backtracking.
+ */
+export function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47 /* '/' */) {
+    end--;
+  }
+  return end === value.length ? value : value.slice(0, end);
+}
+
+/**
+ * Compares two OAuth issuer URLs per RFC 8414 / RFC 9207.
+ * Normalizes trailing slashes and origins to ensure consistent matching,
+ * while rejecting userinfo and preserving query parameters and fragments.
+ */
+export function areIssuersEqual(issuerA: string, issuerB: string): boolean {
+  if (issuerA === issuerB && !issuerA.includes('@')) return true;
+
+  const normalize = (iss: string): string | null => {
+    try {
+      const u = new URL(iss);
+
+      // RFC 8414 & RFC 9207: Valid OAuth issuers MUST NOT contain userinfo.
+      // Discarding or accepting userinfo can enable URL confusion / mix-up attacks
+      // (e.g., https://attacker.com@github.com/login/oauth).
+      if (u.username || u.password) {
+        return null;
+      }
+
+      // Normalize trailing slashes on pathname (e.g., "/oauth/" -> "/oauth")
+      const normalizedPath = trimTrailingSlashes(u.pathname);
+
+      // Reconstruct canonical URL:
+      // - u.protocol and u.host handle lowercasing and default port removal (:443)
+      // - normalizedPath handles trailing slash equivalence
+      // - u.search and u.hash are preserved so different tenants/queries never collide
+      return `${u.protocol}//${u.host}${normalizedPath}${u.search}${u.hash}`;
+    } catch {
+      // Fallback for non-standard / relative strings
+      return trimTrailingSlashes(iss);
+    }
+  };
+
+  const normA = normalize(issuerA);
+  const normB = normalize(issuerB);
+
+  if (normA === null || normB === null) {
+    return false;
+  }
+
+  return normA === normB;
+}
+
+/**
+ * Validates and extracts the canonical origin of an OAuth URL, rejecting
+ * missing values, unsupported schemes, and embedded userinfo credentials.
+ */
+export function extractOAuthUrlOrigin(urlStr: string, label: string): string {
+  if (typeof urlStr !== 'string' || urlStr.trim().length === 0) {
+    throw new OAuthSecurityError(`Missing or empty OAuth ${label} URL.`);
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(urlStr.trim());
+  } catch (e) {
+    throw new OAuthSecurityError(
+      `Invalid OAuth ${label} URL "${urlStr}": ${getErrorMessage(e)}`,
+    );
+  }
+  if (parsed.username || parsed.password) {
+    throw new OAuthSecurityError(
+      `OAuth ${label} URL must not contain userinfo credentials.`,
+    );
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new OAuthSecurityError(
+      `Invalid OAuth ${label} protocol "${parsed.protocol}". Only HTTPS (and HTTP for local development) is supported.`,
+    );
+  }
+  return parsed.origin;
+}
+
+/**
+ * Normalizes an optional endpoint URL from deserialized JSON or configuration:
+ * treats undefined, null, and whitespace-only strings as absent (undefined),
+ * while rejecting non-string values with OAuthSecurityError.
+ */
+export function normalizeOptionalEndpointUrl(
+  value: unknown,
+  label: string,
+): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== 'string') {
+    throw new OAuthSecurityError(
+      `Invalid OAuth ${label} URL: expected string, received ${typeof value}.`,
+    );
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/**
  * Validates an OAuth endpoint URL against SSRF, scheme, and origin constraints per RFC 9728 Section 7.7.
  */
 export async function validateOAuthEndpointUrl(
@@ -86,6 +190,12 @@ export async function validateOAuthEndpointUrl(
   } catch (e) {
     throw new OAuthSecurityError(
       `Invalid OAuth endpoint URL "${resolvedUrl}": ${getErrorMessage(e)}`,
+    );
+  }
+
+  if (parsed.username || parsed.password) {
+    throw new OAuthSecurityError(
+      'OAuth endpoint URL must not contain userinfo credentials.',
     );
   }
 
@@ -341,12 +451,47 @@ export class OAuthUtils {
   static metadataToOAuthConfig(
     metadata: OAuthAuthorizationServerMetadata,
   ): MCPOAuthConfig {
+    const pinnedOrigin = extractOAuthUrlOrigin(metadata.issuer, 'issuer');
+    const authOrigin = extractOAuthUrlOrigin(
+      metadata.authorization_endpoint,
+      'authorization_endpoint',
+    );
+    if (authOrigin !== pinnedOrigin) {
+      throw new OAuthSecurityError(
+        `OAuth authorization_endpoint origin "${authOrigin}" does not match issuer origin "${pinnedOrigin}".`,
+      );
+    }
+    const tokenOrigin = extractOAuthUrlOrigin(
+      metadata.token_endpoint,
+      'token_endpoint',
+    );
+    if (tokenOrigin !== pinnedOrigin) {
+      throw new OAuthSecurityError(
+        `OAuth token_endpoint origin "${tokenOrigin}" does not match issuer origin "${pinnedOrigin}".`,
+      );
+    }
+    const registrationEndpoint = normalizeOptionalEndpointUrl(
+      metadata.registration_endpoint,
+      'registration_endpoint',
+    );
+    if (registrationEndpoint !== undefined) {
+      const registrationOrigin = extractOAuthUrlOrigin(
+        registrationEndpoint,
+        'registration_endpoint',
+      );
+      if (registrationOrigin !== pinnedOrigin) {
+        throw new OAuthSecurityError(
+          `OAuth registration_endpoint origin "${registrationOrigin}" does not match issuer origin "${pinnedOrigin}".`,
+        );
+      }
+    }
+
     return {
       authorizationUrl: metadata.authorization_endpoint,
       issuer: metadata.issuer,
       tokenUrl: metadata.token_endpoint,
       scopes: metadata.scopes_supported || [],
-      registrationUrl: metadata.registration_endpoint,
+      registrationUrl: registrationEndpoint,
       // RFC 9207 Section 3: the flag defaults to false when omitted. Discovered
       // configurations therefore always carry an explicit boolean, which lets
       // the callback policy distinguish them from an explicitly configured issuer.
@@ -376,16 +521,17 @@ export class OAuthUtils {
 
     const authServerUrlObj = new URL(validatedBaseUrl);
     const base = `${authServerUrlObj.protocol}//${authServerUrlObj.host}`;
+    const normalizedPathname = trimTrailingSlashes(authServerUrlObj.pathname);
 
     const endpointsToTry: string[] = [];
 
-    // With issuer URLs with path components, try the following well-known
-    // endpoints in order:
-    if (authServerUrlObj.pathname !== '/') {
+    if (normalizedPathname !== '') {
+      // With issuer URLs with path components, query only path-scoped well-known
+      // endpoints so a path-scoped issuer check never collides with a root issuer:
       // 1. OAuth 2.0 Authorization Server Metadata with path insertion
       endpointsToTry.push(
         new URL(
-          `/.well-known/oauth-authorization-server${authServerUrlObj.pathname}`,
+          `/.well-known/oauth-authorization-server${normalizedPathname}`,
           base,
         ).toString(),
       );
@@ -393,7 +539,7 @@ export class OAuthUtils {
       // 2. OpenID Connect Discovery 1.0 with path insertion
       endpointsToTry.push(
         new URL(
-          `/.well-known/openid-configuration${authServerUrlObj.pathname}`,
+          `/.well-known/openid-configuration${normalizedPathname}`,
           base,
         ).toString(),
       );
@@ -401,33 +547,102 @@ export class OAuthUtils {
       // 3. OpenID Connect Discovery 1.0 with path appending
       endpointsToTry.push(
         new URL(
-          `${authServerUrlObj.pathname}/.well-known/openid-configuration`,
+          `${normalizedPathname}/.well-known/openid-configuration`,
           base,
         ).toString(),
       );
+    } else {
+      // With root issuer URLs without path components, try root well-known endpoints:
+      // 1. OAuth 2.0 Authorization Server Metadata
+      endpointsToTry.push(
+        new URL('/.well-known/oauth-authorization-server', base).toString(),
+      );
+
+      // 2. OpenID Connect Discovery 1.0
+      endpointsToTry.push(
+        new URL('/.well-known/openid-configuration', base).toString(),
+      );
     }
-
-    // With issuer URLs without path components, and those that failed previous
-    // discoveries, try the following well-known endpoints in order:
-
-    // 1. OAuth 2.0 Authorization Server Metadata
-    endpointsToTry.push(
-      new URL('/.well-known/oauth-authorization-server', base).toString(),
-    );
-
-    // 2. OpenID Connect Discovery 1.0
-    endpointsToTry.push(
-      new URL('/.well-known/openid-configuration', base).toString(),
-    );
 
     for (const endpoint of endpointsToTry) {
       const authServerMetadata = await this.fetchAuthorizationServerMetadata(
         endpoint,
         options,
       );
-      if (authServerMetadata) {
-        return authServerMetadata;
+      if (
+        !authServerMetadata ||
+        typeof authServerMetadata !== 'object' ||
+        Array.isArray(authServerMetadata)
+      ) {
+        continue;
       }
+
+      const hasAuthEndpoint =
+        typeof authServerMetadata.authorization_endpoint === 'string' &&
+        authServerMetadata.authorization_endpoint.trim().length > 0;
+      const hasTokenEndpoint =
+        typeof authServerMetadata.token_endpoint === 'string' &&
+        authServerMetadata.token_endpoint.trim().length > 0;
+      if (!hasAuthEndpoint && !hasTokenEndpoint) {
+        // Non-OAuth 200 payload (e.g., generic SPA/status JSON); continue to the
+        // next well-known candidate (such as openid-configuration).
+        continue;
+      }
+
+      // RFC 8414 Section 3.3 / OIDC Discovery Section 4.3: metadata.issuer MUST
+      // be identical to the authorization server URL used for discovery.
+      if (
+        typeof authServerMetadata.issuer !== 'string' ||
+        authServerMetadata.issuer.trim().length === 0 ||
+        !areIssuersEqual(authServerMetadata.issuer, validatedBaseUrl)
+      ) {
+        throw new OAuthSecurityError(
+          `Authorization server metadata issuer "${String(authServerMetadata.issuer ?? '')}" does not match expected authorization server URL "${validatedBaseUrl}".`,
+        );
+      }
+
+      const pinnedOrigin = extractOAuthUrlOrigin(
+        authServerMetadata.issuer,
+        'issuer',
+      );
+      const endpointValidationOptions: OAuthUrlValidationOptions = {
+        allowLoopback: options?.allowLoopback,
+        allowPrivateNetwork: options?.allowPrivateNetwork,
+        expectedOrigin: pinnedOrigin,
+      };
+
+      if (!hasAuthEndpoint) {
+        throw new OAuthSecurityError(
+          'Authorization server metadata is missing required authorization_endpoint.',
+        );
+      }
+      await validateOAuthEndpointUrl(
+        authServerMetadata.authorization_endpoint,
+        endpointValidationOptions,
+      );
+
+      if (!hasTokenEndpoint) {
+        throw new OAuthSecurityError(
+          'Authorization server metadata is missing required token_endpoint.',
+        );
+      }
+      await validateOAuthEndpointUrl(
+        authServerMetadata.token_endpoint,
+        endpointValidationOptions,
+      );
+
+      const registrationEndpoint = normalizeOptionalEndpointUrl(
+        authServerMetadata.registration_endpoint,
+        'registration_endpoint',
+      );
+      if (registrationEndpoint !== undefined) {
+        await validateOAuthEndpointUrl(
+          registrationEndpoint,
+          endpointValidationOptions,
+        );
+      }
+
+      return authServerMetadata;
     }
 
     debugLogger.debug(
@@ -515,12 +730,23 @@ export class OAuthUtils {
         }
       }
 
-      // Fallback: try well-known endpoints at the base URL
+      // Fallback: try well-known endpoints at the server URL, then at the origin
+      // base URL (MCP 2025-03-26 compatibility when PRM is absent on a subpath)
       debugLogger.debug(`Trying OAuth discovery fallback at ${serverUrl}`);
-      const authServerMetadata = await this.discoverAuthorizationServerMetadata(
+      let authServerMetadata = await this.discoverAuthorizationServerMetadata(
         serverUrl,
         authServerDiscoveryOptions,
       );
+      if (!authServerMetadata) {
+        const serverUrlObj = new URL(serverUrl);
+        if (trimTrailingSlashes(serverUrlObj.pathname) !== '') {
+          const baseUrl = this.extractBaseUrl(serverUrl);
+          authServerMetadata = await this.discoverAuthorizationServerMetadata(
+            baseUrl,
+            authServerDiscoveryOptions,
+          );
+        }
+      }
 
       if (authServerMetadata) {
         const config = this.metadataToOAuthConfig(authServerMetadata);
