@@ -113,6 +113,14 @@ async function readFullStructure(
     } catch (error: unknown) {
       if (
         isNodeError(error) &&
+        error.code === 'ENOENT' &&
+        currentPath !== rootPath
+      ) {
+        // Removed after its parent was listed, e.g. a transient lock directory.
+        continue;
+      }
+      if (
+        isNodeError(error) &&
         (error.code === 'EACCES' ||
           error.code === 'ENOENT' ||
           error.code === 'EPERM')
@@ -123,7 +131,7 @@ async function readFullStructure(
         if (currentPath === rootPath && error.code === 'ENOENT') {
           return null; // Root directory itself not found
         }
-        // For other EACCES/ENOENT/EPERM on subdirectories, just skip them.
+        // For EACCES/EPERM on subdirectories, just skip them.
         continue;
       }
       throw error;

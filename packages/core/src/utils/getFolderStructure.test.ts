@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import * as os from 'node:os';
 import { getFolderStructure } from './getFolderStructure.js';
@@ -12,6 +13,7 @@ import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import * as path from 'node:path';
 import { GEMINI_DIR } from './paths.js';
 import { GEMINI_IGNORE_FILE_NAME } from 'src/config/constants.js';
+import { debugLogger } from './debugLogger.js';
 
 describe('getFolderStructure', () => {
   let testRootDir: string;
@@ -35,6 +37,7 @@ describe('getFolderStructure', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await fsPromises.rm(testRootDir, { recursive: true, force: true });
   });
 
@@ -199,11 +202,37 @@ ${testRootDir}${path.sep}
   });
 
   it('should handle non-existent directory', async () => {
+    const warnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
     const nonExistentPath = path.join(testRootDir, 'non-existent');
     const structure = await getFolderStructure(nonExistentPath);
     expect(structure).toContain(
       `Error: Could not read directory "${nonExistentPath}". Check path and permissions.`,
     );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(nonExistentPath),
+    );
+  });
+
+  it('should silently skip a subdirectory removed after its parent was read', async () => {
+    const warnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
+    await createTestFile(GEMINI_DIR, 'settings.json');
+    await createEmptyDir(GEMINI_DIR, 'projects.json.lock');
+    const lockDir = path.join(testRootDir, GEMINI_DIR, 'projects.json.lock');
+
+    const fileService = new FileDiscoveryService(testRootDir);
+    vi.spyOn(fileService, 'shouldIgnoreDirectory').mockImplementation(
+      (dirPath) => {
+        if (dirPath === lockDir) {
+          fs.rmSync(lockDir, { recursive: true, force: true });
+        }
+        return false;
+      },
+    );
+
+    const structure = await getFolderStructure(testRootDir, { fileService });
+
+    expect(structure).toContain('settings.json');
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it('should handle deep folder structure within limits', async () => {
