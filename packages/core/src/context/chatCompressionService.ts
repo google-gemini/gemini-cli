@@ -102,6 +102,67 @@ export const COLLAPSE_HISTORY_BYTE_THRESHOLD = 256 * 1024; // 256 KB
 const OMITTED_BINARY_MESSAGE =
   '[Binary content omitted from previous turn to conserve memory]';
 
+const OMITTED_BINARY_MESSAGE_BYTES = Buffer.byteLength(
+  OMITTED_BINARY_MESSAGE,
+  'utf8',
+);
+
+/**
+ * Computes the retained byte size of an older turn after binary payloads
+ * (sibling inlineData and nested functionResponse.parts) are evicted.
+ */
+function calculateRetainedTurnByteSize(
+  turn: Content,
+  exemptTools: ReadonlySet<string>,
+): number {
+  let bytes = 0;
+  if (!turn.parts) {
+    return bytes;
+  }
+  for (const part of turn.parts) {
+    if (part.inlineData) {
+      bytes += OMITTED_BINARY_MESSAGE_BYTES;
+      continue;
+    }
+    if (part.text) {
+      bytes += Buffer.byteLength(part.text, 'utf8');
+    }
+    if (
+      part.functionResponse &&
+      isExemptRetrievalTool(part.functionResponse.name, exemptTools)
+    ) {
+      const resp = part.functionResponse.response;
+      if (resp) {
+        if (typeof resp === 'string') {
+          bytes += Buffer.byteLength(resp, 'utf8');
+        } else if (typeof resp === 'object') {
+          try {
+            bytes += Buffer.byteLength(JSON.stringify(resp), 'utf8');
+          } catch {
+            // ignore JSON errors
+          }
+        }
+      } else if (part.functionResponse.parts) {
+        for (const nestedPart of part.functionResponse.parts) {
+          if (nestedPart && typeof nestedPart === 'object') {
+            if (
+              'text' in nestedPart &&
+              typeof nestedPart.text === 'string' &&
+              nestedPart.text
+            ) {
+              bytes += Buffer.byteLength(nestedPart.text, 'utf8');
+            }
+            if (nestedPart.inlineData?.data) {
+              bytes += Buffer.byteLength(nestedPart.inlineData.data, 'utf8');
+            }
+          }
+        }
+      }
+    }
+  }
+  return bytes;
+}
+
 /**
  * Computes the total byte size of text and payload content across all turns in history.
  */
@@ -219,7 +280,7 @@ export function collapseOlderFunctionResponses(
     if (!hasExemptPart) {
       continue;
     }
-    const turnBytes = calculateHistoryByteSize([turn]);
+    const turnBytes = calculateRetainedTurnByteSize(turn, exemptTools);
     if (turnBytes <= remainingExemptBytes) {
       preservedExemptTurns.add(i);
       remainingExemptBytes -= turnBytes;
