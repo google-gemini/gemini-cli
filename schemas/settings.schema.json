@@ -22,6 +22,31 @@
         "$ref": "#/$defs/MCPServerConfig"
       }
     },
+    "routing": {
+      "title": "Routing",
+      "description": "Configure numerical complexity score routing.",
+      "markdownDescription": "Configure numerical complexity score routing.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "numericalRules": {
+          "title": "Numerical Routing Rules",
+          "description": "Score bands matched in ascending maxScore order. Each maxScore is inclusive. Scores above all configured bands use the model in the final band.",
+          "markdownDescription": "Score bands matched in ascending maxScore order. Each maxScore is inclusive. Scores above all configured bands use the model in the final band.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "maxScore": { "type": "number", "default": 100 },
+              "model": { "type": "string", "default": "" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "policyPaths": {
       "title": "Policy Paths",
       "description": "Additional policy files or directories to load.",
