@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect, describe, it } from 'vitest';
+import { expect, describe, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   doesToolInvocationMatch,
   getToolSuggestion,
   isParallelizable,
   truncateToolOutput,
   truncateFunctionResponsePart,
+  truncateToolOutputIfNeeded,
 } from './tool-utils.js';
 import type { Part } from '@google/genai';
 import { MAX_STORED_TOOL_OUTPUT_BYTES } from './constants.js';
@@ -22,6 +23,7 @@ import {
   type ToolCallRequestInfo,
 } from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { makeFakeConfig } from '../test-utils/config.js';
 
 describe('getToolSuggestion', () => {
   it('should suggest the top N closest tool names for a typo', () => {
@@ -399,5 +401,80 @@ describe('isParallelizable', () => {
 
   it('defaults to true for non-edit tools when wait_for_previous is omitted', () => {
     expect(isParallelizable(makeRequest('read_file'))).toBe(true);
+  });
+});
+
+describe('truncateToolOutputIfNeeded', () => {
+  let fakeConfig: Config;
+
+  beforeEach(() => {
+    fakeConfig = makeFakeConfig();
+    vi.spyOn(fakeConfig, 'getTruncateToolOutputThreshold').mockReturnValue(20);
+    vi.spyOn(fakeConfig.storage, 'getProjectTempDir').mockReturnValue(
+      '/tmp/test-project',
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('does not truncate shell output if within threshold', async () => {
+    const result = await truncateToolOutputIfNeeded('short output', {
+      toolName: 'run_shell_command',
+      callId: 'call-1',
+      promptId: 'prompt-1',
+      config: fakeConfig,
+    });
+
+    expect(result.truncatedContent).toBe('short output');
+    expect(result.outputFile).toBeUndefined();
+  });
+
+  it('truncates shell output exceeding threshold and saves to disk', async () => {
+    const longOutput = 'a'.repeat(50);
+    const result = await truncateToolOutputIfNeeded(longOutput, {
+      toolName: 'run_shell_command',
+      callId: 'call-shell-1',
+      promptId: 'prompt-shell-1',
+      config: fakeConfig,
+    });
+
+    expect(typeof result.truncatedContent).toBe('string');
+    expect(result.truncatedContent).toContain('Output too large');
+    expect(result.outputFile).toBeDefined();
+    expect(result.outputFile).toContain('call-shell-1');
+  });
+
+  it('truncates MCP tool text output exceeding threshold', async () => {
+    const longOutput = 'b'.repeat(50);
+    const result = await truncateToolOutputIfNeeded([{ text: longOutput }], {
+      toolName: 'mcp_tool',
+      callId: 'call-mcp-1',
+      promptId: 'prompt-mcp-1',
+      isMcp: true,
+      config: fakeConfig,
+    });
+
+    expect(Array.isArray(result.truncatedContent)).toBe(true);
+    const parts = result.truncatedContent as Part[];
+    expect(parts[0]?.text).toContain('Output too large');
+    expect(result.outputFile).toBeDefined();
+  });
+
+  it('caps outputs exceeding MAX_STORED_TOOL_OUTPUT_BYTES', async () => {
+    vi.spyOn(fakeConfig, 'getTruncateToolOutputThreshold').mockReturnValue(0);
+    const hugeOutput = 'x'.repeat(MAX_STORED_TOOL_OUTPUT_BYTES + 500);
+    const result = await truncateToolOutputIfNeeded(hugeOutput, {
+      toolName: 'custom_tool',
+      callId: 'call-huge',
+      config: fakeConfig,
+    });
+
+    expect(typeof result.truncatedContent).toBe('string');
+    expect(
+      Buffer.byteLength(result.truncatedContent as string, 'utf8'),
+    ).toBeLessThanOrEqual(MAX_STORED_TOOL_OUTPUT_BYTES);
+    expect(result.outputFile).toBeDefined();
   });
 });
