@@ -348,9 +348,8 @@ export class McpClient implements McpProgressReporter {
       cliConfig,
       messageBus,
       {
-        ...(options ?? {
-          timeout: this.serverConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-        }),
+        timeout: this.serverConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+        ...options,
         progressReporter: this,
       },
     );
