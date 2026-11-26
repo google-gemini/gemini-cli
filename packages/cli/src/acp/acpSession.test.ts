@@ -1077,6 +1077,54 @@ describe('Session', () => {
     });
   });
 
+  it.each([
+    [
+      'approval mode changes',
+      async () => {
+        const { coreEvents, CoreEvent, ApprovalMode } = await import(
+          '@google/gemini-cli-core'
+        );
+        coreEvents.emit(CoreEvent.ApprovalModeChanged, {
+          sessionId: 'session-1',
+          mode: ApprovalMode.PLAN,
+        });
+      },
+    ],
+    [
+      'a retry attempt occurs',
+      async () => {
+        const { coreEvents, CoreEvent } = await import(
+          '@google/gemini-cli-core'
+        );
+        coreEvents.emit(CoreEvent.RetryAttempt, {
+          attempt: 1,
+          maxAttempts: 3,
+          delayMs: 2500,
+          error: 'RESOURCE_EXHAUSTED',
+          model: 'gemini-2.5-pro',
+          sessionId: 'session-1',
+        });
+      },
+    ],
+  ])(
+    'should handle a failing sessionUpdate when %s',
+    async (_name, emitEvent) => {
+      // These handlers fire and forget. If the connection is closed, the
+      // rejected promise must be handled, or Node terminates the process.
+      const rejection = Promise.reject(new Error('Connection closed'));
+      const thenSpy = vi.spyOn(rejection, 'then');
+      // Replace sendUpdate (the promise the handlers receive) with a plain
+      // function rather than a vi.fn: vitest attaches its own handler to
+      // promises returned by mocks, which would hide an unhandled rejection.
+      session['sendUpdate'] = () => rejection;
+
+      await emitEvent();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(thenSpy).toHaveBeenCalled();
+    },
+  );
+
   it('should send sessionUpdate with agent_thought_chunk when a retry attempt occurs for this session', async () => {
     const { coreEvents, CoreEvent } = await import('@google/gemini-cli-core');
 

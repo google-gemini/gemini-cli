@@ -180,12 +180,14 @@ export class Session {
 
   private handleApprovalModeChanged = (payload: ApprovalModeChangedPayload) => {
     if (payload.sessionId === this.id) {
-      void this.sendUpdate({
+      this.sendUpdate({
         sessionUpdate: 'agent_message_chunk',
         content: {
           type: 'text',
           text: `[MODE_UPDATE] ${payload.mode}`,
         },
+      }).catch((err) => {
+        debugLogger.error(`Failed to send mode update: ${err}`);
       });
     }
   };
