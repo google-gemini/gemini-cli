@@ -14,6 +14,7 @@ import {
   parseCommandDetailsAsync,
   isDefaultParseCommandDetails,
   stripShellWrapper,
+  extractWrappedShellCommands,
   hasRedirection,
   hasRedirectionAsync,
   isDefaultHasRedirection,
@@ -62,6 +63,8 @@ import {
   NoopSandboxManager,
   type SandboxPermissions,
 } from '../services/sandboxManager.js';
+
+const MAX_POLICY_WRAPPER_DEPTH = 5;
 
 function containsGitCommand(args: string[]): boolean {
   if (!args || args.length === 0) return false;
@@ -523,11 +526,28 @@ export class PolicyEngine {
     toolAnnotations?: Record<string, unknown>,
     subagent?: string,
     hasTopLevelHeuristicDowngrade = false,
+    wrapperDepth = 0,
   ): Promise<CheckResult> {
     if (!command) {
       return {
         decision: ruleDecision,
         rule,
+      };
+    }
+
+    if (ruleDecision === PolicyDecision.DENY) {
+      return { decision: PolicyDecision.DENY, rule };
+    }
+
+    if (wrapperDepth >= MAX_POLICY_WRAPPER_DEPTH) {
+      debugLogger.debug(
+        `[PolicyEngine.check] Shell wrapper nesting exceeded depth limit (${MAX_POLICY_WRAPPER_DEPTH}), failing closed: ${command}`,
+      );
+      return {
+        decision: this.nonInteractive
+          ? PolicyDecision.DENY
+          : PolicyDecision.ASK_USER,
+        rule: undefined,
       };
     }
 
@@ -539,11 +559,6 @@ export class PolicyEngine {
 
     // Handle parser failures or syntax errors
     if (subCommands.length === 0 || parsed?.hasError) {
-      // If the matched rule says DENY, we should respect it immediately even if parsing fails.
-      if (ruleDecision === PolicyDecision.DENY) {
-        return { decision: PolicyDecision.DENY, rule };
-      }
-
       if (this.approvalMode === ApprovalMode.YOLO) {
         // Block execution if arguments cannot be validated
         if (rule?.argsPattern) {
@@ -573,10 +588,6 @@ export class PolicyEngine {
     debugLogger.debug(
       `[PolicyEngine.check] Validating shell command: ${subCommands.length} parts`,
     );
-
-    if (ruleDecision === PolicyDecision.DENY) {
-      return { decision: PolicyDecision.DENY, rule };
-    }
 
     // Start with the decision from the rule or heuristics.
     // If the tool call was already downgraded (e.g. by heuristics), we start there.
@@ -619,6 +630,69 @@ export class PolicyEngine {
     let evaluatedSubCommands = 0;
     let allSubCommandsExplicitlyAllowed = true;
     let lastAllowedSubRule: PolicyRule | undefined;
+    const checkedWrappedPayloads = new Set<string>();
+
+    const checkExtractedPayloads = async (
+      sourceCommand: string,
+      alreadyStripped?: string,
+    ): Promise<CheckResult | null> => {
+      if (typeof extractWrappedShellCommands !== 'function') {
+        return null;
+      }
+      const extracted = extractWrappedShellCommands(sourceCommand);
+      if (extracted.some((payload) => payload.uninspectable)) {
+        allSubCommandsExplicitlyAllowed = false;
+        if (aggregateDecision === PolicyDecision.ALLOW) {
+          aggregateDecision = PolicyDecision.ASK_USER;
+          responsibleRule = undefined;
+        }
+      }
+      const extraPayloads = extracted
+        .filter((payload) => !payload.uninspectable)
+        .map((payload) => payload.command.trim())
+        .filter(
+          (payload) =>
+            Boolean(payload) &&
+            payload !== sourceCommand &&
+            payload !== alreadyStripped &&
+            !checkedWrappedPayloads.has(payload),
+        );
+      if (extraPayloads.length === 0) {
+        return null;
+      }
+      for (const wrappedPayload of new Set(extraPayloads)) {
+        checkedWrappedPayloads.add(wrappedPayload);
+        const wrappedResult = await this.checkInternal(
+          { name: toolName, args: { command: wrappedPayload, dir_path } },
+          serverName,
+          toolAnnotations,
+          subagent,
+          Boolean(rule?.argsPattern),
+          wrapperDepth + 1,
+        );
+        if (wrappedResult.decision === PolicyDecision.DENY) {
+          return wrappedResult;
+        }
+        if (wrappedResult.decision === PolicyDecision.ASK_USER) {
+          allSubCommandsExplicitlyAllowed = false;
+          if (aggregateDecision === PolicyDecision.ALLOW) {
+            responsibleRule = wrappedResult.rule;
+          } else {
+            responsibleRule ??= wrappedResult.rule;
+          }
+          aggregateDecision = PolicyDecision.ASK_USER;
+        } else if (
+          wrappedResult.decision === PolicyDecision.ALLOW &&
+          wrappedResult.rule?.decision === PolicyDecision.ALLOW &&
+          Boolean(wrappedResult.rule?.argsPattern)
+        ) {
+          lastAllowedSubRule = wrappedResult.rule;
+        } else {
+          allSubCommandsExplicitlyAllowed = false;
+        }
+      }
+      return null;
+    };
 
     for (const detail of subCommands) {
       if (REDIRECTION_NAMES.has(detail.name)) {
@@ -633,13 +707,15 @@ export class PolicyEngine {
       // Recursive check for shell wrappers (bash -c, etc.)
       const stripped = stripShellWrapper(subCmd);
       if (stripped !== subCmd) {
+        checkedWrappedPayloads.add(stripped);
         evaluatedSubCommands++;
-        const wrapperResult = await this.check(
+        const wrapperResult = await this.checkInternal(
           { name: toolName, args: { command: stripped, dir_path } },
           serverName,
           toolAnnotations,
           subagent,
           true,
+          wrapperDepth + 1,
         );
 
         if (wrapperResult.decision === PolicyDecision.DENY)
@@ -663,14 +739,24 @@ export class PolicyEngine {
         }
       }
 
+      // Also recursively inspect inner payloads wrapped by prefix utilities,
+      // intermediate flags, trailing positional args, or Windows shell switches.
+      // These checks only restrict (DENY/ASK_USER) and never upgrade an
+      // unapproved outer wrapper to ALLOW.
+      const subPayloadDeny = await checkExtractedPayloads(subCmd, stripped);
+      if (subPayloadDeny) {
+        return subPayloadDeny;
+      }
+
       if (!isAtomic) {
         evaluatedSubCommands++;
-        const subResult = await this.check(
+        const subResult = await this.checkInternal(
           { name: toolName, args: { command: subCmd, dir_path } },
           serverName,
           toolAnnotations,
           subagent,
           true,
+          wrapperDepth,
         );
 
         if (subResult.decision === PolicyDecision.DENY) return subResult;
@@ -717,6 +803,13 @@ export class PolicyEngine {
       } else if (stripped === subCmd) {
         allSubCommandsExplicitlyAllowed = false;
       }
+    }
+
+    // Also inspect the full command for any wrapper payload split across AST
+    // redirections (e.g., `sh -c >/dev/null 'dangerous_cmd'`).
+    const topLevelPayloadDeny = await checkExtractedPayloads(command.trim());
+    if (topLevelPayloadDeny) {
+      return topLevelPayloadDeny;
     }
 
     const workspace =
@@ -792,6 +885,7 @@ export class PolicyEngine {
     toolAnnotations?: Record<string, unknown>,
     subagent?: string,
     skipHeuristics = false,
+    wrapperDepth = 0,
   ): Promise<CheckResult> {
     // Case 1: Metadata injection is the primary and safest way to identify an MCP server.
     // If we have explicit `_serverName` metadata (usually injected by tool-registry for active tools), use it.
@@ -918,6 +1012,7 @@ export class PolicyEngine {
             toolAnnotations,
             subagent,
             hasTopLevelHeuristicDowngrade,
+            wrapperDepth,
           );
           decision = shellResult.decision;
           matchedRule = shellResult.rule;
@@ -970,6 +1065,7 @@ export class PolicyEngine {
             toolAnnotations,
             subagent,
             hasTopLevelHeuristicDowngrade,
+            wrapperDepth,
           );
           decision = shellResult.decision;
           matchedRule = shellResult.rule;

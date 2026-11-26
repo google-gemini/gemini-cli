@@ -44,6 +44,27 @@ describe('copyExtension permissions', () => {
     }
   });
 
+  it.skipIf(process.platform === 'win32')(
+    'should keep relative links relative, so they resolve inside the copy',
+    async () => {
+      fs.mkdirSync(path.join(sourceDir, 'shared'));
+      fs.writeFileSync(path.join(sourceDir, 'shared', 'run.sh'), 'echo run');
+      fs.mkdirSync(path.join(sourceDir, 'hooks'));
+      fs.symlinkSync(
+        '../shared/run.sh',
+        path.join(sourceDir, 'hooks', 'run.sh'),
+      );
+
+      await copyExtension(sourceDir, destDir);
+
+      const linkPath = path.join(destDir, 'hooks', 'run.sh');
+      expect(fs.readlinkSync(linkPath)).toBe('../shared/run.sh');
+      expect(fs.realpathSync(linkPath)).toBe(
+        fs.realpathSync(path.join(destDir, 'shared', 'run.sh')),
+      );
+    },
+  );
+
   it('should make destination writable even if source is read-only', async () => {
     const fileName = 'test.txt';
     const filePath = path.join(sourceDir, fileName);

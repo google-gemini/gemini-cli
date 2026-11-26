@@ -62,7 +62,13 @@ import {
   type MCPOAuthConfig,
 } from '../mcp/oauth-provider.js';
 import { DynamicStoredOAuthProvider } from '../mcp/stored-token-provider.js';
-import { OAuthUtils } from '../mcp/oauth-utils.js';
+import {
+  OAuthUtils,
+  OAuthSecurityError,
+  areIssuersEqual,
+  extractOAuthUrlOrigin,
+  normalizeOptionalEndpointUrl,
+} from '../mcp/oauth-utils.js';
 
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import {
@@ -905,6 +911,140 @@ function extractWWWAuthenticateHeader(errorString: string): string | null {
 }
 
 /**
+ * Validates any pre-configured issuer or OAuth endpoints against dynamically
+ * discovered metadata before merging, preserving user credentials/scopes while
+ * preventing cross-origin partial-configuration bypasses.
+ */
+function mergeDiscoveredOAuthConfig(
+  configured: MCPOAuthConfig | undefined,
+  discovered: MCPOAuthConfig,
+): MCPOAuthConfig {
+  if (
+    configured?.issuer &&
+    (!discovered.issuer ||
+      !areIssuersEqual(discovered.issuer, configured.issuer))
+  ) {
+    throw new OAuthSecurityError(
+      `Discovered OAuth issuer "${discovered.issuer ?? ''}" does not match configured issuer "${configured.issuer}".`,
+    );
+  }
+
+  const discoveredAnchorUrl = discovered.issuer ?? discovered.authorizationUrl;
+  if (!discoveredAnchorUrl) {
+    throw new OAuthSecurityError(
+      'Discovered OAuth configuration is missing both issuer and authorizationUrl.',
+    );
+  }
+  const discoveredOrigin = extractOAuthUrlOrigin(
+    discoveredAnchorUrl,
+    discovered.issuer ? 'issuer' : 'authorization_endpoint',
+  );
+
+  if (discovered.authorizationUrl) {
+    const discoveredAuthOrigin = extractOAuthUrlOrigin(
+      discovered.authorizationUrl,
+      'authorization_endpoint',
+    );
+    if (discoveredAuthOrigin !== discoveredOrigin) {
+      throw new OAuthSecurityError(
+        `Discovered OAuth authorizationUrl origin "${discoveredAuthOrigin}" does not match expected origin "${discoveredOrigin}".`,
+      );
+    }
+  }
+
+  if (discovered.tokenUrl) {
+    const discoveredTokenOrigin = extractOAuthUrlOrigin(
+      discovered.tokenUrl,
+      'token_endpoint',
+    );
+    if (discoveredTokenOrigin !== discoveredOrigin) {
+      throw new OAuthSecurityError(
+        `Discovered OAuth tokenUrl origin "${discoveredTokenOrigin}" does not match expected origin "${discoveredOrigin}".`,
+      );
+    }
+  }
+
+  if (configured?.authorizationUrl) {
+    const configuredAuthOrigin = extractOAuthUrlOrigin(
+      configured.authorizationUrl,
+      'authorization_endpoint',
+    );
+    if (configuredAuthOrigin !== discoveredOrigin) {
+      throw new OAuthSecurityError(
+        `Configured OAuth authorizationUrl origin "${configuredAuthOrigin}" does not match discovered origin "${discoveredOrigin}".`,
+      );
+    }
+  }
+
+  if (configured?.tokenUrl) {
+    const configuredTokenOrigin = extractOAuthUrlOrigin(
+      configured.tokenUrl,
+      'token_endpoint',
+    );
+    if (configuredTokenOrigin !== discoveredOrigin) {
+      throw new OAuthSecurityError(
+        `Configured OAuth tokenUrl origin "${configuredTokenOrigin}" does not match discovered origin "${discoveredOrigin}".`,
+      );
+    }
+  }
+
+  const configuredRegistrationUrl = normalizeOptionalEndpointUrl(
+    configured?.registrationUrl,
+    'registration_endpoint',
+  );
+  if (configuredRegistrationUrl !== undefined) {
+    const configuredRegOrigin = extractOAuthUrlOrigin(
+      configuredRegistrationUrl,
+      'registration_endpoint',
+    );
+    if (configuredRegOrigin !== discoveredOrigin) {
+      throw new OAuthSecurityError(
+        `Configured OAuth registrationUrl origin "${configuredRegOrigin}" does not match discovered origin "${discoveredOrigin}".`,
+      );
+    }
+  }
+
+  const discoveredRegistrationUrl = normalizeOptionalEndpointUrl(
+    discovered.registrationUrl,
+    'registration_endpoint',
+  );
+  if (discoveredRegistrationUrl !== undefined) {
+    const discoveredRegOrigin = extractOAuthUrlOrigin(
+      discoveredRegistrationUrl,
+      'registration_endpoint',
+    );
+    if (discoveredRegOrigin !== discoveredOrigin) {
+      throw new OAuthSecurityError(
+        `Discovered OAuth registrationUrl origin "${discoveredRegOrigin}" does not match expected origin "${discoveredOrigin}".`,
+      );
+    }
+  }
+
+  const mergedRegistrationUrl =
+    configuredRegistrationUrl ?? discoveredRegistrationUrl;
+
+  const result: MCPOAuthConfig = {
+    ...configured,
+    enabled: true,
+    authorizationUrl:
+      configured?.authorizationUrl || discovered.authorizationUrl,
+    issuer: configured?.issuer || discovered.issuer,
+    tokenUrl: configured?.tokenUrl || discovered.tokenUrl,
+    scopes: configured?.scopes || discovered.scopes || [],
+    authorizationResponseIssParameterSupported:
+      configured?.authorizationResponseIssParameterSupported ??
+      discovered.authorizationResponseIssParameterSupported,
+    allowPrivateNetwork: configured?.allowPrivateNetwork,
+  };
+  if (mergedRegistrationUrl !== undefined) {
+    result.registrationUrl = mergedRegistrationUrl;
+  } else {
+    delete result.registrationUrl;
+  }
+  return result;
+}
+
+/**
  * Handle automatic OAuth discovery and authentication for a server.
  *
  * @param mcpServerName The name of the MCP server
@@ -922,50 +1062,53 @@ async function handleAutomaticOAuth(
     debugLogger.log(`🔐 '${mcpServerName}' requires OAuth authentication`);
 
     const serverUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
-    const discoveryOptions = {
-      allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
-    };
+    let oauthAuthConfig: MCPOAuthConfig;
 
-    // Try to discover OAuth config from the WWW-Authenticate header first
-    let oauthConfig = await OAuthUtils.discoverOAuthFromWWWAuthenticate(
-      wwwAuthenticate,
-      serverUrl,
-      discoveryOptions,
-    );
+    if (
+      mcpServerConfig.oauth?.authorizationUrl &&
+      mcpServerConfig.oauth?.tokenUrl
+    ) {
+      oauthAuthConfig = {
+        ...mcpServerConfig.oauth,
+        enabled: true,
+      };
+    } else {
+      const discoveryOptions = {
+        allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
+      };
 
-    if (!oauthConfig && hasNetworkTransport(mcpServerConfig)) {
-      // Fallback: try to discover OAuth config from the base URL
-      const baseUrl = OAuthUtils.extractBaseUrl(serverUrl!);
-      oauthConfig = await OAuthUtils.discoverOAuthConfig(
-        baseUrl,
+      // Try to discover OAuth config from the WWW-Authenticate header first
+      let oauthConfig = await OAuthUtils.discoverOAuthFromWWWAuthenticate(
+        wwwAuthenticate,
+        serverUrl,
         discoveryOptions,
       );
-    }
 
-    if (!oauthConfig) {
-      cliConfig.emitMcpDiagnostic(
-        'error',
-        `Could not configure OAuth for '${mcpServerName}' - please authenticate manually with /mcp auth ${mcpServerName}`,
-        undefined,
-        mcpServerName,
+      if (!oauthConfig && hasNetworkTransport(mcpServerConfig)) {
+        // Fallback: try to discover OAuth config from the base URL
+        const baseUrl = OAuthUtils.extractBaseUrl(serverUrl!);
+        oauthConfig = await OAuthUtils.discoverOAuthConfig(
+          baseUrl,
+          discoveryOptions,
+        );
+      }
+
+      if (!oauthConfig) {
+        cliConfig.emitMcpDiagnostic(
+          'error',
+          `Could not configure OAuth for '${mcpServerName}' - please authenticate manually with /mcp auth ${mcpServerName}`,
+          undefined,
+          mcpServerName,
+        );
+        return false;
+      }
+
+      // OAuth configuration discovered - validate against any partial config and merge
+      oauthAuthConfig = mergeDiscoveredOAuthConfig(
+        mcpServerConfig.oauth,
+        oauthConfig,
       );
-      return false;
     }
-
-    // OAuth configuration discovered - proceed with authentication
-
-    // Create OAuth configuration for authentication
-    const oauthAuthConfig: MCPOAuthConfig = {
-      enabled: true,
-      authorizationUrl: oauthConfig.authorizationUrl,
-      issuer: oauthConfig.issuer,
-      tokenUrl: oauthConfig.tokenUrl,
-      scopes: oauthConfig.scopes || [],
-      authorizationResponseIssParameterSupported:
-        mcpServerConfig.oauth?.authorizationResponseIssParameterSupported ??
-        oauthConfig.authorizationResponseIssParameterSupported,
-      allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
-    };
 
     // Perform OAuth authentication
     debugLogger.log(
@@ -2127,38 +2270,42 @@ export async function connectToMcpServer(
         );
 
         if (hasNetworkTransport(mcpServerConfig)) {
-          const serverUrl = new URL(
-            mcpServerConfig.httpUrl || mcpServerConfig.url!,
-          );
-          const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
-          const discoveryOptions = {
-            allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
-          };
+          let oauthAuthConfig: MCPOAuthConfig | null = null;
 
-          // Try to discover OAuth configuration from the base URL
-          const oauthConfig = await OAuthUtils.discoverOAuthConfig(
-            baseUrl,
-            discoveryOptions,
-          );
-          if (oauthConfig) {
-            debugLogger.log(
-              `Discovered OAuth configuration from base URL for server '${mcpServerName}'`,
-            );
-
-            // Create OAuth configuration for authentication
-            const oauthAuthConfig: MCPOAuthConfig = {
+          if (
+            mcpServerConfig.oauth?.authorizationUrl &&
+            mcpServerConfig.oauth?.tokenUrl
+          ) {
+            oauthAuthConfig = {
+              ...mcpServerConfig.oauth,
               enabled: true,
-              authorizationUrl: oauthConfig.authorizationUrl,
-              issuer: oauthConfig.issuer,
-              tokenUrl: oauthConfig.tokenUrl,
-              scopes: oauthConfig.scopes || [],
-              authorizationResponseIssParameterSupported:
-                mcpServerConfig.oauth
-                  ?.authorizationResponseIssParameterSupported ??
-                oauthConfig.authorizationResponseIssParameterSupported,
+            };
+          } else {
+            const serverUrl = new URL(
+              mcpServerConfig.httpUrl || mcpServerConfig.url!,
+            );
+            const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
+            const discoveryOptions = {
               allowPrivateNetwork: mcpServerConfig.oauth?.allowPrivateNetwork,
             };
 
+            // Try to discover OAuth configuration from the base URL
+            const oauthConfig = await OAuthUtils.discoverOAuthConfig(
+              baseUrl,
+              discoveryOptions,
+            );
+            if (oauthConfig) {
+              debugLogger.log(
+                `Discovered OAuth configuration from base URL for server '${mcpServerName}'`,
+              );
+              oauthAuthConfig = mergeDiscoveredOAuthConfig(
+                mcpServerConfig.oauth,
+                oauthConfig,
+              );
+            }
+          }
+
+          if (oauthAuthConfig) {
             // Perform OAuth authentication
             // Pass the server URL for proper discovery
             const authServerUrl =

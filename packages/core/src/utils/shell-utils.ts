@@ -1604,7 +1604,10 @@ function unwrapCmdCommandArg(rawArg: string): string | null {
     return out;
   }
 
-  if (rawArg.startsWith("'") && rawArg.endsWith("'")) {
+  if (rawArg.startsWith("'")) {
+    if (!rawArg.endsWith("'")) {
+      return null;
+    }
     const inner = rawArg.slice(1, -1);
     return inner.includes("'") ? null : inner;
   }
@@ -1613,22 +1616,33 @@ function unwrapCmdCommandArg(rawArg: string): string | null {
 }
 
 function unwrapPowerShellCommandArg(rawArg: string): string | null {
-  if (rawArg.startsWith("'") && rawArg.endsWith("'")) {
+  if (rawArg.length >= 2 && isPowerShellSingleQuote(rawArg[0])) {
+    if (!isPowerShellSingleQuote(rawArg[rawArg.length - 1])) {
+      return null;
+    }
+    let out = '';
     let j = 1;
-    while (j < rawArg.length - 1) {
-      if (rawArg[j] === "'") {
-        if (rawArg[j + 1] === "'" && j + 1 < rawArg.length - 1) {
+    const end = rawArg.length - 1;
+    while (j < end) {
+      if (isPowerShellSingleQuote(rawArg[j])) {
+        if (j + 1 < end && isPowerShellSingleQuote(rawArg[j + 1])) {
+          out += rawArg[j];
           j += 2;
           continue;
         }
         return null;
       }
+      out += rawArg[j];
       j++;
     }
-    return rawArg.slice(1, -1).replace(/''/g, "'");
+    return out;
   }
 
-  if (rawArg.startsWith('"') && rawArg.endsWith('"')) {
+  if (
+    rawArg.length >= 2 &&
+    isPowerShellDoubleQuote(rawArg[0]) &&
+    isPowerShellDoubleQuote(rawArg[rawArg.length - 1])
+  ) {
     let outerHasSubExpression = false;
     let out = '';
     let j = 1;
@@ -1649,13 +1663,13 @@ function unwrapPowerShellCommandArg(rawArg: string): string | null {
           j = bsEnd;
           break;
         }
-        if (rawArg[bsEnd] === '"') {
+        if (isPowerShellDoubleQuote(rawArg[bsEnd])) {
           if (bsCount % 2 === 1) {
             out += '\\'.repeat((bsCount - 1) / 2) + '"';
             j = bsEnd + 1;
             continue;
           }
-          if (bsEnd + 1 < end && rawArg[bsEnd + 1] === '"') {
+          if (bsEnd + 1 < end && isPowerShellDoubleQuote(rawArg[bsEnd + 1])) {
             out += '\\'.repeat(bsCount / 2) + '"';
             j = bsEnd + 2;
             continue;
@@ -1674,8 +1688,8 @@ function unwrapPowerShellCommandArg(rawArg: string): string | null {
         j += 2;
         continue;
       }
-      if (ch === '"') {
-        if (j + 1 < end && rawArg[j + 1] === '"') {
+      if (isPowerShellDoubleQuote(ch)) {
+        if (j + 1 < end && isPowerShellDoubleQuote(rawArg[j + 1])) {
           out += '"';
           j += 2;
           continue;
@@ -1727,7 +1741,10 @@ function stripSingleShellWrapper(command: string): string {
       ) {
         const newCommand = command.substring(flagToken.nextIndex).trim();
         if (newCommand.length >= 2) {
-          if (newCommand.startsWith('"') && newCommand.endsWith('"')) {
+          if (newCommand.startsWith('"')) {
+            if (!newCommand.endsWith('"')) {
+              return command.trim();
+            }
             const outerHasSubstitution = detectBashSubstitution(newCommand);
             let unwrapped: string | null = null;
             try {
@@ -1747,13 +1764,41 @@ function stripSingleShellWrapper(command: string): string {
             }
             return candidate;
           }
-          if (newCommand.startsWith("'") && newCommand.endsWith("'")) {
+          if (newCommand.startsWith("'")) {
+            if (!newCommand.endsWith("'")) {
+              return command.trim();
+            }
             const inner = newCommand.slice(1, -1);
             if (!inner.includes("'")) {
               return inner;
             }
             return command.trim();
           }
+        }
+        if (
+          newCommand.startsWith('-') ||
+          newCommand.startsWith('+') ||
+          newCommand.startsWith("$'") ||
+          newCommand.startsWith('$"') ||
+          /^\d*[<>]/.test(newCommand)
+        ) {
+          return command.trim();
+        }
+        if (
+          /['"\\]/.test(newCommand) &&
+          !detectBashSubstitution(newCommand) &&
+          extractWrappedShellCommands(command.trim()).some(
+            (payload) =>
+              payload.uninspectable ||
+              detectCommandSubstitutionInternal(
+                payload.command,
+                payload.shell,
+                1,
+                new Set<string>(),
+              ),
+          )
+        ) {
+          return command.trim();
         }
         return newCommand;
       }
@@ -1833,10 +1878,1520 @@ function stripSingleShellWrapper(command: string): string {
   return command.trim();
 }
 
+const MAX_SHELL_WRAPPER_DEPTH = 5;
+const MAX_WRAPPER_DETECTION_STATES = 64;
+
+export interface ExtractedShellWrapperPayload {
+  command: string;
+  shell: ShellType;
+  uninspectable?: boolean;
+}
+
+interface WrapperWordToken {
+  raw: string;
+  value: string;
+  quoted: boolean;
+  startIndex: number;
+  endIndex: number;
+}
+
+interface PrefixUtilitySpec {
+  flagsWithValue?: ReadonlySet<string>;
+  positionalSkipCount?: number;
+  skipPositionalUnlessFlags?: ReadonlySet<string>;
+  abortFlags?: ReadonlySet<string>;
+  abortShortChars?: ReadonlySet<string>;
+  acceptsEnvAssignments?: boolean;
+}
+
+const POSIX_WRAPPER_SHELLS = new Set([
+  'sh',
+  'bash',
+  'zsh',
+  'dash',
+  'ksh',
+  'ash',
+  'mksh',
+  'csh',
+  'tcsh',
+  'fish',
+]);
+
+const LEADING_SHELL_KEYWORDS = new Set([
+  '!',
+  'if',
+  'then',
+  'elif',
+  'else',
+  'do',
+  'coproc',
+  '(',
+  '{',
+]);
+
+const ENV_FLAGS_WITH_VALUE = new Set([
+  '-u',
+  '--unset',
+  '-C',
+  '--chdir',
+  '-P',
+  '-a',
+  '--argv0',
+]);
+
+const ENV_SHORT_VALUE_CHARS = new Set(['u', 'C', 'P', 'a']);
+const WATCH_SHORT_VALUE_CHARS = new Set(['n']);
+
+const PREFIX_UTILITY_SPECS: Record<string, PrefixUtilitySpec> = {
+  nice: {
+    flagsWithValue: new Set(['-n', '--adjustment']),
+  },
+  timeout: {
+    flagsWithValue: new Set(['-k', '--kill-after', '-s', '--signal']),
+    positionalSkipCount: 1,
+  },
+  nohup: {},
+  builtin: {},
+  busybox: {},
+  setsid: {},
+  time: {
+    flagsWithValue: new Set(['-f', '--format', '-o', '--output']),
+  },
+  command: {
+    abortFlags: new Set(['-v', '-V']),
+    abortShortChars: new Set(['v', 'V']),
+  },
+  exec: {
+    flagsWithValue: new Set(['-a']),
+  },
+  sudo: {
+    acceptsEnvAssignments: true,
+    flagsWithValue: new Set([
+      '-u',
+      '--user',
+      '-g',
+      '--group',
+      '-h',
+      '--host',
+      '-p',
+      '--prompt',
+      '-r',
+      '--role',
+      '-t',
+      '--type',
+      '-U',
+      '--other-user',
+      '-C',
+      '--close-from',
+      '-D',
+      '--chdir',
+      '-R',
+      '--chroot',
+      '-T',
+      '--command-timeout',
+    ]),
+  },
+  doas: {
+    acceptsEnvAssignments: true,
+    flagsWithValue: new Set(['-u', '-C']),
+  },
+  stdbuf: {
+    flagsWithValue: new Set([
+      '-i',
+      '--input',
+      '-o',
+      '--output',
+      '-e',
+      '--error',
+    ]),
+  },
+  ionice: {
+    flagsWithValue: new Set(['-c', '--class', '-n', '--classdata']),
+    abortFlags: new Set(['-p', '--pid', '-P', '--pgid', '-u', '--uid']),
+  },
+  caffeinate: {
+    flagsWithValue: new Set(['-t', '-w']),
+  },
+  taskset: {
+    flagsWithValue: new Set(['-c', '--cpu-list']),
+    positionalSkipCount: 1,
+    skipPositionalUnlessFlags: new Set(['-c', '--cpu-list']),
+    abortFlags: new Set(['-p', '--pid']),
+  },
+  chrt: {
+    positionalSkipCount: 1,
+    abortFlags: new Set(['-p', '--pid', '-m', '--max']),
+  },
+  xargs: {
+    flagsWithValue: new Set([
+      '-a',
+      '--arg-file',
+      '-d',
+      '--delimiter',
+      '-E',
+      '-I',
+      '-J',
+      '-L',
+      '--max-lines',
+      '-n',
+      '--max-args',
+      '-P',
+      '--max-procs',
+      '-R',
+      '-s',
+      '--max-chars',
+      '--process-slot-var',
+    ]),
+  },
+};
+
+const PS_VALUE_FLAGS = new Set([
+  '-ep',
+  '-w',
+  '-if',
+  '-of',
+  '-wd',
+  '-v',
+  '-version',
+  '-config',
+]);
+
+const PS_VALUE_FLAG_PREFIXES = [
+  '-executionpolicy',
+  '-windowstyle',
+  '-inputformat',
+  '-outputformat',
+  '-workingdirectory',
+  '-configurationname',
+  '-settingsfile',
+  '-custompipename',
+];
+
+const PS_BOOL_FLAGS = new Set([
+  '-noprofile',
+  '-nop',
+  '-nologo',
+  '-nol',
+  '-noninteractive',
+  '-noni',
+  '-noexit',
+  '-noe',
+  '-sta',
+  '-mta',
+  '-login',
+  '-l',
+  '-interactive',
+  '-i',
+  '-noprofileloadtime',
+]);
+
+function normalizeWrapperExecutable(tokenValue: string): string {
+  const slashIdx = Math.max(
+    tokenValue.lastIndexOf('/'),
+    tokenValue.lastIndexOf('\\'),
+  );
+  const base = tokenValue.slice(slashIdx + 1).toLowerCase();
+  if (
+    base.endsWith('.exe') &&
+    base !== 'cmd.exe' &&
+    base !== 'powershell.exe' &&
+    base !== 'pwsh.exe'
+  ) {
+    return base.slice(0, -4);
+  }
+  return base;
+}
+
+function isLeadingShellAssignment(rawToken: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_]*\+?=/u.test(rawToken);
+}
+
+function getShortFlagChars(flags?: ReadonlySet<string>): Set<string> {
+  const chars = new Set<string>();
+  if (!flags) {
+    return chars;
+  }
+  for (const flag of flags) {
+    if (flag.length === 2 && flag[0] === '-') {
+      chars.add(flag[1]);
+    }
+  }
+  return chars;
+}
+
+function classifyShortFlagCluster(
+  arg: string,
+  shortValueChars: ReadonlySet<string>,
+): { consumesNext: boolean; matchedChars: Set<string> } {
+  const matchedChars = new Set<string>();
+  for (let k = 1; k < arg.length; k++) {
+    const ch = arg[k];
+    matchedChars.add(ch);
+    if (shortValueChars.has(ch)) {
+      return { consumesNext: k === arg.length - 1, matchedChars };
+    }
+  }
+  return { consumesNext: false, matchedChars };
+}
+
+function decodeEnvSplitString(splitArg: string): string {
+  let out = '';
+  let inSingle = false;
+  let inDouble = false;
+  for (let i = 0; i < splitArg.length; i++) {
+    const ch = splitArg[i];
+    if (ch === '\\' && i + 1 < splitArg.length) {
+      const next = splitArg[i + 1];
+      if (inSingle) {
+        if (next === "'" || next === '\\') {
+          out += next;
+          i++;
+          continue;
+        }
+        out += ch;
+        continue;
+      }
+      switch (next) {
+        case '_':
+          out += ' ';
+          i++;
+          continue;
+        case 't':
+          out += '\t';
+          i++;
+          continue;
+        case 'n':
+          out += '\n';
+          i++;
+          continue;
+        case 'r':
+          out += '\r';
+          i++;
+          continue;
+        case 'f':
+          out += '\f';
+          i++;
+          continue;
+        case 'v':
+          out += '\v';
+          i++;
+          continue;
+        case 'c':
+          return out;
+        case '#':
+        case '$':
+        case "'":
+        case '"':
+        case '\\':
+          out += next;
+          i++;
+          continue;
+        default:
+          out += ch;
+          continue;
+      }
+    }
+    if (ch === "'" && !inDouble) {
+      inSingle = !inSingle;
+      out += ch;
+      continue;
+    }
+    if (ch === '"' && !inSingle) {
+      inDouble = !inDouble;
+      out += ch;
+      continue;
+    }
+    if (
+      !inSingle &&
+      !inDouble &&
+      ch === '#' &&
+      (out.length === 0 || /\s/.test(out[out.length - 1]))
+    ) {
+      break;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+function normalizePowerShellFlag(rawFlag: string): string {
+  if (
+    rawFlag.length > 0 &&
+    (isPowerShellDash(rawFlag[0]) ||
+      (rawFlag[0] === '/' && !rawFlag.slice(1).includes('/')))
+  ) {
+    return '-' + rawFlag.slice(1).toLowerCase();
+  }
+  return rawFlag.toLowerCase();
+}
+
+function isPowerShellCommandFlag(lowerFlag: string): boolean {
+  return (
+    lowerFlag.length >= 2 &&
+    lowerFlag.startsWith('-c') &&
+    '-command'.startsWith(lowerFlag)
+  );
+}
+
+function isPowerShellFileFlag(lowerFlag: string): boolean {
+  return (
+    lowerFlag.length >= 2 &&
+    lowerFlag.startsWith('-f') &&
+    '-file'.startsWith(lowerFlag)
+  );
+}
+
+function isPowerShellEncodedCommandFlag(lowerFlag: string): boolean {
+  if (lowerFlag === '-ec') {
+    return true;
+  }
+  return (
+    lowerFlag.length >= 2 &&
+    lowerFlag.startsWith('-e') &&
+    '-encodedcommand'.startsWith(lowerFlag)
+  );
+}
+
+function isPowerShellValueFlag(lowerFlag: string): boolean {
+  if (PS_VALUE_FLAGS.has(lowerFlag)) {
+    return true;
+  }
+  return (
+    lowerFlag.length >= 3 &&
+    PS_VALUE_FLAG_PREFIXES.some((full) => full.startsWith(lowerFlag))
+  );
+}
+
+function isPowerShellBoolFlag(lowerFlag: string): boolean {
+  if (PS_BOOL_FLAGS.has(lowerFlag)) {
+    return true;
+  }
+  return (
+    lowerFlag.length >= 4 &&
+    ('-noprofile'.startsWith(lowerFlag) ||
+      '-nologo'.startsWith(lowerFlag) ||
+      '-noninteractive'.startsWith(lowerFlag) ||
+      '-noexit'.startsWith(lowerFlag) ||
+      '-login'.startsWith(lowerFlag) ||
+      '-interactive'.startsWith(lowerFlag))
+  );
+}
+
+function decodePowerShellEncodedCommand(encoded: string): {
+  decoded: string | null;
+  uninspectable: boolean;
+} {
+  const cleaned = encoded.replace(/\s+/g, '');
+  if (!cleaned) {
+    return { decoded: null, uninspectable: false };
+  }
+  if (cleaned.length > 65_536) {
+    return { decoded: null, uninspectable: true };
+  }
+  if (!/^[A-Za-z0-9+/]+=*$/.test(cleaned)) {
+    return { decoded: null, uninspectable: false };
+  }
+  try {
+    const buf = Buffer.from(cleaned, 'base64');
+    if (buf.length < 2) {
+      return { decoded: null, uninspectable: false };
+    }
+    const decoded = buf.toString('utf16le').replace(/\0+$/, '').trim();
+    return { decoded: decoded || null, uninspectable: false };
+  } catch {
+    return { decoded: null, uninspectable: false };
+  }
+}
+
+function decodeAnsiCEscape(
+  text: string,
+  index: number,
+): { char: string; nextIndex: number } {
+  const esc = text[index];
+  switch (esc) {
+    case 'a':
+      return { char: '\x07', nextIndex: index + 1 };
+    case 'b':
+      return { char: '\b', nextIndex: index + 1 };
+    case 'e':
+    case 'E':
+      return { char: '\x1b', nextIndex: index + 1 };
+    case 'f':
+      return { char: '\f', nextIndex: index + 1 };
+    case 'n':
+      return { char: '\n', nextIndex: index + 1 };
+    case 'r':
+      return { char: '\r', nextIndex: index + 1 };
+    case 't':
+      return { char: '\t', nextIndex: index + 1 };
+    case 'v':
+      return { char: '\v', nextIndex: index + 1 };
+    case '\\':
+    case "'":
+    case '"':
+    case '?':
+      return { char: esc, nextIndex: index + 1 };
+    case 'x': {
+      let hexEnd = index + 1;
+      while (
+        hexEnd < text.length &&
+        hexEnd < index + 3 &&
+        /[0-9a-fA-F]/.test(text[hexEnd])
+      ) {
+        hexEnd++;
+      }
+      if (hexEnd > index + 1) {
+        return {
+          char: String.fromCharCode(
+            parseInt(text.slice(index + 1, hexEnd), 16),
+          ),
+          nextIndex: hexEnd,
+        };
+      }
+      return { char: '\\x', nextIndex: index + 1 };
+    }
+    case 'u':
+    case 'U': {
+      const maxDigits = esc === 'u' ? 4 : 8;
+      let hexEnd = index + 1;
+      while (
+        hexEnd < text.length &&
+        hexEnd < index + 1 + maxDigits &&
+        /[0-9a-fA-F]/.test(text[hexEnd])
+      ) {
+        hexEnd++;
+      }
+      if (hexEnd > index + 1) {
+        const code = parseInt(text.slice(index + 1, hexEnd), 16);
+        if (code <= 0x10ffff) {
+          return { char: String.fromCodePoint(code), nextIndex: hexEnd };
+        }
+      }
+      return { char: '\\' + esc, nextIndex: index + 1 };
+    }
+    default: {
+      if (esc >= '0' && esc <= '7') {
+        let octEnd = index;
+        while (
+          octEnd < text.length &&
+          octEnd < index + 3 &&
+          text[octEnd] >= '0' &&
+          text[octEnd] <= '7'
+        ) {
+          octEnd++;
+        }
+        return {
+          char: String.fromCharCode(
+            parseInt(text.slice(index, octEnd), 8) & 0xff,
+          ),
+          nextIndex: octEnd,
+        };
+      }
+      return { char: '\\' + esc, nextIndex: index + 1 };
+    }
+  }
+}
+
+function splitShellSegmentsForWrapperInspection(command: string): string[] {
+  const segments: string[] = [];
+  let start = 0;
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+
+  const pushSegment = (end: number) => {
+    let seg = command.slice(start, end).trim();
+    while (
+      seg.length >= 2 &&
+      ((seg.startsWith('(') && seg.endsWith(')')) ||
+        (seg.startsWith('{') && seg.endsWith('}')))
+    ) {
+      seg = seg.slice(1, -1).trim();
+    }
+    if (seg) {
+      segments.push(seg);
+    }
+  };
+
+  const hasLaterQuote = (
+    fromIndex: number,
+    predicate: (c: string | undefined) => boolean,
+  ): boolean => {
+    for (let k = fromIndex; k < command.length; k++) {
+      if (predicate(command[k])) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  let inSmartSingleQuote = false;
+  let inSmartDoubleQuote = false;
+
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i];
+    if (inSmartSingleQuote) {
+      if (isPowerShellSingleQuote(ch)) {
+        inSmartSingleQuote = false;
+      }
+      continue;
+    }
+    if (inSmartDoubleQuote) {
+      if (isPowerShellDoubleQuote(ch)) {
+        inSmartDoubleQuote = false;
+      }
+      continue;
+    }
+    if (ch === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      continue;
+    }
+    if (ch === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      continue;
+    }
+    if (inSingleQuote) {
+      continue;
+    }
+    if (
+      !inDoubleQuote &&
+      isPowerShellSingleQuote(ch) &&
+      hasLaterQuote(i + 1, isPowerShellSingleQuote)
+    ) {
+      inSmartSingleQuote = true;
+      continue;
+    }
+    if (
+      !inDoubleQuote &&
+      isPowerShellDoubleQuote(ch) &&
+      hasLaterQuote(i + 1, isPowerShellDoubleQuote)
+    ) {
+      inSmartDoubleQuote = true;
+      continue;
+    }
+    if (ch === '\\' && i + 1 < command.length) {
+      if (inDoubleQuote) {
+        const next = command[i + 1];
+        if (next === '"' || next === '\\' || next === '$' || next === '`') {
+          i++;
+        }
+      } else {
+        i++;
+      }
+      continue;
+    }
+    if (!inDoubleQuote) {
+      if (ch === '<' && command[i + 1] === '#') {
+        const closeIdx = command.indexOf('#>', i + 2);
+        if (closeIdx === -1) {
+          break;
+        }
+        i = closeIdx + 1;
+        continue;
+      }
+      if (ch === '#' && (i === start || /\s/.test(command[i - 1]))) {
+        pushSegment(i);
+        const nlIdx = command.indexOf('\n', i + 1);
+        if (nlIdx === -1) {
+          start = command.length;
+          break;
+        }
+        i = nlIdx;
+        start = nlIdx + 1;
+        continue;
+      }
+      if (
+        ch === ';' ||
+        (ch === '|' && (i === 0 || command[i - 1] !== '>')) ||
+        ch === '&' ||
+        ch === '\n' ||
+        ch === '\r'
+      ) {
+        pushSegment(i);
+        start = i + 1;
+      }
+    }
+  }
+
+  if (start < command.length) {
+    pushSegment(command.length);
+  }
+  return segments;
+}
+
+function collectAstCommandSegments(command: string): string[] | null {
+  if (!bashLanguage) {
+    return null;
+  }
+  const tree = parseCommandTree(command);
+  if (!tree) {
+    return null;
+  }
+  try {
+    if (tree.rootNode.hasError) {
+      return null;
+    }
+    const extractNodeTextWithoutHeredocs = (node: Node): string => {
+      let out = '';
+      let cursor = node.startIndex;
+      for (let i = 0; i < node.childCount; i++) {
+        const child = node.child(i);
+        if (
+          !child ||
+          (child.type !== 'heredoc_redirect' &&
+            child.type !== 'herestring_redirect' &&
+            child.type !== 'comment')
+        ) {
+          continue;
+        }
+        if (child.startIndex > cursor) {
+          out += command.slice(cursor, child.startIndex);
+        }
+        cursor = Math.max(cursor, child.endIndex);
+      }
+      if (cursor < node.endIndex) {
+        out += command.slice(cursor, node.endIndex);
+      }
+      return out.trim();
+    };
+
+    const segments: string[] = [];
+    const stack: Node[] = [tree.rootNode];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      if (current.type === 'redirected_statement') {
+        const body = current.childForFieldName('body');
+        if (body?.type === 'command') {
+          const text = extractNodeTextWithoutHeredocs(current);
+          if (text) {
+            segments.push(text);
+          }
+        }
+      } else if (
+        current.type === 'command' &&
+        current.parent?.type !== 'redirected_statement'
+      ) {
+        const text = extractNodeTextWithoutHeredocs(current);
+        if (text) {
+          segments.push(text);
+        }
+      }
+      for (let i = current.childCount - 1; i >= 0; i--) {
+        const child = current.child(i);
+        if (child) {
+          stack.push(child);
+        }
+      }
+    }
+    return segments.length > 0 ? segments : null;
+  } finally {
+    tree.delete();
+  }
+}
+
+function isStandaloneRedirectionOp(raw: string): boolean {
+  return /^(?:\d+|&)?(?:>>?|>\||<<?<?|<>|>&|<&)$/.test(raw);
+}
+
+function isAttachedRedirectionToken(raw: string): boolean {
+  if (raw.startsWith('<(') || raw.startsWith('>(')) {
+    return false;
+  }
+  if (isStandaloneRedirectionOp(raw)) {
+    return false;
+  }
+  return /^(?:\d+|&)?(?:>>?|>\||<<?<?|<>|>&|<&)\S+/.test(raw);
+}
+
+function tokenizeForWrapperInspection(segment: string): WrapperWordToken[] {
+  const rawTokens: WrapperWordToken[] = [];
+  let i = 0;
+  const len = segment.length;
+  const isPosixShell = getShellConfiguration().shell === 'bash';
+
+  const hasLaterQuote = (
+    fromIndex: number,
+    predicate: (c: string | undefined) => boolean,
+  ): boolean => {
+    for (let k = fromIndex; k < len; k++) {
+      if (predicate(segment[k])) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  while (i < len) {
+    while (i < len && /\s/.test(segment[i])) {
+      i++;
+    }
+    if (i >= len || segment[i] === '#') {
+      break;
+    }
+    if (segment[i] === '<' && segment[i + 1] === '#') {
+      const closeIdx = segment.indexOf('#>', i + 2);
+      if (closeIdx === -1) {
+        break;
+      }
+      i = closeIdx + 2;
+      continue;
+    }
+
+    const startIndex = i;
+    let value = '';
+    let quoted = false;
+    let inSingleQuote = false;
+    let inSmartSingleQuote = false;
+    let inDoubleQuote = false;
+    let inSmartDoubleQuote = false;
+
+    while (i < len) {
+      const ch = segment[i];
+      if (
+        !inSingleQuote &&
+        !inSmartSingleQuote &&
+        !inDoubleQuote &&
+        !inSmartDoubleQuote &&
+        /\s/.test(ch)
+      ) {
+        break;
+      }
+      if (inSmartSingleQuote) {
+        if (isPowerShellSingleQuote(ch)) {
+          if (i + 1 < len && isPowerShellSingleQuote(segment[i + 1])) {
+            value += ch;
+            i += 2;
+            continue;
+          }
+          inSmartSingleQuote = false;
+          i++;
+          continue;
+        }
+        value += ch;
+        i++;
+        continue;
+      }
+      if (inSmartDoubleQuote) {
+        if (isPowerShellDoubleQuote(ch)) {
+          if (i + 1 < len && isPowerShellDoubleQuote(segment[i + 1])) {
+            value += '"';
+            i += 2;
+            continue;
+          }
+          inSmartDoubleQuote = false;
+          i++;
+          continue;
+        }
+        value += ch;
+        i++;
+        continue;
+      }
+      if (
+        !inSingleQuote &&
+        !inDoubleQuote &&
+        ch === '$' &&
+        segment[i + 1] === "'"
+      ) {
+        quoted = true;
+        i += 2;
+        while (i < len && segment[i] !== "'") {
+          if (segment[i] === '\\' && i + 1 < len) {
+            const decoded = decodeAnsiCEscape(segment, i + 1);
+            value += decoded.char;
+            i = decoded.nextIndex;
+          } else {
+            value += segment[i];
+            i++;
+          }
+        }
+        if (i < len && segment[i] === "'") {
+          i++;
+        }
+        continue;
+      }
+      if (
+        !inSingleQuote &&
+        !inDoubleQuote &&
+        ch === '$' &&
+        segment[i + 1] === '"'
+      ) {
+        quoted = true;
+        inDoubleQuote = true;
+        i += 2;
+        continue;
+      }
+      if (ch === "'" && !inDoubleQuote) {
+        inSingleQuote = !inSingleQuote;
+        quoted = true;
+        i++;
+        continue;
+      }
+      if (ch === '"' && !inSingleQuote) {
+        inDoubleQuote = !inDoubleQuote;
+        quoted = true;
+        i++;
+        continue;
+      }
+      if (inSingleQuote) {
+        value += ch;
+        i++;
+        continue;
+      }
+      if (
+        !inDoubleQuote &&
+        isPowerShellSingleQuote(ch) &&
+        hasLaterQuote(i + 1, isPowerShellSingleQuote)
+      ) {
+        inSmartSingleQuote = true;
+        quoted = true;
+        i++;
+        continue;
+      }
+      if (
+        !inDoubleQuote &&
+        isPowerShellDoubleQuote(ch) &&
+        hasLaterQuote(i + 1, isPowerShellDoubleQuote)
+      ) {
+        inSmartDoubleQuote = true;
+        quoted = true;
+        i++;
+        continue;
+      }
+      if (ch === '\\' && i + 1 < len) {
+        const next = segment[i + 1];
+        if (inDoubleQuote) {
+          if (
+            next === '"' ||
+            next === '\\' ||
+            next === '$' ||
+            next === '`' ||
+            next === '\n'
+          ) {
+            if (next !== '\n') {
+              value += next;
+            }
+            i += 2;
+            continue;
+          }
+          value += ch;
+          i++;
+          continue;
+        }
+        const isWindowsDrivePath = /^[A-Za-z]:/.test(value);
+        const isWindowsUncPath = !isPosixShell && value.startsWith('\\');
+        const isPathSafeChar = /[A-Za-z0-9._\-/\\]/.test(next);
+        value +=
+          (isWindowsDrivePath || isWindowsUncPath) && isPathSafeChar
+            ? ch + next
+            : next;
+        i += 2;
+        continue;
+      }
+      value += ch;
+      i++;
+    }
+
+    const raw = segment.slice(startIndex, i);
+    rawTokens.push({ raw, value, quoted, startIndex, endIndex: i });
+  }
+
+  // Strip unquoted POSIX redirections so leading or mid-command redirections
+  // cannot blind wrapper unwrapping.
+  const tokens: WrapperWordToken[] = [];
+  for (let idx = 0; idx < rawTokens.length; idx++) {
+    const tok = rawTokens[idx];
+    if (!tok.quoted && isStandaloneRedirectionOp(tok.raw)) {
+      idx++;
+      continue;
+    }
+    if (isAttachedRedirectionToken(tok.raw)) {
+      continue;
+    }
+    tokens.push(tok);
+  }
+  return tokens;
+}
+
+function extractWrappersFromSegment(
+  segment: string,
+): ExtractedShellWrapperPayload[] {
+  const tokens = tokenizeForWrapperInspection(segment);
+  if (tokens.length === 0) {
+    return [];
+  }
+
+  const results: ExtractedShellWrapperPayload[] = [];
+  let idx = 0;
+
+  while (
+    idx < tokens.length &&
+    !tokens[idx].quoted &&
+    LEADING_SHELL_KEYWORDS.has(tokens[idx].value)
+  ) {
+    idx++;
+  }
+
+  // Iteratively peel environment assignments and transparent prefix utilities.
+  while (idx < tokens.length) {
+    const tok = tokens[idx];
+    if (isLeadingShellAssignment(tok.raw)) {
+      idx++;
+      continue;
+    }
+
+    const baseName = normalizeWrapperExecutable(tok.value);
+
+    if (baseName === 'env') {
+      idx++;
+      let splitStringHandled = false;
+      while (idx < tokens.length) {
+        const arg = tokens[idx];
+        if (isEnvAssignmentToken(arg.value)) {
+          idx++;
+          continue;
+        }
+        if (arg.value === '--') {
+          idx++;
+          break;
+        }
+        if (arg.value === '-') {
+          idx++;
+          continue;
+        }
+        const pushEnvSplitPayload = (
+          splitArg: string,
+          nextTokenIdx: number,
+        ) => {
+          const decodedSplit = decodeEnvSplitString(splitArg).trim();
+          const tail = tokens
+            .slice(nextTokenIdx)
+            .map((t) => t.raw)
+            .join(' ');
+          const combined = [decodedSplit, tail].filter(Boolean).join(' ');
+          if (combined) {
+            results.push({ command: combined, shell: 'bash' });
+          }
+        };
+        if (arg.value === '-S' || arg.value === '--split-string') {
+          if (idx + 1 < tokens.length) {
+            pushEnvSplitPayload(tokens[idx + 1].value, idx + 2);
+          }
+          splitStringHandled = true;
+          break;
+        }
+        if (arg.value.startsWith('--split-string=')) {
+          pushEnvSplitPayload(
+            arg.value.slice('--split-string='.length),
+            idx + 1,
+          );
+          splitStringHandled = true;
+          break;
+        }
+        if (arg.value.startsWith('-S') && arg.value.length > 2) {
+          pushEnvSplitPayload(arg.value.slice(2), idx + 1);
+          splitStringHandled = true;
+          break;
+        }
+        if (ENV_FLAGS_WITH_VALUE.has(arg.value)) {
+          idx += 2;
+          continue;
+        }
+        if (arg.value.startsWith('-')) {
+          if (!arg.value.startsWith('--') && arg.value.length > 2) {
+            const sPos = arg.value.indexOf('S', 1);
+            if (sPos !== -1) {
+              const beforeS = arg.value.slice(1, sPos);
+              const hasEarlierValueOpt = Array.from(beforeS).some((c) =>
+                ENV_SHORT_VALUE_CHARS.has(c),
+              );
+              if (!hasEarlierValueOpt) {
+                const remainder = arg.value.slice(sPos + 1).trim();
+                if (remainder) {
+                  pushEnvSplitPayload(remainder, idx + 1);
+                } else if (idx + 1 < tokens.length) {
+                  pushEnvSplitPayload(tokens[idx + 1].value, idx + 2);
+                }
+                splitStringHandled = true;
+                break;
+              }
+            }
+            const { consumesNext } = classifyShortFlagCluster(
+              arg.value,
+              ENV_SHORT_VALUE_CHARS,
+            );
+            idx += consumesNext ? 2 : 1;
+            continue;
+          }
+          idx++;
+          continue;
+        }
+        break;
+      }
+      if (splitStringHandled) {
+        return results;
+      }
+      continue;
+    }
+
+    if (baseName === 'watch') {
+      idx++;
+      let execMode = false;
+      while (idx < tokens.length) {
+        const arg = tokens[idx].value;
+        if (arg === '--') {
+          idx++;
+          break;
+        }
+        if (arg === '-x' || arg === '--exec') {
+          execMode = true;
+          idx++;
+          continue;
+        }
+        if (arg === '-n' || arg === '--interval') {
+          idx += 2;
+          continue;
+        }
+        if (arg.startsWith('-')) {
+          if (!arg.startsWith('--') && arg.length > 2) {
+            const { consumesNext, matchedChars } = classifyShortFlagCluster(
+              arg,
+              WATCH_SHORT_VALUE_CHARS,
+            );
+            if (matchedChars.has('x')) {
+              execMode = true;
+            }
+            idx += consumesNext ? 2 : 1;
+            continue;
+          }
+          idx++;
+          continue;
+        }
+        break;
+      }
+      if (execMode) {
+        continue;
+      }
+      if (idx < tokens.length) {
+        const joined = tokens
+          .slice(idx)
+          .map((t) => t.value)
+          .join(' ')
+          .trim();
+        if (joined) {
+          results.push({ command: joined, shell: 'bash' });
+        }
+      }
+      return results;
+    }
+
+    const spec = Object.prototype.hasOwnProperty.call(
+      PREFIX_UTILITY_SPECS,
+      baseName,
+    )
+      ? PREFIX_UTILITY_SPECS[baseName]
+      : undefined;
+    if (spec) {
+      idx++;
+      let skipPositionalSuppressed = false;
+      const shortValueChars = getShortFlagChars(spec.flagsWithValue);
+      const shortSkipUnlessChars = getShortFlagChars(
+        spec.skipPositionalUnlessFlags,
+      );
+      while (idx < tokens.length) {
+        const argTok = tokens[idx];
+        const arg = argTok.value;
+        if (spec.acceptsEnvAssignments && isEnvAssignmentToken(arg)) {
+          idx++;
+          continue;
+        }
+        if (arg === '--') {
+          idx++;
+          break;
+        }
+        if (spec.abortFlags?.has(arg)) {
+          return results;
+        }
+        if (
+          spec.skipPositionalUnlessFlags &&
+          (spec.skipPositionalUnlessFlags.has(arg) ||
+            Array.from(spec.skipPositionalUnlessFlags).some((f) =>
+              arg.startsWith(`${f}=`),
+            ))
+        ) {
+          skipPositionalSuppressed = true;
+        }
+        if (spec.flagsWithValue?.has(arg)) {
+          idx += 2;
+          continue;
+        }
+        if (arg.startsWith('-')) {
+          if (!arg.startsWith('--') && arg.length > 2) {
+            const { consumesNext, matchedChars } = classifyShortFlagCluster(
+              arg,
+              shortValueChars,
+            );
+            if (
+              spec.abortShortChars &&
+              Array.from(matchedChars).some((c) => spec.abortShortChars!.has(c))
+            ) {
+              return results;
+            }
+            if (
+              Array.from(matchedChars).some((c) => shortSkipUnlessChars.has(c))
+            ) {
+              skipPositionalSuppressed = true;
+            }
+            idx += consumesNext ? 2 : 1;
+            continue;
+          }
+          if (
+            spec.abortShortChars &&
+            !arg.startsWith('--') &&
+            arg.length === 2 &&
+            spec.abortShortChars.has(arg[1])
+          ) {
+            return results;
+          }
+          idx++;
+          continue;
+        }
+        break;
+      }
+      if (spec.positionalSkipCount && !skipPositionalSuppressed) {
+        idx = Math.min(idx + spec.positionalSkipCount, tokens.length);
+      }
+      continue;
+    }
+
+    break;
+  }
+
+  if (idx >= tokens.length) {
+    return results;
+  }
+
+  const exeBase = normalizeWrapperExecutable(tokens[idx].value);
+
+  // 1. POSIX / Unix shell wrappers: sh, bash, zsh, dash, ksh, fish, etc.
+  if (POSIX_WRAPPER_SHELLS.has(exeBase)) {
+    let sawCommandFlag = false;
+    let j = idx + 1;
+    while (j < tokens.length) {
+      const arg = tokens[j];
+      if (arg.value === '--' || arg.value === '-') {
+        j++;
+        break;
+      }
+      if (exeBase === 'fish') {
+        if (
+          arg.value.startsWith('--command=') ||
+          arg.value.startsWith('--init-command=')
+        ) {
+          const eqIdx = arg.value.indexOf('=');
+          const script = arg.value.slice(eqIdx + 1).trim();
+          if (script) {
+            results.push({ command: script, shell: 'bash' });
+          }
+          j++;
+          continue;
+        }
+        if (
+          arg.value === '-c' ||
+          arg.value === '--command' ||
+          arg.value === '-C' ||
+          arg.value === '--init-command'
+        ) {
+          if (j + 1 < tokens.length) {
+            const script = tokens[j + 1].value.trim();
+            if (script) {
+              results.push({ command: script, shell: 'bash' });
+            }
+          }
+          j += 2;
+          continue;
+        }
+      }
+      if (arg.value.startsWith('--')) {
+        j += arg.value === '--rcfile' || arg.value === '--init-file' ? 2 : 1;
+        continue;
+      }
+      if (
+        (arg.value.startsWith('-') || arg.value.startsWith('+')) &&
+        arg.value.length > 1 &&
+        /^[+-][a-zA-Z]+$/.test(arg.value)
+      ) {
+        const flagChars = arg.value.slice(1);
+        if (flagChars.includes('c')) {
+          sawCommandFlag = true;
+        }
+        const optArgsCount = Array.from(flagChars).filter(
+          (c) => c === 'o' || c === 'O',
+        ).length;
+        j += 1 + optArgsCount;
+        continue;
+      }
+      break;
+    }
+
+    if (sawCommandFlag && j < tokens.length) {
+      const script = tokens[j].value.trim();
+      if (script) {
+        results.push({ command: script, shell: 'bash' });
+      }
+    }
+    return results;
+  }
+
+  // 2. Shell eval builtin.
+  if (exeBase === 'eval') {
+    let j = idx + 1;
+    if (j < tokens.length && tokens[j].value === '--') {
+      j++;
+    }
+    if (j < tokens.length) {
+      const script = tokens
+        .slice(j)
+        .map((t) => t.value)
+        .join(' ')
+        .trim();
+      if (script) {
+        results.push({ command: script, shell: 'bash' });
+      }
+    }
+    return results;
+  }
+
+  // 3. Windows cmd / cmd.exe wrappers (/c, /k, /r and pre-switches).
+  if (exeBase === 'cmd' || exeBase === 'cmd.exe') {
+    let j = idx + 1;
+    while (j < tokens.length) {
+      const arg = tokens[j];
+      const lower = arg.value.toLowerCase();
+      if (lower === '/c' || lower === '/k' || lower === '/r') {
+        const rawRemainder = segment.slice(arg.endIndex).trim();
+        if (rawRemainder) {
+          const unwrapped = unwrapCmdCommandArg(rawRemainder);
+          const candidate = (
+            unwrapped !== null
+              ? unwrapped
+              : j + 1 < tokens.length
+                ? tokens
+                    .slice(j + 1)
+                    .map((t) => t.value)
+                    .join(' ')
+                : rawRemainder
+          ).trim();
+          if (candidate) {
+            results.push({ command: candidate, shell: 'cmd' });
+          }
+        }
+        return results;
+      }
+      if (
+        (lower.startsWith('/c') ||
+          lower.startsWith('/k') ||
+          lower.startsWith('/r')) &&
+        arg.raw.length > 2 &&
+        !/^[a-z]/i.test(arg.raw[2])
+      ) {
+        const rawRemainder = segment.slice(arg.startIndex + 2).trim();
+        if (rawRemainder) {
+          const unwrapped = unwrapCmdCommandArg(rawRemainder);
+          const joinedTail = [
+            arg.value.slice(2),
+            ...tokens.slice(j + 1).map((t) => t.value),
+          ]
+            .filter(Boolean)
+            .join(' ');
+          const candidate = (unwrapped ?? joinedTail).trim();
+          if (candidate) {
+            results.push({ command: candidate, shell: 'cmd' });
+          }
+        }
+        return results;
+      }
+      if (/^\/[a-z](?::\S+)?$/i.test(arg.value)) {
+        j++;
+        continue;
+      }
+      break;
+    }
+    return results;
+  }
+
+  // 4. PowerShell / pwsh wrappers (-Command/-c/-com..., /c, default -Command,
+  // and -EncodedCommand).
+  if (
+    exeBase === 'powershell' ||
+    exeBase === 'powershell.exe' ||
+    exeBase === 'pwsh' ||
+    exeBase === 'pwsh.exe'
+  ) {
+    const extractPowerShellRemainder = (
+      rawRemainder: string,
+      tailTokens: WrapperWordToken[],
+    ) => {
+      if (!rawRemainder) {
+        return;
+      }
+      let candidate = unwrapPowerShellCommandArg(rawRemainder);
+      if (candidate === null && tailTokens.length > 0) {
+        candidate = tailTokens
+          .map((t) => unwrapPowerShellCommandArg(t.raw) ?? t.value)
+          .join(' ');
+      }
+      const trimmedCandidate = candidate?.trim();
+      if (trimmedCandidate) {
+        results.push({ command: trimmedCandidate, shell: 'powershell' });
+      }
+    };
+
+    let j = idx + 1;
+    while (j < tokens.length) {
+      const arg = tokens[j];
+      const lowerFlag = normalizePowerShellFlag(arg.value);
+      const colonIdx = lowerFlag.indexOf(':');
+      const flagName =
+        colonIdx !== -1 ? lowerFlag.slice(0, colonIdx) : lowerFlag;
+      const attachedValue =
+        colonIdx !== -1 ? arg.value.slice(colonIdx + 1) : undefined;
+
+      if (isPowerShellFileFlag(flagName)) {
+        return results;
+      }
+      if (isPowerShellCommandFlag(flagName)) {
+        const rawRemainder =
+          attachedValue !== undefined
+            ? [attachedValue, segment.slice(arg.endIndex).trim()]
+                .filter(Boolean)
+                .join(' ')
+            : segment.slice(arg.endIndex).trim();
+        const tailTokens =
+          attachedValue !== undefined
+            ? [
+                {
+                  raw: attachedValue,
+                  value: attachedValue,
+                  quoted: false,
+                  startIndex: arg.startIndex + colonIdx + 1,
+                  endIndex: arg.endIndex,
+                },
+                ...tokens.slice(j + 1),
+              ]
+            : tokens.slice(j + 1);
+        extractPowerShellRemainder(rawRemainder, tailTokens);
+        return results;
+      }
+      if (isPowerShellEncodedCommandFlag(flagName)) {
+        const encodedArg =
+          attachedValue !== undefined
+            ? attachedValue
+            : j + 1 < tokens.length
+              ? tokens[j + 1].value
+              : undefined;
+        if (encodedArg !== undefined) {
+          const { decoded, uninspectable } =
+            decodePowerShellEncodedCommand(encodedArg);
+          if (uninspectable) {
+            results.push({
+              command: '',
+              shell: 'powershell',
+              uninspectable: true,
+            });
+          } else if (decoded) {
+            results.push({ command: decoded, shell: 'powershell' });
+          }
+        }
+        return results;
+      }
+      if (isPowerShellValueFlag(flagName)) {
+        j += attachedValue !== undefined ? 1 : 2;
+        continue;
+      }
+      if (isPowerShellBoolFlag(flagName)) {
+        j++;
+        continue;
+      }
+      break;
+    }
+
+    // Windows PowerShell (`powershell` / `powershell.exe`) defaults to -Command
+    // when positional arguments are passed without -File or -Command.
+    if (
+      (exeBase === 'powershell' || exeBase === 'powershell.exe') &&
+      j < tokens.length &&
+      tokens[j].value !== '-'
+    ) {
+      const remainingTokens = tokens.slice(j);
+      const isSingleScriptPath =
+        remainingTokens.length === 1 &&
+        /^[^\s;&|$()`'"]+\.ps1$/i.test(remainingTokens[0].value);
+      if (!isSingleScriptPath) {
+        const rawRemainder = segment.slice(tokens[j].startIndex).trim();
+        extractPowerShellRemainder(rawRemainder, remainingTokens);
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Extracts inner shell command payloads wrapped by prefix utilities (such as
+ * `env`, `nice`, `timeout`, `nohup`, `setsid`, `sudo`, `xargs`) and shell
+ * invocations (`sh`/`bash`/`zsh`/`fish` with `-c` and arbitrary flags, `eval`,
+ * `cmd.exe /c|/k|/r`, `powershell`/`pwsh` `-Command`/`-c`/`-com`/`/c`/`-EncodedCommand`)
+ * across compound pipelines and lists.
+ *
+ * Uses tree-sitter-bash AST decomposition when available and falls back to a
+ * linear-time segmenter when the WASM parser is unavailable or on Windows/PowerShell.
+ */
+export function extractWrappedShellCommands(
+  command: string,
+): ExtractedShellWrapperPayload[] {
+  const trimmed = command.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  const configuration = getShellConfiguration();
+  const segments =
+    (configuration.shell === 'bash'
+      ? collectAstCommandSegments(trimmed)
+      : null) ?? splitShellSegmentsForWrapperInspection(trimmed);
+
+  const payloads: ExtractedShellWrapperPayload[] = [];
+  const seen = new Set<string>();
+  for (const segment of segments) {
+    for (const payload of extractWrappersFromSegment(segment)) {
+      if (payload.uninspectable) {
+        const key = `${payload.shell}:__uninspectable__`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          payloads.push({
+            command: '',
+            shell: payload.shell,
+            uninspectable: true,
+          });
+        }
+        continue;
+      }
+      const normalized = payload.command.trim();
+      if (!normalized || normalized === trimmed) {
+        continue;
+      }
+      const key = `${payload.shell}:${normalized}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        payloads.push({ command: normalized, shell: payload.shell });
+      }
+    }
+  }
+  return payloads;
+}
+
 export function stripShellWrapper(command: string): string {
   let current = command.trim();
-  const MAX_WRAPPER_DEPTH = 5;
-  for (let depth = 0; depth < MAX_WRAPPER_DEPTH; depth++) {
+  for (let depth = 0; depth < MAX_SHELL_WRAPPER_DEPTH; depth++) {
     const next = stripSingleShellWrapper(current);
     if (next === current) {
       break;
@@ -2054,16 +3609,74 @@ export async function* execStreaming(
   }
 }
 
+function detectCommandSubstitutionInternal(
+  command: string,
+  shell: ShellType,
+  depth: number,
+  visited: Set<string>,
+): boolean {
+  const trimmed = command.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  const stateKey = `${shell}:${trimmed}`;
+  if (visited.has(stateKey)) {
+    return false;
+  }
+  if (visited.size >= MAX_WRAPPER_DETECTION_STATES) {
+    return true;
+  }
+  visited.add(stateKey);
+
+  if (shell === 'powershell') {
+    if (detectPowerShellSubstitution(trimmed)) {
+      return true;
+    }
+  } else {
+    if (detectBashSubstitution(trimmed)) {
+      return true;
+    }
+  }
+
+  const wrappedPayloads = extractWrappedShellCommands(trimmed);
+  if (wrappedPayloads.length === 0) {
+    return false;
+  }
+  if (depth >= MAX_SHELL_WRAPPER_DEPTH) {
+    // Fail closed when nested shell wrappers exceed the inspection depth cap.
+    return true;
+  }
+
+  for (const payload of wrappedPayloads) {
+    if (
+      payload.uninspectable ||
+      detectCommandSubstitutionInternal(
+        payload.command,
+        payload.shell,
+        depth + 1,
+        visited,
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function detectCommandSubstitution(command: string): boolean {
   const shell = getShellConfiguration().shell;
   const isPowerShell =
     typeof shell === 'string' &&
     (shell.toLowerCase().includes('powershell') ||
       shell.toLowerCase().includes('pwsh'));
-  if (isPowerShell) {
-    return detectPowerShellSubstitution(command);
-  }
-  return detectBashSubstitution(command);
+  return detectCommandSubstitutionInternal(
+    command,
+    isPowerShell ? 'powershell' : 'bash',
+    0,
+    new Set<string>(),
+  );
 }
 
 function detectBashSubstitution(command: string): boolean {
@@ -2994,7 +4607,8 @@ function isEnvAssignmentToken(token: string): boolean {
     return false;
   }
   const name = token.slice(0, eqIdx);
-  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
+  const baseName = name.endsWith('+') ? name.slice(0, -1) : name;
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(baseName);
 }
 
 function isInteractiveGeminiSegment(segment: string): boolean {
