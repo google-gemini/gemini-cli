@@ -11,8 +11,10 @@
 
 import { type FunctionDeclaration } from '@google/genai';
 import * as os from 'node:os';
+import path from 'node:path';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
+import { getShellConfiguration } from '../../utils/shell-utils.js';
 import {
   SHELL_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
@@ -60,7 +62,8 @@ export function getShellToolDescription(
     const backgroundInstructions = enableInteractiveShell
       ? `To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true. Do NOT use PowerShell background constructs.`
       : 'Command can start background processes using PowerShell constructs such as `Start-Process -NoNewWindow` or `Start-Job`.';
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${efficiencyGuidelines}${returnedInfo}`;
+    const { invocation, compatibilityNote } = getWindowsShellInvocation();
+    return `This tool executes a given shell command as \`${invocation}\`. ${compatibilityNote}${backgroundInstructions}${efficiencyGuidelines}${returnedInfo}`;
   } else {
     const backgroundInstructions = enableInteractiveShell
       ? `To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true. Do NOT use \`&\` to background commands.`
@@ -74,9 +77,21 @@ export function getShellToolDescription(
  */
 export function getCommandDescription(): string {
   if (os.platform() === 'win32') {
-    return 'Exact command to execute as `powershell.exe -NoProfile -Command <command>`';
+    return `Exact command to execute as \`${getWindowsShellInvocation().invocation}\``;
   }
   return 'Exact bash command to execute as `bash -c <command>`';
+}
+
+function getWindowsShellInvocation() {
+  const config = getShellConfiguration();
+  const executable = path.win32.basename(config.executable);
+  return {
+    invocation: [executable, ...config.argsPrefix, '<command>'].join(' '),
+    compatibilityNote:
+      executable.toLowerCase() === 'powershell.exe'
+        ? String.raw`Windows PowerShell 5.1 may strip embedded double quotes in arguments to native executables; prefix those double quotes with a backslash (\"). `
+        : '',
+  };
 }
 
 /**
