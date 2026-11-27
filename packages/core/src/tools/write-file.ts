@@ -326,10 +326,12 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     );
     const fileName = path.basename(this.resolvedPath);
 
+    const normalizedOriginal = originalContent.replace(/\r\n/g, '\n');
+    const normalizedProposed = correctedContent.replace(/\r\n/g, '\n');
     const fileDiff = Diff.createPatch(
       fileName,
-      originalContent, // Original content (empty if new file or unreadable)
-      correctedContent, // Content after potential correction
+      normalizedOriginal, // Original content normalized to LF (empty if new file or unreadable)
+      normalizedProposed, // Content after potential correction normalized to LF
       'Current',
       'Proposed',
       DEFAULT_DIFF_OPTIONS,
@@ -462,15 +464,15 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         await fsPromises.mkdir(dirName, { recursive: true });
       }
 
-      let finalContent = fileContent;
+      const normalizedFileContent = fileContent.replace(/\r\n/g, '\n');
       const useCRLF =
         !isNewFile && originalContent
           ? detectLineEnding(originalContent) === '\r\n'
           : os.EOL === '\r\n';
 
-      if (useCRLF) {
-        finalContent = finalContent.replace(/\r?\n/g, '\r\n');
-      }
+      const finalContent = useCRLF
+        ? normalizedFileContent.replace(/\n/g, '\r\n')
+        : normalizedFileContent;
 
       await this.config
         .getFileSystemService()
@@ -487,23 +489,26 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       // However, if it was unreadable, currentContentForDiff will be empty.
       const currentContentForDiff = correctedContentResult.error
         ? '' // Or some indicator of unreadable content
-        : originalContent;
+        : originalContent.replace(/\r\n/g, '\n');
 
       const fileDiff = Diff.createPatch(
         fileName,
         currentContentForDiff,
-        fileContent,
+        normalizedFileContent,
         'Original',
         'Written',
         DEFAULT_DIFF_OPTIONS,
       );
 
-      const originallyProposedContent = ai_proposed_content || content;
+      const originallyProposedContent = (
+        ai_proposed_content || content
+      ).replace(/\r\n/g, '\n');
+      const normalizedContent = content.replace(/\r\n/g, '\n');
       const diffStat = getDiffStat(
         fileName,
         currentContentForDiff,
         originallyProposedContent,
-        content,
+        normalizedContent,
       );
 
       const llmSuccessMessageParts = [
