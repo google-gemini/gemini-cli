@@ -323,7 +323,7 @@ export const Footer: React.FC = () => {
         break;
       }
       case 'model-name': {
-        const str = getDisplayString(model);
+        const str = getDisplayString(model, config);
         addCol(
           id,
           header,
