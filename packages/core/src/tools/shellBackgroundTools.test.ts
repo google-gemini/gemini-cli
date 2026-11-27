@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
 import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 import {
@@ -31,6 +31,11 @@ describe('Background Tools', () => {
     // Clear history to avoid state leakage from previous runs
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (ShellExecutionService as any).backgroundProcessHistory.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('list_background_processes should return empty message when no processes', async () => {
@@ -334,5 +339,118 @@ describe('Background Tools', () => {
     expect(result.llmContent).not.toContain('line1');
 
     fs.unlinkSync(logPath);
+  });
+
+  it('read_background_output should reject immediately with AbortError when signal is already aborted without delay_ms', async () => {
+    const listProcessesSpy = vi.spyOn(
+      ShellExecutionService,
+      'listBackgroundProcesses',
+    );
+    const accessSpy = vi.spyOn(fs.promises, 'access');
+    const openSpy = vi.spyOn(fs.promises, 'open');
+
+    const controller = new AbortController();
+    controller.abort();
+
+    const invocation = readTool.build({ pid: 12345 });
+    await expect(
+      invocation.execute({ abortSignal: controller.signal }),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+
+    expect(listProcessesSpy).not.toHaveBeenCalled();
+    expect(accessSpy).not.toHaveBeenCalled();
+    expect(openSpy).not.toHaveBeenCalled();
+  });
+
+  it('read_background_output should reject immediately with AbortError when signal is already aborted with delay_ms', async () => {
+    vi.useFakeTimers();
+    const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+    const listProcessesSpy = vi.spyOn(
+      ShellExecutionService,
+      'listBackgroundProcesses',
+    );
+    const accessSpy = vi.spyOn(fs.promises, 'access');
+    const openSpy = vi.spyOn(fs.promises, 'open');
+
+    const controller = new AbortController();
+    controller.abort();
+
+    const invocation = readTool.build({ pid: 12345, delay_ms: 500 });
+    await expect(
+      invocation.execute({ abortSignal: controller.signal }),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+
+    expect(setTimeoutSpy).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(listProcessesSpy).not.toHaveBeenCalled();
+    expect(accessSpy).not.toHaveBeenCalled();
+    expect(openSpy).not.toHaveBeenCalled();
+  });
+
+  it('read_background_output should clear timer and reject with AbortError when aborted during delay_ms', async () => {
+    vi.useFakeTimers();
+    const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+    const listProcessesSpy = vi.spyOn(
+      ShellExecutionService,
+      'listBackgroundProcesses',
+    );
+    const accessSpy = vi.spyOn(fs.promises, 'access');
+    const openSpy = vi.spyOn(fs.promises, 'open');
+
+    const controller = new AbortController();
+    const invocation = readTool.build({ pid: 12345, delay_ms: 500 });
+    const executePromise = invocation.execute({
+      abortSignal: controller.signal,
+    });
+
+    await vi.advanceTimersByTimeAsync(100);
+    controller.abort();
+
+    await expect(executePromise).rejects.toMatchObject({ name: 'AbortError' });
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(listProcessesSpy).not.toHaveBeenCalled();
+    expect(accessSpy).not.toHaveBeenCalled();
+    expect(openSpy).not.toHaveBeenCalled();
+  });
+
+  it('read_background_output should read log output normally after delay_ms when not aborted', async () => {
+    vi.useFakeTimers();
+    const pid = 88999;
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const logDir = ShellExecutionService.getLogDir();
+
+    const history = new Map();
+    history.set(pid, {
+      command: 'delayed command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    fs.mkdirSync(logDir, { recursive: true });
+    fs.writeFileSync(logPath, 'line 1\nline 2\nline 3\n');
+
+    try {
+      const controller = new AbortController();
+      const invocation = readTool.build({ pid, lines: 2, delay_ms: 300 });
+      const executePromise = invocation.execute({
+        abortSignal: controller.signal,
+      });
+
+      await vi.advanceTimersByTimeAsync(300);
+      const result = await executePromise;
+
+      expect(result.llmContent).toContain('Showing last 2 of 3 lines');
+      expect(result.llmContent).toContain('line 2\nline 3');
+    } finally {
+      if (fs.existsSync(logPath)) {
+        fs.unlinkSync(logPath);
+      }
+    }
   });
 });
