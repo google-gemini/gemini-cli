@@ -271,7 +271,8 @@ export async function initializeTelemetry(
 
   const gcpProjectId =
     process.env['OTLP_GOOGLE_CLOUD_PROJECT'] ||
-    process.env['GOOGLE_CLOUD_PROJECT'];
+    process.env['GOOGLE_CLOUD_PROJECT'] ||
+    process.env['GOOGLE_CLOUD_PROJECT_ID'];
   const useDirectGcpExport =
     telemetryTarget === TelemetryTarget.GCP && !useCollector;
 

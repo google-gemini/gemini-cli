@@ -37,7 +37,10 @@ export class AboutCommand implements Command {
     const cliVersion = await getVersion();
     const selectedAuthType =
       context.settings.merged?.security?.auth?.selectedType ?? '';
-    const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'] || '';
+    const gcpProject =
+      process.env['GOOGLE_CLOUD_PROJECT'] ||
+      process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
+      '';
     const ideClient = await getIdeClientName(context);
 
     const userAccountManager = new UserAccountManager();

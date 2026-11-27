@@ -204,6 +204,7 @@ export async function createApp() {
       'LOG_LEVEL',
       'GOOGLE_APPLICATION_CREDENTIALS',
       'GOOGLE_CLOUD_PROJECT',
+      'GOOGLE_CLOUD_PROJECT_ID',
       'GEMINI_CLI_USE_COMPUTE_ADC',
     ];
     for (const key of allowedServerKeys) {

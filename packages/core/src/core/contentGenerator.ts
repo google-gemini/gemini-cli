@@ -380,8 +380,20 @@ export async function createContentGenerator(
           ? new HttpProxyAgent(proxyUrl)
           : new HttpsProxyAgent(proxyUrl)
         : undefined;
+      const getEnv = (key: string) =>
+        gcConfig?.env && gcConfig.env[key] !== undefined
+          ? gcConfig.env[key]
+          : process.env[key];
       const useVertex =
         config.vertexai ?? config.authType === AuthType.USE_VERTEX_AI;
+      const fallbackVertexProject =
+        useVertex &&
+        !config.apiKey &&
+        !getEnv('GOOGLE_CLOUD_PROJECT') &&
+        getEnv('GOOGLE_CLOUD_PROJECT_ID')
+          ? getEnv('GOOGLE_CLOUD_PROJECT_ID')
+          : undefined;
+      const vertexLocation = getEnv('GOOGLE_CLOUD_LOCATION');
       const googleGenAI = new GoogleGenAI({
         apiKey:
           config.authType === AuthType.GATEWAY
@@ -389,7 +401,13 @@ export async function createContentGenerator(
             : config.apiKey === ''
               ? undefined
               : config.apiKey,
-        vertexai: config.vertexai ?? config.authType === AuthType.USE_VERTEX_AI,
+        vertexai: useVertex,
+        ...(fallbackVertexProject && {
+          project: fallbackVertexProject,
+          ...(vertexLocation && {
+            location: vertexLocation,
+          }),
+        }),
         httpOptions,
         ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
         // Merge proxy and GDCH endpoint into googleAuthOptions if either exists

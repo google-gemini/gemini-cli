@@ -1095,9 +1095,11 @@ export class Task {
       // Temporarily unset GCP environment variables so they do not leak into
       // tool calls.
       const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'];
+      const gcpProjectId = process.env['GOOGLE_CLOUD_PROJECT_ID'];
       const gcpCreds = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
       try {
         delete process.env['GOOGLE_CLOUD_PROJECT'];
+        delete process.env['GOOGLE_CLOUD_PROJECT_ID'];
         delete process.env['GOOGLE_APPLICATION_CREDENTIALS'];
 
         // This will trigger the scheduler to continue or cancel the specific tool.
@@ -1137,6 +1139,9 @@ export class Task {
       } finally {
         if (gcpProject) {
           process.env['GOOGLE_CLOUD_PROJECT'] = gcpProject;
+        }
+        if (gcpProjectId) {
+          process.env['GOOGLE_CLOUD_PROJECT_ID'] = gcpProjectId;
         }
         if (gcpCreds) {
           process.env['GOOGLE_APPLICATION_CREDENTIALS'] = gcpCreds;

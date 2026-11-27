@@ -28,6 +28,7 @@ describe('validateAuthMethod', () => {
   beforeEach(() => {
     vi.stubEnv('GEMINI_API_KEY', undefined);
     vi.stubEnv('GOOGLE_CLOUD_PROJECT', undefined);
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', undefined);
     vi.stubEnv('GOOGLE_CLOUD_LOCATION', undefined);
     vi.stubEnv('GOOGLE_API_KEY', undefined);
   });
@@ -73,6 +74,38 @@ describe('validateAuthMethod', () => {
         GOOGLE_CLOUD_LOCATION: 'test-location',
       },
       expected: null,
+    },
+    {
+      description:
+        'should return null for USE_VERTEX_AI if GOOGLE_CLOUD_PROJECT_ID and GOOGLE_CLOUD_LOCATION are set',
+      authType: AuthType.USE_VERTEX_AI,
+      envs: {
+        GOOGLE_CLOUD_PROJECT_ID: 'test-project-id',
+        GOOGLE_CLOUD_LOCATION: 'test-location',
+      },
+      expected: null,
+    },
+    {
+      description:
+        'should return a targeted GOOGLE_CLOUD_LOCATION error for USE_VERTEX_AI if GOOGLE_CLOUD_PROJECT is set without GOOGLE_CLOUD_LOCATION',
+      authType: AuthType.USE_VERTEX_AI,
+      envs: {
+        GOOGLE_CLOUD_PROJECT: 'test-project',
+      },
+      expected:
+        'When using Vertex AI with a Google Cloud project, you must also specify the GOOGLE_CLOUD_LOCATION environment variable (or GOOGLE_API_KEY if using express mode).\n' +
+        'Update your environment and try again (no reload needed if using .env)!',
+    },
+    {
+      description:
+        'should return a targeted GOOGLE_CLOUD_LOCATION error for USE_VERTEX_AI if GOOGLE_CLOUD_PROJECT_ID is set without GOOGLE_CLOUD_LOCATION',
+      authType: AuthType.USE_VERTEX_AI,
+      envs: {
+        GOOGLE_CLOUD_PROJECT_ID: 'test-project-id',
+      },
+      expected:
+        'When using Vertex AI with a Google Cloud project, you must also specify the GOOGLE_CLOUD_LOCATION environment variable (or GOOGLE_API_KEY if using express mode).\n' +
+        'Update your environment and try again (no reload needed if using .env)!',
     },
     {
       description:
