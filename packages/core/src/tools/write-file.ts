@@ -464,15 +464,15 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         await fsPromises.mkdir(dirName, { recursive: true });
       }
 
-      let finalContent = fileContent;
+      const normalizedFileContent = fileContent.replace(/\r\n/g, '\n');
       const useCRLF =
         !isNewFile && originalContent
           ? detectLineEnding(originalContent) === '\r\n'
           : os.EOL === '\r\n';
 
-      if (useCRLF) {
-        finalContent = finalContent.replace(/\r?\n/g, '\r\n');
-      }
+      const finalContent = useCRLF
+        ? normalizedFileContent.replace(/\n/g, '\r\n')
+        : normalizedFileContent;
 
       await this.config
         .getFileSystemService()
@@ -490,7 +490,6 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       const currentContentForDiff = correctedContentResult.error
         ? '' // Or some indicator of unreadable content
         : originalContent.replace(/\r\n/g, '\n');
-      const normalizedFileContent = fileContent.replace(/\r\n/g, '\n');
 
       const fileDiff = Diff.createPatch(
         fileName,
