@@ -131,6 +131,7 @@ export class ToolExecutor {
             this.config,
             request.originalRequestName,
             true, // skipBeforeHook
+            callId,
           );
 
           const toolResult: ToolResult = await promise;
