@@ -74,8 +74,8 @@ export async function executeToolWithHooks(
   options?: Omit<ExecuteOptions, 'abortSignal' | 'updateOutput'>,
   config?: Config,
   originalRequestName?: string,
-  callId?: string,
   skipBeforeHook?: boolean,
+  callId?: string,
 ): Promise<ToolResult> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const toolInput = (invocation.params || {}) as Record<string, unknown>;
