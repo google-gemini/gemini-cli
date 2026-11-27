@@ -190,6 +190,53 @@ describe('restoreCommand', () => {
       );
     });
 
+    it.each(['missing service', 'missing tree', 'unexpected error'])(
+      'should preserve history and not replay the tool after %s',
+      async (failure) => {
+        const toolCallData = {
+          history: [{ type: 'user', text: 'older history', id: 123 }],
+          clientHistory: [{ role: 'user', parts: [{ text: 'older history' }] }],
+          commitHash: 'missing-commit',
+          toolCall: {
+            name: 'write_file',
+            args: { file_path: 'example.txt', content: 'old content' },
+          },
+        };
+        await fs.writeFile(
+          path.join(checkpointsDir, 'failed-checkpoint.json'),
+          JSON.stringify(toolCallData),
+        );
+        if (failure === 'missing service') {
+          mockContext.services.git = undefined;
+        } else {
+          vi.mocked(
+            mockGitService.restoreProjectFromSnapshot,
+          ).mockRejectedValue(
+            new Error(
+              failure === 'missing tree'
+                ? 'fatal: unable to read tree missing-commit'
+                : 'fatal: could not resolve missing-commit',
+            ),
+          );
+        }
+
+        const result = await restoreCommand(mockConfig)?.action?.(
+          mockContext,
+          'failed-checkpoint',
+        );
+
+        expect(result).not.toEqual(expect.objectContaining({ type: 'tool' }));
+        expect(mockContext.ui.loadHistory).not.toHaveBeenCalled();
+        expect(mockSetHistory).not.toHaveBeenCalled();
+        if (failure !== 'unexpected error') {
+          expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+            { type: 'error', text: expect.any(String) },
+            expect.any(Number),
+          );
+        }
+      },
+    );
+
     it('should restore even if only toolCall is present', async () => {
       const toolCallData = {
         toolCall: { name: 'run_shell_command', args: { command: 'ls' } },

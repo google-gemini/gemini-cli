@@ -15,14 +15,6 @@ export async function* performRestore<
   toolCallData: ToolCallData<HistoryType, ArgsType>,
   gitService: GitService | undefined,
 ): AsyncGenerator<CommandActionReturn<HistoryType>> {
-  if (toolCallData.history && toolCallData.clientHistory) {
-    yield {
-      type: 'load_history',
-      history: toolCallData.history,
-      clientHistory: toolCallData.clientHistory,
-    };
-  }
-
   if (toolCallData.commitHash) {
     if (!gitService) {
       yield {
@@ -36,11 +28,6 @@ export async function* performRestore<
 
     try {
       await gitService.restoreProjectFromSnapshot(toolCallData.commitHash);
-      yield {
-        type: 'message',
-        messageType: 'info',
-        content: 'Restored project to the state before the tool call.',
-      };
     } catch (e) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
@@ -54,5 +41,21 @@ export async function* performRestore<
       }
       throw e;
     }
+  }
+
+  if (toolCallData.history && toolCallData.clientHistory) {
+    yield {
+      type: 'load_history',
+      history: toolCallData.history,
+      clientHistory: toolCallData.clientHistory,
+    };
+  }
+
+  if (toolCallData.commitHash) {
+    yield {
+      type: 'message',
+      messageType: 'info',
+      content: 'Restored project to the state before the tool call.',
+    };
   }
 }
