@@ -84,6 +84,7 @@ describe('Telemetry SDK', () => {
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     await shutdownTelemetry(mockConfig);
   });
 
@@ -299,8 +300,10 @@ describe('Telemetry SDK', () => {
 
     const originalOtlpEnv = process.env['OTLP_GOOGLE_CLOUD_PROJECT'];
     const originalGoogleEnv = process.env['GOOGLE_CLOUD_PROJECT'];
+    const originalGoogleProjectIdEnv = process.env['GOOGLE_CLOUD_PROJECT_ID'];
     delete process.env['OTLP_GOOGLE_CLOUD_PROJECT'];
     delete process.env['GOOGLE_CLOUD_PROJECT'];
+    delete process.env['GOOGLE_CLOUD_PROJECT_ID'];
 
     try {
       await initializeTelemetry(mockConfig);
@@ -315,6 +318,9 @@ describe('Telemetry SDK', () => {
       }
       if (originalGoogleEnv) {
         process.env['GOOGLE_CLOUD_PROJECT'] = originalGoogleEnv;
+      }
+      if (originalGoogleProjectIdEnv) {
+        process.env['GOOGLE_CLOUD_PROJECT_ID'] = originalGoogleProjectIdEnv;
       }
     }
   });
@@ -358,6 +364,35 @@ describe('Telemetry SDK', () => {
         delete process.env['GOOGLE_CLOUD_PROJECT'];
       }
     }
+  });
+
+  it('should use GOOGLE_CLOUD_PROJECT_ID as fallback when OTLP_GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_PROJECT are not set', async () => {
+    mockGetApplicationDefault.mockResolvedValue(undefined); // Simulate ADC available
+    vi.spyOn(mockConfig, 'getTelemetryTarget').mockReturnValue(
+      TelemetryTarget.GCP,
+    );
+    vi.spyOn(mockConfig, 'getTelemetryUseCollector').mockReturnValue(false);
+    vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue('');
+
+    vi.stubEnv('OTLP_GOOGLE_CLOUD_PROJECT', '');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', 'fallback-project-id');
+
+    await initializeTelemetry(mockConfig);
+
+    expect(GcpTraceExporter).toHaveBeenCalledWith(
+      'fallback-project-id',
+      undefined,
+    );
+    expect(GcpLogExporter).toHaveBeenCalledWith(
+      'fallback-project-id',
+      undefined,
+    );
+    expect(GcpMetricExporter).toHaveBeenCalledWith(
+      'fallback-project-id',
+      undefined,
+    );
+    expect(NodeSDK.prototype.start).toHaveBeenCalled();
   });
 
   it('should not use OTLP exporters when telemetryOutfile is set', async () => {

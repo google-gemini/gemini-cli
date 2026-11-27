@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
+  IneligibleTierError,
   ProjectIdRequiredError,
   setupUser,
   ValidationCancelledError,
@@ -14,7 +15,12 @@ import {
 import { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import { CodeAssistServer } from '../code_assist/server.js';
 import type { OAuth2Client } from 'google-auth-library';
-import { UserTierId, type GeminiUserTier } from './types.js';
+import {
+  IneligibleTierReasonCode,
+  UserTierId,
+  type GeminiUserTier,
+  type IneligibleTier,
+} from './types.js';
 import type { Config } from '../config/config.js';
 import {
   logOnboardingSuccess,
@@ -175,6 +181,42 @@ describe('setupUser', () => {
         undefined,
         undefined,
       );
+    });
+
+    it('should use GOOGLE_CLOUD_PROJECT_ID when GOOGLE_CLOUD_PROJECT is unset', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', 'fallback-project-id');
+      mockLoad.mockResolvedValue({
+        currentTier: mockPaidTier,
+      });
+      const result = await setupUser({} as OAuth2Client, mockConfig);
+      expect(CodeAssistServer).toHaveBeenCalledWith(
+        {},
+        'fallback-project-id',
+        {},
+        '',
+        undefined,
+        undefined,
+      );
+      expect(result.projectId).toBe('fallback-project-id');
+    });
+
+    it('should prefer GOOGLE_CLOUD_PROJECT over GOOGLE_CLOUD_PROJECT_ID when both are set', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'primary-project');
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', 'fallback-project-id');
+      mockLoad.mockResolvedValue({
+        currentTier: mockPaidTier,
+      });
+      const result = await setupUser({} as OAuth2Client, mockConfig);
+      expect(CodeAssistServer).toHaveBeenCalledWith(
+        {},
+        'primary-project',
+        {},
+        '',
+        undefined,
+        undefined,
+      );
+      expect(result.projectId).toBe('primary-project');
     });
 
     it('should pass httpOptions to CodeAssistServer when provided', async () => {
@@ -438,6 +480,98 @@ describe('setupUser', () => {
       expect(mockValidationHandler).toHaveBeenCalledTimes(3);
       expect(mockLoad).toHaveBeenCalledTimes(4);
     });
+
+    it('should throw IneligibleTierError with enterprise project ID hint and intact ineligibleTiers for existing user without project ID', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', '');
+      const ineligibleTiers: IneligibleTier[] = [
+        {
+          reasonMessage: 'Account is not eligible for free tier.',
+          reasonCode: IneligibleTierReasonCode.INELIGIBLE_ACCOUNT,
+          tierId: UserTierId.FREE,
+          tierName: 'free',
+        },
+      ];
+      mockLoad.mockResolvedValue({
+        currentTier: mockPaidTier,
+        ineligibleTiers,
+      });
+
+      let thrownError: unknown;
+      try {
+        await setupUser({} as OAuth2Client, mockConfig);
+      } catch (e) {
+        thrownError = e;
+      }
+
+      expect(thrownError).toBeInstanceOf(IneligibleTierError);
+      const err = thrownError as IneligibleTierError;
+      expect(err.ineligibleTiers).toEqual(ineligibleTiers);
+      expect(err.message).toBe(
+        'Account is not eligible for free tier.\n\nIf you are using a Google Cloud or Enterprise account, ensure the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID environment variable is set to your Google Cloud Project ID. See https://geminicli.com/docs/get-started/authentication/#set-gcp',
+      );
+    });
+
+    it('should throw IneligibleTierError with enterprise project ID hint during onboarding when no project ID is returned', async () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', '');
+      const ineligibleTiers: IneligibleTier[] = [
+        {
+          reasonMessage: 'Standard tier requires a Google Cloud project.',
+          reasonCode: IneligibleTierReasonCode.DASHER_USER,
+          tierId: UserTierId.STANDARD,
+          tierName: 'standard',
+        },
+      ];
+      mockLoad.mockResolvedValue({
+        allowedTiers: [mockPaidTier],
+        ineligibleTiers,
+      });
+      mockOnboardUser.mockResolvedValue({
+        done: true,
+        response: {
+          cloudaicompanionProject: undefined,
+        },
+      });
+
+      let thrownError: unknown;
+      try {
+        await setupUser({} as OAuth2Client, mockConfig);
+      } catch (e) {
+        thrownError = e;
+      }
+
+      expect(thrownError).toBeInstanceOf(IneligibleTierError);
+      const err = thrownError as IneligibleTierError;
+      expect(err.ineligibleTiers).toEqual(ineligibleTiers);
+      expect(err.message).toContain(
+        'Standard tier requires a Google Cloud project.\n\nIf you are using a Google Cloud or Enterprise account, ensure the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID',
+      );
+    });
+  });
+});
+
+describe('IneligibleTierError', () => {
+  const tiers: IneligibleTier[] = [
+    {
+      reasonMessage: 'Not eligible.',
+      reasonCode: IneligibleTierReasonCode.INELIGIBLE_ACCOUNT,
+      tierId: UserTierId.FREE,
+      tierName: 'free',
+    },
+  ];
+
+  it('should preserve reason messages when no projectIdHint is provided', () => {
+    const err = new IneligibleTierError(tiers);
+    expect(err.name).toBe('IneligibleTierError');
+    expect(err.message).toBe('Not eligible.');
+    expect(err.ineligibleTiers).toEqual(tiers);
+  });
+
+  it('should append projectIdHint separated by a blank line without mutating ineligibleTiers', () => {
+    const err = new IneligibleTierError(tiers, 'Set GOOGLE_CLOUD_PROJECT.');
+    expect(err.message).toBe('Not eligible.\n\nSet GOOGLE_CLOUD_PROJECT.');
+    expect(err.ineligibleTiers).toEqual(tiers);
   });
 });
 

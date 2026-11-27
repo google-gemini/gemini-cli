@@ -94,6 +94,7 @@ const AUTH_ENV_VAR_WHITELIST = [
   'GEMINI_API_KEY',
   'GOOGLE_API_KEY',
   'GOOGLE_CLOUD_PROJECT',
+  'GOOGLE_CLOUD_PROJECT_ID',
   'GOOGLE_CLOUD_LOCATION',
 ];
 
@@ -667,8 +668,9 @@ export function setUpCloudShellEnvironment(
   // Special handling for GOOGLE_CLOUD_PROJECT in Cloud Shell:
   // Because GOOGLE_CLOUD_PROJECT in Cloud Shell tracks the project
   // set by the user using "gcloud config set project" we do not want to
-  // use its value. So, unless the user overrides GOOGLE_CLOUD_PROJECT in
-  // one of the .env files, we set the Cloud Shell-specific default here.
+  // use its value. So, unless the user explicitly sets GOOGLE_CLOUD_PROJECT_ID
+  // or overrides GOOGLE_CLOUD_PROJECT / GOOGLE_CLOUD_PROJECT_ID in one of the
+  // .env files, we set the Cloud Shell-specific default here.
   //
   // However, if the user has explicitly selected Vertex AI auth, they intend
   // to use their own GCP project, so we restore the original value and skip
@@ -677,13 +679,18 @@ export function setUpCloudShellEnvironment(
   // Save the user's original value before overwriting, so it can be restored
   // if the user later switches to Vertex AI (even after a process restart).
   if (!process.env[USER_GCP_PROJECT]) {
-    const current = process.env['GOOGLE_CLOUD_PROJECT'];
+    const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'];
+    const current =
+      gcpProject && gcpProject !== 'cloudshell-gca'
+        ? gcpProject
+        : process.env['GOOGLE_CLOUD_PROJECT_ID'];
     if (current && current !== 'cloudshell-gca') {
       process.env[USER_GCP_PROJECT] = current;
     }
   }
 
-  let value: string | undefined = 'cloudshell-gca';
+  let value: string | undefined =
+    process.env['GOOGLE_CLOUD_PROJECT_ID'] || 'cloudshell-gca';
 
   if (selectedAuthType === AuthType.USE_VERTEX_AI) {
     value = process.env[USER_GCP_PROJECT];
@@ -692,9 +699,11 @@ export function setUpCloudShellEnvironment(
   if (envFilePath && fs.existsSync(envFilePath)) {
     const envFileContent = fs.readFileSync(envFilePath);
     const parsedEnv = dotenv.parse(envFileContent);
-    if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
+    const envFileProject =
+      parsedEnv['GOOGLE_CLOUD_PROJECT'] || parsedEnv['GOOGLE_CLOUD_PROJECT_ID'];
+    if (envFileProject) {
       // .env file takes precedence in Cloud Shell
-      value = parsedEnv['GOOGLE_CLOUD_PROJECT'];
+      value = envFileProject;
       if (!isTrusted && isSandboxed) {
         value = sanitizeEnvVar(value);
       }

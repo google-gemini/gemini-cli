@@ -403,7 +403,11 @@ describe('getSecureSanitizationConfig', () => {
 
   it('should filter out variables from allowed list that match NEVER_ALLOWED_ENVIRONMENT_VARIABLES', () => {
     const requestedConfig = {
-      allowedEnvironmentVariables: ['SAFE_VAR', 'GOOGLE_CLOUD_PROJECT'],
+      allowedEnvironmentVariables: [
+        'SAFE_VAR',
+        'GOOGLE_CLOUD_PROJECT',
+        'GOOGLE_CLOUD_PROJECT_ID',
+      ],
     };
 
     const config = getSecureSanitizationConfig(requestedConfig);
@@ -411,6 +415,9 @@ describe('getSecureSanitizationConfig', () => {
     expect(config.allowedEnvironmentVariables).toContain('SAFE_VAR');
     expect(config.allowedEnvironmentVariables).not.toContain(
       'GOOGLE_CLOUD_PROJECT',
+    );
+    expect(config.allowedEnvironmentVariables).not.toContain(
+      'GOOGLE_CLOUD_PROJECT_ID',
     );
   });
 

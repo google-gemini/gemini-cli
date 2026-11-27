@@ -59,9 +59,10 @@ export class ValidationCancelledError extends Error {
 export class IneligibleTierError extends Error {
   readonly ineligibleTiers: IneligibleTier[];
 
-  constructor(ineligibleTiers: IneligibleTier[]) {
+  constructor(ineligibleTiers: IneligibleTier[], projectIdHint?: string) {
     const reasons = ineligibleTiers.map((t) => t.reasonMessage).join(', ');
-    super(reasons);
+    const message = projectIdHint ? `${reasons}\n\n${projectIdHint}` : reasons;
+    super(message);
     this.name = 'IneligibleTierError';
     this.ineligibleTiers = ineligibleTiers;
   }
@@ -311,9 +312,15 @@ async function _doSetupUser(
   };
 }
 
+const INELIGIBLE_TIER_PROJECT_ID_HINT =
+  'If you are using a Google Cloud or Enterprise account, ensure the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID environment variable is set to your Google Cloud Project ID. See https://geminicli.com/docs/get-started/authentication/#set-gcp';
+
 function throwIneligibleOrProjectIdError(res: LoadCodeAssistResponse): never {
   if (res.ineligibleTiers && res.ineligibleTiers.length > 0) {
-    throw new IneligibleTierError(res.ineligibleTiers);
+    throw new IneligibleTierError(
+      res.ineligibleTiers,
+      INELIGIBLE_TIER_PROJECT_ID_HINT,
+    );
   }
   throw new ProjectIdRequiredError();
 }

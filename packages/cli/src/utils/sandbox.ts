@@ -843,6 +843,14 @@ export async function start_sandbox(
       );
     }
 
+    // copy GOOGLE_CLOUD_PROJECT_ID
+    if (process.env['GOOGLE_CLOUD_PROJECT_ID']) {
+      args.push(
+        '--env',
+        `GOOGLE_CLOUD_PROJECT_ID=${process.env['GOOGLE_CLOUD_PROJECT_ID']}`,
+      );
+    }
+
     // copy GOOGLE_CLOUD_LOCATION
     if (process.env['GOOGLE_CLOUD_LOCATION']) {
       args.push(
@@ -1351,6 +1359,7 @@ async function start_lxc_sandbox(
       GOOGLE_GENAI_USE_VERTEXAI: process.env['GOOGLE_GENAI_USE_VERTEXAI'],
       GOOGLE_GENAI_USE_GCA: process.env['GOOGLE_GENAI_USE_GCA'],
       GOOGLE_CLOUD_PROJECT: process.env['GOOGLE_CLOUD_PROJECT'],
+      GOOGLE_CLOUD_PROJECT_ID: process.env['GOOGLE_CLOUD_PROJECT_ID'],
       GOOGLE_CLOUD_LOCATION: process.env['GOOGLE_CLOUD_LOCATION'],
       GEMINI_MODEL: process.env['GEMINI_MODEL'],
       TERM: process.env['TERM'],

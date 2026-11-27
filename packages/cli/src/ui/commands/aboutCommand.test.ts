@@ -178,4 +178,20 @@ describe('aboutCommand', () => {
       }),
     );
   });
+
+  it('should fall back to GOOGLE_CLOUD_PROJECT_ID when GOOGLE_CLOUD_PROJECT is unset', async () => {
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', 'fallback-gcp-project-id');
+    if (!aboutCommand.action) {
+      throw new Error('The about command must have an action.');
+    }
+
+    await aboutCommand.action(mockContext, '');
+
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gcpProject: 'fallback-gcp-project-id',
+      }),
+    );
+  });
 });

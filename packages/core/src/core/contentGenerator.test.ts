@@ -1058,6 +1058,68 @@ describe('createContentGenerator', () => {
     );
   });
 
+  it('should pass GOOGLE_CLOUD_PROJECT_ID and GOOGLE_CLOUD_LOCATION to GoogleGenAI for Vertex AI when GOOGLE_CLOUD_PROJECT is unset', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', 'my-project-id');
+    vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'us-central1');
+
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_VERTEX_AI,
+    );
+    await createContentGenerator(config, mockConfig);
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiKey: undefined,
+        vertexai: true,
+        project: 'my-project-id',
+        location: 'us-central1',
+      }),
+    );
+  });
+
+  it('should not pass project override when GOOGLE_CLOUD_PROJECT is set alongside GOOGLE_CLOUD_PROJECT_ID', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'primary-project');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', 'fallback-project');
+    vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'us-central1');
+
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_VERTEX_AI,
+    );
+    await createContentGenerator(config, mockConfig);
+
+    const callArg = vi.mocked(GoogleGenAI).mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(callArg['vertexai']).toBe(true);
+    expect(callArg).not.toHaveProperty('project');
+  });
+
   it('should prefer GOOGLE_VERTEX_BASE_URL when authType is USE_VERTEX_AI without inferred vertex credentials', async () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
@@ -1497,9 +1559,23 @@ describe('createContentGeneratorConfig', () => {
     expect(config.apiKey).toBeUndefined();
   });
 
+  it('should configure for Vertex AI using GOOGLE_CLOUD_PROJECT_ID and location when GOOGLE_CLOUD_PROJECT is unset', async () => {
+    vi.stubEnv('GOOGLE_API_KEY', '');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', 'env-gcp-project-id');
+    vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'env-gcp-location');
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_VERTEX_AI,
+    );
+    expect(config.vertexai).toBe(true);
+    expect(config.apiKey).toBeUndefined();
+  });
+
   it('should not configure for Vertex AI if required env vars are empty', async () => {
     vi.stubEnv('GOOGLE_API_KEY', '');
     vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', '');
     vi.stubEnv('GOOGLE_CLOUD_LOCATION', '');
     const config = await createContentGeneratorConfig(
       mockConfig,

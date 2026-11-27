@@ -2714,16 +2714,18 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Ensure you have the necessary permissions.
   - Example: `export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"` (Windows PowerShell:
     `$env:GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"`).
-- **`GOOGLE_CLOUD_PROJECT`**:
-  - Your Google Cloud Project ID.
+- **`GOOGLE_CLOUD_PROJECT`** (fallback: **`GOOGLE_CLOUD_PROJECT_ID`**):
+  - Your Google Cloud Project ID. Gemini CLI checks `GOOGLE_CLOUD_PROJECT` first
+    and falls back to `GOOGLE_CLOUD_PROJECT_ID`.
   - Required for using Code Assist or Vertex AI.
   - If using Vertex AI, ensure you have the necessary permissions in this
     project.
   - **Cloud Shell note:** When running in a Cloud Shell environment, this
     variable defaults to a special project allocated for Cloud Shell users. If
     you have `GOOGLE_CLOUD_PROJECT` set in your global environment in Cloud
-    Shell, it will be overridden by this default. To use a different project in
-    Cloud Shell, you must define `GOOGLE_CLOUD_PROJECT` in a `.env` file.
+    Shell, it will be overridden by this default unless you set
+    `GOOGLE_CLOUD_PROJECT_ID` or define `GOOGLE_CLOUD_PROJECT` (or
+    `GOOGLE_CLOUD_PROJECT_ID`) in a `.env` file.
   - Example: `export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"` (Windows
     PowerShell: `$env:GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`).
 - **`GOOGLE_APPLICATION_CREDENTIALS`** (string):

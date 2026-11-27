@@ -3929,6 +3929,7 @@ describe('Settings Loading and Merging', () => {
       delete process.env['GEMINI_API_KEY'];
       delete process.env['GOOGLE_API_KEY'];
       delete process.env['GOOGLE_CLOUD_PROJECT'];
+      delete process.env['GOOGLE_CLOUD_PROJECT_ID'];
       delete process.env['GOOGLE_CLOUD_LOCATION'];
       delete process.env['CLOUD_SHELL'];
       delete process.env['MALICIOUS_VAR'];
@@ -4035,6 +4036,7 @@ describe('Settings Loading and Merging', () => {
 GEMINI_API_KEY=secret-key
 MALICIOUS_VAR=should-be-ignored
 GOOGLE_API_KEY=another-secret
+GOOGLE_CLOUD_PROJECT_ID=my-project;inject
     `);
 
         loadEnvironment(
@@ -4044,6 +4046,7 @@ GOOGLE_API_KEY=another-secret
 
         expect(process.env['GEMINI_API_KEY']).toBe('secret-key');
         expect(process.env['GOOGLE_API_KEY']).toBe('another-secret');
+        expect(process.env['GOOGLE_CLOUD_PROJECT_ID']).toBe('my-projectinject');
         expect(process.env['MALICIOUS_VAR']).toBeUndefined();
       });
 
@@ -4314,6 +4317,99 @@ MALICIOUS_VAR=allowed-because-trusted
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe(
           'attacker-projectinject',
         );
+      });
+
+      it('should respect GOOGLE_CLOUD_PROJECT_ID in Cloud Shell instead of overwriting with cloudshell-gca', () => {
+        process.env['CLOUD_SHELL'] = 'true';
+        process.env['GOOGLE_CLOUD_PROJECT_ID'] = 'my-explicit-project-id';
+        process.argv = ['node', 'gemini', '-s', 'prompt'];
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: false,
+          source: 'file',
+        });
+        vi.mocked(fs.existsSync).mockReturnValue(false);
+
+        loadEnvironment(
+          createMockSettings({ tools: { sandbox: false } }).merged,
+          MOCK_WORKSPACE_DIR,
+        );
+
+        expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe(
+          'my-explicit-project-id',
+        );
+      });
+
+      it('should sanitize GOOGLE_CLOUD_PROJECT_ID in Cloud Shell when loaded from .env in untrusted mode', () => {
+        process.env['CLOUD_SHELL'] = 'true';
+        process.argv = ['node', 'gemini', '-s', 'prompt'];
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: false,
+          source: 'file',
+        });
+        vi.mocked(fs.existsSync).mockReturnValue(true);
+        vi.mocked(fs.readFileSync).mockReturnValue(
+          'GOOGLE_CLOUD_PROJECT_ID=attacker-project-id;inject',
+        );
+
+        loadEnvironment(
+          createMockSettings({ tools: { sandbox: false } }).merged,
+          MOCK_WORKSPACE_DIR,
+        );
+
+        expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe(
+          'attacker-project-idinject',
+        );
+        expect(process.env['GOOGLE_CLOUD_PROJECT_ID']).toBe(
+          'attacker-project-idinject',
+        );
+      });
+
+      it('should preserve GOOGLE_CLOUD_PROJECT_ID in Cloud Shell when auth type is vertex-ai', () => {
+        process.env['CLOUD_SHELL'] = 'true';
+        process.env['GOOGLE_CLOUD_PROJECT_ID'] = 'my-vertex-project-id';
+        process.argv = ['node', 'gemini', '-s', 'prompt'];
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: false,
+          source: 'file',
+        });
+        vi.mocked(fs.existsSync).mockReturnValue(false);
+
+        loadEnvironment(
+          createMockSettings({
+            tools: { sandbox: false },
+            security: { auth: { selectedType: AuthType.USE_VERTEX_AI } },
+          }).merged,
+          MOCK_WORKSPACE_DIR,
+        );
+
+        expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe(
+          'my-vertex-project-id',
+        );
+      });
+
+      it('should fall back to GOOGLE_CLOUD_PROJECT_ID for Vertex AI when GOOGLE_CLOUD_PROJECT is already cloudshell-gca', () => {
+        process.env['CLOUD_SHELL'] = 'true';
+        process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
+        process.env['GOOGLE_CLOUD_PROJECT_ID'] = 'my-real-project-id';
+        process.argv = ['node', 'gemini', '-s', 'prompt'];
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: false,
+          source: 'file',
+        });
+        vi.mocked(fs.existsSync).mockReturnValue(false);
+
+        loadEnvironment(
+          createMockSettings({
+            tools: { sandbox: false },
+            security: { auth: { selectedType: AuthType.USE_VERTEX_AI } },
+          }).merged,
+          MOCK_WORKSPACE_DIR,
+        );
+
+        expect(process.env['_GEMINI_USER_GCP_PROJECT']).toBe(
+          'my-real-project-id',
+        );
+        expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('my-real-project-id');
       });
     });
 
