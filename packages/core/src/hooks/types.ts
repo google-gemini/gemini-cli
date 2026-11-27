@@ -500,6 +500,7 @@ export interface BeforeToolInput extends HookInput {
   tool_input: Record<string, unknown>;
   mcp_context?: McpToolContext; // Only present for MCP tools
   original_request_name?: string;
+  tool_call_id?: string;
 }
 
 /**
@@ -521,6 +522,7 @@ export interface AfterToolInput extends HookInput {
   tool_response: Record<string, unknown>;
   mcp_context?: McpToolContext; // Only present for MCP tools
   original_request_name?: string;
+  tool_call_id?: string;
 }
 
 /**
