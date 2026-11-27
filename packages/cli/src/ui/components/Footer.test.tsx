@@ -913,4 +913,45 @@ describe('<Footer />', () => {
       unmount();
     });
   });
+
+  describe('custom model displayName', () => {
+    it('displays configured custom displayName for long Vertex AI model resource paths instead of dropping model info', async () => {
+      const vertexModel =
+        'projects/my-gcp-project/locations/us-central1/publishers/google/models/gemini-3.8-flash';
+      const customConfig = {
+        ...mockConfigPlain,
+        getModel: () => vertexModel,
+        getExperimentalDynamicModelConfiguration: () => true,
+        modelConfigService: {
+          getModelDefinition: (modelId: string) =>
+            modelId === vertexModel
+              ? { displayName: 'gemini-3.8-flash' }
+              : undefined,
+        },
+      } as unknown as Config;
+
+      const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+        config: customConfig,
+        width: 120,
+        uiState: {
+          sessionStats: mockSessionStats,
+          currentModel: vertexModel,
+          branchName: 'main',
+        },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              hideModelInfo: false,
+            },
+          },
+        }),
+      });
+
+      const output = lastFrame();
+      expect(output).toContain('gemini-3.8-flash');
+      expect(output).not.toContain('projects/my-gcp-project');
+      expect(output).not.toContain('…');
+      unmount();
+    });
+  });
 });
