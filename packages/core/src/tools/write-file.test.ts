@@ -1449,4 +1449,52 @@ describe('WriteFileTool', () => {
       ).toBe(false);
     });
   });
+
+  describe('CRLF diff normalization', () => {
+    const abortSignal = new AbortController().signal;
+
+    it('shows only changed lines in approval diff, result diff, and diffStat while preserving CRLF on disk', async () => {
+      const filePath = path.join(rootDir, 'crlf_diff_test.txt');
+      const originalCRLF = 'line1\r\nline2\r\nline3\r\nline4\r\nline5\r\n';
+      const proposedLF = 'line1\nline2\nCHANGED\nline4\nline5\n';
+      fs.writeFileSync(filePath, originalCRLF, 'utf8');
+
+      mockConfigInternal.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+      mockEnsureCorrectFileContent.mockResolvedValue(proposedLF);
+
+      const invocation = tool.build({
+        file_path: filePath,
+        content: proposedLF,
+      });
+
+      const confirmDetails = await invocation.shouldConfirmExecute(abortSignal);
+      expect(confirmDetails).not.toBe(false);
+      if (confirmDetails && confirmDetails.type === 'edit') {
+        expect(confirmDetails.fileDiff).toContain('-line3');
+        expect(confirmDetails.fileDiff).toContain('+CHANGED');
+        expect(confirmDetails.fileDiff).not.toContain('-line1');
+        expect(confirmDetails.fileDiff).not.toContain('-line5');
+      }
+
+      const result = await invocation.execute({ abortSignal });
+      expect(result.error).toBeUndefined();
+      expect(typeof result.returnDisplay).toBe('object');
+      if (
+        typeof result.returnDisplay === 'object' &&
+        'fileDiff' in result.returnDisplay
+      ) {
+        expect(result.returnDisplay.fileDiff).toContain('-line3');
+        expect(result.returnDisplay.fileDiff).toContain('+CHANGED');
+        expect(result.returnDisplay.fileDiff).not.toContain('-line1');
+        expect(result.returnDisplay.fileDiff).not.toContain('-line5');
+        expect(result.returnDisplay.diffStat?.model_added_lines).toBe(1);
+        expect(result.returnDisplay.diffStat?.model_removed_lines).toBe(1);
+      }
+
+      // Disk bytes must still preserve CRLF line endings
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(
+        'line1\r\nline2\r\nCHANGED\r\nline4\r\nline5\r\n',
+      );
+    });
+  });
 });
