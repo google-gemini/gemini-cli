@@ -4386,6 +4386,31 @@ MALICIOUS_VAR=allowed-because-trusted
           'my-vertex-project-id',
         );
       });
+
+      it('should fall back to GOOGLE_CLOUD_PROJECT_ID for Vertex AI when GOOGLE_CLOUD_PROJECT is already cloudshell-gca', () => {
+        process.env['CLOUD_SHELL'] = 'true';
+        process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
+        process.env['GOOGLE_CLOUD_PROJECT_ID'] = 'my-real-project-id';
+        process.argv = ['node', 'gemini', '-s', 'prompt'];
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: false,
+          source: 'file',
+        });
+        vi.mocked(fs.existsSync).mockReturnValue(false);
+
+        loadEnvironment(
+          createMockSettings({
+            tools: { sandbox: false },
+            security: { auth: { selectedType: AuthType.USE_VERTEX_AI } },
+          }).merged,
+          MOCK_WORKSPACE_DIR,
+        );
+
+        expect(process.env['_GEMINI_USER_GCP_PROJECT']).toBe(
+          'my-real-project-id',
+        );
+        expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('my-real-project-id');
+      });
     });
 
     describe('system configuration security', () => {

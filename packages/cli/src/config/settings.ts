@@ -679,9 +679,11 @@ export function setUpCloudShellEnvironment(
   // Save the user's original value before overwriting, so it can be restored
   // if the user later switches to Vertex AI (even after a process restart).
   if (!process.env[USER_GCP_PROJECT]) {
+    const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'];
     const current =
-      process.env['GOOGLE_CLOUD_PROJECT'] ||
-      process.env['GOOGLE_CLOUD_PROJECT_ID'];
+      gcpProject && gcpProject !== 'cloudshell-gca'
+        ? gcpProject
+        : process.env['GOOGLE_CLOUD_PROJECT_ID'];
     if (current && current !== 'cloudshell-gca') {
       process.env[USER_GCP_PROJECT] = current;
     }
