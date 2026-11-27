@@ -126,6 +126,7 @@ describe('performRestore', () => {
     const generator = performRestore(toolCallData, mockGitService);
 
     const historyResult = await generator.next();
+    expect(spy).toHaveBeenCalledWith('test-commit-hash');
     expect(historyResult.value).toEqual({
       type: 'load_history',
       history: toolCallData.history,
@@ -144,6 +145,51 @@ describe('performRestore', () => {
 
     const nextResult = await generator.next();
     expect(nextResult.done).toBe(true);
+  });
+
+  it.each(['missing service', 'missing tree'])(
+    'should preserve history when restoration fails with %s',
+    async (failure) => {
+      const toolCallData: ToolCallData = {
+        toolCall: { name: 'write_file', args: {} },
+        history: [{ some: 'history' }],
+        clientHistory: [{ role: 'user', parts: [{ text: 'hello' }] }],
+        commitHash: 'missing-commit',
+      };
+      vi.mocked(mockGitService.restoreProjectFromSnapshot).mockRejectedValue(
+        new Error('fatal: unable to read tree missing-commit'),
+      );
+
+      const actions = [];
+      for await (const action of performRestore(
+        toolCallData,
+        failure === 'missing service' ? undefined : mockGitService,
+      )) {
+        actions.push(action);
+      }
+
+      expect(actions).toEqual([
+        expect.objectContaining({ type: 'message', messageType: 'error' }),
+      ]);
+    },
+  );
+
+  it('should not yield history before an unexpected Git error', async () => {
+    const error = new Error('fatal: could not resolve missing-commit');
+    vi.mocked(mockGitService.restoreProjectFromSnapshot).mockRejectedValue(
+      error,
+    );
+    const generator = performRestore(
+      {
+        toolCall: { name: 'write_file', args: {} },
+        history: [{ some: 'history' }],
+        clientHistory: [{ role: 'user', parts: [{ text: 'hello' }] }],
+        commitHash: 'missing-commit',
+      },
+      mockGitService,
+    );
+
+    await expect(generator.next()).rejects.toThrow(error);
   });
 
   it('should yield error message if commitHash is present but gitService is undefined', async () => {

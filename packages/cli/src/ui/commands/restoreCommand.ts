@@ -118,6 +118,9 @@ async function restoreAction(
           },
           Date.now(),
         );
+        if (action.messageType === 'error') {
+          return;
+        }
       } else if (action.type === 'load_history' && loadHistory) {
         loadHistory(action.history);
         if (action.clientHistory) {
