@@ -6,7 +6,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
 import {
@@ -15,6 +14,8 @@ import {
   GEMINI_DIR,
   getErrorMessage,
   getFsErrorMessage,
+  getSystemSettingsPath,
+  getSystemDefaultsPath,
   Storage,
   coreEvents,
   homedir,
@@ -103,28 +104,7 @@ export function sanitizeEnvVar(value: string): string {
   return value.replace(/[^a-zA-Z0-9\-_./]/g, '');
 }
 
-export function getSystemSettingsPath(): string {
-  if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
-    return process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
-  }
-  if (platform() === 'darwin') {
-    return '/Library/Application Support/GeminiCli/settings.json';
-  } else if (platform() === 'win32') {
-    return 'C:\\ProgramData\\gemini-cli\\settings.json';
-  } else {
-    return '/etc/gemini-cli/settings.json';
-  }
-}
-
-export function getSystemDefaultsPath(): string {
-  if (process.env['GEMINI_CLI_SYSTEM_DEFAULTS_PATH']) {
-    return process.env['GEMINI_CLI_SYSTEM_DEFAULTS_PATH'];
-  }
-  return path.join(
-    path.dirname(getSystemSettingsPath()),
-    'system-defaults.json',
-  );
-}
+export { getSystemSettingsPath, getSystemDefaultsPath };
 
 export type { DnsResolutionOrder } from './settingsSchema.js';
 

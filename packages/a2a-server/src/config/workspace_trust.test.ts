@@ -17,6 +17,7 @@ import {
 import * as core from '@google/gemini-cli-core';
 import { loadConfig } from './config.js';
 import type { Settings } from './settings.js';
+import * as settingsModule from './settings.js';
 
 describe('Workspace Trust Evaluation', () => {
   let tempWorkspaceDir: string;
@@ -95,6 +96,7 @@ describe('Workspace Trust Evaluation', () => {
   });
 
   it('assigns undefined to mcpServers, policyPaths, adminPolicyPaths, tools, and telemetry in configParams and policySettings when trusted is false', async () => {
+    vi.spyOn(settingsModule, 'loadSettings').mockReturnValue({});
     const policySpy = vi.spyOn(core, 'createPolicyEngineConfig');
     const settings: Settings = {
       mcpServers: {

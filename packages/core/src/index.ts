@@ -5,6 +5,7 @@
  */
 
 // Export config
+export * from './config/settingsPaths.js';
 export * from './config/config.js';
 export * from './config/agent-loop-context.js';
 export * from './config/memory.js';

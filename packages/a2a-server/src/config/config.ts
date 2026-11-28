@@ -288,38 +288,16 @@ export async function loadConfig(
       : ApprovalMode.DEFAULT;
 
   if (!trusted) {
-    if (settings.mcpServers) {
-      logger.warn(
-        '[Configuration] Untrusted workspace detected. Stripping repository mcpServers definitions to prevent unintended command execution.',
-      );
-    }
-    if (settings.policyPaths) {
-      logger.warn(
-        '[Configuration] Untrusted workspace detected. Stripping repository policyPaths definitions to prevent unintended policy override.',
-      );
-    }
-    if (settings.adminPolicyPaths) {
-      logger.warn(
-        '[Configuration] Untrusted workspace detected. Stripping repository adminPolicyPaths definitions to prevent unintended admin policy override.',
-      );
-    }
-    if (settings.tools) {
-      logger.warn(
-        '[Configuration] Untrusted workspace detected. Stripping repository tools definitions to prevent unintended tool enablement.',
-      );
-    }
-    if (settings.telemetry) {
-      logger.warn(
-        '[Configuration] Untrusted workspace detected. Stripping repository telemetry definitions to prevent unintended data routing.',
-      );
-    }
+    // The supplied settings may include repository values. Reload these fields
+    // without the workspace layer so system and user configuration still applies.
+    const nonWorkspaceSettings = loadSettings(workspaceDir, false);
     settings = {
       ...settings,
-      mcpServers: undefined,
-      policyPaths: undefined,
-      adminPolicyPaths: undefined,
-      tools: undefined,
-      telemetry: undefined,
+      mcpServers: nonWorkspaceSettings.mcpServers,
+      policyPaths: nonWorkspaceSettings.policyPaths,
+      adminPolicyPaths: nonWorkspaceSettings.adminPolicyPaths,
+      tools: nonWorkspaceSettings.tools,
+      telemetry: nonWorkspaceSettings.telemetry,
     };
   }
 

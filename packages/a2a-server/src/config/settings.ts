@@ -17,6 +17,8 @@ import {
   homedir,
   checkPathTrust,
   isHeadlessMode,
+  getSystemSettingsPath,
+  getSystemDefaultsPath,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 
@@ -862,8 +864,8 @@ function loadAndMigrateFile(
 }
 
 /**
- * Loads settings from user and workspace directories.
- * Project settings override user settings if the workspace is trusted.
+ * Loads system defaults, user, trusted workspace, and system override settings,
+ * in increasing order of precedence.
  *
  * How is it different to gemini-cli/cli: Returns already merged settings rather
  * than `LoadedSettings` (unnecessary since we are not modifying users
@@ -874,12 +876,29 @@ export function loadSettings(
   isTrustedOverride?: boolean,
 ): Settings {
   const settingsErrors: SettingsError[] = [];
+  const systemDefaults = loadAndMigrateFile(
+    getSystemDefaultsPath(),
+    settingsErrors,
+  );
   const userSettings = loadAndMigrateFile(USER_SETTINGS_PATH, settingsErrors);
+  const systemSettings = loadAndMigrateFile(
+    getSystemSettingsPath(),
+    settingsErrors,
+  );
+  const nonWorkspaceSettings = customDeepMerge(
+    getMergeStrategyForPath,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    systemDefaults as MergeableObject,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    userSettings as MergeableObject,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    systemSettings as MergeableObject,
+  ) as Settings;
 
   let isTrusted = isTrustedOverride;
   if (isTrusted === undefined) {
     const isFolderTrustEnabled =
-      userSettings.security?.folderTrust?.enabled ?? true;
+      nonWorkspaceSettings.security?.folderTrust?.enabled ?? true;
     const { isTrusted: trustResult } = checkPathTrust({
       path: workspaceDir,
       isFolderTrustEnabled,
@@ -909,16 +928,19 @@ export function loadSettings(
   const mergedSettings = customDeepMerge(
     getMergeStrategyForPath,
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    systemDefaults as MergeableObject,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     userSettings as MergeableObject,
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     workspaceSettings as MergeableObject,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    systemSettings as MergeableObject,
   ) as Settings;
 
-  // Security: ensure policyPaths and adminPolicyPaths are only loaded from trusted, user-level
-  // configuration and cannot be overridden by workspace-level settings, even if the
-  // workspace is trusted.
-  mergedSettings.policyPaths = userSettings.policyPaths;
-  mergedSettings.adminPolicyPaths = userSettings.adminPolicyPaths;
+  // Policy paths may come from system and user configuration, but never from
+  // workspace settings, even if the workspace is trusted.
+  mergedSettings.policyPaths = nonWorkspaceSettings.policyPaths;
+  mergedSettings.adminPolicyPaths = nonWorkspaceSettings.adminPolicyPaths;
 
   return mergedSettings;
 }
