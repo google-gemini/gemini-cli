@@ -6,7 +6,7 @@
 
 import { isApiError, isStructuredError } from './quotaErrorDetection.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
-import type { UserTierId } from '../code_assist/types.js';
+import { UserTierId } from '../code_assist/types.js';
 import { AuthType } from '../core/contentGenerator.js';
 
 const RATE_LIMIT_ERROR_MESSAGE_USE_GEMINI =
@@ -32,6 +32,68 @@ function getRateLimitMessage(
   }
 }
 
+const PROJECT_DOCS_URL =
+  'https://geminicli.com/docs/get-started/authentication/#set-gcp';
+
+/**
+ * Actionable hint appended when the API reports a 403 PERMISSION_DENIED /
+ * CONSUMER_INVALID error, i.e. the request was billed against a missing or
+ * invalid Google Cloud project (for example, OAuth login without
+ * GOOGLE_CLOUD_PROJECT set). This is a soft, error-time hint only: it never
+ * blocks login or startup, because some users do not need
+ * GOOGLE_CLOUD_PROJECT set at all (notably the free tier, which uses a
+ * managed project). See https://github.com/google-gemini/gemini-cli/issues/22009
+ */
+function getMissingProjectHint(userTier?: UserTierId): string {
+  if (userTier === UserTierId.FREE) {
+    return (
+      `\nThis usually means the Google Cloud project used for the request is missing or invalid. ` +
+      `Free-tier accounts use a managed project, so first try signing in again ` +
+      `(/auth) and retrying. If the problem persists, see ${PROJECT_DOCS_URL}`
+    );
+  }
+  const projectId =
+    process.env['GOOGLE_CLOUD_PROJECT'] ||
+    process.env['GOOGLE_CLOUD_PROJECT_ID'];
+  if (!projectId) {
+    return (
+      `\nThis usually means the Google Cloud project used for the request is missing: ` +
+      `GOOGLE_CLOUD_PROJECT (or GOOGLE_CLOUD_PROJECT_ID) is not set. ` +
+      `Set it to your string-based project ID and try again. See ${PROJECT_DOCS_URL}`
+    );
+  }
+  return (
+    `\nThis usually means the Google Cloud project used for the request is missing or invalid. ` +
+    `Check that GOOGLE_CLOUD_PROJECT (or GOOGLE_CLOUD_PROJECT_ID) is set to your ` +
+    `string-based project ID (not the numeric project number). See ${PROJECT_DOCS_URL}`
+  );
+}
+
+function isConsumerInvalidProjectError(
+  code: number | undefined,
+  status: string | undefined,
+  message: string,
+  details?: unknown,
+): boolean {
+  if (code !== 403) {
+    return false;
+  }
+  if (status !== undefined && status !== 'PERMISSION_DENIED') {
+    return false;
+  }
+  if (
+    message.includes('CONSUMER_INVALID') ||
+    /permission denied on resource project/i.test(message)
+  ) {
+    return true;
+  }
+  try {
+    return JSON.stringify(details ?? '').includes('CONSUMER_INVALID');
+  } catch {
+    return false;
+  }
+}
+
 export function parseAndFormatApiError(
   error: unknown,
   authType?: AuthType,
@@ -43,6 +105,10 @@ export function parseAndFormatApiError(
     let text = `[API Error: ${error.message}]`;
     if (error.status === 429) {
       text += getRateLimitMessage(authType, fallbackModel);
+    } else if (
+      isConsumerInvalidProjectError(error.status, undefined, error.message)
+    ) {
+      text += getMissingProjectHint(userTier);
     }
     return text;
   }
@@ -72,6 +138,15 @@ export function parseAndFormatApiError(
         let text = `[API Error: ${finalMessage} (Status: ${parsedError.error.status})]`;
         if (parsedError.error.code === 429) {
           text += getRateLimitMessage(authType, fallbackModel);
+        } else if (
+          isConsumerInvalidProjectError(
+            parsedError.error.code,
+            parsedError.error.status,
+            finalMessage,
+            parsedError.error.details,
+          )
+        ) {
+          text += getMissingProjectHint(userTier);
         }
         return text;
       }
