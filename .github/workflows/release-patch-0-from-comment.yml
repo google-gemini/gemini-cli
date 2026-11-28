@@ -15,6 +15,7 @@ jobs:
       startsWith(github.event.comment.body, '/patch')
     permissions:
       contents: 'read'
+      issues: 'write'
       pull-requests: 'write'
       actions: 'write'
     steps:
@@ -25,17 +26,51 @@ jobs:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           script: |
             const commenter = context.payload.comment.user.login;
-            const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              username: commenter,
-            });
-            const allowed = ['admin', 'maintain', 'write'].includes(data.permission);
-            core.setOutput('authorized', allowed ? 'true' : 'false');
-            if (!allowed) {
-              core.warning(`Actor '${commenter}' has '${data.permission}' permission; write access is required to run /patch.`);
+            const assoc = context.payload.comment.author_association;
+            const trustedAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR'];
+
+            // Fast-reject external commenters without making an API call.
+            if (!trustedAssociations.includes(assoc)) {
+              core.setOutput('authorized', 'false');
+              core.warning(
+                `Actor '${commenter}' has author_association '${assoc}'; write access is required to run /patch.`,
+              );
               return;
             }
+
+            // Verify exact repository permission when permitted by GITHUB_TOKEN;
+            // fall back to the verified author_association only on HTTP 403.
+            let allowed = false;
+            try {
+              const { data } =
+                await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  username: commenter,
+                });
+              allowed = ['admin', 'maintain', 'write'].includes(data.permission);
+              if (!allowed) {
+                core.warning(
+                  `Actor '${commenter}' has '${data.permission}' permission; write access is required to run /patch.`,
+                );
+              }
+            } catch (error) {
+              if (error.status === 403) {
+                core.warning(
+                  `getCollaboratorPermissionLevel returned 403 (${error.message}); falling back to author_association '${assoc}'.`,
+                );
+                allowed = true;
+              } else {
+                core.setOutput('authorized', 'false');
+                throw error;
+              }
+            }
+
+            core.setOutput('authorized', allowed ? 'true' : 'false');
+            if (!allowed) {
+              return;
+            }
+
             try {
               await github.rest.reactions.createForIssueComment({
                 owner: context.repo.owner,
