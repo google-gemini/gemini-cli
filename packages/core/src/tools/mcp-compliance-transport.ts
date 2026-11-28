@@ -12,6 +12,17 @@ import type {
 import { EventEmitter } from 'node:events';
 
 /**
+ * Optional members that some MCP transports expose but the base `Transport`
+ * interface does not declare (for example `StreamableHTTPClientTransport`).
+ * Declared locally so the wrapper does not reach into SDK internals by name at
+ * each call site.
+ */
+interface TransportWithSessionState extends Transport {
+  setProtocolVersion?(version: string): void;
+  sessionId?: string;
+}
+
+/**
  * A wrapper transport that intercepts messages from MCP servers and fixes
  * non-compliant responses.
  *
@@ -53,6 +64,16 @@ export class McpComplianceTransport extends EventEmitter implements Transport {
 
   async send(message: JSONRPCMessage): Promise<void> {
     await this.transport.send(message);
+  }
+
+  // Forward optional transport members so the SDK can negotiate/store state on
+  // the wrapped transport (e.g. MCP-Protocol-Version header on HTTP).
+  setProtocolVersion(version: string): void {
+    (this.transport as TransportWithSessionState).setProtocolVersion?.(version);
+  }
+
+  get sessionId(): string | undefined {
+    return (this.transport as TransportWithSessionState).sessionId;
   }
 
   private handleMessage(message: JSONRPCMessage) {
