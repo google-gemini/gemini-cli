@@ -56,6 +56,9 @@ export interface ToolExecutionContext {
   onUpdateToolCall: (updatedCall: ToolCall) => void;
 }
 
+export const STOPPED_CALL_MESSAGE =
+  '[Stopped: this call was stopped before its result came back. It may have taken effect in full or in part before it stopped; a call to a remote server may also have completed there or may still be running. Check whether it took effect before running it again.]';
+
 export class ToolExecutor {
   constructor(private readonly context: AgentLoopContext) {}
 
@@ -152,7 +155,6 @@ export class ToolExecutor {
           if (signal.aborted) {
             completedToolCall = await this.createCancelledResult(
               call,
-              'User cancelled tool execution.',
               toolResult,
             );
           } else if (toolResult.error === undefined) {
@@ -182,12 +184,7 @@ export class ToolExecutor {
               executionError.message.includes('Operation cancelled by user'));
 
           if (signal.aborted || abortedByError) {
-            completedToolCall = await this.createCancelledResult(
-              call,
-              isAbortError(executionError)
-                ? 'Operation cancelled.'
-                : 'User cancelled tool execution.',
-            );
+            completedToolCall = await this.createCancelledResult(call);
           } else {
             const error =
               executionError instanceof Error
@@ -454,10 +451,12 @@ export class ToolExecutor {
 
   private async createCancelledResult(
     call: ToolCall,
-    reason: string,
     toolResult?: ToolResult,
   ): Promise<CancelledToolCall> {
-    const errorMessage = `[Operation Cancelled] ${reason}`;
+    // The call had started, so it may have run; a remote (MCP) call may have completed on its server, or still be
+    // running there, after the client stopped waiting. "Cancelled" reads as "did not happen", and models then run
+    // the call again.
+    const errorMessage = STOPPED_CALL_MESSAGE;
     const startTime = 'startTime' in call ? call.startTime : undefined;
 
     if (!('tool' in call) || !('invocation' in call)) {
