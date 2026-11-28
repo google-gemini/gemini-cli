@@ -7,44 +7,101 @@ on:
 jobs:
   slash-command:
     runs-on: 'ubuntu-latest'
-    # Only run if the comment is from a human user (not automated)
-    if: "github.event.comment.user.type == 'User' && github.event.comment.user.login != 'github-actions[bot]'"
+    # Only run on PR /patch comments from human users (not automated)
+    if: >-
+      github.event.issue.pull_request != null &&
+      github.event.comment.user.type == 'User' &&
+      github.event.comment.user.login != 'github-actions[bot]' &&
+      startsWith(github.event.comment.body, '/patch')
     permissions:
-      contents: 'write'
+      contents: 'read'
+      issues: 'write'
       pull-requests: 'write'
       actions: 'write'
     steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+      - name: 'Verify Write Permission'
+        id: 'auth'
+        uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
         with:
-          persist-credentials: false
-          fetch-depth: 1
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          script: |
+            const commenter = context.payload.comment.user.login;
+            const assoc = context.payload.comment.author_association;
+            const trustedAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR'];
 
-      - name: 'Slash Command Dispatch'
-        id: 'slash_command'
-        uses: 'peter-evans/slash-command-dispatch@40877f718dce0101edfc7aea2b3800cc192f9ed5'
-        with:
-          token: '${{ secrets.GITHUB_TOKEN }}'
-          commands: 'patch'
-          permission: 'write'
-          issue-type: 'pull-request'
+            // Fast-reject external commenters without making an API call.
+            if (!trustedAssociations.includes(assoc)) {
+              core.setOutput('authorized', 'false');
+              core.warning(
+                `Actor '${commenter}' has author_association '${assoc}'; write access is required to run /patch.`,
+              );
+              return;
+            }
+
+            // Verify exact repository permission when permitted by GITHUB_TOKEN;
+            // fall back to the verified author_association only on HTTP 403.
+            let allowed = false;
+            try {
+              const { data } =
+                await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  username: commenter,
+                });
+              allowed = ['admin', 'maintain', 'write'].includes(data.permission);
+              if (!allowed) {
+                core.warning(
+                  `Actor '${commenter}' has '${data.permission}' permission; write access is required to run /patch.`,
+                );
+              }
+            } catch (error) {
+              if (error.status === 403) {
+                core.warning(
+                  `getCollaboratorPermissionLevel returned 403 (${error.message}); falling back to author_association '${assoc}'.`,
+                );
+                allowed = true;
+              } else {
+                core.setOutput('authorized', 'false');
+                throw error;
+              }
+            }
+
+            core.setOutput('authorized', allowed ? 'true' : 'false');
+            if (!allowed) {
+              return;
+            }
+
+            try {
+              await github.rest.reactions.createForIssueComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: context.payload.comment.id,
+                content: 'eyes',
+              });
+            } catch (error) {
+              core.warning(`Failed to add eyes reaction: ${error.message}`);
+            }
 
       - name: 'Get PR Status'
         id: 'pr_status'
-        if: "startsWith(github.event.comment.body, '/patch')"
+        if: "steps.auth.outputs.authorized == 'true'"
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_REPO: '${{ github.repository }}'
+          PR_NUMBER: '${{ github.event.issue.number }}'
         run: |
-          gh pr view "${{ github.event.issue.number }}" --json mergeCommit,state > pr_status.json
+          gh pr view "${PR_NUMBER}" --json mergeCommit,state > pr_status.json
           echo "MERGE_COMMIT_SHA=$(jq -r .mergeCommit.oid pr_status.json)" >> "$GITHUB_OUTPUT"
           echo "STATE=$(jq -r .state pr_status.json)" >> "$GITHUB_OUTPUT"
 
       - name: 'Dispatch if Merged'
-        if: "steps.pr_status.outputs.STATE == 'MERGED'"
+        if: "steps.auth.outputs.authorized == 'true' && steps.pr_status.outputs.STATE == 'MERGED'"
         id: 'dispatch_patch'
         uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
         env:
           COMMENT_BODY: '${{ github.event.comment.body }}'
+          MERGE_COMMIT_SHA: '${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}'
+          ORIGINAL_PR: '${{ github.event.issue.number }}'
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           script: |
@@ -88,9 +145,9 @@ jobs:
                 workflow_id: 'release-patch-1-create-pr.yml',
                 ref: 'main',
                 inputs: {
-                  commit: '${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}',
+                  commit: process.env.MERGE_COMMIT_SHA,
                   channel: channel,
-                  original_pr: '${{ github.event.issue.number }}',
+                  original_pr: process.env.ORIGINAL_PR,
                   environment: 'prod'
                 }
               });
@@ -127,7 +184,7 @@ jobs:
             }
 
       - name: 'Comment on Failure'
-        if: "startsWith(github.event.comment.body, '/patch') && steps.pr_status.outputs.STATE != 'MERGED'"
+        if: "steps.auth.outputs.authorized == 'true' && steps.pr_status.outputs.STATE != 'MERGED'"
         uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
         with:
           token: '${{ secrets.GITHUB_TOKEN }}'
@@ -136,7 +193,7 @@ jobs:
             :x: The `/patch` command failed. This pull request must be merged before a patch can be created.
 
       - name: 'Final Status Comment - Success'
-        if: "always() && startsWith(github.event.comment.body, '/patch') && steps.dispatch_patch.outcome == 'success' && steps.dispatch_patch.outputs.dispatched_run_urls"
+        if: "always() && steps.auth.outputs.authorized == 'true' && steps.dispatch_patch.outcome == 'success' && steps.dispatch_patch.outputs.dispatched_run_urls"
         uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
         with:
           token: '${{ secrets.GITHUB_TOKEN }}'
@@ -157,7 +214,7 @@ jobs:
             - [This trigger workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
       - name: 'Final Status Comment - Dispatch Success (No URL)'
-        if: "always() && startsWith(github.event.comment.body, '/patch') && steps.dispatch_patch.outcome == 'success' && !steps.dispatch_patch.outputs.dispatched_run_urls"
+        if: "always() && steps.auth.outputs.authorized == 'true' && steps.dispatch_patch.outcome == 'success' && !steps.dispatch_patch.outputs.dispatched_run_urls"
         uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
         with:
           token: '${{ secrets.GITHUB_TOKEN }}'
@@ -177,7 +234,7 @@ jobs:
             - [This trigger workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
       - name: 'Final Status Comment - Failure'
-        if: "always() && startsWith(github.event.comment.body, '/patch') && (steps.dispatch_patch.outcome == 'failure' || steps.dispatch_patch.outcome == 'cancelled')"
+        if: "always() && steps.auth.outputs.authorized == 'true' && (steps.dispatch_patch.outcome == 'failure' || steps.dispatch_patch.outcome == 'cancelled')"
         uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
         with:
           token: '${{ secrets.GITHUB_TOKEN }}'
