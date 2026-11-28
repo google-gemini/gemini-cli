@@ -13,7 +13,14 @@ import {
   USER_SETTINGS_PATH,
   resolveEnvVarsInString,
 } from './settings.js';
-import { debugLogger, checkPathTrust } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  checkPathTrust,
+  Config,
+  SimpleExtensionLoader,
+} from '@google/gemini-cli-core';
+import * as core from '@google/gemini-cli-core';
+import { loadConfig } from './config.js';
 
 const mocks = vi.hoisted(() => {
   const suffix = Math.random().toString(36).slice(2);
@@ -57,9 +64,13 @@ describe('loadSettings', () => {
   );
   const mockGeminiHomeDir = path.join(mockHomeDir, '.gemini');
   const mockGeminiWorkspaceDir = path.join(mockWorkspaceDir, '.gemini');
+  const systemSettingsPath = path.join(mockHomeDir, 'system-settings.json');
+  const systemDefaultsPath = path.join(mockHomeDir, 'system-defaults.json');
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('GEMINI_CLI_SYSTEM_SETTINGS_PATH', systemSettingsPath);
+    vi.stubEnv('GEMINI_CLI_SYSTEM_DEFAULTS_PATH', systemDefaultsPath);
     // Create the directories using the real fs
     if (!fs.existsSync(mockGeminiHomeDir)) {
       fs.mkdirSync(mockGeminiHomeDir, { recursive: true });
@@ -162,6 +173,195 @@ describe('loadSettings', () => {
     // Nested object values deep-merged across user and workspace scopes
     expect(result.context?.fileFiltering?.respectGitIgnore).toBe(false);
     expect(result.context?.fileFiltering?.enableRecursiveFileSearch).toBe(true);
+  });
+
+  describe('system settings layers', () => {
+    it.each([
+      { layers: 1, trusted: true, expected: 'defaults' },
+      { layers: 2, trusted: true, expected: 'user' },
+      { layers: 3, trusted: true, expected: 'workspace' },
+      { layers: 3, trusted: false, expected: 'user' },
+      { layers: 4, trusted: true, expected: 'system' },
+      { layers: 4, trusted: false, expected: 'system' },
+    ])(
+      'uses $expected with $layers layers and trusted=$trusted',
+      ({ layers, trusted, expected }) => {
+        const files = [
+          [systemDefaultsPath, 'defaults'],
+          [USER_SETTINGS_PATH, 'user'],
+          [path.join(mockGeminiWorkspaceDir, 'settings.json'), 'workspace'],
+          [systemSettingsPath, 'system'],
+        ];
+        for (const [filePath, name] of files.slice(0, layers)) {
+          fs.writeFileSync(
+            filePath,
+            JSON.stringify({
+              model: { name },
+              tools: { core: [name], exclude: [`${name}-excluded`] },
+            }),
+          );
+        }
+
+        const result = loadSettings(mockWorkspaceDir, trusted);
+        expect(result.model?.name).toBe(expected);
+        expect(result.tools?.core).toEqual([expected]);
+        expect(result.tools?.exclude).toEqual([`${expected}-excluded`]);
+      },
+    );
+
+    it('migrates and resolves environment variables in system files while preserving nested defaults', () => {
+      vi.stubEnv('A2A_TEST_TOOL', 'read_file');
+      fs.writeFileSync(
+        systemDefaultsPath,
+        JSON.stringify({
+          coreTools: ['${A2A_TEST_TOOL}'],
+          fileFiltering: { respectGitIgnore: true, respectGeminiIgnore: true },
+        }),
+      );
+      fs.writeFileSync(
+        systemSettingsPath,
+        JSON.stringify({
+          excludeTools: ['run_shell_command'],
+          fileFiltering: { respectGitIgnore: false },
+        }),
+      );
+
+      const result = loadSettings(mockWorkspaceDir);
+      expect(result.tools?.core).toEqual(['read_file']);
+      expect(result.tools?.exclude).toEqual(['run_shell_command']);
+      expect(result.context?.fileFiltering?.respectGitIgnore).toBe(false);
+      expect(result.context?.fileFiltering?.respectGeminiIgnore).toBe(true);
+    });
+
+    it.each(['defaults', 'system'])(
+      'reports malformed %s files and continues loading user settings',
+      (layer) => {
+        const invalidPath =
+          layer === 'defaults' ? systemDefaultsPath : systemSettingsPath;
+        fs.writeFileSync(invalidPath, '{ invalid json');
+        fs.writeFileSync(
+          USER_SETTINGS_PATH,
+          JSON.stringify({ model: { name: 'user' } }),
+        );
+
+        expect(loadSettings(mockWorkspaceDir).model?.name).toBe('user');
+        expect(debugLogger.error).toHaveBeenCalledWith(
+          `  Path: ${invalidPath}`,
+        );
+      },
+    );
+
+    it('unions policy paths from system and user layers, excluding workspace paths', () => {
+      for (const [filePath, name] of [
+        [systemDefaultsPath, 'defaults'],
+        [USER_SETTINGS_PATH, 'user'],
+        [systemSettingsPath, 'system'],
+        [path.join(mockGeminiWorkspaceDir, 'settings.json'), 'workspace'],
+      ]) {
+        fs.writeFileSync(
+          filePath,
+          JSON.stringify({
+            policyPaths: [name, 'shared'],
+            adminPolicyPaths: [`${name}-admin`, 'shared-admin'],
+          }),
+        );
+      }
+
+      const result = loadSettings(mockWorkspaceDir, true);
+      expect(result.policyPaths).toEqual([
+        'defaults',
+        'shared',
+        'user',
+        'system',
+      ]);
+      expect(result.adminPolicyPaths).toEqual([
+        'defaults-admin',
+        'shared-admin',
+        'user-admin',
+        'system-admin',
+      ]);
+    });
+
+    it.each([true, false])(
+      'preserves system and user settings through runtime configuration with trusted=%s',
+      async (trusted) => {
+        vi.stubEnv('GEMINI_API_KEY', 'test-key');
+        vi.spyOn(Config.prototype, 'initialize').mockResolvedValue(undefined);
+        vi.spyOn(Config.prototype, 'waitForMcpInit').mockResolvedValue(
+          undefined,
+        );
+        const policySpy = vi.spyOn(core, 'createPolicyEngineConfig');
+        const layers = [
+          [systemDefaultsPath, 'defaults'],
+          [USER_SETTINGS_PATH, 'user'],
+          [path.join(mockGeminiWorkspaceDir, 'settings.json'), 'workspace'],
+          [systemSettingsPath, 'system'],
+        ];
+        for (const [filePath, name] of layers) {
+          fs.writeFileSync(
+            filePath,
+            JSON.stringify({
+              tools: { core: [name], exclude: [`${name}-excluded`] },
+              policyPaths: [path.join(mockHomeDir, `${name}-policies`)],
+              adminPolicyPaths: [path.join(mockHomeDir, `${name}-admin`)],
+              mcpServers: { [name]: { command: name } },
+              telemetry: { otlpEndpoint: `http://${name}:4317` },
+            }),
+          );
+        }
+
+        // Even if a caller supplies workspace settings, restricted mode must
+        // recover the machine/user fields rather than discard them entirely.
+        const settings = loadSettings(mockWorkspaceDir, true);
+        const config = await loadConfig(
+          settings,
+          new SimpleExtensionLoader([]),
+          'system-settings-test',
+          trusted,
+          mockWorkspaceDir,
+        );
+
+        expect(config.getCoreTools()).toEqual(['system']);
+        expect(config.getExcludeTools()).toContain('system-excluded');
+        expect(config.getTelemetryOtlpEndpoint()).toBe('http://system:4317');
+        const policySettings = policySpy.mock.calls[0][0];
+        expect(policySettings.tools?.core).toEqual(['system']);
+        expect(policySettings.tools?.exclude).toEqual(['system-excluded']);
+        for (const key of ['policyPaths', 'adminPolicyPaths'] as const) {
+          const suffix = key === 'policyPaths' ? 'policies' : 'admin';
+          expect(policySettings[key]).toEqual(
+            ['defaults', 'user', 'system'].map((name) =>
+              path.join(mockHomeDir, `${name}-${suffix}`),
+            ),
+          );
+        }
+        expect(Object.keys(config.getMcpServers() ?? {})).toEqual(
+          trusted
+            ? ['defaults', 'user', 'workspace', 'system']
+            : ['defaults', 'user', 'system'],
+        );
+      },
+    );
+
+    it('uses system overrides when determining whether folder trust is enabled', () => {
+      fs.writeFileSync(
+        USER_SETTINGS_PATH,
+        JSON.stringify({ security: { folderTrust: { enabled: false } } }),
+      );
+      fs.writeFileSync(
+        systemSettingsPath,
+        JSON.stringify({ security: { folderTrust: { enabled: true } } }),
+      );
+      fs.writeFileSync(
+        path.join(mockGeminiWorkspaceDir, 'settings.json'),
+        JSON.stringify({ model: { name: 'workspace' } }),
+      );
+
+      expect(loadSettings(mockWorkspaceDir).model?.name).toBeUndefined();
+      expect(checkPathTrust).toHaveBeenCalledWith(
+        expect.objectContaining({ isFolderTrustEnabled: true }),
+      );
+    });
   });
 
   describe('security', () => {
