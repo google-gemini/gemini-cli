@@ -55,6 +55,16 @@ export class McpComplianceTransport extends EventEmitter implements Transport {
     await this.transport.send(message);
   }
 
+  // Forward optional transport members so the SDK can negotiate/store state on
+  // the wrapped transport (e.g. MCP-Protocol-Version header on HTTP).
+  setProtocolVersion(version: string): void {
+    (this.transport as { setProtocolVersion?: (version: string) => void }).setProtocolVersion?.(version);
+  }
+
+  get sessionId(): string | undefined {
+    return (this.transport as { sessionId?: string }).sessionId;
+  }
+
   private handleMessage(message: JSONRPCMessage) {
     if (this.isJsonResponse(message)) {
       this.fixStructuredContent(message);
