@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { parseAndFormatApiError } from './errorParsing.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { UserTierId } from '../code_assist/types.js';
 import { AuthType } from '../core/contentGenerator.js';
 import type { StructuredError } from '../core/turn.js';
 
@@ -123,5 +124,83 @@ describe('parseAndFormatApiError', () => {
     const error = 12345;
     const expected = '[API Error: An unknown error occurred.]';
     expect(parseAndFormatApiError(error)).toBe(expected);
+  });
+});
+
+describe('parseAndFormatApiError with CONSUMER_INVALID project errors', () => {
+  const originalProject = process.env['GOOGLE_CLOUD_PROJECT'];
+  const originalProjectId = process.env['GOOGLE_CLOUD_PROJECT_ID'];
+
+  afterEach(() => {
+    if (originalProject === undefined) {
+      delete process.env['GOOGLE_CLOUD_PROJECT'];
+    } else {
+      process.env['GOOGLE_CLOUD_PROJECT'] = originalProject;
+    }
+    if (originalProjectId === undefined) {
+      delete process.env['GOOGLE_CLOUD_PROJECT_ID'];
+    } else {
+      process.env['GOOGLE_CLOUD_PROJECT_ID'] = originalProjectId;
+    }
+  });
+
+  const consumerInvalidError =
+    'got status: 403 Forbidden. {"error":{"code":403,"message":"Permission denied on resource project Gemini Project.","status":"PERMISSION_DENIED","details":[{"reason":"CONSUMER_INVALID"}]}}';
+
+  it('should append a set-the-env-var hint when the project env var is missing', () => {
+    delete process.env['GOOGLE_CLOUD_PROJECT'];
+    delete process.env['GOOGLE_CLOUD_PROJECT_ID'];
+    const result = parseAndFormatApiError(consumerInvalidError);
+    expect(result).toContain(
+      '[API Error: Permission denied on resource project Gemini Project. (Status: PERMISSION_DENIED)]',
+    );
+    expect(result).toContain(
+      'GOOGLE_CLOUD_PROJECT (or GOOGLE_CLOUD_PROJECT_ID) is not set',
+    );
+    expect(result).toContain(
+      'https://geminicli.com/docs/get-started/authentication/#set-gcp',
+    );
+  });
+
+  it('should append a check-the-value hint when the project env var is set', () => {
+    process.env['GOOGLE_CLOUD_PROJECT'] = 'my-project-123';
+    const result = parseAndFormatApiError(consumerInvalidError);
+    expect(result).toContain('missing or invalid');
+    expect(result).toContain('not the numeric project number');
+  });
+
+  it('should not append the hint for a 403 without CONSUMER_INVALID', () => {
+    const errorMessage =
+      'got status: 403 Forbidden. {"error":{"code":403,"message":"The caller does not have permission.","status":"PERMISSION_DENIED"}}';
+    expect(parseAndFormatApiError(errorMessage)).toBe(
+      '[API Error: The caller does not have permission. (Status: PERMISSION_DENIED)]',
+    );
+  });
+
+  it('should append the hint for a 403 StructuredError mentioning CONSUMER_INVALID', () => {
+    const error: StructuredError = {
+      message: 'Permission denied (CONSUMER_INVALID) on resource project.',
+      status: 403,
+    };
+    delete process.env['GOOGLE_CLOUD_PROJECT'];
+    delete process.env['GOOGLE_CLOUD_PROJECT_ID'];
+    const result = parseAndFormatApiError(error);
+    expect(result).toContain(
+      'GOOGLE_CLOUD_PROJECT (or GOOGLE_CLOUD_PROJECT_ID) is not set',
+    );
+  });
+
+  it('should give free-tier users a re-auth hint instead of env-var advice', () => {
+    delete process.env['GOOGLE_CLOUD_PROJECT'];
+    delete process.env['GOOGLE_CLOUD_PROJECT_ID'];
+    const result = parseAndFormatApiError(
+      consumerInvalidError,
+      undefined,
+      UserTierId.FREE,
+    );
+    expect(result).toContain('Free-tier accounts use a managed project');
+    expect(result).not.toContain(
+      'GOOGLE_CLOUD_PROJECT (or GOOGLE_CLOUD_PROJECT_ID) is not set',
+    );
   });
 });
